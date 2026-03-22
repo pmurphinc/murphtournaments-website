@@ -16,8 +16,8 @@ import PlayerSpotlight from '@/components/PlayerSpotlight';
  */
 
 export default function Home() {
-  // Next tournament date (example: 30 days from now)
-  const nextTournamentDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  // Next Development Division event: April 3rd, 2026 at 6 PM PST
+  const nextTournamentDate = new Date('2026-04-03T18:00:00-07:00');
 
   return (
     <div className="min-h-screen bg-dark-charcoal">
@@ -182,7 +182,7 @@ export default function Home() {
         <div className="container">
           <NextEventBanner
             eventName="Development Division"
-            date="First Friday of Each Month"
+            date="April 3rd, 2026"
             time="6 PM - 9 PM PST"
             format="3v3 Teams"
             prizePool="To Be Announced"
@@ -208,9 +208,9 @@ export default function Home() {
                   <p className="text-sm text-white/60 font-mono">Plat - Diamond Players</p>
                 </div>
                 <div>
-                  <p className="text-xs text-white/60 font-mono uppercase tracking-widest mb-2">Schedule</p>
-                  <p className="text-lg font-bold text-neon-gold font-mono">Monthly Event</p>
-                  <p className="text-sm text-white/60 font-mono">6 PM - 9 PM PST</p>
+                  <p className="text-xs text-white/60 font-mono uppercase tracking-widest mb-2">Next Event</p>
+                  <p className="text-lg font-bold text-neon-gold font-mono">April 3rd</p>
+                  <p className="text-sm text-white/60 font-mono">6 PM PST</p>
                 </div>
                 <div>
                   <p className="text-xs text-white/60 font-mono uppercase tracking-widest mb-2">Prize Pool</p>

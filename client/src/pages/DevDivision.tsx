@@ -86,13 +86,13 @@ export default function DevDivision() {
           </NeonCard>
 
           <NeonCard variant="cyan">
-            <h3 className="text-lg font-bold font-mono text-neon-cyan mb-4 uppercase">Schedule</h3>
+            <h3 className="text-lg font-bold font-mono text-neon-cyan mb-4 uppercase">Upcoming Events</h3>
             <ul className="space-y-2 text-sm text-white/70 font-mono">
-              <li>📅 First Friday of Each Month</li>
-              <li>🕘 6 PM - 9 PM PST</li>
-              <li>👥 3v3 Team Format</li>
-              <li>🎙️ Streamed on Twitch</li>
-              <li>💬 Post-match Analysis</li>
+              <li>📅 April 3rd, 2026</li>
+              <li>📅 May 1st, 2026</li>
+              <li>📅 June 5th, 2026</li>
+              <li>📅 July 3rd, 2026</li>
+              <li>🕘 Always 6 PM - 9 PM PST</li>
             </ul>
           </NeonCard>
         </div>
