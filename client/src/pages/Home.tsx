@@ -130,7 +130,7 @@ export default function Home() {
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-white/60 font-mono">Events Produced</span>
-                    <span className="text-2xl font-bold text-neon-lime font-mono">20+ (FCL)</span>
+                    <span className="text-2xl font-bold text-neon-lime font-mono">20+ (Including FCL)</span>
                   </div>
                 </div>
               </div>

@@ -54,20 +54,20 @@ export default function About() {
             <h3 className="text-lg font-bold font-mono text-neon-magenta mb-6 uppercase">By The Numbers</h3>
             <div className="space-y-4">
               <div className="border-b border-neon-magenta/20 pb-3">
-                <p className="text-xs text-white/50 font-mono uppercase mb-1">Murph Tournaments Hosted</p>
-                <p className="text-3xl font-bold font-mono text-neon-magenta">14</p>
+                <p className="text-xs text-white/50 font-mono uppercase mb-1">TikTok Followers</p>
+                <p className="text-3xl font-bold font-mono text-neon-magenta">10K+</p>
               </div>
               <div className="border-b border-neon-magenta/20 pb-3">
-                <p className="text-xs text-white/50 font-mono uppercase mb-1">Total Prize Pool Distributed</p>
-                <p className="text-3xl font-bold font-mono text-neon-cyan">$50K+</p>
+                <p className="text-xs text-white/50 font-mono uppercase mb-1">TikTok Likes</p>
+                <p className="text-3xl font-bold font-mono text-neon-cyan">400K+</p>
               </div>
               <div className="border-b border-neon-magenta/20 pb-3">
-                <p className="text-xs text-white/50 font-mono uppercase mb-1">Avg Tournament Viewers</p>
-                <p className="text-3xl font-bold font-mono text-neon-gold">45+</p>
+                <p className="text-xs text-white/50 font-mono uppercase mb-1">TikTok Views</p>
+                <p className="text-3xl font-bold font-mono text-neon-gold">5M+</p>
               </div>
               <div>
-                <p className="text-xs text-white/50 font-mono uppercase mb-1">Development Division Events</p>
-                <p className="text-3xl font-bold font-mono text-neon-lime">12+</p>
+                <p className="text-xs text-white/50 font-mono uppercase mb-1">Community Reach</p>
+                <p className="text-3xl font-bold font-mono text-neon-lime">Growing</p>
               </div>
             </div>
           </NeonCard>
