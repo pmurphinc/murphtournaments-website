@@ -121,16 +121,16 @@ export default function Home() {
                     <span className="text-2xl font-bold text-neon-cyan font-mono">14+</span>
                   </div>
                   <div className="flex justify-between items-center border-b border-neon-cyan/20 pb-2">
-                    <span className="text-white/60 font-mono">Development Division Events</span>
-                    <span className="text-2xl font-bold text-neon-cyan font-mono">12+</span>
+                    <span className="text-white/60 font-mono">Total Prize Pool Awarded</span>
+                    <span className="text-2xl font-bold text-neon-gold font-mono">$2,500+</span>
                   </div>
                   <div className="flex justify-between items-center border-b border-neon-cyan/20 pb-2">
-                    <span className="text-white/60 font-mono">Total Prize Pool</span>
-                    <span className="text-2xl font-bold text-neon-gold font-mono">$50K+</span>
+                    <span className="text-white/60 font-mono">Players Competed</span>
+                    <span className="text-2xl font-bold text-neon-magenta font-mono">100+ Verified</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-white/60 font-mono">Competitive Community</span>
-                    <span className="text-2xl font-bold text-neon-magenta font-mono">Active</span>
+                    <span className="text-white/60 font-mono">Events Produced</span>
+                    <span className="text-2xl font-bold text-neon-lime font-mono">20+ (FCL)</span>
                   </div>
                 </div>
               </div>
