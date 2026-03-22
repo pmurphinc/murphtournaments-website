@@ -38,7 +38,7 @@ export default function Footer() {
           {/* Community */}
           <div>
             <h3 className="text-sm font-bold font-mono text-neon-cyan mb-4 uppercase">Community</h3>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-4">
               <a href="https://www.twitch.tv/pmurphinc" target="_blank" rel="noopener noreferrer" className="text-sm text-white/60 hover:text-neon-magenta transition-colors">
                 Twitch
               </a>
