@@ -97,13 +97,13 @@ export default function Home() {
                 About Murph
               </h2>
               <p className="text-white/80 font-mono mb-4">
-                Patrick "Murph" Murphy is a tournament organizer, league operator, and competitive systems builder within THE FINALS ecosystem.
+                Tournament organizer, league operator, and competitive systems builder within THE FINALS ecosystem.
               </p>
               <p className="text-white/80 font-mono mb-4">
-                With 14+ completed tournaments and a focus on competitive integrity, Murph has established PMURPHINC as a trusted hub for serious players seeking structure, fairness, and exposure.
+                With 14+ completed tournaments and a focus on competitive integrity, Murph Tournaments has established itself as a trusted hub for serious players seeking structure, fairness, and exposure.
               </p>
               <p className="text-white/80 font-mono mb-6">
-                His mission: develop elite players, run professional tournaments, and build a competitive community that values skill and dedication.
+                Mission: develop elite players, run professional tournaments, and build a competitive community that values skill and dedication.
               </p>
               <Link href="/about">
                 <button className="px-6 py-2 border-2 border-neon-gold text-neon-gold font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all">
