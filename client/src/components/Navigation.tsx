@@ -16,7 +16,7 @@ export default function Navigation() {
 
   const navItems = [
     { label: 'Home', href: '/' },
-    { label: 'Tournaments', href: '/tournaments' },
+    { label: 'History', href: '/tournaments' },
     { label: 'Bracket', href: '/bracket' },
     { label: 'Dev Division', href: '/dev-division' },
     { label: 'About', href: '/about' },

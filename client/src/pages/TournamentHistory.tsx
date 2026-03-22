@@ -38,45 +38,12 @@ export default function TournamentHistory() {
           </p>
         </div>
 
-        {/* Format Explanation */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
-          <NeonCard variant="cyan">
-            <h3 className="text-lg font-bold font-mono text-neon-cyan mb-4 uppercase">Tournament Format</h3>
-            <ul className="space-y-2 text-sm text-white/70 font-mono">
-              <li>• 6-10 Teams Compete</li>
-              <li>• Double Elimination</li>
-              <li>• Final Round Focus</li>
-              <li>• One-Night Competition</li>
-            </ul>
-          </NeonCard>
-
-          <NeonCard variant="gold">
-            <h3 className="text-lg font-bold font-mono text-neon-gold mb-4 uppercase">Schedule</h3>
-            <ul className="space-y-2 text-sm text-white/70 font-mono">
-              <li>• Streams: 9 PM - 12 AM PST</li>
-              <li>• Check-in: 8:45 PM</li>
-              <li>• Matches: Back-to-back</li>
-              <li>• Awards: Post-tournament</li>
-            </ul>
-          </NeonCard>
-
-          <NeonCard variant="magenta">
-            <h3 className="text-lg font-bold font-mono text-neon-magenta mb-4 uppercase">Prize Distribution</h3>
-            <ul className="space-y-2 text-sm text-white/70 font-mono">
-              <li>• 1st Place: 50%</li>
-              <li>• 2nd Place: 30%</li>
-              <li>• 3rd Place: 20%</li>
-              <li>• Streamed on Twitch</li>
-            </ul>
-          </NeonCard>
-        </div>
-
         {/* Past Tournaments List */}
         <div>
           <h2 className="text-2xl font-bold font-mono text-neon-cyan mb-6 uppercase">Past Tournaments</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {pastTournaments.map((tournament, idx) => (
-              <NeonCard key={idx} variant={idx % 2 === 0 ? 'cyan' : 'magenta'}>
+              <NeonCard key={idx} variant="cyan">
                 <div className="flex justify-between items-start mb-3">
                   <div>
                     <h3 className="text-lg font-bold font-mono text-white mb-1">{tournament.name}</h3>

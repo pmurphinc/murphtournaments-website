@@ -49,7 +49,7 @@ export default function DevDivision() {
             Part of Murph Tournaments. Monthly competitive tournaments for Plat–Diamond players seeking competitive experience, skill development, and exposure.
           </p>
           <p className="text-sm text-white/60 font-mono max-w-3xl">
-            Structured matches, detailed feedback, and professional stream coverage. First Friday of each month, 8 PM PST.
+            Structured matches, detailed feedback, and professional stream coverage. First Friday of each month, 6 PM PST.
           </p>
         </div>
 
@@ -89,7 +89,7 @@ export default function DevDivision() {
             <h3 className="text-lg font-bold font-mono text-neon-cyan mb-4 uppercase">Schedule</h3>
             <ul className="space-y-2 text-sm text-white/70 font-mono">
               <li>📅 First Friday of Each Month</li>
-              <li>🕘 8 PM - 11 PM PST</li>
+              <li>🕘 6 PM - 9 PM PST</li>
               <li>👥 4v4 Team Format</li>
               <li>🎙️ Streamed on Twitch</li>
               <li>💬 Post-match Analysis</li>

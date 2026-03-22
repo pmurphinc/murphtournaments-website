@@ -121,16 +121,16 @@ export default function Home() {
                     <span className="text-2xl font-bold text-neon-cyan font-mono">14+</span>
                   </div>
                   <div className="flex justify-between items-center border-b border-neon-cyan/20 pb-2">
-                    <span className="text-white/60 font-mono">Players Developed</span>
-                    <span className="text-2xl font-bold text-neon-cyan font-mono">100+</span>
+                    <span className="text-white/60 font-mono">Development Division Events</span>
+                    <span className="text-2xl font-bold text-neon-cyan font-mono">12+</span>
                   </div>
                   <div className="flex justify-between items-center border-b border-neon-cyan/20 pb-2">
-                    <span className="text-white/60 font-mono">Prize Pool Distributed</span>
+                    <span className="text-white/60 font-mono">Total Prize Pool</span>
                     <span className="text-2xl font-bold text-neon-gold font-mono">$50K+</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-white/60 font-mono">Avg Viewers (Twitch)</span>
-                    <span className="text-2xl font-bold text-neon-magenta font-mono">45+</span>
+                    <span className="text-white/60 font-mono">Competitive Community</span>
+                    <span className="text-2xl font-bold text-neon-magenta font-mono">Active</span>
                   </div>
                 </div>
               </div>
