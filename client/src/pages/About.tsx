@@ -94,14 +94,14 @@ export default function About() {
             <NeonCard variant="lime">
               <h3 className="text-lg font-bold font-mono text-neon-lime mb-3 uppercase">Community First</h3>
               <p className="text-white/70 font-mono">
-                Murph Tournaments is built on community. Discord is the hub. Tournaments are for players. Streams are for fans. Everything serves the competitive community.
+                Built on community. Discord is the hub. Tournaments are for players. Streams are for fans. Everything serves the competitive community.
               </p>
             </NeonCard>
 
             <NeonCard variant="lime">
               <h3 className="text-lg font-bold font-mono text-neon-lime mb-3 uppercase">Professionalism</h3>
               <p className="text-white/70 font-mono">
-                Tournament production, stream quality, and communication are held to professional standards. Murph Tournaments represents the competitive scene with pride.
+                Tournament production, stream quality, and communication are held to professional standards. Representing the competitive scene with pride.
               </p>
             </NeonCard>
           </div>
@@ -141,16 +141,16 @@ export default function About() {
         <div className="text-center">
           <h2 className="text-2xl font-bold font-mono text-neon-cyan mb-6 uppercase">Connect</h2>
           <p className="text-white/80 font-mono mb-6">
-            Follow PMURPHINC across all platforms for tournament updates, live streams, and competitive opportunities.
+            Join the community on Discord to connect with players, learn about tournaments, and stay updated on all competitive opportunities.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a
-              href="https://www.twitch.tv/pmurphinc"
+              href="https://discord.gg/kcmdxmBgnC"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-block px-8 py-3 bg-neon-magenta text-dark-black font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all"
             >
-              Twitch
+              Join Discord
             </a>
             <a
               href="https://www.youtube.com/Pmurphinc"

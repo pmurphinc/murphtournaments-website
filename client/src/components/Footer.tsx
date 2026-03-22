@@ -42,7 +42,7 @@ export default function Footer() {
               <a href="https://www.twitch.tv/pmurphinc" target="_blank" rel="noopener noreferrer" className="text-sm text-white/60 hover:text-neon-magenta transition-colors">
                 Twitch
               </a>
-              <a href="https://discord.gg" target="_blank" rel="noopener noreferrer" className="text-sm text-white/60 hover:text-neon-magenta transition-colors">
+              <a href="https://discord.gg/kcmdxmBgnC" target="_blank" rel="noopener noreferrer" className="text-sm text-white/60 hover:text-neon-magenta transition-colors">
                 Discord
               </a>
               <a href="https://www.tiktok.com/@pmurphinc" target="_blank" rel="noopener noreferrer" className="text-sm text-white/60 hover:text-neon-magenta transition-colors">
@@ -55,7 +55,7 @@ export default function Footer() {
           <div>
             <h3 className="text-sm font-bold font-mono text-neon-cyan mb-4 uppercase">Contact</h3>
             <p className="text-sm text-white/60 font-mono mb-4">Join our Discord for tournament updates and community.</p>
-            <a href="https://discord.gg" target="_blank" rel="noopener noreferrer" className="inline-block px-4 py-2 bg-neon-magenta text-dark-black font-bold font-mono text-xs uppercase tracking-widest hover-glow-magenta rounded-sm transition-all">
+            <a href="https://discord.gg/kcmdxmBgnC" target="_blank" rel="noopener noreferrer" className="inline-block px-4 py-2 bg-neon-magenta text-dark-black font-bold font-mono text-xs uppercase tracking-widest hover-glow-magenta rounded-sm transition-all">
               Join Discord
             </a>
           </div>

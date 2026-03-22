@@ -148,11 +148,11 @@ export default function DevDivision() {
           <p className="text-lg text-white/80 font-mono mb-6">
             Ready to compete and improve?
           </p>
-          <Link href="/join">
-            <button className="px-8 py-3 bg-neon-cyan text-dark-black font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all">
-              Join Development Division
-            </button>
-          </Link>
+              <a href="https://discord.gg/kcmdxmBgnC" target="_blank" rel="noopener noreferrer">
+                <button className="px-8 py-3 bg-neon-cyan text-dark-black font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all">
+                  Join Discord
+                </button>
+              </a>
         </div>
       </div>
     </div>

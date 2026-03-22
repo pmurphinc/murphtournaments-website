@@ -73,11 +73,11 @@ export default function NextEventBanner({
 
           {/* Right: CTA */}
           <div className="flex flex-col gap-3 w-full md:w-auto">
-            <Link href="/join">
+            <a href="https://discord.gg/kcmdxmBgnC" target="_blank" rel="noopener noreferrer">
               <button className="w-full md:w-auto px-8 py-3 bg-neon-magenta text-dark-black font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all">
-                Join Now
+                Join Discord
               </button>
-            </Link>
+            </a>
             <Link href="/tournaments">
               <button className="w-full md:w-auto px-8 py-3 border-2 border-neon-magenta text-neon-magenta font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all">
                 View Details

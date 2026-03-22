@@ -45,16 +45,16 @@ export default function Home() {
               </p>
 
               <p className="text-sm text-white/60 font-mono leading-relaxed max-w-md">
-                Murph Tournaments hosts competitive THE FINALS events. The Development Division is our pathway for aspiring competitive players. Join the competitive hub.
+                Competitive tournament showcase. Development Division for aspiring players. Tournament history, live streams, and community hub for THE FINALS competitive scene.
               </p>
 
               {/* CTA Buttons */}
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                <Link href="/join">
+                <a href="https://discord.gg/kcmdxmBgnC" target="_blank" rel="noopener noreferrer">
                   <button className="px-8 py-3 bg-neon-magenta text-dark-black font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all">
-                    Join Tournament
+                    Join Discord
                   </button>
-                </Link>
+                </a>
                 <Link href="/watch">
                   <button className="px-8 py-3 border-2 border-neon-cyan text-neon-cyan font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all">
                     Watch Live
