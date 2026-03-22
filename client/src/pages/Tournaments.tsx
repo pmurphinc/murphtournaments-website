@@ -4,27 +4,26 @@ import GlitchText from '@/components/GlitchText';
 /**
  * Tournaments Page
  * Cyberpunk Neon Rebellion Design
- * - List of past tournaments (Murph Tournaments I-XIV)
+ * - List of past tournaments (Murph Tournaments I-XIII)
  * - Format explanation
  * - Bracket placeholder
  */
 
 export default function Tournaments() {
   const pastTournaments = [
-    { name: 'Murph Tournament XIV', date: 'March 15, 2026', teams: 8, prizePool: '$5,000' },
-    { name: 'Murph Tournament XIII', date: 'February 20, 2026', teams: 8, prizePool: '$4,500' },
-    { name: 'Murph Tournament XII', date: 'January 25, 2026', teams: 8, prizePool: '$4,500' },
-    { name: 'Murph Tournament XI', date: 'December 28, 2025', teams: 8, prizePool: '$5,000' },
-    { name: 'Murph Tournament X', date: 'November 30, 2025', teams: 8, prizePool: '$4,000' },
-    { name: 'Murph Tournament IX', date: 'October 26, 2025', teams: 8, prizePool: '$4,000' },
-    { name: 'Murph Tournament VIII', date: 'September 21, 2025', teams: 8, prizePool: '$3,500' },
-    { name: 'Murph Tournament VII', date: 'August 24, 2025', teams: 8, prizePool: '$3,500' },
-    { name: 'Murph Tournament VI', date: 'July 20, 2025', teams: 8, prizePool: '$3,000' },
-    { name: 'Murph Tournament V', date: 'June 22, 2025', teams: 8, prizePool: '$3,000' },
-    { name: 'Murph Tournament IV', date: 'May 18, 2025', teams: 8, prizePool: '$2,500' },
-    { name: 'Murph Tournament III', date: 'April 20, 2025', teams: 8, prizePool: '$2,500' },
-    { name: 'Murph Tournament II', date: 'March 23, 2025', teams: 8, prizePool: '$2,000' },
-    { name: 'Murph Tournament I', date: 'February 15, 2025', teams: 8, prizePool: '$2,000' },
+    { name: 'Murph Monthly – September', date: 'September 5, 2025', teams: 8, prizePool: '$175 + Codes', winners: 'FAFO' },
+    { name: 'July Showdown', date: 'July 26, 2025', teams: 8, prizePool: 'Community-Funded', winners: 'Deadlyalzheimers' },
+    { name: 'Tournament XI – Coach vs. Coach', date: 'June 27, 2025', teams: 4, prizePool: '$240', winners: 'Team Purestrafez' },
+    { name: 'Murph Tournament X', date: 'May 31, 2025', teams: 8, prizePool: '$180', winners: 'Your Moms Fav' },
+    { name: 'Murph Tournament IX', date: 'May 10, 2025', teams: 10, prizePool: '$200', winners: 'Tiger, Honor' },
+    { name: 'Murph Tournament VIII', date: 'April 19, 2025', teams: 8, prizePool: '$270', winners: 'Honorbound Aces' },
+    { name: 'Murph Tournament VII', date: 'March 28, 2025', teams: 8, prizePool: '$225', winners: '4th Party Cashbox' },
+    { name: 'Murph Tournament VI', date: 'March 8, 2025', teams: 8, prizePool: '$165', winners: 'The Empty Mags' },
+    { name: 'Murph Tournament V', date: 'February 21, 2025', teams: 8, prizePool: '$170', winners: 'TRAFFY & Team' },
+    { name: 'Murph Tournament IV', date: 'February 7, 2025', teams: 8, prizePool: '$240', winners: 'pinhead & Team' },
+    { name: 'Murph Tournament III', date: 'January 24, 2025', teams: 6, prizePool: '$125', winners: 'purestrafez & Team' },
+    { name: 'Murph Tournament II', date: 'January 17, 2025', teams: 8, prizePool: '$360', winners: 'The High Notes' },
+    { name: 'Murph Tournament I', date: 'January 4, 2025', teams: 8, prizePool: 'No Prize Pool', winners: 'Murph, Lazerbladez' },
   ];
 
   return (
@@ -36,7 +35,7 @@ export default function Tournaments() {
             Tournament History
           </GlitchText>
           <p className="text-lg text-white/80 font-mono max-w-2xl">
-            Murph Tournaments has hosted 14 competitive tournaments, establishing a track record of professional production, fair competition, and consistent prize pools.
+            Murph Tournaments has hosted 13 competitive tournaments, establishing a track record of professional production, fair competition, and consistent prize pools.
           </p>
         </div>
 
@@ -45,9 +44,9 @@ export default function Tournaments() {
           <NeonCard variant="cyan">
             <h3 className="text-lg font-bold font-mono text-neon-cyan mb-4 uppercase">Tournament Format</h3>
             <ul className="space-y-2 text-sm text-white/70 font-mono">
-              <li>• 8 Teams Compete</li>
-              <li>• Cashout Rounds (Elimination)</li>
-              <li>• Final Round Best of 3</li>
+              <li>• 6-10 Teams Compete</li>
+              <li>• Double Elimination</li>
+              <li>• Final Round Focus</li>
               <li>• One-Night Competition</li>
             </ul>
           </NeonCard>
@@ -80,7 +79,7 @@ export default function Tournaments() {
             <div className="aspect-video bg-dark-charcoal rounded-sm flex items-center justify-center border border-neon-lime/30">
               <div className="text-center">
                 <div className="text-6xl mb-4 font-mono text-neon-lime/30">⚔️</div>
-                <p className="text-lg font-mono text-white/60 mb-2">8-Team Single Elimination</p>
+                <p className="text-lg font-mono text-white/60 mb-2">Double Elimination Format</p>
                 <p className="text-sm font-mono text-white/40">Bracket visualization coming soon</p>
               </div>
             </div>
@@ -99,14 +98,20 @@ export default function Tournaments() {
                     <p className="text-sm text-white/60 font-mono">{tournament.date}</p>
                   </div>
                 </div>
-                <div className="flex justify-between items-center border-t border-white/10 pt-3">
-                  <div>
-                    <p className="text-xs text-white/50 font-mono uppercase">Teams</p>
-                    <p className="text-lg font-bold font-mono text-neon-gold">{tournament.teams}</p>
+                <div className="space-y-2 border-t border-white/10 pt-3">
+                  <div className="flex justify-between">
+                    <div>
+                      <p className="text-xs text-white/50 font-mono uppercase">Teams</p>
+                      <p className="text-lg font-bold font-mono text-neon-gold">{tournament.teams}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-white/50 font-mono uppercase">Prize Pool</p>
+                      <p className="text-lg font-bold font-mono text-neon-lime">{tournament.prizePool}</p>
+                    </div>
                   </div>
                   <div>
-                    <p className="text-xs text-white/50 font-mono uppercase">Prize Pool</p>
-                    <p className="text-lg font-bold font-mono text-neon-lime">{tournament.prizePool}</p>
+                    <p className="text-xs text-white/50 font-mono uppercase">Winners</p>
+                    <p className="text-sm font-mono text-neon-cyan">{tournament.winners}</p>
                   </div>
                 </div>
               </NeonCard>
