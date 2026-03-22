@@ -17,10 +17,10 @@ export default function Navigation() {
   const navItems = [
     { label: 'Home', href: '/' },
     { label: 'Tournaments', href: '/tournaments' },
+    { label: 'Bracket', href: '/bracket' },
     { label: 'Dev Division', href: '/dev-division' },
     { label: 'About', href: '/about' },
     { label: 'Watch', href: '/watch' },
-    { label: 'Join', href: '/join' },
   ];
 
   return (
@@ -73,14 +73,6 @@ export default function Navigation() {
                 </div>
               </Link>
             ))}
-            <Link href="/join">
-              <button
-                className="w-full px-6 py-2 bg-neon-magenta text-dark-black font-bold font-mono uppercase tracking-widest rounded-sm transition-all"
-                onClick={() => setIsOpen(false)}
-              >
-                Join Tournament
-              </button>
-            </Link>
           </div>
         </div>
       )}

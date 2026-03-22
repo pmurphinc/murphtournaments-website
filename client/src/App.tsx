@@ -7,7 +7,8 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import Navigation from "./components/Navigation";
 import Footer from "./components/Footer";
 import Home from "./pages/Home";
-import Tournaments from "./pages/Tournaments";
+import TournamentHistory from "./pages/TournamentHistory";
+import LiveBracket from "./pages/LiveBracket";
 import DevDivision from "./pages/DevDivision";
 import About from "./pages/About";
 import Watch from "./pages/Watch";
@@ -28,7 +29,8 @@ function Router() {
       <main className="flex-1 pt-16">
         <Switch>
           <Route path={"/"} component={Home} />
-          <Route path={"/tournaments"} component={Tournaments} />
+          <Route path={"/tournaments"} component={TournamentHistory} />
+          <Route path={"/bracket"} component={LiveBracket} />
           <Route path={"/dev-division"} component={DevDivision} />
           <Route path={"/about"} component={About} />
           <Route path={"/watch"} component={Watch} />

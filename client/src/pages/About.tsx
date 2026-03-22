@@ -31,7 +31,7 @@ export default function About() {
 
               <div className="space-y-4 text-white/80 font-mono leading-relaxed">
                 <p>
-                  Murph is a competitive esports organizer and systems builder focused on THE FINALS ecosystem. With a passion for competitive integrity and player development, Murph has established PMURPHINC as a trusted hub for serious competitors.
+                  Competitive esports organizer and systems builder focused on THE FINALS ecosystem. With a passion for competitive integrity and player development, establishing Murph Tournaments as a trusted hub for serious competitors.
                 </p>
 
                 <p>
