@@ -1,0 +1,93 @@
+import { useState } from 'react';
+import { Link } from 'wouter';
+import { Menu, X } from 'lucide-react';
+
+/**
+ * Navigation Component
+ * Cyberpunk Neon Rebellion Design
+ * - Asymmetric layout with neon accents
+ * - Mobile-first responsive design
+ * - Glowing borders on hover
+ * - Primary colors: magenta, cyan, gold
+ */
+
+export default function Navigation() {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const navItems = [
+    { label: 'Home', href: '/' },
+    { label: 'Tournaments', href: '/tournaments' },
+    { label: 'Dev Division', href: '/dev-division' },
+    { label: 'About', href: '/about' },
+    { label: 'Watch', href: '/watch' },
+    { label: 'Join', href: '/join' },
+  ];
+
+  return (
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-dark-charcoal border-b border-neon-magenta/30 backdrop-blur-sm">
+      <div className="container flex items-center justify-between h-16">
+        {/* Logo */}
+        <Link href="/">
+          <div className="flex items-center gap-2 cursor-pointer group">
+            <div className="text-2xl font-bold text-white font-mono tracking-widest group-hover:glow-magenta transition-all">
+              PMURPHINC
+            </div>
+            <div className="text-xs text-neon-cyan font-mono uppercase tracking-widest">
+              Tournaments
+            </div>
+          </div>
+        </Link>
+
+        {/* Desktop Navigation */}
+        <div className="hidden md:flex items-center gap-8">
+          {navItems.map((item) => (
+            <Link key={item.href} href={item.href}>
+              <div className="text-sm font-mono uppercase tracking-widest text-white/80 hover:text-neon-magenta transition-colors hover-glow-magenta px-3 py-2 cursor-pointer">
+                {item.label}
+              </div>
+            </Link>
+          ))}
+          <Link href="/join">
+            <button className="px-6 py-2 bg-neon-magenta text-dark-black font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all">
+              Join
+            </button>
+          </Link>
+        </div>
+
+        {/* Mobile Menu Button */}
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="md:hidden text-neon-cyan hover:text-neon-magenta transition-colors"
+        >
+          {isOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
+      </div>
+
+      {/* Mobile Navigation */}
+      {isOpen && (
+        <div className="md:hidden bg-dark-purple border-t border-neon-magenta/30">
+          <div className="container py-4 flex flex-col gap-4">
+            {navItems.map((item) => (
+              <Link key={item.href} href={item.href}>
+                <div
+                  className="text-sm font-mono uppercase tracking-widest text-white/80 hover:text-neon-magenta transition-colors py-2 cursor-pointer"
+                  onClick={() => setIsOpen(false)}
+                >
+                  {item.label}
+                </div>
+              </Link>
+            ))}
+            <Link href="/join">
+              <button
+                className="w-full px-6 py-2 bg-neon-magenta text-dark-black font-bold font-mono uppercase tracking-widest rounded-sm transition-all"
+                onClick={() => setIsOpen(false)}
+              >
+                Join Tournament
+              </button>
+            </Link>
+          </div>
+        </div>
+      )}
+    </nav>
+  );
+}
