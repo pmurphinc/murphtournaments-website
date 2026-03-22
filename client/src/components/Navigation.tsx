@@ -28,14 +28,11 @@ export default function Navigation() {
       <div className="container flex items-center justify-between h-16">
         {/* Logo */}
         <Link href="/">
-          <div className="flex items-center gap-2 cursor-pointer group">
-            <div className="text-2xl font-bold text-white font-mono tracking-widest group-hover:glow-magenta transition-all">
-              MURPH
-            </div>
-            <div className="text-xs text-neon-cyan font-mono uppercase tracking-widest">
-              Tournaments
-            </div>
-          </div>
+          <img 
+            src="https://d2xsxph8kpxj0f.cloudfront.net/310519663462787524/GzitzUSk3snQMAtW4LnLnQ/MurphTournaments_logo_747bd67f.png" 
+            alt="Murph Tournaments" 
+            className="h-12 cursor-pointer hover:opacity-80 transition-opacity"
+          />
         </Link>
 
         {/* Desktop Navigation */}
