@@ -25,13 +25,13 @@ export default function Navigation() {
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-dark-charcoal border-b border-neon-magenta/30 backdrop-blur-sm">
-      <div className="container flex items-center justify-between h-16">
+      <div className="container flex items-center justify-between h-20">
         {/* Logo */}
         <Link href="/">
           <img 
             src="https://d2xsxph8kpxj0f.cloudfront.net/310519663462787524/GzitzUSk3snQMAtW4LnLnQ/MurphTournaments_logo_747bd67f.png" 
             alt="Murph Tournaments" 
-            className="h-12 cursor-pointer hover:opacity-80 transition-opacity"
+            className="h-16 cursor-pointer hover:opacity-80 transition-opacity"
           />
         </Link>
 

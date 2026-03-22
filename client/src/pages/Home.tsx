@@ -22,7 +22,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-dark-charcoal">
       {/* Hero Section */}
-      <section className="relative py-20 md:py-32 overflow-hidden">
+      <section className="relative pt-24 pb-20 md:pt-32 md:pb-32 overflow-hidden">
         {/* Background scan lines effect */}
         <div className="absolute inset-0 scan-lines opacity-5 pointer-events-none" />
 
