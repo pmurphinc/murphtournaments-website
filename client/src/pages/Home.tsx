@@ -181,11 +181,11 @@ export default function Home() {
       <section className="py-16 md:py-20 border-t border-neon-magenta/20">
         <div className="container">
           <NextEventBanner
-            eventName="Murph Tournament XV"
-            date="April 19, 2026"
-            time="9 PM - 12 AM PST"
-            format="8 Teams"
-            prizePool="$5,000"
+            eventName="Development Division"
+            date="First Friday of Each Month"
+            time="6 PM - 9 PM PST"
+            format="3v3 Teams"
+            prizePool="To Be Announced"
           />
         </div>
       </section>
@@ -199,31 +199,31 @@ export default function Home() {
 
           <NeonCard variant="gold" className="mb-8">
             <div className="space-y-8">
-              <CountdownTimer targetDate={nextTournamentDate} eventName="Murph Tournament XV" />
+              <CountdownTimer targetDate={nextTournamentDate} eventName="Development Division" />
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-t border-neon-gold/20 pt-8">
                 <div>
                   <p className="text-xs text-white/60 font-mono uppercase tracking-widest mb-2">Format</p>
-                  <p className="text-lg font-bold text-neon-gold font-mono">8 Teams</p>
-                  <p className="text-sm text-white/60 font-mono">Cashout Rounds → BO3 Final</p>
+                  <p className="text-lg font-bold text-neon-gold font-mono">3v3 Teams</p>
+                  <p className="text-sm text-white/60 font-mono">Plat - Diamond Players</p>
                 </div>
                 <div>
                   <p className="text-xs text-white/60 font-mono uppercase tracking-widest mb-2">Schedule</p>
-                  <p className="text-lg font-bold text-neon-gold font-mono">One Night</p>
-                  <p className="text-sm text-white/60 font-mono">9 PM - 12 AM PST</p>
+                  <p className="text-lg font-bold text-neon-gold font-mono">Monthly Event</p>
+                  <p className="text-sm text-white/60 font-mono">6 PM - 9 PM PST</p>
                 </div>
                 <div>
                   <p className="text-xs text-white/60 font-mono uppercase tracking-widest mb-2">Prize Pool</p>
-                  <p className="text-lg font-bold text-neon-gold font-mono">$5,000</p>
-                  <p className="text-sm text-white/60 font-mono">1st - 3rd Place</p>
+                  <p className="text-lg font-bold text-neon-gold font-mono">TBA</p>
+                  <p className="text-sm text-white/60 font-mono">To Be Announced</p>
                 </div>
               </div>
             </div>
           </NeonCard>
 
-          <Link href="/tournaments">
+          <Link href="/dev-division">
             <button className="px-8 py-3 border-2 border-neon-gold text-neon-gold font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all">
-              View All Tournaments
+              Learn More About Dev Division
             </button>
           </Link>
         </div>

@@ -26,23 +26,23 @@ export default function LiveBracket() {
 
         {/* Current Tournament Info */}
         <div className="mb-16">
-          <h2 className="text-2xl font-bold font-mono text-neon-gold mb-6 uppercase">Murph Tournament XV</h2>
+          <h2 className="text-2xl font-bold font-mono text-neon-gold mb-6 uppercase">Upcoming Tournament</h2>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
             <NeonCard variant="gold">
-              <p className="text-xs text-white/50 font-mono uppercase mb-2">Date</p>
-              <p className="text-lg font-bold font-mono text-neon-gold">April 19, 2026</p>
+              <p className="text-xs text-white/50 font-mono uppercase mb-2">Status</p>
+              <p className="text-lg font-bold font-mono text-neon-gold">Coming Soon</p>
             </NeonCard>
             <NeonCard variant="gold">
-              <p className="text-xs text-white/50 font-mono uppercase mb-2">Time</p>
-              <p className="text-lg font-bold font-mono text-neon-gold">9 PM - 12 AM PST</p>
+              <p className="text-xs text-white/50 font-mono uppercase mb-2">Format</p>
+              <p className="text-lg font-bold font-mono text-neon-gold">TBA</p>
             </NeonCard>
             <NeonCard variant="gold">
               <p className="text-xs text-white/50 font-mono uppercase mb-2">Teams</p>
-              <p className="text-lg font-bold font-mono text-neon-gold">8</p>
+              <p className="text-lg font-bold font-mono text-neon-gold">TBA</p>
             </NeonCard>
             <NeonCard variant="gold">
               <p className="text-xs text-white/50 font-mono uppercase mb-2">Prize Pool</p>
-              <p className="text-lg font-bold font-mono text-neon-gold">$5,000</p>
+              <p className="text-lg font-bold font-mono text-neon-gold">TBA</p>
             </NeonCard>
           </div>
         </div>
