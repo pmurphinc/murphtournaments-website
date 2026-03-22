@@ -177,24 +177,11 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Next Event Banner */}
-      <section className="py-16 md:py-20 border-t border-neon-magenta/20">
-        <div className="container">
-          <NextEventBanner
-            eventName="Development Division"
-            date="April 3rd, 2026"
-            time="6 PM - 9 PM PST"
-            format="3v3 Teams"
-            prizePool="To Be Announced"
-          />
-        </div>
-      </section>
-
       {/* Upcoming Tournament Section */}
       <section className="py-16 md:py-24 border-t border-neon-magenta/20">
         <div className="container">
           <h2 className="text-4xl font-bold font-mono text-neon-gold mb-12 uppercase tracking-widest">
-            Tournament Details
+            Next Tournament
           </h2>
 
           <NeonCard variant="gold" className="mb-8">
