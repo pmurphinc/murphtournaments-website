@@ -15,7 +15,7 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
           {/* Brand */}
           <div>
-            <div className="text-lg font-bold font-mono text-white mb-2">PMURPHINC</div>
+            <div className="text-lg font-bold font-mono text-white mb-2">MURPH TOURNAMENTS</div>
             <p className="text-sm text-white/60 font-mono">Competitive THE FINALS tournaments. Built by players. Run like a league.</p>
           </div>
 
@@ -63,7 +63,7 @@ export default function Footer() {
 
         {/* Bottom Bar */}
         <div className="border-t border-neon-magenta/20 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-xs text-white/40 font-mono">© 2026 PMURPHINC. All rights reserved.</p>
+          <p className="text-xs text-white/40 font-mono">© 2026 Murph Tournaments. All rights reserved.</p>
           <div className="flex gap-6">
             <a href="#" className="text-xs text-white/40 hover:text-neon-cyan transition-colors font-mono">Privacy</a>
             <a href="#" className="text-xs text-white/40 hover:text-neon-cyan transition-colors font-mono">Terms</a>

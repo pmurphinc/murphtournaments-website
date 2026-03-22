@@ -30,7 +30,7 @@ export default function Navigation() {
         <Link href="/">
           <div className="flex items-center gap-2 cursor-pointer group">
             <div className="text-2xl font-bold text-white font-mono tracking-widest group-hover:glow-magenta transition-all">
-              PMURPHINC
+              MURPH
             </div>
             <div className="text-xs text-neon-cyan font-mono uppercase tracking-widest">
               Tournaments
@@ -47,11 +47,7 @@ export default function Navigation() {
               </div>
             </Link>
           ))}
-          <Link href="/join">
-            <button className="px-6 py-2 bg-neon-magenta text-dark-black font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all">
-              Join
-            </button>
-          </Link>
+
         </div>
 
         {/* Mobile Menu Button */}

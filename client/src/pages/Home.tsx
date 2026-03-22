@@ -45,7 +45,7 @@ export default function Home() {
               </p>
 
               <p className="text-sm text-white/60 font-mono leading-relaxed max-w-md">
-                PMURPHINC is the parent organization for competitive THE FINALS. Home to Murph Tournaments and the Development Division. Join the competitive hub.
+                Murph Tournaments hosts competitive THE FINALS events. The Development Division is our pathway for aspiring competitive players. Join the competitive hub.
               </p>
 
               {/* CTA Buttons */}
@@ -74,9 +74,9 @@ export default function Home() {
                 {/* Center text */}
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="text-center">
-                    <div className="text-6xl font-bold font-mono text-neon-magenta/30 mb-4">
-                      PMURPHINC
-                    </div>
+                <div className="text-6xl font-bold font-mono text-neon-magenta/30 mb-4">
+                  MURPH
+                </div>
                     <div className="text-sm font-mono text-neon-cyan/30 uppercase tracking-widest">
                       Tournament Production
                     </div>

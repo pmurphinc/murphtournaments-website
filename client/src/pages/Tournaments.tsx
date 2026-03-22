@@ -36,7 +36,7 @@ export default function Tournaments() {
             Tournament History
           </GlitchText>
           <p className="text-lg text-white/80 font-mono max-w-2xl">
-            PMURPHINC has hosted 14+ competitive tournaments, establishing a track record of professional production, fair competition, and consistent prize pools.
+            Murph Tournaments has hosted 14 competitive tournaments, establishing a track record of professional production, fair competition, and consistent prize pools.
           </p>
         </div>
 

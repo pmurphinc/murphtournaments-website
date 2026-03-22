@@ -16,7 +16,7 @@ export default function About() {
         {/* Header */}
         <div className="mb-16">
           <GlitchText size="xl" variant="gold" className="mb-4">
-            About PMURPHINC
+            About Murph Tournaments
           </GlitchText>
           <p className="text-xl text-white/80 font-mono max-w-3xl">
             Competitive Tournament Organization & Player Development
@@ -39,7 +39,7 @@ export default function About() {
                 </p>
 
                 <p>
-                  PMURPHINC operates as the parent organization, housing Murph Tournaments (competitive events) and the Development Division (monthly tournaments for aspiring players). This structure creates a clear pathway from casual play to professional competition.
+                  Murph Tournaments operates two main initiatives: the flagship Murph Tournaments (competitive events) and the Development Division (monthly tournaments for aspiring players). This structure creates a clear pathway from casual play to professional competition.
                 </p>
 
                 <p>
@@ -94,14 +94,14 @@ export default function About() {
             <NeonCard variant="lime">
               <h3 className="text-lg font-bold font-mono text-neon-lime mb-3 uppercase">Community First</h3>
               <p className="text-white/70 font-mono">
-                PMURPHINC is built on community. Discord is the hub. Tournaments are for players. Streams are for fans. Everything serves the competitive community.
+                Murph Tournaments is built on community. Discord is the hub. Tournaments are for players. Streams are for fans. Everything serves the competitive community.
               </p>
             </NeonCard>
 
             <NeonCard variant="lime">
               <h3 className="text-lg font-bold font-mono text-neon-lime mb-3 uppercase">Professionalism</h3>
               <p className="text-white/70 font-mono">
-                Tournament production, stream quality, and communication are held to professional standards. PMURPHINC represents the competitive scene with pride.
+                Tournament production, stream quality, and communication are held to professional standards. Murph Tournaments represents the competitive scene with pride.
               </p>
             </NeonCard>
           </div>
@@ -115,18 +115,6 @@ export default function About() {
               <div className="flex items-start gap-4">
                 <div className="text-3xl font-bold font-mono text-neon-magenta min-w-fit">01</div>
                 <div>
-                  <h3 className="text-lg font-bold font-mono text-neon-gold mb-2">PMURPHINC (Parent Organization)</h3>
-                  <p className="text-white/70 font-mono">
-                    The umbrella organization housing all competitive initiatives. PMURPHINC sets the standard for tournament production, competitive integrity, and player development in THE FINALS.
-                  </p>
-                </div>
-              </div>
-            </NeonCard>
-
-            <NeonCard variant="gold">
-              <div className="flex items-start gap-4">
-                <div className="text-3xl font-bold font-mono text-neon-cyan min-w-fit">02</div>
-                <div>
                   <h3 className="text-lg font-bold font-mono text-neon-gold mb-2">Murph Tournaments</h3>
                   <p className="text-white/70 font-mono">
                     14 competitive tournaments showcasing THE FINALS' best talent. Each event features professional production, fair competition, and meaningful prize pools.
@@ -137,11 +125,11 @@ export default function About() {
 
             <NeonCard variant="gold">
               <div className="flex items-start gap-4">
-                <div className="text-3xl font-bold font-mono text-neon-lime min-w-fit">03</div>
+                <div className="text-3xl font-bold font-mono text-neon-cyan min-w-fit">02</div>
                 <div>
                   <h3 className="text-lg font-bold font-mono text-neon-gold mb-2">Development Division</h3>
                   <p className="text-white/70 font-mono">
-                    Monthly tournaments for Plat–Diamond players seeking competitive experience. Part of Murph Tournaments, providing structured matches, feedback, and stream exposure.
+                    Monthly tournaments for Plat–Diamond players seeking competitive experience. A division of Murph Tournaments, providing structured matches, feedback, and stream exposure.
                   </p>
                 </div>
               </div>
