@@ -300,23 +300,30 @@ export default function Home() {
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            {/* Placeholder for TikTok/YouTube embeds */}
+            {/* TikTok Featured Clip */}
             <NeonCard variant="lime">
-              <div className="aspect-video bg-dark-charcoal rounded-sm flex items-center justify-center border border-neon-lime/30">
-                <div className="text-center">
-                  <div className="text-4xl mb-2">📱</div>
-                  <p className="text-sm text-white/60 font-mono">TikTok Highlights</p>
+              <a href="https://www.tiktok.com/@pmurphinc/video/7446651252408110366" target="_blank" rel="noopener noreferrer" className="block">
+                <div className="aspect-video bg-dark-charcoal rounded-sm flex items-center justify-center border border-neon-lime/30 hover:border-neon-lime/60 transition-all cursor-pointer">
+                  <div className="text-center">
+                    <div className="text-4xl mb-2">📱</div>
+                    <p className="text-sm text-white/60 font-mono">TikTok Highlights</p>
+                    <p className="text-xs text-neon-lime mt-2">Click to watch →</p>
+                  </div>
                 </div>
-              </div>
+              </a>
             </NeonCard>
 
+            {/* YouTube Featured Clip */}
             <NeonCard variant="lime">
-              <div className="aspect-video bg-dark-charcoal rounded-sm flex items-center justify-center border border-neon-lime/30">
-                <div className="text-center">
-                  <div className="text-4xl mb-2">🎬</div>
-                  <p className="text-sm text-white/60 font-mono">YouTube Highlights</p>
+              <a href="https://www.youtube.com/shorts/QTgm-CL5BYY" target="_blank" rel="noopener noreferrer" className="block">
+                <div className="aspect-video bg-dark-charcoal rounded-sm flex items-center justify-center border border-neon-lime/30 hover:border-neon-lime/60 transition-all cursor-pointer">
+                  <div className="text-center">
+                    <div className="text-4xl mb-2">🎬</div>
+                    <p className="text-sm text-white/60 font-mono">YouTube Highlights</p>
+                    <p className="text-xs text-neon-lime mt-2">Click to watch →</p>
+                  </div>
                 </div>
-              </div>
+              </a>
             </NeonCard>
           </div>
 
