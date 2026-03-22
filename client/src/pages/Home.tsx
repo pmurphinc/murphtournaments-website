@@ -45,7 +45,7 @@ export default function Home() {
               </p>
 
               <p className="text-sm text-white/60 font-mono leading-relaxed max-w-md">
-                PMURPHINC hosts competitive tournaments, develops elite players, and produces the Finals Contender League. Join the competitive hub for THE FINALS.
+                PMURPHINC is the parent organization for competitive THE FINALS. Home to Murph Tournaments and the Development Division. Join the competitive hub.
               </p>
 
               {/* CTA Buttons */}

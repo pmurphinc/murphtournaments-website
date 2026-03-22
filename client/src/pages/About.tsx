@@ -4,8 +4,8 @@ import GlitchText from '@/components/GlitchText';
 /**
  * About Page
  * Cyberpunk Neon Rebellion Design
- * - Patrick "Murph" Murphy biography
- * - Tournament organizer, league operator, system builder
+ * - Murph biography (no government name)
+ * - Organizational hierarchy: PMURPHINC (parent) → Murph Tournaments → Development Division
  * - Competitive integrity focus
  */
 
@@ -16,10 +16,10 @@ export default function About() {
         {/* Header */}
         <div className="mb-16">
           <GlitchText size="xl" variant="gold" className="mb-4">
-            About Murph
+            About PMURPHINC
           </GlitchText>
           <p className="text-xl text-white/80 font-mono max-w-3xl">
-            Tournament Organizer, League Operator, Community Builder
+            Competitive Tournament Organization & Player Development
           </p>
         </div>
 
@@ -27,11 +27,11 @@ export default function About() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
           <div className="md:col-span-2">
             <NeonCard variant="cyan">
-              <h2 className="text-2xl font-bold font-mono text-neon-cyan mb-6 uppercase">Patrick "Murph" Murphy</h2>
+              <h2 className="text-2xl font-bold font-mono text-neon-cyan mb-6 uppercase">Murph</h2>
 
               <div className="space-y-4 text-white/80 font-mono leading-relaxed">
                 <p>
-                  Patrick "Murph" Murphy is a competitive esports organizer and systems builder focused on THE FINALS ecosystem. With a passion for competitive integrity and player development, Murph has established PMURPHINC as a trusted hub for serious competitors.
+                  Murph is a competitive esports organizer and systems builder focused on THE FINALS ecosystem. With a passion for competitive integrity and player development, Murph has established PMURPHINC as a trusted hub for serious competitors.
                 </p>
 
                 <p>
@@ -39,11 +39,11 @@ export default function About() {
                 </p>
 
                 <p>
-                  Beyond tournaments, Murph is committed to building sustainable competitive systems. The Development Division represents his vision: a structured pathway for aspiring competitive players to improve, gain exposure, and transition to professional play.
+                  PMURPHINC operates as the parent organization, housing Murph Tournaments (competitive events) and the Development Division (monthly tournaments for aspiring players). This structure creates a clear pathway from casual play to professional competition.
                 </p>
 
                 <p>
-                  As the producer of the Finals Contender League (FCL) Season 1, Murph continues to expand the competitive landscape for THE FINALS, creating opportunities for players at all levels to compete with integrity and purpose.
+                  As a producer and organizer within THE FINALS competitive scene, Murph continues to expand opportunities for players at all levels to compete with integrity and purpose.
                 </p>
               </div>
             </NeonCard>
@@ -54,20 +54,20 @@ export default function About() {
             <h3 className="text-lg font-bold font-mono text-neon-magenta mb-6 uppercase">By The Numbers</h3>
             <div className="space-y-4">
               <div className="border-b border-neon-magenta/20 pb-3">
-                <p className="text-xs text-white/50 font-mono uppercase mb-1">Tournaments Hosted</p>
-                <p className="text-3xl font-bold font-mono text-neon-magenta">14+</p>
+                <p className="text-xs text-white/50 font-mono uppercase mb-1">Murph Tournaments Hosted</p>
+                <p className="text-3xl font-bold font-mono text-neon-magenta">14</p>
               </div>
               <div className="border-b border-neon-magenta/20 pb-3">
-                <p className="text-xs text-white/50 font-mono uppercase mb-1">Players Developed</p>
-                <p className="text-3xl font-bold font-mono text-neon-cyan">100+</p>
+                <p className="text-xs text-white/50 font-mono uppercase mb-1">Total Prize Pool Distributed</p>
+                <p className="text-3xl font-bold font-mono text-neon-cyan">$50K+</p>
               </div>
               <div className="border-b border-neon-magenta/20 pb-3">
-                <p className="text-xs text-white/50 font-mono uppercase mb-1">Prize Pool Distributed</p>
-                <p className="text-3xl font-bold font-mono text-neon-gold">$50K+</p>
+                <p className="text-xs text-white/50 font-mono uppercase mb-1">Avg Tournament Viewers</p>
+                <p className="text-3xl font-bold font-mono text-neon-gold">45+</p>
               </div>
               <div>
-                <p className="text-xs text-white/50 font-mono uppercase mb-1">Years in Esports</p>
-                <p className="text-3xl font-bold font-mono text-neon-lime">5+</p>
+                <p className="text-xs text-white/50 font-mono uppercase mb-1">Development Division Events</p>
+                <p className="text-3xl font-bold font-mono text-neon-lime">12+</p>
               </div>
             </div>
           </NeonCard>
@@ -87,7 +87,7 @@ export default function About() {
             <NeonCard variant="lime">
               <h3 className="text-lg font-bold font-mono text-neon-lime mb-3 uppercase">Player Development</h3>
               <p className="text-white/70 font-mono">
-                Murph believes in creating pathways for players to improve and advance. The Development Division exists to help Plat–Diamond players reach their competitive potential.
+                We believe in creating pathways for players to improve and advance. The Development Division exists to help Plat–Diamond players reach their competitive potential.
               </p>
             </NeonCard>
 
@@ -107,17 +107,17 @@ export default function About() {
           </div>
         </div>
 
-        {/* Initiatives */}
+        {/* Organizational Structure */}
         <div className="mb-16">
-          <h2 className="text-2xl font-bold font-mono text-neon-gold mb-6 uppercase">Key Initiatives</h2>
+          <h2 className="text-2xl font-bold font-mono text-neon-gold mb-6 uppercase">Organizational Structure</h2>
           <div className="space-y-4">
             <NeonCard variant="gold">
               <div className="flex items-start gap-4">
                 <div className="text-3xl font-bold font-mono text-neon-magenta min-w-fit">01</div>
                 <div>
-                  <h3 className="text-lg font-bold font-mono text-neon-gold mb-2">Murph Tournaments</h3>
+                  <h3 className="text-lg font-bold font-mono text-neon-gold mb-2">PMURPHINC (Parent Organization)</h3>
                   <p className="text-white/70 font-mono">
-                    14+ competitive tournaments showcasing THE FINALS' best talent. Each event features professional production, fair competition, and meaningful prize pools.
+                    The umbrella organization housing all competitive initiatives. PMURPHINC sets the standard for tournament production, competitive integrity, and player development in THE FINALS.
                   </p>
                 </div>
               </div>
@@ -127,9 +127,9 @@ export default function About() {
               <div className="flex items-start gap-4">
                 <div className="text-3xl font-bold font-mono text-neon-cyan min-w-fit">02</div>
                 <div>
-                  <h3 className="text-lg font-bold font-mono text-neon-gold mb-2">Development Division</h3>
+                  <h3 className="text-lg font-bold font-mono text-neon-gold mb-2">Murph Tournaments</h3>
                   <p className="text-white/70 font-mono">
-                    Monthly competitive events for Plat–Diamond players. Structured matches, detailed feedback, and stream exposure to accelerate player development.
+                    14 competitive tournaments showcasing THE FINALS' best talent. Each event features professional production, fair competition, and meaningful prize pools.
                   </p>
                 </div>
               </div>
@@ -139,9 +139,9 @@ export default function About() {
               <div className="flex items-start gap-4">
                 <div className="text-3xl font-bold font-mono text-neon-lime min-w-fit">03</div>
                 <div>
-                  <h3 className="text-lg font-bold font-mono text-neon-gold mb-2">FCL Season 1 Producer</h3>
+                  <h3 className="text-lg font-bold font-mono text-neon-gold mb-2">Development Division</h3>
                   <p className="text-white/70 font-mono">
-                    Producer of the Finals Contender League, expanding competitive opportunities and building the infrastructure for THE FINALS esports ecosystem.
+                    Monthly tournaments for Plat–Diamond players seeking competitive experience. Part of Murph Tournaments, providing structured matches, feedback, and stream exposure.
                   </p>
                 </div>
               </div>
@@ -149,20 +149,38 @@ export default function About() {
           </div>
         </div>
 
-        {/* Contact/Social */}
+        {/* Connect/Social */}
         <div className="text-center">
           <h2 className="text-2xl font-bold font-mono text-neon-cyan mb-6 uppercase">Connect</h2>
           <p className="text-white/80 font-mono mb-6">
-            Join the community on Discord for tournament updates, player spotlights, and competitive opportunities.
+            Follow PMURPHINC across all platforms for tournament updates, live streams, and competitive opportunities.
           </p>
-          <a
-            href="https://discord.gg"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-block px-8 py-3 bg-neon-cyan text-dark-black font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all"
-          >
-            Join Discord
-          </a>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <a
+              href="https://www.twitch.tv/pmurphinc"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block px-8 py-3 bg-neon-magenta text-dark-black font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all"
+            >
+              Twitch
+            </a>
+            <a
+              href="https://www.youtube.com/Pmurphinc"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block px-8 py-3 border-2 border-neon-cyan text-neon-cyan font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all"
+            >
+              YouTube
+            </a>
+            <a
+              href="https://www.tiktok.com/@pmurphinc"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block px-8 py-3 border-2 border-neon-gold text-neon-gold font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all"
+            >
+              TikTok
+            </a>
+          </div>
         </div>
       </div>
     </div>

@@ -45,8 +45,11 @@ export default function DevDivision() {
           <p className="text-xl text-white/80 font-mono max-w-3xl mb-4">
             The Path to Competitive Play
           </p>
-          <p className="text-lg text-white/70 font-mono max-w-3xl">
-            Built for Plat–Diamond players seeking competitive experience, skill development, and exposure. Monthly tournaments with structured matches, detailed feedback, and professional stream coverage.
+          <p className="text-lg text-white/70 font-mono max-w-3xl mb-4">
+            Part of Murph Tournaments. Monthly competitive tournaments for Plat–Diamond players seeking competitive experience, skill development, and exposure.
+          </p>
+          <p className="text-sm text-white/60 font-mono max-w-3xl">
+            Structured matches, detailed feedback, and professional stream coverage. First Friday of each month, 8 PM PST.
           </p>
         </div>
 

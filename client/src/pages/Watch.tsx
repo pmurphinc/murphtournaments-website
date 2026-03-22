@@ -39,7 +39,7 @@ export default function Watch() {
                 Watch live tournament matches, competitive gameplay, and community events on Twitch. PMURPHINC streams regularly during tournament nights with professional commentary and analysis.
               </p>
               <a
-                href="https://twitch.tv"
+                href="https://www.twitch.tv/pmurphinc"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-block px-6 py-2 bg-neon-magenta text-dark-black font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all"
@@ -65,7 +65,7 @@ export default function Watch() {
                 Fast-paced tournament highlights, clutch plays, and competitive moments. Follow for daily esports content.
               </p>
               <a
-                href="https://tiktok.com"
+                href="https://www.tiktok.com/@pmurphinc"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-block px-6 py-2 border-2 border-neon-cyan text-neon-cyan font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all"
@@ -85,7 +85,7 @@ export default function Watch() {
                 Best moments from tournaments, player spotlights, and behind-the-scenes content. Shareable clips daily.
               </p>
               <a
-                href="https://tiktok.com"
+                href="https://www.tiktok.com/@pmurphinc"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-block px-6 py-2 border-2 border-neon-cyan text-neon-cyan font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all"
@@ -111,7 +111,7 @@ export default function Watch() {
                 Complete tournament recordings, full matches, and archived streams. Watch at your own pace.
               </p>
               <a
-                href="https://youtube.com"
+                href="https://www.youtube.com/Pmurphinc"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-block px-6 py-2 border-2 border-neon-gold text-neon-gold font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all"
@@ -131,7 +131,7 @@ export default function Watch() {
                 Competitive analysis, player interviews, and educational content. Learn from the pros.
               </p>
               <a
-                href="https://youtube.com"
+                href="https://www.youtube.com/Pmurphinc"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-block px-6 py-2 border-2 border-neon-gold text-neon-gold font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all"
