@@ -22,7 +22,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-dark-charcoal">
       {/* Hero Section */}
-      <section className="relative pt-24 pb-20 md:pt-32 md:pb-32 overflow-hidden">
+      <section className="relative pt-40 pb-20 md:pt-48 md:pb-32 overflow-hidden">
         {/* Background scan lines effect */}
         <div className="absolute inset-0 scan-lines opacity-5 pointer-events-none" />
 
@@ -63,24 +63,18 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Right: Decorative Element */}
+            {/* Right: THE FINALS Season 10 News */}
             <div className="hidden md:flex items-center justify-center">
-              <div className="relative w-full h-96">
-                {/* Animated border box */}
-                <div className="absolute inset-0 border-2 border-neon-magenta/30 rounded-sm" />
-                <div className="absolute inset-2 border-2 border-neon-cyan/20 rounded-sm" />
-                <div className="absolute inset-4 border-2 border-neon-gold/10 rounded-sm" />
-
-                {/* Center text */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center">
-                <div className="text-6xl font-bold font-mono text-neon-magenta/30 mb-4">
-                  MURPH
-                </div>
-                    <div className="text-sm font-mono text-neon-cyan/30 uppercase tracking-widest">
-                      Tournament Production
-                    </div>
-                  </div>
+              <div className="relative w-full h-96 bg-gradient-to-br from-neon-magenta/10 to-neon-cyan/10 border-2 border-neon-gold/40 rounded-sm p-8 flex flex-col justify-center">
+                <div className="text-center space-y-4">
+                  <div className="text-neon-gold font-mono text-sm uppercase tracking-widest font-bold">Latest News</div>
+                  <h3 className="text-3xl font-bold font-mono text-neon-cyan uppercase tracking-widest">Season 10 Launch</h3>
+                  <p className="text-white/80 font-mono text-sm leading-relaxed">
+                    THE FINALS Season 10 launches on <span className="text-neon-gold font-bold">March 26, 2026</span>. A bold new era for the arena with new content, gameplay updates, and competitive opportunities.
+                  </p>
+                  <a href="https://www.reachthefinals.com" target="_blank" rel="noopener noreferrer" className="inline-block mt-4 px-6 py-2 border-2 border-neon-cyan text-neon-cyan font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all">
+                    Learn More
+                  </a>
                 </div>
               </div>
             </div>
