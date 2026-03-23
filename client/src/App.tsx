@@ -21,8 +21,8 @@ import Join from "./pages/Join";
  * - Responsive mobile-first layout
  * - Tournament-focused content structure
  */
-
 function Router() {
+  // make sure to consider if you need authentication for certain routes
   return (
     <div className="flex flex-col min-h-screen">
       <Navigation />

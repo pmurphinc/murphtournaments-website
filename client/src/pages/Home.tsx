@@ -1,3 +1,4 @@
+import { useAuth } from '@/_core/hooks/useAuth';
 import { Link } from 'wouter';
 import NeonCard from '@/components/NeonCard';
 import GlitchText from '@/components/GlitchText';
@@ -16,6 +17,10 @@ import PlayerSpotlight from '@/components/PlayerSpotlight';
  */
 
 export default function Home() {
+  // The userAuth hooks provides authentication state
+  // To implement login/logout functionality, simply call logout() or redirect to getLoginUrl()
+  let { user, loading, error, isAuthenticated, logout } = useAuth();
+
   // Next Development Division event: April 3rd, 2026 at 6 PM PST
   const nextTournamentDate = new Date('2026-04-03T18:00:00-07:00');
 
