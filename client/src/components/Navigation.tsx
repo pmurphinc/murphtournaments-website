@@ -31,7 +31,7 @@ export default function Navigation() {
           <img 
             src="https://d2xsxph8kpxj0f.cloudfront.net/310519663462787524/GzitzUSk3snQMAtW4LnLnQ/MurphTournaments_logo_747bd67f.png" 
             alt="Murph Tournaments" 
-            className="h-20 cursor-pointer hover:opacity-80 transition-opacity scale-125 origin-left"
+            className="h-14 cursor-pointer hover:opacity-80 transition-opacity"
           />
         </Link>
 
