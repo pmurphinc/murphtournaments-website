@@ -1,12 +1,12 @@
 import NeonCard from '@/components/NeonCard';
 import GlitchText from '@/components/GlitchText';
 import { Link } from 'wouter';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 /**
  * Live Bracket Page - Development Division
  * Cyberpunk Neon Rebellion Design
- * - Registered teams from approved signups
+ * - Registered teams with player rosters
  * - 3-Cycle Development Division format
  * - Stage 1 (Cashout) and Stage 2 (Finals) structure
  * - FRP (Final Round Points) scoring system
@@ -15,28 +15,34 @@ import { useState, useEffect } from 'react';
 interface Team {
   id: number;
   name: string;
-  captain: string;
-  players: number;
+  players: string[];
 }
 
 const APPROVED_TEAMS: Team[] = [
-  { id: 1, name: "EkaZo's Kittens", captain: "44turnips#0802", players: 2 },
-  { id: 2, name: "Droolings", captain: "Dromings#1811", players: 2 },
-  { id: 3, name: "Captain", captain: "Captain#8153", players: 2 },
-  { id: 4, name: "chezzcakee", captain: "chezzcakee#5108", players: 1 },
-  { id: 5, name: "Three Deadly Sins", captain: "StrmWRLD#3588", players: 2 },
-  { id: 6, name: "SWAGGYTLOL", captain: "SWAGGYTLOL#2499", players: 2 },
-  { id: 7, name: "TwoCeez", captain: "TwoCeez#1054", players: 2 },
-  { id: 8, name: "LIQR 2", captain: "sikk#2681", players: 4 },
-  { id: 9, name: "MisterBirdy", captain: "MisterBirdy#5602", players: 4 },
-  { id: 10, name: "Lionxec", captain: "Lionxec#0714", players: 4 },
-  { id: 11, name: "The Baiters", captain: "PLUTO#8051", players: 2 },
-  { id: 12, name: "SteelSabbath", captain: "SteelSabbath#1024", players: 4 },
-  { id: 13, name: "MrThirdParty", captain: "MrThirdParty#3398", players: 2 },
+  {
+    id: 1,
+    name: "EkaZo's Kittens",
+    players: ["44turnips#0802", "Droowings#1811", "Captain#8153", "chezzcakee#5108"]
+  },
+  {
+    id: 2,
+    name: "Three Deadly Sins",
+    players: ["StrmWRLD#3588", "SWAGGYTLOL#2499", "TwoCeez#1054"]
+  },
+  {
+    id: 3,
+    name: "LIQR",
+    players: ["2sikk#2681", "MisterBirdy#5602", "Lionxec#0714"]
+  },
+  {
+    id: 4,
+    name: "The Baiters",
+    players: ["PLUTO#8051", "SteelSabbath#1024", "MrThirdParty#3398"]
+  }
 ];
 
 export default function LiveBracket() {
-  const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+  const [expandedTeam, setExpandedTeam] = useState<number | null>(null);
 
   return (
     <div className="min-h-screen bg-dark-charcoal py-20">
@@ -77,22 +83,31 @@ export default function LiveBracket() {
         {/* Registered Teams */}
         <div className="mb-16">
           <h2 className="text-2xl font-bold font-mono text-neon-cyan mb-6 uppercase">Registered Teams ({APPROVED_TEAMS.length})</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {APPROVED_TEAMS.map((team) => (
-              <NeonCard 
-                key={team.id} 
-                variant="cyan"
-                className="cursor-pointer hover:opacity-80 transition-opacity"
-                onClick={() => setSelectedTeam(team)}
-              >
-                <div className="space-y-2">
-                  <p className="text-lg font-bold font-mono text-neon-cyan uppercase">{team.name}</p>
-                  <p className="text-xs text-white/60 font-mono">Captain: {team.captain}</p>
-                  <p className="text-xs text-white/50 font-mono">Players: {team.players}</p>
-                </div>
-              </NeonCard>
+              <div key={team.id}>
+                <NeonCard 
+                  variant="cyan"
+                  className="cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={() => setExpandedTeam(expandedTeam === team.id ? null : team.id)}
+                >
+                  <div className="space-y-2">
+                    <p className="text-lg font-bold font-mono text-neon-cyan uppercase">{team.name}</p>
+                    <p className="text-xs text-white/60 font-mono">{team.players.length} Players</p>
+                    {expandedTeam === team.id && (
+                      <div className="mt-4 pt-4 border-t border-neon-cyan/30 space-y-2">
+                        <p className="text-xs text-white/50 font-mono uppercase mb-2">Roster:</p>
+                        {team.players.map((player, idx) => (
+                          <p key={idx} className="text-xs text-white/70 font-mono">• {player}</p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </NeonCard>
+              </div>
             ))}
           </div>
+          <p className="text-xs text-white/50 font-mono mt-4">Click on a team to view full roster</p>
         </div>
 
         {/* Tournament Structure */}
