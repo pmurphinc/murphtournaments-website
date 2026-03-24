@@ -46,7 +46,7 @@ export default function Home() {
               </GlitchText>
 
               <p className="text-lg text-white/80 font-mono leading-relaxed max-w-md">
-                Built by players. Run like a league.
+                Built by players. For players.
               </p>
 
               <p className="text-sm text-white/60 font-mono leading-relaxed max-w-md">
@@ -99,7 +99,10 @@ export default function Home() {
                 Tournament organizer, league operator, and competitive systems builder within THE FINALS ecosystem.
               </p>
               <p className="text-white/80 font-mono mb-4">
-                With 14+ completed tournaments and a focus on competitive integrity, Murph Tournaments has established itself as a trusted hub for serious players seeking structure, fairness, and exposure.
+                - Development Division Founder<br/>
+                - FCL Season 1 Producer<br/>
+                - Murph Tournaments ×14<br/>
+                - Gaming Since '92
               </p>
               <p className="text-white/80 font-mono mb-6">
                 Mission: develop elite players, run professional tournaments, and build a competitive community that values skill and dedication.

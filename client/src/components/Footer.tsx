@@ -16,7 +16,7 @@ export default function Footer() {
           {/* Brand */}
           <div>
             <div className="text-lg font-bold font-mono text-white mb-2">MURPH TOURNAMENTS</div>
-            <p className="text-sm text-white/60 font-mono">Competitive THE FINALS tournaments. Built by players. Run like a league.</p>
+            <p className="text-sm text-white/60 font-mono">Competitive THE FINALS tournaments. Built by players. For players.</p>
           </div>
 
           {/* Quick Links */}
