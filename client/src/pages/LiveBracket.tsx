@@ -96,9 +96,9 @@ export default function LiveBracket() {
                     <p className="text-xs text-white/60 font-mono">{team.players.length} Players</p>
                     {expandedTeam === team.id && (
                       <div className="mt-4 pt-4 border-t border-neon-cyan/30 space-y-2">
-                        <p className="text-xs text-white/50 font-mono uppercase mb-2">Roster:</p>
+                        <p className="text-sm text-white/50 font-mono uppercase mb-2">Roster:</p>
                         {team.players.map((player, idx) => (
-                          <p key={idx} className="text-xs text-white/70 font-mono">• {player}</p>
+                          <p key={idx} className="text-sm text-white/70 font-mono">• {player}</p>
                         ))}
                       </div>
                     )}

@@ -25,8 +25,8 @@ export default function NeonCard({
   const variantClasses = {
     magenta: 'border-neon-magenta hover-glow-magenta',
     cyan: 'border-neon-cyan hover-glow-cyan',
-    gold: 'border-neon-gold',
-    lime: 'border-neon-lime',
+    gold: 'border-neon-gold hover-glow-gold',
+    lime: 'border-neon-lime hover-glow-lime',
   };
 
   return (
