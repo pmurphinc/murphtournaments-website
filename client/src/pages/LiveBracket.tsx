@@ -1,63 +1,168 @@
 import NeonCard from '@/components/NeonCard';
 import GlitchText from '@/components/GlitchText';
 import { Link } from 'wouter';
+import { useState, useEffect } from 'react';
 
 /**
- * Live Bracket Page
+ * Live Bracket Page - Development Division
  * Cyberpunk Neon Rebellion Design
- * - Current/upcoming tournament bracket
- * - Bracket visualization placeholder
- * - Tournament details and schedule
+ * - Registered teams from approved signups
+ * - 3-Cycle Development Division format
+ * - Stage 1 (Cashout) and Stage 2 (Finals) structure
+ * - FRP (Final Round Points) scoring system
  */
 
+interface Team {
+  id: number;
+  name: string;
+  captain: string;
+  players: number;
+}
+
+const APPROVED_TEAMS: Team[] = [
+  { id: 1, name: "EkaZo's Kittens", captain: "44turnips#0802", players: 2 },
+  { id: 2, name: "Droolings", captain: "Dromings#1811", players: 2 },
+  { id: 3, name: "Captain", captain: "Captain#8153", players: 2 },
+  { id: 4, name: "chezzcakee", captain: "chezzcakee#5108", players: 1 },
+  { id: 5, name: "Three Deadly Sins", captain: "StrmWRLD#3588", players: 2 },
+  { id: 6, name: "SWAGGYTLOL", captain: "SWAGGYTLOL#2499", players: 2 },
+  { id: 7, name: "TwoCeez", captain: "TwoCeez#1054", players: 2 },
+  { id: 8, name: "LIQR 2", captain: "sikk#2681", players: 4 },
+  { id: 9, name: "MisterBirdy", captain: "MisterBirdy#5602", players: 4 },
+  { id: 10, name: "Lionxec", captain: "Lionxec#0714", players: 4 },
+  { id: 11, name: "The Baiters", captain: "PLUTO#8051", players: 2 },
+  { id: 12, name: "SteelSabbath", captain: "SteelSabbath#1024", players: 4 },
+  { id: 13, name: "MrThirdParty", captain: "MrThirdParty#3398", players: 2 },
+];
+
 export default function LiveBracket() {
+  const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+
   return (
     <div className="min-h-screen bg-dark-charcoal py-20">
       <div className="container">
         {/* Header */}
         <div className="mb-16">
           <GlitchText size="xl" variant="lime" className="mb-4">
-            Live Bracket
+            Development Division
           </GlitchText>
           <p className="text-lg text-white/80 font-mono max-w-2xl">
-            Current tournament bracket and real-time match updates. Follow the action as teams compete for the championship.
+            3-Cycle tournament structure with Stage 1 (Cashout) and Stage 2 (Finals). Teams compete for the highest FRP (Final Round Points) across all cycles.
           </p>
         </div>
 
-        {/* Current Tournament Info */}
+        {/* Tournament Info */}
         <div className="mb-16">
-          <h2 className="text-2xl font-bold font-mono text-neon-gold mb-6 uppercase">Upcoming Tournament</h2>
+          <h2 className="text-2xl font-bold font-mono text-neon-gold mb-6 uppercase">Tournament Overview</h2>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
             <NeonCard variant="gold">
-              <p className="text-xs text-white/50 font-mono uppercase mb-2">Status</p>
-              <p className="text-lg font-bold font-mono text-neon-gold">Coming Soon</p>
-            </NeonCard>
-            <NeonCard variant="gold">
               <p className="text-xs text-white/50 font-mono uppercase mb-2">Format</p>
-              <p className="text-lg font-bold font-mono text-neon-gold">TBA</p>
+              <p className="text-lg font-bold font-mono text-neon-gold">3 Cycles</p>
             </NeonCard>
             <NeonCard variant="gold">
-              <p className="text-xs text-white/50 font-mono uppercase mb-2">Teams</p>
-              <p className="text-lg font-bold font-mono text-neon-gold">TBA</p>
+              <p className="text-xs text-white/50 font-mono uppercase mb-2">Registered Teams</p>
+              <p className="text-lg font-bold font-mono text-neon-gold">{APPROVED_TEAMS.length}</p>
             </NeonCard>
             <NeonCard variant="gold">
-              <p className="text-xs text-white/50 font-mono uppercase mb-2">Prize Pool</p>
-              <p className="text-lg font-bold font-mono text-neon-gold">TBA</p>
+              <p className="text-xs text-white/50 font-mono uppercase mb-2">Team Size</p>
+              <p className="text-lg font-bold font-mono text-neon-gold">3v3</p>
+            </NeonCard>
+            <NeonCard variant="gold">
+              <p className="text-xs text-white/50 font-mono uppercase mb-2">Scoring</p>
+              <p className="text-lg font-bold font-mono text-neon-gold">FRP Based</p>
             </NeonCard>
           </div>
         </div>
 
-        {/* Bracket Visualization */}
+        {/* Registered Teams */}
         <div className="mb-16">
-          <h2 className="text-2xl font-bold font-mono text-neon-lime mb-6 uppercase">Tournament Bracket</h2>
-          <NeonCard variant="lime">
-            <div className="aspect-video bg-dark-charcoal rounded-sm flex items-center justify-center border border-neon-lime/30">
-              <div className="text-center">
-                <div className="text-6xl mb-4 font-mono text-neon-lime/30">⚔️</div>
-                <p className="text-lg font-mono text-white/60 mb-2">8-Team Double Elimination</p>
-                <p className="text-sm font-mono text-white/40">Bracket visualization coming soon</p>
-                <p className="text-xs font-mono text-white/30 mt-4">Check back during tournament for live updates</p>
+          <h2 className="text-2xl font-bold font-mono text-neon-cyan mb-6 uppercase">Registered Teams ({APPROVED_TEAMS.length})</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {APPROVED_TEAMS.map((team) => (
+              <NeonCard 
+                key={team.id} 
+                variant="cyan"
+                className="cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={() => setSelectedTeam(team)}
+              >
+                <div className="space-y-2">
+                  <p className="text-lg font-bold font-mono text-neon-cyan uppercase">{team.name}</p>
+                  <p className="text-xs text-white/60 font-mono">Captain: {team.captain}</p>
+                  <p className="text-xs text-white/50 font-mono">Players: {team.players}</p>
+                </div>
+              </NeonCard>
+            ))}
+          </div>
+        </div>
+
+        {/* Tournament Structure */}
+        <div className="mb-16">
+          <h2 className="text-2xl font-bold font-mono text-neon-magenta mb-6 uppercase">Tournament Structure</h2>
+          
+          {/* Cycle Breakdown */}
+          <div className="space-y-8">
+            {[1, 2, 3].map((cycle) => (
+              <div key={cycle} className="space-y-4">
+                <h3 className="text-xl font-bold font-mono text-neon-gold uppercase">Cycle {cycle}</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Stage 1: Cashout */}
+                  <NeonCard variant="gold">
+                    <h4 className="text-lg font-bold font-mono text-neon-gold mb-4 uppercase">Stage 1: Cashout</h4>
+                    <div className="space-y-3 text-sm text-white/70 font-mono">
+                      <div>
+                        <p className="text-neon-gold font-bold mb-1">4 Teams Compete</p>
+                        <p className="text-xs text-white/50">Top 4 teams from previous cycle or random draw</p>
+                      </div>
+                      <div>
+                        <p className="text-neon-gold font-bold mb-1">Placements</p>
+                        <ul className="space-y-1 text-xs text-white/60">
+                          <li>• 1st Place: 4 FRP</li>
+                          <li>• 2nd Place: 3 FRP</li>
+                          <li>• 3rd Place: 2 FRP</li>
+                          <li>• 4th Place: 1 FRP</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </NeonCard>
+
+                  {/* Stage 2: Finals */}
+                  <NeonCard variant="magenta">
+                    <h4 className="text-lg font-bold font-mono text-neon-magenta mb-4 uppercase">Stage 2: Finals</h4>
+                    <div className="space-y-3 text-sm text-white/70 font-mono">
+                      <div>
+                        <p className="text-neon-magenta font-bold mb-1">Best of 3 Matches</p>
+                        <ul className="space-y-1 text-xs text-white/60">
+                          <li>• 1st vs 2nd (BO3)</li>
+                          <li>• 3rd vs 4th (BO3)</li>
+                        </ul>
+                      </div>
+                      <div>
+                        <p className="text-neon-magenta font-bold mb-1">FRP Per Round Win</p>
+                        <p className="text-xs text-white/50">Each round victory = 1 FRP</p>
+                      </div>
+                    </div>
+                  </NeonCard>
+                </div>
               </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Win Condition */}
+        <div className="mb-16">
+          <NeonCard variant="lime">
+            <h2 className="text-2xl font-bold font-mono text-neon-lime mb-4 uppercase">Win Condition</h2>
+            <div className="space-y-4 text-white/80 font-mono">
+              <p>
+                <span className="text-neon-lime font-bold">Highest FRP After 3 Cycles:</span> The team with the most accumulated Final Round Points across all three cycles wins the tournament.
+              </p>
+              <p>
+                <span className="text-neon-lime font-bold">Tie Scenario:</span> If two or more teams are tied on FRP, a Sudden Death Final Round determines the champion.
+              </p>
+              <p className="text-sm text-white/60">
+                FRP is tracked cumulatively throughout the tournament. Every placement in Stage 1 and every round win in Stage 2 contributes to your total.
+              </p>
             </div>
           </NeonCard>
         </div>
@@ -69,22 +174,22 @@ export default function LiveBracket() {
             <NeonCard variant="cyan">
               <h3 className="text-lg font-bold font-mono text-neon-cyan mb-4 uppercase">Match Structure</h3>
               <ul className="space-y-2 text-sm text-white/70 font-mono">
-                <li>• Double Elimination Format</li>
-                <li>• Winners Bracket → Finals</li>
-                <li>• Losers Bracket → Consolation</li>
-                <li>• Best of 1 (BO1)</li>
-                <li>• Final Round Focus</li>
+                <li>• 3v3 Team Format</li>
+                <li>• 3 Cycles Total</li>
+                <li>• Stage 1: Cashout (4 teams)</li>
+                <li>• Stage 2: Finals (BO3 matches)</li>
+                <li>• FRP Scoring System</li>
               </ul>
             </NeonCard>
 
             <NeonCard variant="cyan">
               <h3 className="text-lg font-bold font-mono text-neon-cyan mb-4 uppercase">Prize Distribution</h3>
               <ul className="space-y-2 text-sm text-white/70 font-mono">
-                <li>• 1st Place: $2,500 (50%)</li>
-                <li>• 2nd Place: $1,500 (30%)</li>
-                <li>• 3rd Place: $1,000 (20%)</li>
+                <li>• Prize Pool: TBA</li>
+                <li>• 1st Place: TBA</li>
+                <li>• 2nd Place: TBA</li>
+                <li>• 3rd Place: TBA</li>
                 <li>• Streamed on Twitch</li>
-                <li>• Professional Commentary</li>
               </ul>
             </NeonCard>
           </div>
@@ -94,7 +199,7 @@ export default function LiveBracket() {
         <div className="text-center mb-16">
           <h2 className="text-2xl font-bold font-mono text-neon-magenta mb-6 uppercase">Watch Live</h2>
           <p className="text-lg text-white/80 font-mono mb-6 max-w-2xl mx-auto">
-            Tune in to our Twitch channel for live tournament coverage with professional commentary and analysis.
+            Tune in to our Twitch channel for live Development Division coverage with professional commentary and real-time FRP tracking.
           </p>
           <a
             href="https://www.twitch.tv/pmurphinc"
@@ -108,7 +213,7 @@ export default function LiveBracket() {
 
         {/* Navigation */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Link href="/tournaments">
+          <Link href="/history">
             <button className="px-8 py-3 border-2 border-neon-cyan text-neon-cyan font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all">
               Tournament History
             </button>
