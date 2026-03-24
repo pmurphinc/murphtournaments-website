@@ -172,7 +172,7 @@ export default function About() {
               href="https://www.twitch.tv/pmurphinc"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-block px-8 py-3 border-2 border-neon-lime text-neon-lime font-bold font-mono uppercase tracking-widest hover-glow-lime rounded-sm transition-all"
+              className="inline-block px-8 py-3 border-2 border-neon-magenta text-neon-magenta font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all"
             >
               Twitch
             </a>
