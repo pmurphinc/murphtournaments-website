@@ -128,11 +128,11 @@ export default function Home() {
                   </div>
                   <div className="flex justify-between items-center border-b border-neon-cyan/20 pb-2">
                     <span className="text-white/60 font-mono">Players Competed</span>
-                    <span className="text-2xl font-bold text-neon-magenta font-mono">100+ Verified</span>
+                    <span className="text-2xl font-bold text-neon-magenta font-mono" style={{textAlign: 'right'}}>100+ Verified</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-white/60 font-mono">Events Produced</span>
-                    <span className="text-2xl font-bold text-neon-lime font-mono">20+ (Including FCL)</span>
+                    <span className="text-2xl font-bold text-neon-lime font-mono" style={{textAlign: 'right'}}>20+ (Including FCL)</span>
                   </div>
                 </div>
               </div>

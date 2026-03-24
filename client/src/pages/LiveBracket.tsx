@@ -1,12 +1,14 @@
 import NeonCard from '@/components/NeonCard';
 import GlitchText from '@/components/GlitchText';
 import { Link } from 'wouter';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 /**
  * Live Bracket Page - Development Division
  * Cyberpunk Neon Rebellion Design
  * - Registered teams with player rosters
+ * - Dynamic team names from Google Sheets
+ * - Live Event Status and Current Leader panels
  * - 3-Cycle Development Division format
  * - Stage 1 (Cashout) and Stage 2 (Finals) structure
  * - FRP (Final Round Points) scoring system
@@ -18,7 +20,7 @@ interface Team {
   players: string[];
 }
 
-const APPROVED_TEAMS: Team[] = [
+const STATIC_TEAMS: Team[] = [
   {
     id: 1,
     name: "EkaZo's Kittens",
@@ -41,12 +43,110 @@ const APPROVED_TEAMS: Team[] = [
   }
 ];
 
+// Google Sheets CSV export URL
+const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1tXZ5opDeFAy_l_uTiOD-dEO1wMlL66MhuKBFtr84adc/export?format=csv&gid=0';
+
+interface LiveData {
+  teamNames: string[];
+  eventStatus: string;
+  currentLeader: string;
+  tiebreaker: string;
+  dataAvailable: boolean;
+}
+
 export default function LiveBracket() {
   const [expandedTeam, setExpandedTeam] = useState<number | null>(null);
+  const [liveData, setLiveData] = useState<LiveData>({
+    teamNames: STATIC_TEAMS.map(t => t.name),
+    eventStatus: 'Awaiting Results',
+    currentLeader: 'Pending Results',
+    tiebreaker: 'NO TIEBREAKER NEEDED',
+    dataAvailable: true
+  });
+
+  // Fetch data from Google Sheets
+  useEffect(() => {
+    const fetchSheetData = async () => {
+      try {
+        const response = await fetch(SHEET_CSV_URL);
+        const csv = await response.text();
+        const lines = csv.split('\n');
+        
+        // Extract team names from A5:A24 (rows 5-24, column A is index 0)
+        const teamNames: string[] = [];
+        for (let i = 4; i < Math.min(24, lines.length); i++) {
+          const row = lines[i].split(',');
+          if (row[0] && row[0].trim()) {
+            teamNames.push(row[0].trim());
+          }
+        }
+
+        // Extract Live Event Status from E6:G8 (rows 6-8, columns E-G are indices 4-6)
+        let eventStatus = 'Awaiting Results';
+        if (lines.length > 6) {
+          const statusRow = lines[6].split(',');
+          if (statusRow[5] && statusRow[5].trim()) {
+            eventStatus = statusRow[5].trim();
+          }
+        }
+
+        // Extract Current Leader from I6:K8 (rows 6-8, columns I-K are indices 8-10)
+        let currentLeader = 'Pending Results';
+        if (lines.length > 6) {
+          const leaderRow = lines[6].split(',');
+          if (leaderRow[9] && leaderRow[9].trim()) {
+            currentLeader = leaderRow[9].trim();
+          }
+        }
+
+        // Extract Tiebreaker from I8 (row 8, column I is index 8)
+        let tiebreaker = 'NO TIEBREAKER NEEDED';
+        if (lines.length > 7) {
+          const tieRow = lines[7].split(',');
+          if (tieRow[8] && tieRow[8].trim()) {
+            tiebreaker = tieRow[8].trim();
+          }
+        }
+
+        setLiveData({
+          teamNames: teamNames.length > 0 ? teamNames : STATIC_TEAMS.map(t => t.name),
+          eventStatus,
+          currentLeader,
+          tiebreaker,
+          dataAvailable: teamNames.length > 0
+        });
+      } catch (error) {
+        console.error('Failed to fetch sheet data:', error);
+        setLiveData(prev => ({
+          ...prev,
+          dataAvailable: false
+        }));
+      }
+    };
+
+    fetchSheetData();
+    
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(fetchSheetData, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Build teams with dynamic names
+  const teams: Team[] = STATIC_TEAMS.map((team, idx) => ({
+    ...team,
+    name: liveData.teamNames[idx] || team.name
+  }));
 
   return (
     <div className="min-h-screen bg-dark-charcoal py-20">
       <div className="container">
+        {/* Data Status Indicator */}
+        {!liveData.dataAvailable && (
+          <div className="mb-6 p-3 bg-neon-magenta/10 border border-neon-magenta/50 rounded text-neon-magenta text-sm font-mono">
+            ⚠ Live data unavailable - displaying cached team information
+          </div>
+        )}
+
         {/* Header */}
         <div className="mb-16">
           <GlitchText size="xl" variant="lime" className="mb-4">
@@ -55,6 +155,35 @@ export default function LiveBracket() {
           <p className="text-lg text-white/80 font-mono max-w-2xl">
             The Development Division is played across three competitive cycles. Each cycle functions as a complete mini-bracket, where teams first establish seeding through Cashout and then compete in Final Round matchups for points. Performance carries across all three cycles, with Final Round Points (FRP) accumulating to determine the overall winner.
           </p>
+        </div>
+
+        {/* Live Status Panels */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-16">
+          {/* Event Winner */}
+          <NeonCard variant="gold">
+            <h3 className="text-sm font-mono text-white/50 uppercase mb-3">Event Winner</h3>
+            <p className="text-xl font-bold font-mono text-neon-gold">{liveData.eventStatus}</p>
+          </NeonCard>
+
+          {/* Live Event Status */}
+          <NeonCard variant="cyan">
+            <h3 className="text-sm font-mono text-white/50 uppercase mb-3">Status</h3>
+            <p className="text-xl font-bold font-mono text-neon-cyan">{liveData.eventStatus}</p>
+          </NeonCard>
+
+          {/* Current Leader */}
+          <NeonCard variant="magenta">
+            <h3 className="text-sm font-mono text-white/50 uppercase mb-3">Current Leader</h3>
+            <p className="text-xl font-bold font-mono text-neon-magenta">{liveData.currentLeader}</p>
+          </NeonCard>
+        </div>
+
+        {/* Tiebreaker Alert */}
+        <div className="mb-16">
+          <NeonCard variant="lime">
+            <h3 className="text-sm font-mono text-white/50 uppercase mb-2">Tiebreaker Alert</h3>
+            <p className="text-lg font-bold font-mono text-neon-lime">{liveData.tiebreaker}</p>
+          </NeonCard>
         </div>
 
         {/* Tournament Info */}
@@ -67,7 +196,7 @@ export default function LiveBracket() {
             </NeonCard>
             <NeonCard variant="gold">
               <p className="text-xs text-white/50 font-mono uppercase mb-2">Registered Teams</p>
-              <p className="text-lg font-bold font-mono text-neon-gold">{APPROVED_TEAMS.length}</p>
+              <p className="text-lg font-bold font-mono text-neon-gold">{teams.length}</p>
             </NeonCard>
             <NeonCard variant="gold">
               <p className="text-xs text-white/50 font-mono uppercase mb-2">Team Size</p>
@@ -82,9 +211,9 @@ export default function LiveBracket() {
 
         {/* Registered Teams */}
         <div className="mb-16">
-          <h2 className="text-2xl font-bold font-mono text-neon-cyan mb-6 uppercase">Registered Teams ({APPROVED_TEAMS.length})</h2>
+          <h2 className="text-2xl font-bold font-mono text-neon-cyan mb-6 uppercase">Registered Teams ({teams.length})</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {APPROVED_TEAMS.map((team) => (
+            {teams.map((team) => (
               <div key={team.id}>
                 <NeonCard 
                   variant="cyan"
