@@ -53,7 +53,7 @@ export default function LiveBracket() {
             Development Division
           </GlitchText>
           <p className="text-lg text-white/80 font-mono max-w-2xl">
-            3-Cycle tournament structure with Stage 1 (Cashout) and Stage 2 (Finals). Teams compete for the highest FRP (Final Round Points) across all cycles.
+            The Development Division is played across three competitive cycles. Each cycle functions as a complete mini-bracket, where teams first establish seeding through Cashout and then compete in Final Round matchups for points. Performance carries across all three cycles, with Final Round Points (FRP) accumulating to determine the overall winner.
           </p>
         </div>
 
@@ -127,15 +127,15 @@ export default function LiveBracket() {
                     <div className="space-y-3 text-sm text-white/70 font-mono">
                       <div>
                         <p className="text-neon-gold font-bold mb-1">4 Teams Compete</p>
-                        <p className="text-xs text-white/50">Top 4 teams from previous cycle or random draw</p>
+                        <p className="text-xs text-white/50">All 4 teams play one round of Cashout</p>
                       </div>
                       <div>
                         <p className="text-neon-gold font-bold mb-1">Placements</p>
                         <ul className="space-y-1 text-xs text-white/60">
-                          <li>• 1st Place: 4 FRP</li>
-                          <li>• 2nd Place: 3 FRP</li>
-                          <li>• 3rd Place: 2 FRP</li>
-                          <li>• 4th Place: 1 FRP</li>
+                          <li>• 1st Place</li>
+                          <li>• 2nd Place</li>
+                          <li>• 3rd Place</li>
+                          <li>• 4th Place</li>
                         </ul>
                       </div>
                     </div>
@@ -143,7 +143,7 @@ export default function LiveBracket() {
 
                   {/* Stage 2: Finals */}
                   <NeonCard variant="magenta">
-                    <h4 className="text-lg font-bold font-mono text-neon-magenta mb-4 uppercase">Stage 2: Finals</h4>
+                    <h4 className="text-lg font-bold font-mono text-neon-magenta mb-4 uppercase">Stage 2: Final Round</h4>
                     <div className="space-y-3 text-sm text-white/70 font-mono">
                       <div>
                         <p className="text-neon-magenta font-bold mb-1">Best of 3 Matches</p>
@@ -153,8 +153,8 @@ export default function LiveBracket() {
                         </ul>
                       </div>
                       <div>
-                        <p className="text-neon-magenta font-bold mb-1">FRP Per Round Win</p>
-                        <p className="text-xs text-white/50">Each round victory = 1 FRP</p>
+                        <p className="text-neon-magenta font-bold mb-1">1 FRP Per Round Win</p>
+                        <p className="text-xs text-white/50">Each victory = 1 FRP</p>
                       </div>
                     </div>
                   </NeonCard>
