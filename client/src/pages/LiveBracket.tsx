@@ -11,6 +11,7 @@ import { ChevronDown } from 'lucide-react';
  * - Intelligent visibility logic based on event state
  * - Collapsible cycle sections
  * - Real-time standings leaderboard
+ * - Team rosters from Team Members sheet
  */
 
 interface CashoutResult {
@@ -30,11 +31,21 @@ interface CycleData {
   hasData: boolean;
 }
 
+interface TeamRoster {
+  teamName: string;
+  teamLeader: string;
+  player1: string;
+  player2: string;
+  player3: string;
+  sub: string;
+}
+
 interface PageState {
   eventWinner: string;
   status: string;
   currentLeader: string;
   registeredTeams: string[];
+  teamRosters: Record<string, TeamRoster>;
   standings: Array<{ name: string; frp: number; rank: number }>;
   cycles: CycleData[];
   isPreEvent: boolean;
@@ -76,12 +87,14 @@ const getRangeValues = (data: string[][], startRow: number, endRow: number, col:
 
 export default function LiveBracket() {
   const [expandedCycles, setExpandedCycles] = useState<Set<number>>(new Set());
+  const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [pageState, setPageState] = useState<PageState>({
     eventWinner: 'Pending Results',
     status: 'Awaiting Results',
     currentLeader: 'Pending Results',
     registeredTeams: [],
+    teamRosters: {},
     standings: [],
     cycles: [],
     isPreEvent: true,
@@ -100,151 +113,304 @@ export default function LiveBracket() {
     setExpandedCycles(newSet);
   };
 
-  // Fetch and parse all sheet data
+  const toggleTeam = (teamName: string) => {
+    const newSet = new Set(expandedTeams);
+    if (newSet.has(teamName)) {
+      newSet.delete(teamName);
+    } else {
+      newSet.add(teamName);
+    }
+    setExpandedTeams(newSet);
+  };
+
   useEffect(() => {
     const fetchAllData = async () => {
       try {
-        // Fetch Dashboard tab (gid=1845713046)
-        const dashboardCsv = await fetch(getSheetCsvUrl(NEW_SHEET_ID, '1845713046')).then(r => r.text());
-        const dashboardData = parseCsv(dashboardCsv);
+        // Fetch Lists tab (gid=0) for registered teams
+        const listsUrl = getSheetCsvUrl(NEW_SHEET_ID, '0');
+        const listsResponse = await fetch(listsUrl);
+        const listsData = parseCsv(await listsResponse.text());
+        const registeredTeams = getRangeValues(listsData, 5, 24, 1).filter(t => t.trim());
 
-        // Fetch Lists tab (gid=0)
-        const listsCsv = await fetch(getSheetCsvUrl(NEW_SHEET_ID, '0')).then(r => r.text());
-        const listsData = parseCsv(listsCsv);
+        // Fetch Team Members tab (gid=1) for rosters
+        const teamMembersUrl = getSheetCsvUrl(NEW_SHEET_ID, '1');
+        const teamMembersResponse = await fetch(teamMembersUrl);
+        const teamMembersData = parseCsv(await teamMembersResponse.text());
 
-        // Fetch Standings tab (gid=1845713047)
-        const standingsCsv = await fetch(getSheetCsvUrl(NEW_SHEET_ID, '1845713047')).then(r => r.text());
-        const standingsData = parseCsv(standingsCsv);
+        // Build roster map from Team Members sheet
+        const teamRosters: Record<string, TeamRoster> = {};
+        for (let row = 2; row <= 21; row++) {
+          const teamName = getCellValue(teamMembersData, row, 1).trim();
+          if (teamName) {
+            teamRosters[teamName] = {
+              teamName,
+              teamLeader: getCellValue(teamMembersData, row, 2).trim(),
+              player1: getCellValue(teamMembersData, row, 3).trim(),
+              player2: getCellValue(teamMembersData, row, 4).trim(),
+              player3: getCellValue(teamMembersData, row, 5).trim(),
+              sub: getCellValue(teamMembersData, row, 6).trim()
+            };
+          }
+        }
 
-        // Extract Dashboard data
-        const eventWinner = getCellValue(dashboardData, 4, 2); // B4
-        const status = getCellValue(dashboardData, 4, 5); // E4
-        const currentLeader = getCellValue(dashboardData, 4, 9); // I4
+        // Fetch Dashboard tab (gid=2) for status
+        const dashboardUrl = getSheetCsvUrl(NEW_SHEET_ID, '2');
+        const dashboardResponse = await fetch(dashboardUrl);
+        const dashboardData = parseCsv(await dashboardResponse.text());
 
-        // Extract Registered Teams from Lists tab (A3:A22)
-        const registeredTeams = getRangeValues(listsData, 3, 22, 1);
+        const eventWinner = getCellValue(dashboardData, 6, 2) || 'Pending Results';
+        const status = getCellValue(dashboardData, 6, 5) || 'Awaiting Results';
+        const currentLeader = getCellValue(dashboardData, 6, 9) || 'Pending Results';
 
-        // Extract Standings (J5:L24)
-        const standingsTeams = getRangeValues(standingsData, 5, 24, 10); // Column J
-        const standingsFrps = getRangeValues(standingsData, 5, 24, 11); // Column K
-        const standingsRanks = getRangeValues(standingsData, 5, 24, 12); // Column L
+        // Determine event state
+        const isPreEvent = status === 'Awaiting Results' || status === 'Pre-Event';
+        const isLiveEvent = status === 'Live' || status === 'In Progress';
+        const isEventComplete = status === 'Complete' || eventWinner !== 'Pending Results';
+
+        // Fetch Standings tab (gid=3) for leaderboard
+        const standingsUrl = getSheetCsvUrl(NEW_SHEET_ID, '3');
+        const standingsResponse = await fetch(standingsUrl);
+        const standingsData = parseCsv(await standingsResponse.text());
 
         const standings: Array<{ name: string; frp: number; rank: number }> = [];
-        for (let i = 0; i < standingsTeams.length; i++) {
-          if (standingsTeams[i]) {
+        for (let row = 5; row <= 24; row++) {
+          const teamName = getCellValue(standingsData, row, 10).trim();
+          const frpStr = getCellValue(standingsData, row, 11).trim();
+          const rankStr = getCellValue(standingsData, row, 12).trim();
+          if (teamName && frpStr) {
             standings.push({
-              name: standingsTeams[i],
-              frp: parseInt(standingsFrps[i] || '0') || 0,
-              rank: parseInt(standingsRanks[i] || '0') || 0
+              name: teamName,
+              frp: parseInt(frpStr) || 0,
+              rank: parseInt(rankStr) || 0
             });
           }
         }
 
-        // Determine page state
-        const isPreEvent = status === 'Awaiting Results';
-        const isEventComplete = eventWinner !== 'Pending Results' && eventWinner !== '';
-        const isLiveEvent = standings.some(t => t.frp > 0) && !isEventComplete;
-
-        // Fetch cycle data
+        // Fetch cycles data
         const cycles: CycleData[] = [];
-        const cycleTabIds = ['1845713048', '1845713049', '1845713050']; // Cycle 1, 2, 3
 
-        for (const tabId of cycleTabIds) {
-          try {
-            const cycleCsv = await fetch(getSheetCsvUrl(NEW_SHEET_ID, tabId)).then(r => r.text());
-            const cycleData = parseCsv(cycleCsv);
+        // Cycle 1 (gid=4)
+        try {
+          const cycle1Url = getSheetCsvUrl(NEW_SHEET_ID, '4');
+          const cycle1Response = await fetch(cycle1Url);
+          const cycleData = parseCsv(await cycle1Response.text());
 
-            const cycleLeader = getCellValue(cycleData, 26, 7); // G26
-            
-            // Extract Cashout results (A7:B10)
-            const cashoutTeams = getRangeValues(cycleData, 7, 10, 1);
-            const cashoutPlacements = getRangeValues(cycleData, 7, 10, 2);
-            const cashout: CashoutResult[] = [];
-            for (let i = 0; i < cashoutTeams.length; i++) {
-              if (cashoutTeams[i]) {
-                cashout.push({
-                  team: cashoutTeams[i],
-                  placement: parseInt(cashoutPlacements[i] || '0') || 0
-                });
-              }
+          const cashout: CashoutResult[] = [];
+          for (let i = 0; i < 4; i++) {
+            const placement = getCellValue(cycleData, 7 + i, 1).trim();
+            const team = getCellValue(cycleData, 7 + i, 2).trim();
+            if (team && placement) {
+              cashout.push({ team, placement: parseInt(placement) || i + 1 });
             }
-
-            // Check if cycle has data
-            const hasCashout = cashout.length > 0;
-            const hasCycleLeader = cycleLeader !== 'Pending Results' && cycleLeader !== '';
-            const hasData = hasCashout || hasCycleLeader;
-
-            // Only include cycle if it has data
-            if (hasData) {
-              // Extract Match results
-              const matches: MatchResult[] = [];
-
-              // Match 1 (B17:B21)
-              const match1Status = getCellValue(cycleData, 21, 2);
-              if (match1Status !== 'Awaiting Teams' && match1Status !== '') {
-                const match1Winners = [
-                  getCellValue(cycleData, 17, 2),
-                  getCellValue(cycleData, 18, 2),
-                  getCellValue(cycleData, 19, 2)
-                ].filter(w => w && w !== 'N/A');
-                
-                if (match1Winners.length > 0) {
-                  // Count wins per team
-                  const winCount: Record<string, number> = {};
-                  match1Winners.forEach(w => {
-                    winCount[w] = (winCount[w] || 0) + 1;
-                  });
-                  
-                  // Get winner (most wins)
-                  const sorted = Object.entries(winCount).sort((a, b) => b[1] - a[1]);
-                  if (sorted.length >= 2) {
-                    const winner = sorted[0][0];
-                    const loser = sorted[1][0];
-                    matches.push({ winner, loser });
-                  } else if (sorted.length === 1) {
-                    matches.push({ winner: sorted[0][0], loser: 'TBD' });
-                  }
-                }
-              }
-
-              // Match 2 (G17:G21)
-              const match2Status = getCellValue(cycleData, 21, 7);
-              if (match2Status !== 'Awaiting Teams' && match2Status !== '') {
-                const match2Winners = [
-                  getCellValue(cycleData, 17, 7),
-                  getCellValue(cycleData, 18, 7),
-                  getCellValue(cycleData, 19, 7)
-                ].filter(w => w && w !== 'N/A');
-                
-                if (match2Winners.length > 0) {
-                  // Count wins per team
-                  const winCount: Record<string, number> = {};
-                  match2Winners.forEach(w => {
-                    winCount[w] = (winCount[w] || 0) + 1;
-                  });
-                  
-                  // Get winner (most wins)
-                  const sorted = Object.entries(winCount).sort((a, b) => b[1] - a[1]);
-                  if (sorted.length >= 2) {
-                    const winner = sorted[0][0];
-                    const loser = sorted[1][0];
-                    matches.push({ winner, loser });
-                  } else if (sorted.length === 1) {
-                    matches.push({ winner: sorted[0][0], loser: 'TBD' });
-                  }
-                }
-              }
-
-              cycles.push({
-                cashout,
-                matches,
-                leader: cycleLeader,
-                hasData: true
-              });
-            }
-          } catch (e) {
-            console.error(`Failed to fetch cycle ${cycles.length + 1}:`, e);
           }
+
+          const cycleLeader = getCellValue(cycleData, 26, 10).trim() || 'Pending Results';
+          const matches: MatchResult[] = [];
+
+          // Match 1 (G12:G16)
+          const match1Status = getCellValue(cycleData, 21, 7);
+          if (match1Status !== 'Awaiting Teams' && match1Status !== '') {
+            const match1Winners = [
+              getCellValue(cycleData, 12, 7),
+              getCellValue(cycleData, 13, 7),
+              getCellValue(cycleData, 14, 7)
+            ].filter(w => w && w !== 'N/A');
+            
+            if (match1Winners.length > 0) {
+              const winCount: Record<string, number> = {};
+              match1Winners.forEach(w => {
+                winCount[w] = (winCount[w] || 0) + 1;
+              });
+              
+              const sorted = Object.entries(winCount).sort((a, b) => b[1] - a[1]);
+              if (sorted.length >= 2) {
+                matches.push({ winner: sorted[0][0], loser: sorted[1][0] });
+              } else if (sorted.length === 1) {
+                matches.push({ winner: sorted[0][0], loser: 'TBD' });
+              }
+            }
+          }
+
+          // Match 2 (G17:G21)
+          const match2Status = getCellValue(cycleData, 21, 7);
+          if (match2Status !== 'Awaiting Teams' && match2Status !== '') {
+            const match2Winners = [
+              getCellValue(cycleData, 17, 7),
+              getCellValue(cycleData, 18, 7),
+              getCellValue(cycleData, 19, 7)
+            ].filter(w => w && w !== 'N/A');
+            
+            if (match2Winners.length > 0) {
+              const winCount: Record<string, number> = {};
+              match2Winners.forEach(w => {
+                winCount[w] = (winCount[w] || 0) + 1;
+              });
+              
+              const sorted = Object.entries(winCount).sort((a, b) => b[1] - a[1]);
+              if (sorted.length >= 2) {
+                matches.push({ winner: sorted[0][0], loser: sorted[1][0] });
+              } else if (sorted.length === 1) {
+                matches.push({ winner: sorted[0][0], loser: 'TBD' });
+              }
+            }
+          }
+
+          cycles.push({
+            cashout,
+            matches,
+            leader: cycleLeader,
+            hasData: true
+          });
+        } catch (e) {
+          console.error('Failed to fetch cycle 1:', e);
+        }
+
+        // Cycle 2 (gid=5)
+        try {
+          const cycle2Url = getSheetCsvUrl(NEW_SHEET_ID, '5');
+          const cycle2Response = await fetch(cycle2Url);
+          const cycleData = parseCsv(await cycle2Response.text());
+
+          const cashout: CashoutResult[] = [];
+          for (let i = 0; i < 4; i++) {
+            const placement = getCellValue(cycleData, 7 + i, 1).trim();
+            const team = getCellValue(cycleData, 7 + i, 2).trim();
+            if (team && placement) {
+              cashout.push({ team, placement: parseInt(placement) || i + 1 });
+            }
+          }
+
+          const cycleLeader = getCellValue(cycleData, 26, 10).trim() || 'Pending Results';
+          const matches: MatchResult[] = [];
+
+          const match1Status = getCellValue(cycleData, 21, 7);
+          if (match1Status !== 'Awaiting Teams' && match1Status !== '') {
+            const match1Winners = [
+              getCellValue(cycleData, 12, 7),
+              getCellValue(cycleData, 13, 7),
+              getCellValue(cycleData, 14, 7)
+            ].filter(w => w && w !== 'N/A');
+            
+            if (match1Winners.length > 0) {
+              const winCount: Record<string, number> = {};
+              match1Winners.forEach(w => {
+                winCount[w] = (winCount[w] || 0) + 1;
+              });
+              
+              const sorted = Object.entries(winCount).sort((a, b) => b[1] - a[1]);
+              if (sorted.length >= 2) {
+                matches.push({ winner: sorted[0][0], loser: sorted[1][0] });
+              } else if (sorted.length === 1) {
+                matches.push({ winner: sorted[0][0], loser: 'TBD' });
+              }
+            }
+          }
+
+          const match2Status = getCellValue(cycleData, 21, 7);
+          if (match2Status !== 'Awaiting Teams' && match2Status !== '') {
+            const match2Winners = [
+              getCellValue(cycleData, 17, 7),
+              getCellValue(cycleData, 18, 7),
+              getCellValue(cycleData, 19, 7)
+            ].filter(w => w && w !== 'N/A');
+            
+            if (match2Winners.length > 0) {
+              const winCount: Record<string, number> = {};
+              match2Winners.forEach(w => {
+                winCount[w] = (winCount[w] || 0) + 1;
+              });
+              
+              const sorted = Object.entries(winCount).sort((a, b) => b[1] - a[1]);
+              if (sorted.length >= 2) {
+                matches.push({ winner: sorted[0][0], loser: sorted[1][0] });
+              } else if (sorted.length === 1) {
+                matches.push({ winner: sorted[0][0], loser: 'TBD' });
+              }
+            }
+          }
+
+          cycles.push({
+            cashout,
+            matches,
+            leader: cycleLeader,
+            hasData: true
+          });
+        } catch (e) {
+          console.error('Failed to fetch cycle 2:', e);
+        }
+
+        // Cycle 3 (gid=6)
+        try {
+          const cycle3Url = getSheetCsvUrl(NEW_SHEET_ID, '6');
+          const cycle3Response = await fetch(cycle3Url);
+          const cycleData = parseCsv(await cycle3Response.text());
+
+          const cashout: CashoutResult[] = [];
+          for (let i = 0; i < 4; i++) {
+            const placement = getCellValue(cycleData, 7 + i, 1).trim();
+            const team = getCellValue(cycleData, 7 + i, 2).trim();
+            if (team && placement) {
+              cashout.push({ team, placement: parseInt(placement) || i + 1 });
+            }
+          }
+
+          const cycleLeader = getCellValue(cycleData, 26, 10).trim() || 'Pending Results';
+          const matches: MatchResult[] = [];
+
+          const match1Status = getCellValue(cycleData, 21, 7);
+          if (match1Status !== 'Awaiting Teams' && match1Status !== '') {
+            const match1Winners = [
+              getCellValue(cycleData, 12, 7),
+              getCellValue(cycleData, 13, 7),
+              getCellValue(cycleData, 14, 7)
+            ].filter(w => w && w !== 'N/A');
+            
+            if (match1Winners.length > 0) {
+              const winCount: Record<string, number> = {};
+              match1Winners.forEach(w => {
+                winCount[w] = (winCount[w] || 0) + 1;
+              });
+              
+              const sorted = Object.entries(winCount).sort((a, b) => b[1] - a[1]);
+              if (sorted.length >= 2) {
+                matches.push({ winner: sorted[0][0], loser: sorted[1][0] });
+              } else if (sorted.length === 1) {
+                matches.push({ winner: sorted[0][0], loser: 'TBD' });
+              }
+            }
+          }
+
+          const match2Status = getCellValue(cycleData, 21, 7);
+          if (match2Status !== 'Awaiting Teams' && match2Status !== '') {
+            const match2Winners = [
+              getCellValue(cycleData, 17, 7),
+              getCellValue(cycleData, 18, 7),
+              getCellValue(cycleData, 19, 7)
+            ].filter(w => w && w !== 'N/A');
+            
+            if (match2Winners.length > 0) {
+              const winCount: Record<string, number> = {};
+              match2Winners.forEach(w => {
+                winCount[w] = (winCount[w] || 0) + 1;
+              });
+              
+              const sorted = Object.entries(winCount).sort((a, b) => b[1] - a[1]);
+              if (sorted.length >= 2) {
+                matches.push({ winner: sorted[0][0], loser: sorted[1][0] });
+              } else if (sorted.length === 1) {
+                matches.push({ winner: sorted[0][0], loser: 'TBD' });
+              }
+            }
+          }
+
+          cycles.push({
+            cashout,
+            matches,
+            leader: cycleLeader,
+            hasData: true
+          });
+        } catch (e) {
+          console.error('Failed to fetch cycle 3:', e);
         }
 
         setPageState({
@@ -252,6 +418,7 @@ export default function LiveBracket() {
           status: status || 'Awaiting Results',
           currentLeader: currentLeader && currentLeader !== 'Pending Results' ? currentLeader : 'Pending Results',
           registeredTeams,
+          teamRosters,
           standings,
           cycles,
           isPreEvent,
@@ -428,27 +595,68 @@ export default function LiveBracket() {
           </NeonCard>
         </div>
 
-        {/* PRE-EVENT STATE: Show Registered Teams + Status */}
+        {/* PRE-EVENT STATE: Show Teams */}
         {pageState.isPreEvent && (
           <>
             {/* Registered Teams (TOP) */}
             <div className="mb-16">
               <h2 className="text-2xl font-bold font-mono text-neon-cyan mb-6 uppercase">Registered Teams ({pageState.registeredTeams.length})</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {pageState.registeredTeams.map((team, idx) => (
-                  <NeonCard key={idx} variant="cyan">
-                    <p className="text-lg font-bold font-mono text-neon-cyan uppercase">{team}</p>
-                  </NeonCard>
-                ))}
-              </div>
-            </div>
+                {pageState.registeredTeams.map((team, idx) => {
+                  const roster = pageState.teamRosters[team];
+                  const isExpanded = expandedTeams.has(team);
 
-            {/* Status Panel */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-16">
-              <NeonCard variant="cyan">
-                <h3 className="text-sm font-mono text-white/50 uppercase mb-3">Status</h3>
-                <p className="text-xl font-bold font-mono text-neon-cyan">{pageState.status}</p>
-              </NeonCard>
+                  return (
+                    <div key={idx}>
+                      {/* Team Card Header */}
+                      <button
+                        onClick={() => toggleTeam(team)}
+                        className="w-full"
+                      >
+                        <NeonCard variant="cyan" className="cursor-pointer hover:opacity-80 transition-opacity">
+                          <div className="flex items-center justify-between">
+                            <p className="text-lg font-bold font-mono text-neon-cyan uppercase">{team}</p>
+                            <ChevronDown
+                              size={20}
+                              className={`text-neon-cyan transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                            />
+                          </div>
+                        </NeonCard>
+                      </button>
+
+                      {/* Roster Dropdown */}
+                      {isExpanded && (
+                        <div className="mt-2 p-4 bg-dark-charcoal/50 border border-neon-cyan/30 rounded text-sm font-mono text-white/70 space-y-2">
+                          {roster ? (
+                            <>
+                              {roster.teamLeader && (
+                                <div><span className="text-neon-cyan font-bold">Team Leader:</span> {roster.teamLeader}</div>
+                              )}
+                              {roster.player1 && (
+                                <div><span className="text-neon-cyan font-bold">Player 1:</span> {roster.player1}</div>
+                              )}
+                              {roster.player2 && (
+                                <div><span className="text-neon-cyan font-bold">Player 2:</span> {roster.player2}</div>
+                              )}
+                              {roster.player3 && (
+                                <div><span className="text-neon-cyan font-bold">Player 3:</span> {roster.player3}</div>
+                              )}
+                              {roster.sub && (
+                                <div><span className="text-neon-cyan font-bold">Sub:</span> {roster.sub}</div>
+                              )}
+                              {!roster.teamLeader && !roster.player1 && !roster.player2 && !roster.player3 && !roster.sub && (
+                                <div className="text-white/50 italic">Roster pending</div>
+                              )}
+                            </>
+                          ) : (
+                            <div className="text-white/50 italic">Roster pending</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </>
         )}
@@ -566,11 +774,60 @@ export default function LiveBracket() {
             <div className="mb-16">
               <h2 className="text-2xl font-bold font-mono text-neon-cyan mb-6 uppercase">Registered Teams ({pageState.registeredTeams.length})</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {pageState.registeredTeams.map((team, idx) => (
-                  <NeonCard key={idx} variant="cyan">
-                    <p className="text-lg font-bold font-mono text-neon-cyan uppercase">{team}</p>
-                  </NeonCard>
-                ))}
+                {pageState.registeredTeams.map((team, idx) => {
+                  const roster = pageState.teamRosters[team];
+                  const isExpanded = expandedTeams.has(team);
+
+                  return (
+                    <div key={idx}>
+                      {/* Team Card Header */}
+                      <button
+                        onClick={() => toggleTeam(team)}
+                        className="w-full"
+                      >
+                        <NeonCard variant="cyan" className="cursor-pointer hover:opacity-80 transition-opacity">
+                          <div className="flex items-center justify-between">
+                            <p className="text-lg font-bold font-mono text-neon-cyan uppercase">{team}</p>
+                            <ChevronDown
+                              size={20}
+                              className={`text-neon-cyan transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                            />
+                          </div>
+                        </NeonCard>
+                      </button>
+
+                      {/* Roster Dropdown */}
+                      {isExpanded && (
+                        <div className="mt-2 p-4 bg-dark-charcoal/50 border border-neon-cyan/30 rounded text-sm font-mono text-white/70 space-y-2">
+                          {roster ? (
+                            <>
+                              {roster.teamLeader && (
+                                <div><span className="text-neon-cyan font-bold">Team Leader:</span> {roster.teamLeader}</div>
+                              )}
+                              {roster.player1 && (
+                                <div><span className="text-neon-cyan font-bold">Player 1:</span> {roster.player1}</div>
+                              )}
+                              {roster.player2 && (
+                                <div><span className="text-neon-cyan font-bold">Player 2:</span> {roster.player2}</div>
+                              )}
+                              {roster.player3 && (
+                                <div><span className="text-neon-cyan font-bold">Player 3:</span> {roster.player3}</div>
+                              )}
+                              {roster.sub && (
+                                <div><span className="text-neon-cyan font-bold">Sub:</span> {roster.sub}</div>
+                              )}
+                              {!roster.teamLeader && !roster.player1 && !roster.player2 && !roster.player3 && !roster.sub && (
+                                <div className="text-white/50 italic">Roster pending</div>
+                              )}
+                            </>
+                          ) : (
+                            <div className="text-white/50 italic">Roster pending</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </>
@@ -673,11 +930,60 @@ export default function LiveBracket() {
             <div className="mb-16">
               <h2 className="text-2xl font-bold font-mono text-neon-cyan mb-6 uppercase">Registered Teams ({pageState.registeredTeams.length})</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {pageState.registeredTeams.map((team, idx) => (
-                  <NeonCard key={idx} variant="cyan">
-                    <p className="text-lg font-bold font-mono text-neon-cyan uppercase">{team}</p>
-                  </NeonCard>
-                ))}
+                {pageState.registeredTeams.map((team, idx) => {
+                  const roster = pageState.teamRosters[team];
+                  const isExpanded = expandedTeams.has(team);
+
+                  return (
+                    <div key={idx}>
+                      {/* Team Card Header */}
+                      <button
+                        onClick={() => toggleTeam(team)}
+                        className="w-full"
+                      >
+                        <NeonCard variant="cyan" className="cursor-pointer hover:opacity-80 transition-opacity">
+                          <div className="flex items-center justify-between">
+                            <p className="text-lg font-bold font-mono text-neon-cyan uppercase">{team}</p>
+                            <ChevronDown
+                              size={20}
+                              className={`text-neon-cyan transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                            />
+                          </div>
+                        </NeonCard>
+                      </button>
+
+                      {/* Roster Dropdown */}
+                      {isExpanded && (
+                        <div className="mt-2 p-4 bg-dark-charcoal/50 border border-neon-cyan/30 rounded text-sm font-mono text-white/70 space-y-2">
+                          {roster ? (
+                            <>
+                              {roster.teamLeader && (
+                                <div><span className="text-neon-cyan font-bold">Team Leader:</span> {roster.teamLeader}</div>
+                              )}
+                              {roster.player1 && (
+                                <div><span className="text-neon-cyan font-bold">Player 1:</span> {roster.player1}</div>
+                              )}
+                              {roster.player2 && (
+                                <div><span className="text-neon-cyan font-bold">Player 2:</span> {roster.player2}</div>
+                              )}
+                              {roster.player3 && (
+                                <div><span className="text-neon-cyan font-bold">Player 3:</span> {roster.player3}</div>
+                              )}
+                              {roster.sub && (
+                                <div><span className="text-neon-cyan font-bold">Sub:</span> {roster.sub}</div>
+                              )}
+                              {!roster.teamLeader && !roster.player1 && !roster.player2 && !roster.player3 && !roster.sub && (
+                                <div className="text-white/50 italic">Roster pending</div>
+                              )}
+                            </>
+                          ) : (
+                            <div className="text-white/50 italic">Roster pending</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </>
