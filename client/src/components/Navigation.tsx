@@ -33,7 +33,7 @@ export default function Navigation() {
             <img 
               src="https://d2xsxph8kpxj0f.cloudfront.net/310519663462787524/GzitzUSk3snQMAtW4LnLnQ/DD_logo-removebg-preview_07cba133.png" 
               alt="Development Division" 
-              className="h-14 cursor-pointer hover:opacity-80 transition-opacity" style={{width: '100px', height: '96px', marginBottom: '-5px'}}
+              className="h-14 cursor-pointer hover:opacity-80 transition-opacity" style={{width: '100px', height: '96px', marginBottom: '-5px', objectFit: 'contain'}}
             />
           </Link>
           
@@ -42,7 +42,7 @@ export default function Navigation() {
             <img 
               src="https://d2xsxph8kpxj0f.cloudfront.net/310519663462787524/GzitzUSk3snQMAtW4LnLnQ/MurphTournaments_logo_747bd67f.png" 
               alt="Murph Tournaments" 
-              className="h-14 cursor-pointer hover:opacity-80 transition-opacity" style={{width: '180px', height: '121px', marginBottom: '-5px', marginTop: '7px'}}
+              className="h-14 cursor-pointer hover:opacity-80 transition-opacity" style={{width: '180px', height: '121px', marginBottom: '-5px', marginTop: '7px', objectFit: 'contain'}}
             />
           </Link>
         </div>
