@@ -43,11 +43,12 @@ const STATIC_TEAMS: Team[] = [
   }
 ];
 
-// Google Sheets CSV export URL
-const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1tXZ5opDeFAy_l_uTiOD-dEO1wMlL66MhuKBFtr84adc/export?format=csv&gid=0';
+// Google Sheets CSV export URL - Dashboard tab (gid=65660360)
+const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1tXZ5opDeFAy_l_uTiOD-dEO1wMlL66MhuKBFtr84adc/export?format=csv&gid=65660360';
 
 interface LiveData {
   teamNames: string[];
+  eventWinner: string;
   eventStatus: string;
   currentLeader: string;
   tiebreaker: string;
@@ -58,6 +59,7 @@ export default function LiveBracket() {
   const [expandedTeam, setExpandedTeam] = useState<number | null>(null);
   const [liveData, setLiveData] = useState<LiveData>({
     teamNames: STATIC_TEAMS.map(t => t.name),
+    eventWinner: 'Pending Results',
     eventStatus: 'Awaiting Results',
     currentLeader: 'Pending Results',
     tiebreaker: 'NO TIEBREAKER NEEDED',
@@ -81,19 +83,28 @@ export default function LiveBracket() {
           }
         }
 
-        // Extract Live Event Status from E6:G8 (rows 6-8, columns E-G are indices 4-6)
+        // Extract Event Winner from A6:C8 (row 6, column B is index 1)
+        let eventWinner = 'Pending Results';
+        if (lines.length > 5) {
+          const winnerRow = lines[5].split(',');
+          if (winnerRow[1] && winnerRow[1].trim()) {
+            eventWinner = winnerRow[1].trim();
+          }
+        }
+
+        // Extract Live Event Status from E6:G8 (row 6, column F is index 5)
         let eventStatus = 'Awaiting Results';
-        if (lines.length > 6) {
-          const statusRow = lines[6].split(',');
+        if (lines.length > 5) {
+          const statusRow = lines[5].split(',');
           if (statusRow[5] && statusRow[5].trim()) {
             eventStatus = statusRow[5].trim();
           }
         }
 
-        // Extract Current Leader from I6:K8 (rows 6-8, columns I-K are indices 8-10)
+        // Extract Current Leader from I6:K8 (row 6, column J is index 9)
         let currentLeader = 'Pending Results';
-        if (lines.length > 6) {
-          const leaderRow = lines[6].split(',');
+        if (lines.length > 5) {
+          const leaderRow = lines[5].split(',');
           if (leaderRow[9] && leaderRow[9].trim()) {
             currentLeader = leaderRow[9].trim();
           }
@@ -110,15 +121,19 @@ export default function LiveBracket() {
 
         setLiveData({
           teamNames: teamNames.length > 0 ? teamNames : STATIC_TEAMS.map(t => t.name),
+          eventWinner,
           eventStatus,
           currentLeader,
           tiebreaker,
-          dataAvailable: teamNames.length > 0
+          dataAvailable: true
         });
       } catch (error) {
         console.error('Failed to fetch sheet data:', error);
         setLiveData(prev => ({
           ...prev,
+          eventWinner: 'Data unavailable',
+          eventStatus: 'Data unavailable',
+          currentLeader: 'Data unavailable',
           dataAvailable: false
         }));
       }
@@ -162,7 +177,7 @@ export default function LiveBracket() {
           {/* Event Winner */}
           <NeonCard variant="gold">
             <h3 className="text-sm font-mono text-white/50 uppercase mb-3">Event Winner</h3>
-            <p className="text-xl font-bold font-mono text-neon-gold">{liveData.eventStatus}</p>
+            <p className="text-xl font-bold font-mono text-neon-gold">{liveData.eventWinner}</p>
           </NeonCard>
 
           {/* Live Event Status */}
@@ -357,7 +372,7 @@ export default function LiveBracket() {
 
         {/* Navigation */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Link href="/history">
+          <Link to="/tournaments">
             <button className="px-8 py-3 border-2 border-neon-cyan text-neon-cyan font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all">
               Tournament History
             </button>
