@@ -76,6 +76,7 @@ const getRangeValues = (data: string[][], startRow: number, endRow: number, col:
 
 export default function LiveBracket() {
   const [expandedCycles, setExpandedCycles] = useState<Set<number>>(new Set());
+  const [isLoading, setIsLoading] = useState(true);
   const [pageState, setPageState] = useState<PageState>({
     eventWinner: 'Pending Results',
     status: 'Awaiting Results',
@@ -258,12 +259,14 @@ export default function LiveBracket() {
           isEventComplete,
           dataAvailable: true
         });
+        setIsLoading(false);
       } catch (error) {
         console.error('Failed to fetch sheet data:', error);
         setPageState(prev => ({
           ...prev,
           dataAvailable: false
         }));
+        setIsLoading(false);
       }
     };
 
@@ -271,6 +274,16 @@ export default function LiveBracket() {
     const interval = setInterval(fetchAllData, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-dark-charcoal py-20">
+        <div className="container">
+          <div className="text-center text-white/50 font-mono">Loading tournament data...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-dark-charcoal py-20">
@@ -290,6 +303,129 @@ export default function LiveBracket() {
           <p className="text-lg text-white/80 font-mono max-w-2xl">
             The Development Division is played across three competitive cycles. Each cycle functions as a complete mini-bracket, where teams first establish seeding through Cashout and then compete in Final Round matchups for points. Performance carries across all three cycles, with Final Round Points (FRP) accumulating to determine the overall winner.
           </p>
+        </div>
+
+        {/* Tournament Structure */}
+        <div className="mb-16">
+          <h2 className="text-2xl font-bold font-mono text-neon-gold mb-6 uppercase">Tournament Structure</h2>
+          <div className="space-y-8">
+            {/* Cycle 1 */}
+            <div>
+              <h3 className="text-xl font-bold font-mono text-white mb-4 uppercase">Cycle 1</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <NeonCard variant="gold">
+                  <h4 className="text-lg font-bold font-mono text-neon-gold mb-3 uppercase">Stage 1: Cashout</h4>
+                  <div className="space-y-2 text-sm font-mono text-white/70">
+                    <div><span className="text-neon-gold font-bold">4 Teams Compete</span></div>
+                    <div className="text-xs">All 4 teams play one round of Cashout</div>
+                    <div className="mt-3 text-neon-gold font-bold">Placements</div>
+                    <div className="text-xs space-y-1">
+                      <div>• 1st Place</div>
+                      <div>• 2nd Place</div>
+                      <div>• 3rd Place</div>
+                      <div>• 4th Place</div>
+                    </div>
+                  </div>
+                </NeonCard>
+                <NeonCard variant="magenta">
+                  <h4 className="text-lg font-bold font-mono text-neon-magenta mb-3 uppercase">Stage 2: Final Round</h4>
+                  <div className="space-y-2 text-sm font-mono text-white/70">
+                    <div><span className="text-neon-magenta font-bold">Best of 3 Matches</span></div>
+                    <div className="text-xs space-y-1">
+                      <div>• 1st vs 2nd (BO3)</div>
+                      <div>• 3rd vs 4th (BO3)</div>
+                    </div>
+                    <div className="mt-3 text-neon-magenta font-bold">1 FRP Per Round Win</div>
+                    <div className="text-xs">Each victory = 1 FRP</div>
+                  </div>
+                </NeonCard>
+              </div>
+            </div>
+
+            {/* Cycle 2 */}
+            <div>
+              <h3 className="text-xl font-bold font-mono text-white mb-4 uppercase">Cycle 2</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <NeonCard variant="gold">
+                  <h4 className="text-lg font-bold font-mono text-neon-gold mb-3 uppercase">Stage 1: Cashout</h4>
+                  <div className="space-y-2 text-sm font-mono text-white/70">
+                    <div><span className="text-neon-gold font-bold">4 Teams Compete</span></div>
+                    <div className="text-xs">All 4 teams play one round of Cashout</div>
+                    <div className="mt-3 text-neon-gold font-bold">Placements</div>
+                    <div className="text-xs space-y-1">
+                      <div>• 1st Place</div>
+                      <div>• 2nd Place</div>
+                      <div>• 3rd Place</div>
+                      <div>• 4th Place</div>
+                    </div>
+                  </div>
+                </NeonCard>
+                <NeonCard variant="magenta">
+                  <h4 className="text-lg font-bold font-mono text-neon-magenta mb-3 uppercase">Stage 2: Final Round</h4>
+                  <div className="space-y-2 text-sm font-mono text-white/70">
+                    <div><span className="text-neon-magenta font-bold">Best of 3 Matches</span></div>
+                    <div className="text-xs space-y-1">
+                      <div>• 1st vs 2nd (BO3)</div>
+                      <div>• 3rd vs 4th (BO3)</div>
+                    </div>
+                    <div className="mt-3 text-neon-magenta font-bold">1 FRP Per Round Win</div>
+                    <div className="text-xs">Each victory = 1 FRP</div>
+                  </div>
+                </NeonCard>
+              </div>
+            </div>
+
+            {/* Cycle 3 */}
+            <div>
+              <h3 className="text-xl font-bold font-mono text-white mb-4 uppercase">Cycle 3</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <NeonCard variant="gold">
+                  <h4 className="text-lg font-bold font-mono text-neon-gold mb-3 uppercase">Stage 1: Cashout</h4>
+                  <div className="space-y-2 text-sm font-mono text-white/70">
+                    <div><span className="text-neon-gold font-bold">4 Teams Compete</span></div>
+                    <div className="text-xs">All 4 teams play one round of Cashout</div>
+                    <div className="mt-3 text-neon-gold font-bold">Placements</div>
+                    <div className="text-xs space-y-1">
+                      <div>• 1st Place</div>
+                      <div>• 2nd Place</div>
+                      <div>• 3rd Place</div>
+                      <div>• 4th Place</div>
+                    </div>
+                  </div>
+                </NeonCard>
+                <NeonCard variant="magenta">
+                  <h4 className="text-lg font-bold font-mono text-neon-magenta mb-3 uppercase">Stage 2: Final Round</h4>
+                  <div className="space-y-2 text-sm font-mono text-white/70">
+                    <div><span className="text-neon-magenta font-bold">Best of 3 Matches</span></div>
+                    <div className="text-xs space-y-1">
+                      <div>• 1st vs 2nd (BO3)</div>
+                      <div>• 3rd vs 4th (BO3)</div>
+                    </div>
+                    <div className="mt-3 text-neon-magenta font-bold">1 FRP Per Round Win</div>
+                    <div className="text-xs">Each victory = 1 FRP</div>
+                  </div>
+                </NeonCard>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Win Condition */}
+        <div className="mb-16">
+          <h2 className="text-2xl font-bold font-mono text-neon-cyan mb-6 uppercase">Win Condition</h2>
+          <NeonCard variant="cyan">
+            <div className="space-y-4 text-sm font-mono text-white/70">
+              <div>
+                <span className="text-neon-cyan font-bold">Highest FRP After 3 Cycles:</span> The team with the most accumulated Final Round Points across all three cycles wins the tournament.
+              </div>
+              <div className="border-t border-neon-cyan/30 pt-4">
+                <span className="text-neon-cyan font-bold">Tie Scenario:</span> If two or more teams are tied on FRP, a Sudden Death Final Round determines the champion.
+              </div>
+              <div className="border-t border-neon-cyan/30 pt-4">
+                <span className="text-neon-cyan font-bold">FRP Tracking:</span> FRP is tracked cumulatively throughout the tournament. Every placement in Stage 1 and every round win in Stage 2 contributes to your total.
+              </div>
+            </div>
+          </NeonCard>
         </div>
 
         {/* PRE-EVENT STATE: Show Registered Teams + Status */}
