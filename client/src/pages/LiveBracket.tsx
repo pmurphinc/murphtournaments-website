@@ -106,7 +106,7 @@ export default function LiveBracket() {
         // Fetch Lists tab for registered teams (A5:A24)
         const teamsResult = await trpcClient.bracket.getSheetData.query({
           sheetId: NEW_SHEET_ID,
-          tabId: '0'
+          range: 'Lists!A5:A24'
         });
         
         if (!teamsResult.success) throw new Error(teamsResult.error);
@@ -119,7 +119,7 @@ export default function LiveBracket() {
         // Fetch Team Members tab for rosters (A2:L21)
         const rostersResult = await trpcClient.bracket.getSheetData.query({
           sheetId: NEW_SHEET_ID,
-          tabId: '1'
+          range: 'Team Members!A2:L21'
         });
         
         if (!rostersResult.success) throw new Error(rostersResult.error);
@@ -146,7 +146,7 @@ export default function LiveBracket() {
         // Fetch Dashboard tab for status (B6, E6, I6)
         const dashboardResult = await trpcClient.bracket.getSheetData.query({
           sheetId: NEW_SHEET_ID,
-          tabId: '2'
+          range: 'Dashboard!B6:I6'
         });
         
         if (!dashboardResult.success) throw new Error(dashboardResult.error);
@@ -162,7 +162,7 @@ export default function LiveBracket() {
         // Fetch Standings tab (J5:L24)
         const standingsResult = await trpcClient.bracket.getSheetData.query({
           sheetId: NEW_SHEET_ID,
-          tabId: '3'
+          range: 'Standings!J5:L24'
         });
         
         if (!standingsResult.success) throw new Error(standingsResult.error);
@@ -191,7 +191,7 @@ export default function LiveBracket() {
             // Fetch cashout results (A7:B10)
             const cashoutResult = await trpcClient.bracket.getSheetData.query({
               sheetId: NEW_SHEET_ID,
-              tabId: String(3 + cycleNum)
+              range: `Cycle ${cycleNum}!A7:B10`
             });
             
             const cashout: CashoutResult[] = [];
@@ -212,7 +212,7 @@ export default function LiveBracket() {
             // Fetch match results (A13:B18)
             const matchesResult = await trpcClient.bracket.getSheetData.query({
               sheetId: NEW_SHEET_ID,
-              tabId: String(3 + cycleNum)
+              range: `Cycle ${cycleNum}!A13:B18`
             });
             
             const matches: MatchResult[] = [];
@@ -233,7 +233,7 @@ export default function LiveBracket() {
             // Fetch cycle leader (E7)
             const leaderResult = await trpcClient.bracket.getSheetData.query({
               sheetId: NEW_SHEET_ID,
-              tabId: String(3 + cycleNum)
+              range: `Cycle ${cycleNum}!E7:E7`
             });
             
             const leader = leaderResult.success && leaderResult.values?.[0]?.[0]

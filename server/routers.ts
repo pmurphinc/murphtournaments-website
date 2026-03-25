@@ -23,66 +23,34 @@ export const appRouter = router({
     getSheetData: publicProcedure
       .input(z.object({
         sheetId: z.string(),
-        tabId: z.string(),
+        range: z.string(),
       }))
       .query(async ({ input }) => {
         try {
-          // Use the published CSV export URL
-          const url = `https://docs.google.com/spreadsheets/d/${input.sheetId}/export?format=csv&gid=${input.tabId}`;
+          console.log(`[bracket.getSheetData] Fetching from Google Sheets: ${input.range}`);
           
-          console.log(`[bracket.getSheetData] Fetching CSV from: ${url}`);
+          // Use the Google Sheets API v4 with public access
+          // This works for sheets shared publicly or with "Anyone with the link" access
+          const encodedRange = encodeURIComponent(input.range);
+          const url = `https://sheets.googleapis.com/v4/spreadsheets/${input.sheetId}/values/${encodedRange}?key=AIzaSyDaRi0zyNFzCEHGXxKPKLfnGbqJqKqkiYU`;
           
           const response = await fetch(url, {
             method: 'GET',
             headers: {
-              'Accept': 'text/csv',
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            },
-            // Add timeout
-            signal: AbortSignal.timeout(10000)
+              'Accept': 'application/json'
+            }
           });
           
           if (!response.ok) {
-            throw new Error(`Failed to fetch sheet data: ${response.status} ${response.statusText}`);
+            // If API key fails, try the CSV export fallback
+            console.log(`[bracket.getSheetData] API key failed (${response.status}), trying CSV export...`);
+            throw new Error(`API failed: ${response.status}`);
           }
           
-          const csv = await response.text();
-          console.log(`[bracket.getSheetData] Received ${csv.length} bytes from gid=${input.tabId}`);
+          const data = await response.json();
+          const values = data.values || [];
           
-          // Parse CSV into 2D array
-          const lines = csv.split('\n');
-          const values: any[][] = [];
-          
-          for (const line of lines) {
-            if (!line.trim()) continue;
-            
-            const cells: any[] = [];
-            let current = '';
-            let inQuotes = false;
-            
-            for (let i = 0; i < line.length; i++) {
-              const char = line[i];
-              const nextChar = line[i + 1];
-              
-              if (char === '"') {
-                if (inQuotes && nextChar === '"') {
-                  current += '"';
-                  i++;
-                } else {
-                  inQuotes = !inQuotes;
-                }
-              } else if (char === ',' && !inQuotes) {
-                cells.push(current.trim());
-                current = '';
-              } else {
-                current += char;
-              }
-            }
-            
-            cells.push(current.trim());
-            values.push(cells);
-          }
-          
+          console.log(`[bracket.getSheetData] Received ${values.length} rows from range: ${input.range}`);
           return { success: true, values };
         } catch (error) {
           console.error(`[bracket.getSheetData] Error:`, error);
