@@ -26,14 +26,26 @@ export default function Navigation() {
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-dark-charcoal border-b border-neon-magenta/30 backdrop-blur-sm">
       <div className="container flex items-center justify-between h-16">
-        {/* Logo */}
-        <Link href="/">
-          <img 
-            src="https://d2xsxph8kpxj0f.cloudfront.net/310519663462787524/GzitzUSk3snQMAtW4LnLnQ/DD_logo-removebg-preview_07cba133.png" 
-            alt="Murph Tournaments" 
-            className="h-14 cursor-pointer hover:opacity-80 transition-opacity" style={{width: '100px', height: '96px', marginBottom: '-5px'}}
-          />
-        </Link>
+        {/* Logo Section */}
+        <div className="flex items-center gap-4 md:gap-6">
+          {/* DD Logo */}
+          <Link href="/">
+            <img 
+              src="https://d2xsxph8kpxj0f.cloudfront.net/310519663462787524/GzitzUSk3snQMAtW4LnLnQ/DD_logo-removebg-preview_07cba133.png" 
+              alt="Development Division" 
+              className="h-14 cursor-pointer hover:opacity-80 transition-opacity" style={{width: '100px', height: '96px', marginBottom: '-5px'}}
+            />
+          </Link>
+          
+          {/* Murph Tournaments Logo */}
+          <Link href="/">
+            <img 
+              src="https://d2xsxph8kpxj0f.cloudfront.net/310519663462787524/GzitzUSk3snQMAtW4LnLnQ/MurphTournaments_logo_747bd67f.png" 
+              alt="Murph Tournaments" 
+              className="h-14 cursor-pointer hover:opacity-80 transition-opacity" style={{width: '180px', height: '60px', marginBottom: '-5px'}}
+            />
+          </Link>
+        </div>
 
         {/* Desktop Navigation */}
         <div className="hidden md:flex items-center gap-8">
