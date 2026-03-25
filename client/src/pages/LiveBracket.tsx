@@ -36,12 +36,16 @@ export default function LiveBracket() {
       <div className="container max-w-4xl space-y-8">
         {/* Header */}
         <div className="text-center space-y-4">
-        <GlitchText size="2xl" variant="magenta">
-          DEVELOPMENT
-        </GlitchText>
-        <GlitchText size="2xl" variant="cyan">
-          DIVISION
-        </GlitchText>
+          <div>
+            <GlitchText size="2xl" variant="magenta">
+              DEVELOPMENT
+            </GlitchText>
+          </div>
+          <div>
+            <GlitchText size="2xl" variant="cyan">
+              DIVISION
+            </GlitchText>
+          </div>
           <p className="text-neon-cyan font-mono">Live Tournament Bracket</p>
         </div>
 
