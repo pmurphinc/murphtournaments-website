@@ -29,9 +29,9 @@ export default function Navigation() {
         {/* Logo */}
         <Link href="/">
           <img 
-            src="https://d2xsxph8kpxj0f.cloudfront.net/310519663462787524/GzitzUSk3snQMAtW4LnLnQ/MurphTournaments_logo_747bd67f.png" 
+            src="https://d2xsxph8kpxj0f.cloudfront.net/310519663462787524/GzitzUSk3snQMAtW4LnLnQ/DD_logo_66084337.png" 
             alt="Murph Tournaments" 
-            className="h-14 cursor-pointer hover:opacity-80 transition-opacity" style={{width: '249px', height: '146px', marginBottom: '-10px'}}
+            className="h-14 cursor-pointer hover:opacity-80 transition-opacity" style={{width: '80px', height: '80px', marginBottom: '-10px'}}
           />
         </Link>
 
