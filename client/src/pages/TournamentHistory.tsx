@@ -11,6 +11,42 @@ import GlitchText from '@/components/GlitchText';
 export default function TournamentHistory() {
   const pastTournaments = [
     {
+      name: 'Murph Monthly – September',
+      date: 'September 5, 2025',
+      teams: 8,
+      prizePool: '$175 cash + 3x $10 Embark codes',
+      winners: 'FAFO - n0rmalize, mojoflojo, brizz',
+      format: 'Invite Only, Final Round, Double Elimination (BO1)',
+      description: 'An exclusive event returning to the original style with invite-only slots.'
+    },
+    {
+      name: 'July Showdown',
+      date: 'July 26, 2025',
+      teams: 8,
+      prizePool: 'Community-funded (starting at $100)',
+      winners: 'Deadlyalzheimers, greenhazard44, neoncey',
+      format: 'Final Round, Double Elimination, BO3',
+      description: 'Community-driven event introducing Best-of-3 by popular demand.'
+    },
+    {
+      name: 'Tournament XI – Coach vs. Coach',
+      date: 'June 27, 2025',
+      teams: 4,
+      prizePool: '$240 total ($60 per player on winning team)',
+      winners: 'Team Purestrafez - Pookie#6485, CronusToBronze#0913, lyonleadz#4172',
+      format: 'Final Round, Double Elimination, BO1',
+      description: 'Unique format where Ruby-ranked coaches led randomly drafted teams.'
+    },
+    {
+      name: 'Tournament X',
+      date: 'May 31, 2025',
+      teams: 8,
+      prizePool: '$180 (1st) + cosmetic reward (2nd)',
+      winners: 'Your Moms Fav - Brendy, Sponz, WhenImWinchU',
+      format: 'Cashout → Final Round, Double Elimination, BO1',
+      description: 'A milestone event, drawing one of the largest audiences to date.'
+    },
+    {
       name: 'Murph Tournament IX',
       date: 'May 10, 2025',
       teams: 10,
@@ -102,7 +138,7 @@ export default function TournamentHistory() {
             Tournament History
           </GlitchText>
           <p className="text-lg text-white/80 font-mono max-w-2xl">
-            Murph Tournaments has hosted 9 competitive tournaments, establishing a track record of professional production, fair competition, and consistent prize pools.
+            Murph Tournaments has hosted 13 competitive tournaments, establishing a track record of professional production, fair competition, and consistent prize pools.
           </p>
         </div>
 
