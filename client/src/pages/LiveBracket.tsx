@@ -60,6 +60,46 @@ export default function LiveBracket() {
           </NeonCard>
         </div>
 
+        {/* Registered Teams */}
+        <NeonCard variant="magenta" className="p-8">
+          <h2 className="text-2xl font-bold text-neon-magenta mb-6 font-mono">REGISTERED TEAMS</h2>
+          <div className="space-y-2">
+            {REGISTERED_TEAMS.map((team) => {
+              const isExpanded = expandedTeams.has(team.teamName);
+              return (
+                <div key={team.teamName} className="border border-neon-magenta/50 rounded overflow-hidden">
+                  <button
+                    onClick={() => {
+                      const newExpanded = new Set(expandedTeams);
+                      if (newExpanded.has(team.teamName)) {
+                        newExpanded.delete(team.teamName);
+                      } else {
+                        newExpanded.add(team.teamName);
+                      }
+                      setExpandedTeams(newExpanded);
+                    }}
+                    className="w-full p-4 flex items-center justify-between hover:bg-neon-magenta/10 transition-colors"
+                  >
+                    <span className="font-bold text-white font-mono">{team.teamName}</span>
+                    <ChevronDown
+                      size={20}
+                      className={`text-neon-magenta transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                    />
+                  </button>
+
+                  {isExpanded && (
+                    <div className="bg-dark-charcoal/50 p-4 border-t border-neon-magenta/50 space-y-2 text-sm font-mono">
+                      {team.players.map((player) => (
+                        <p key={player} className="text-white/80">{player}</p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </NeonCard>
+
         {/* Tournament Structure */}
         <NeonCard variant="gold" className="p-8">
           <h2 className="text-2xl font-bold text-neon-gold mb-6 font-mono">TOURNAMENT STRUCTURE</h2>
@@ -115,46 +155,6 @@ export default function LiveBracket() {
             <p>
               <span className="font-bold text-neon-cyan">FRP Tracking:</span> FRP is tracked cumulatively throughout the tournament. Every round win in Stage 2 contributes to your total.
             </p>
-          </div>
-        </NeonCard>
-
-        {/* Registered Teams */}
-        <NeonCard variant="magenta" className="p-8">
-          <h2 className="text-2xl font-bold text-neon-magenta mb-6 font-mono">REGISTERED TEAMS</h2>
-          <div className="space-y-2">
-            {REGISTERED_TEAMS.map((team) => {
-              const isExpanded = expandedTeams.has(team.teamName);
-              return (
-                <div key={team.teamName} className="border border-neon-magenta/50 rounded overflow-hidden">
-                  <button
-                    onClick={() => {
-                      const newExpanded = new Set(expandedTeams);
-                      if (newExpanded.has(team.teamName)) {
-                        newExpanded.delete(team.teamName);
-                      } else {
-                        newExpanded.add(team.teamName);
-                      }
-                      setExpandedTeams(newExpanded);
-                    }}
-                    className="w-full p-4 flex items-center justify-between hover:bg-neon-magenta/10 transition-colors"
-                  >
-                    <span className="font-bold text-white font-mono">{team.teamName}</span>
-                    <ChevronDown
-                      size={20}
-                      className={`text-neon-magenta transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                    />
-                  </button>
-
-                  {isExpanded && (
-                    <div className="bg-dark-charcoal/50 p-4 border-t border-neon-magenta/50 space-y-2 text-sm font-mono">
-                      {team.players.map((player) => (
-                        <p key={player} className="text-white/80">{player}</p>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
           </div>
         </NeonCard>
 
