@@ -32,20 +32,22 @@ export default function Home() {
         <div className="absolute inset-0 scan-lines opacity-5 pointer-events-none" />
 
         <div className="container relative z-10">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
             {/* Left: Text Content */}
-            <div className="space-y-6">
-              <GlitchText size="2xl" variant="magenta">
-                COMPETITIVE
-              </GlitchText>
-              <GlitchText size="2xl" variant="cyan">
-                THE FINALS
-              </GlitchText>
-              <GlitchText size="2xl" variant="gold">
-                TOURNAMENTS
-              </GlitchText>
+            <div className="space-y-6 max-w-full lg:max-w-none">
+              <div className="max-w-full lg:max-w-none overflow-wrap break-word">
+                <GlitchText size="2xl" variant="magenta">
+                  COMPETITIVE
+                </GlitchText>
+                <GlitchText size="2xl" variant="cyan">
+                  THE FINALS
+                </GlitchText>
+                <GlitchText size="2xl" variant="gold">
+                  TOURNAMENTS
+                </GlitchText>
+              </div>
 
-              <p className="text-lg text-white/80 font-mono leading-relaxed max-w-md">
+              <p className="text-lg text-white/80 font-mono leading-relaxed max-w-full lg:max-w-md">
                 Built by players. For players.
               </p>
 
@@ -69,7 +71,7 @@ export default function Home() {
             </div>
 
             {/* Right: THE FINALS Season 10 News */}
-            <div className="hidden md:flex items-center justify-center">
+            <div className="hidden lg:flex items-center justify-center">
               <div className="relative w-full h-96 bg-gradient-to-br from-neon-magenta/10 to-neon-cyan/10 border-2 border-neon-gold/40 rounded-sm p-8 flex flex-col justify-center">
                 <div className="text-center space-y-4">
                   <div className="text-neon-gold font-mono text-sm uppercase tracking-widest font-bold">Latest News</div>
