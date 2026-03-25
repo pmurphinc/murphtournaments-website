@@ -422,7 +422,7 @@ export default function LiveBracket() {
                 <span className="text-neon-cyan font-bold">Tie Scenario:</span> If two or more teams are tied on FRP, a Sudden Death Final Round determines the champion.
               </div>
               <div className="border-t border-neon-cyan/30 pt-4">
-                <span className="text-neon-cyan font-bold">FRP Tracking:</span> FRP is tracked cumulatively throughout the tournament. Every placement in Stage 1 and every round win in Stage 2 contributes to your total.
+                <span className="text-neon-cyan font-bold">FRP Tracking:</span> FRP is tracked cumulatively throughout the tournament. Every round win in Stage 2 contributes to your total.
               </div>
             </div>
           </NeonCard>
