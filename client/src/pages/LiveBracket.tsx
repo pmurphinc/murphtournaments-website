@@ -3,11 +3,12 @@ import GlitchText from '@/components/GlitchText';
 import { Link } from 'wouter';
 import { useState, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
+import { trpc } from '@/lib/trpc';
 
 /**
  * Live Bracket Page - Development Division
  * Uses DD Scorekeeper 2.0 Google Sheet as single source of truth
- * - Smart data fetching from multiple tabs
+ * - Smart data fetching from multiple tabs via Sheets API
  * - Intelligent visibility logic based on event state
  * - Collapsible cycle sections
  * - Real-time standings leaderboard
@@ -56,36 +57,32 @@ interface PageState {
 
 const NEW_SHEET_ID = '1-e00pcvQOPZIAyYsIjmmRQbniWzgHxyOVO68fv-X2gs';
 
-// Helper to get CSV export URL for a specific tab
-const getSheetCsvUrl = (sheetId: string, tabId: string) => 
-  `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${tabId}`;
-
-// Parse CSV data
-const parseCsv = (csv: string): string[][] => {
-  return csv.split('\n').map(line => 
-    line.split(',').map(cell => cell.trim().replace(/^"(.*)"$/, '$1'))
-  );
+// Helper to build sheet range strings
+const buildRange = (tabName: string, startRow: number, endRow: number, col: string): string => {
+  return `${tabName}!${col}${startRow}:${col}${endRow}`;
 };
 
-// Extract cell value from CSV data (1-indexed)
-const getCellValue = (data: string[][], row: number, col: number): string => {
-  if (row - 1 < data.length && col - 1 < data[row - 1].length) {
-    return data[row - 1][col - 1] || '';
+// Parse 2D array values from Sheets API
+const getArrayValue = (values: any[][], row: number, col: number): string => {
+  if (values && values[row - 1] && values[row - 1][col - 1]) {
+    return String(values[row - 1][col - 1]).trim();
   }
   return '';
 };
 
-// Extract range from CSV data (1-indexed)
-const getRangeValues = (data: string[][], startRow: number, endRow: number, col: number): string[] => {
-  const values: string[] = [];
+// Extract range values from 2D array
+const getRangeValues = (values: any[][], startRow: number, endRow: number, col: number): string[] => {
+  const result: string[] = [];
   for (let i = startRow; i <= endRow; i++) {
-    const val = getCellValue(data, i, col);
-    if (val) values.push(val);
+    const val = getArrayValue(values, i, col);
+    if (val) result.push(val);
   }
-  return values;
+  console.log(`[getRangeValues] Fetched ${result.length} values from rows ${startRow}-${endRow}, col ${col}:`, result);
+  return result;
 };
 
 export default function LiveBracket() {
+  const trpcClient = trpc.useUtils().client;
   const [expandedCycles, setExpandedCycles] = useState<Set<number>>(new Set());
   const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
@@ -100,319 +97,164 @@ export default function LiveBracket() {
     isPreEvent: true,
     isLiveEvent: false,
     isEventComplete: false,
-    dataAvailable: true
+    dataAvailable: false,
   });
-
-  const toggleCycle = (idx: number) => {
-    const newSet = new Set(expandedCycles);
-    if (newSet.has(idx)) {
-      newSet.delete(idx);
-    } else {
-      newSet.add(idx);
-    }
-    setExpandedCycles(newSet);
-  };
-
-  const toggleTeam = (teamName: string) => {
-    const newSet = new Set(expandedTeams);
-    if (newSet.has(teamName)) {
-      newSet.delete(teamName);
-    } else {
-      newSet.add(teamName);
-    }
-    setExpandedTeams(newSet);
-  };
 
   useEffect(() => {
     const fetchAllData = async () => {
       try {
-        // Fetch Lists tab (gid=0) for registered teams
-        const listsUrl = getSheetCsvUrl(NEW_SHEET_ID, '0');
-        const listsResponse = await fetch(listsUrl);
-        const listsData = parseCsv(await listsResponse.text());
-        const registeredTeams = getRangeValues(listsData, 5, 24, 1).filter(t => t.trim());
+        // Fetch Lists tab for registered teams (A5:A24)
+        const teamsResult = await trpcClient.bracket.getSheetData.query({
+          sheetId: NEW_SHEET_ID,
+          tabId: '0'
+        });
+        
+        if (!teamsResult.success) throw new Error(teamsResult.error);
+        const registeredTeams = (teamsResult.values || [])
+          .flat()
+          .map((v: any) => String(v).trim())
+          .filter((v: string) => v);
+        console.log('[fetchAllData] Registered teams:', registeredTeams);
 
-        // Fetch Team Members tab (gid=1) for rosters
-        const teamMembersUrl = getSheetCsvUrl(NEW_SHEET_ID, '1');
-        const teamMembersResponse = await fetch(teamMembersUrl);
-        const teamMembersData = parseCsv(await teamMembersResponse.text());
-
-        // Build roster map from Team Members sheet
+        // Fetch Team Members tab for rosters (A2:L21)
+        const rostersResult = await trpcClient.bracket.getSheetData.query({
+          sheetId: NEW_SHEET_ID,
+          tabId: '1'
+        });
+        
+        if (!rostersResult.success) throw new Error(rostersResult.error);
         const teamRosters: Record<string, TeamRoster> = {};
-        for (let row = 2; row <= 21; row++) {
-          const teamName = getCellValue(teamMembersData, row, 1).trim();
-          if (teamName) {
-            teamRosters[teamName] = {
-              teamName,
-              teamLeader: getCellValue(teamMembersData, row, 2).trim(),
-              player1: getCellValue(teamMembersData, row, 3).trim(),
-              player2: getCellValue(teamMembersData, row, 4).trim(),
-              player3: getCellValue(teamMembersData, row, 5).trim(),
-              sub: getCellValue(teamMembersData, row, 6).trim()
-            };
+        const rosterValues = rostersResult.values || [];
+        
+        for (let i = 0; i < rosterValues.length; i++) {
+          const row = rosterValues[i];
+          if (row && row[0]) {
+            const teamName = String(row[0]).trim();
+            if (teamName) {
+              teamRosters[teamName] = {
+                teamName,
+                teamLeader: String(row[1] || '').trim(),
+                player1: String(row[2] || '').trim(),
+                player2: String(row[3] || '').trim(),
+                player3: String(row[4] || '').trim(),
+                sub: String(row[5] || '').trim(),
+              };
+            }
           }
         }
 
-        // Fetch Dashboard tab (gid=2) for status
-        const dashboardUrl = getSheetCsvUrl(NEW_SHEET_ID, '2');
-        const dashboardResponse = await fetch(dashboardUrl);
-        const dashboardData = parseCsv(await dashboardResponse.text());
+        // Fetch Dashboard tab for status (B6, E6, I6)
+        const dashboardResult = await trpcClient.bracket.getSheetData.query({
+          sheetId: NEW_SHEET_ID,
+          tabId: '2'
+        });
+        
+        if (!dashboardResult.success) throw new Error(dashboardResult.error);
+        const dashboardValues = dashboardResult.values?.[0] || [];
+        const eventWinner = String(dashboardValues[0] || '').trim() || 'Pending Results';
+        const status = String(dashboardValues[4] || '').trim() || 'Awaiting Results';
+        const currentLeader = String(dashboardValues[8] || '').trim() || 'Pending Results';
 
-        const eventWinner = getCellValue(dashboardData, 6, 2) || 'Pending Results';
-        const status = getCellValue(dashboardData, 6, 5) || 'Awaiting Results';
-        const currentLeader = getCellValue(dashboardData, 6, 9) || 'Pending Results';
-
-        // Determine event state
         const isPreEvent = status === 'Awaiting Results' || status === 'Pre-Event';
         const isLiveEvent = status === 'Live' || status === 'In Progress';
         const isEventComplete = status === 'Complete' || eventWinner !== 'Pending Results';
 
-        // Fetch Standings tab (gid=3) for leaderboard
-        const standingsUrl = getSheetCsvUrl(NEW_SHEET_ID, '3');
-        const standingsResponse = await fetch(standingsUrl);
-        const standingsData = parseCsv(await standingsResponse.text());
-
+        // Fetch Standings tab (J5:L24)
+        const standingsResult = await trpcClient.bracket.getSheetData.query({
+          sheetId: NEW_SHEET_ID,
+          tabId: '3'
+        });
+        
+        if (!standingsResult.success) throw new Error(standingsResult.error);
         const standings: Array<{ name: string; frp: number; rank: number }> = [];
-        for (let row = 5; row <= 24; row++) {
-          const teamName = getCellValue(standingsData, row, 10).trim();
-          const frpStr = getCellValue(standingsData, row, 11).trim();
-          const rankStr = getCellValue(standingsData, row, 12).trim();
-          if (teamName && frpStr) {
-            standings.push({
-              name: teamName,
-              frp: parseInt(frpStr) || 0,
-              rank: parseInt(rankStr) || 0
-            });
+        const standingsValues = standingsResult.values || [];
+        
+        for (let i = 0; i < standingsValues.length; i++) {
+          const row = standingsValues[i];
+          if (row && row[0]) {
+            const teamName = String(row[0]).trim();
+            const frp = parseInt(String(row[1] || '0')) || 0;
+            const rank = i + 1;
+            if (teamName && frp > 0) {
+              standings.push({ name: teamName, frp, rank });
+            }
           }
         }
 
         // Fetch cycles data
         const cycles: CycleData[] = [];
 
-        // Cycle 1 (gid=4)
-        try {
-          const cycle1Url = getSheetCsvUrl(NEW_SHEET_ID, '4');
-          const cycle1Response = await fetch(cycle1Url);
-          const cycleData = parseCsv(await cycle1Response.text());
-
-          const cashout: CashoutResult[] = [];
-          for (let i = 0; i < 4; i++) {
-            const placement = getCellValue(cycleData, 7 + i, 1).trim();
-            const team = getCellValue(cycleData, 7 + i, 2).trim();
-            if (team && placement) {
-              cashout.push({ team, placement: parseInt(placement) || i + 1 });
-            }
-          }
-
-          const cycleLeader = getCellValue(cycleData, 26, 10).trim() || 'Pending Results';
-          const matches: MatchResult[] = [];
-
-          // Match 1 (G12:G16)
-          const match1Status = getCellValue(cycleData, 21, 7);
-          if (match1Status !== 'Awaiting Teams' && match1Status !== '') {
-            const match1Winners = [
-              getCellValue(cycleData, 12, 7),
-              getCellValue(cycleData, 13, 7),
-              getCellValue(cycleData, 14, 7)
-            ].filter(w => w && w !== 'N/A');
+        for (let cycleNum = 1; cycleNum <= 3; cycleNum++) {
+          try {
+            const tabName = `Cycle ${cycleNum}`;
             
-            if (match1Winners.length > 0) {
-              const winCount: Record<string, number> = {};
-              match1Winners.forEach(w => {
-                winCount[w] = (winCount[w] || 0) + 1;
-              });
-              
-              const sorted = Object.entries(winCount).sort((a, b) => b[1] - a[1]);
-              if (sorted.length >= 2) {
-                matches.push({ winner: sorted[0][0], loser: sorted[1][0] });
-              } else if (sorted.length === 1) {
-                matches.push({ winner: sorted[0][0], loser: 'TBD' });
+            // Fetch cashout results (A7:B10)
+            const cashoutResult = await trpcClient.bracket.getSheetData.query({
+              sheetId: NEW_SHEET_ID,
+              tabId: String(3 + cycleNum)
+            });
+            
+            const cashout: CashoutResult[] = [];
+            if (cashoutResult.success) {
+              const cashoutValues = cashoutResult.values || [];
+              for (let i = 0; i < cashoutValues.length; i++) {
+                const row = cashoutValues[i];
+                if (row && row[0]) {
+                  const team = String(row[0]).trim();
+                  const placement = parseInt(String(row[1] || '0')) || 0;
+                  if (team && placement > 0) {
+                    cashout.push({ team, placement });
+                  }
+                }
               }
             }
-          }
 
-          // Match 2 (G17:G21)
-          const match2Status = getCellValue(cycleData, 21, 7);
-          if (match2Status !== 'Awaiting Teams' && match2Status !== '') {
-            const match2Winners = [
-              getCellValue(cycleData, 17, 7),
-              getCellValue(cycleData, 18, 7),
-              getCellValue(cycleData, 19, 7)
-            ].filter(w => w && w !== 'N/A');
+            // Fetch match results (A13:B18)
+            const matchesResult = await trpcClient.bracket.getSheetData.query({
+              sheetId: NEW_SHEET_ID,
+              tabId: String(3 + cycleNum)
+            });
             
-            if (match2Winners.length > 0) {
-              const winCount: Record<string, number> = {};
-              match2Winners.forEach(w => {
-                winCount[w] = (winCount[w] || 0) + 1;
-              });
-              
-              const sorted = Object.entries(winCount).sort((a, b) => b[1] - a[1]);
-              if (sorted.length >= 2) {
-                matches.push({ winner: sorted[0][0], loser: sorted[1][0] });
-              } else if (sorted.length === 1) {
-                matches.push({ winner: sorted[0][0], loser: 'TBD' });
+            const matches: MatchResult[] = [];
+            if (matchesResult.success) {
+              const matchValues = matchesResult.values || [];
+              for (let i = 0; i < matchValues.length; i++) {
+                const row = matchValues[i];
+                if (row && row[0] && row[1]) {
+                  const winner = String(row[0]).trim();
+                  const loser = String(row[1]).trim();
+                  if (winner && loser) {
+                    matches.push({ winner, loser });
+                  }
+                }
               }
             }
-          }
 
-          cycles.push({
-            cashout,
-            matches,
-            leader: cycleLeader,
-            hasData: true
-          });
-        } catch (e) {
-          console.error('Failed to fetch cycle 1:', e);
+            // Fetch cycle leader (E7)
+            const leaderResult = await trpcClient.bracket.getSheetData.query({
+              sheetId: NEW_SHEET_ID,
+              tabId: String(3 + cycleNum)
+            });
+            
+            const leader = leaderResult.success && leaderResult.values?.[0]?.[0]
+              ? String(leaderResult.values[0][0]).trim()
+              : '';
+
+            const hasData = cashout.length > 0 || matches.length > 0;
+            cycles.push({ cashout, matches, leader, hasData });
+          } catch (e) {
+            console.error(`Failed to fetch cycle ${cycleNum}:`, e);
+            cycles.push({ cashout: [], matches: [], leader: '', hasData: false });
+          }
         }
 
-        // Cycle 2 (gid=5)
-        try {
-          const cycle2Url = getSheetCsvUrl(NEW_SHEET_ID, '5');
-          const cycle2Response = await fetch(cycle2Url);
-          const cycleData = parseCsv(await cycle2Response.text());
-
-          const cashout: CashoutResult[] = [];
-          for (let i = 0; i < 4; i++) {
-            const placement = getCellValue(cycleData, 7 + i, 1).trim();
-            const team = getCellValue(cycleData, 7 + i, 2).trim();
-            if (team && placement) {
-              cashout.push({ team, placement: parseInt(placement) || i + 1 });
-            }
-          }
-
-          const cycleLeader = getCellValue(cycleData, 26, 10).trim() || 'Pending Results';
-          const matches: MatchResult[] = [];
-
-          const match1Status = getCellValue(cycleData, 21, 7);
-          if (match1Status !== 'Awaiting Teams' && match1Status !== '') {
-            const match1Winners = [
-              getCellValue(cycleData, 12, 7),
-              getCellValue(cycleData, 13, 7),
-              getCellValue(cycleData, 14, 7)
-            ].filter(w => w && w !== 'N/A');
-            
-            if (match1Winners.length > 0) {
-              const winCount: Record<string, number> = {};
-              match1Winners.forEach(w => {
-                winCount[w] = (winCount[w] || 0) + 1;
-              });
-              
-              const sorted = Object.entries(winCount).sort((a, b) => b[1] - a[1]);
-              if (sorted.length >= 2) {
-                matches.push({ winner: sorted[0][0], loser: sorted[1][0] });
-              } else if (sorted.length === 1) {
-                matches.push({ winner: sorted[0][0], loser: 'TBD' });
-              }
-            }
-          }
-
-          const match2Status = getCellValue(cycleData, 21, 7);
-          if (match2Status !== 'Awaiting Teams' && match2Status !== '') {
-            const match2Winners = [
-              getCellValue(cycleData, 17, 7),
-              getCellValue(cycleData, 18, 7),
-              getCellValue(cycleData, 19, 7)
-            ].filter(w => w && w !== 'N/A');
-            
-            if (match2Winners.length > 0) {
-              const winCount: Record<string, number> = {};
-              match2Winners.forEach(w => {
-                winCount[w] = (winCount[w] || 0) + 1;
-              });
-              
-              const sorted = Object.entries(winCount).sort((a, b) => b[1] - a[1]);
-              if (sorted.length >= 2) {
-                matches.push({ winner: sorted[0][0], loser: sorted[1][0] });
-              } else if (sorted.length === 1) {
-                matches.push({ winner: sorted[0][0], loser: 'TBD' });
-              }
-            }
-          }
-
-          cycles.push({
-            cashout,
-            matches,
-            leader: cycleLeader,
-            hasData: true
-          });
-        } catch (e) {
-          console.error('Failed to fetch cycle 2:', e);
-        }
-
-        // Cycle 3 (gid=6)
-        try {
-          const cycle3Url = getSheetCsvUrl(NEW_SHEET_ID, '6');
-          const cycle3Response = await fetch(cycle3Url);
-          const cycleData = parseCsv(await cycle3Response.text());
-
-          const cashout: CashoutResult[] = [];
-          for (let i = 0; i < 4; i++) {
-            const placement = getCellValue(cycleData, 7 + i, 1).trim();
-            const team = getCellValue(cycleData, 7 + i, 2).trim();
-            if (team && placement) {
-              cashout.push({ team, placement: parseInt(placement) || i + 1 });
-            }
-          }
-
-          const cycleLeader = getCellValue(cycleData, 26, 10).trim() || 'Pending Results';
-          const matches: MatchResult[] = [];
-
-          const match1Status = getCellValue(cycleData, 21, 7);
-          if (match1Status !== 'Awaiting Teams' && match1Status !== '') {
-            const match1Winners = [
-              getCellValue(cycleData, 12, 7),
-              getCellValue(cycleData, 13, 7),
-              getCellValue(cycleData, 14, 7)
-            ].filter(w => w && w !== 'N/A');
-            
-            if (match1Winners.length > 0) {
-              const winCount: Record<string, number> = {};
-              match1Winners.forEach(w => {
-                winCount[w] = (winCount[w] || 0) + 1;
-              });
-              
-              const sorted = Object.entries(winCount).sort((a, b) => b[1] - a[1]);
-              if (sorted.length >= 2) {
-                matches.push({ winner: sorted[0][0], loser: sorted[1][0] });
-              } else if (sorted.length === 1) {
-                matches.push({ winner: sorted[0][0], loser: 'TBD' });
-              }
-            }
-          }
-
-          const match2Status = getCellValue(cycleData, 21, 7);
-          if (match2Status !== 'Awaiting Teams' && match2Status !== '') {
-            const match2Winners = [
-              getCellValue(cycleData, 17, 7),
-              getCellValue(cycleData, 18, 7),
-              getCellValue(cycleData, 19, 7)
-            ].filter(w => w && w !== 'N/A');
-            
-            if (match2Winners.length > 0) {
-              const winCount: Record<string, number> = {};
-              match2Winners.forEach(w => {
-                winCount[w] = (winCount[w] || 0) + 1;
-              });
-              
-              const sorted = Object.entries(winCount).sort((a, b) => b[1] - a[1]);
-              if (sorted.length >= 2) {
-                matches.push({ winner: sorted[0][0], loser: sorted[1][0] });
-              } else if (sorted.length === 1) {
-                matches.push({ winner: sorted[0][0], loser: 'TBD' });
-              }
-            }
-          }
-
-          cycles.push({
-            cashout,
-            matches,
-            leader: cycleLeader,
-            hasData: true
-          });
-        } catch (e) {
-          console.error('Failed to fetch cycle 3:', e);
-        }
-
+        console.log('[fetchAllData] Final state:', {
+          registeredTeams: registeredTeams.length,
+          teamRostersCount: Object.keys(teamRosters).length,
+          standingsCount: standings.length,
+          cyclesCount: cycles.length
+        });
+        
         setPageState({
           eventWinner: eventWinner || 'Pending Results',
           status: status || 'Awaiting Results',
@@ -428,11 +270,7 @@ export default function LiveBracket() {
         });
         setIsLoading(false);
       } catch (error) {
-        console.error('Failed to fetch sheet data:', error);
-        setPageState(prev => ({
-          ...prev,
-          dataAvailable: false
-        }));
+        console.error('[fetchAllData] Failed to fetch sheet data:', error);
         setIsLoading(false);
       }
     };
@@ -440,567 +278,251 @@ export default function LiveBracket() {
     fetchAllData();
     const interval = setInterval(fetchAllData, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [trpcClient]);
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-dark-charcoal py-20">
-        <div className="container">
-          <div className="text-center text-white/50 font-mono">Loading tournament data...</div>
+      <div className="min-h-screen bg-dark-charcoal flex items-center justify-center">
+        <div className="text-center">
+          <GlitchText size="xl" variant="cyan">Loading tournament data...</GlitchText>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-dark-charcoal py-20">
-      <div className="container">
-        {/* Data Status Indicator */}
-        {!pageState.dataAvailable && (
-          <div className="mb-6 p-3 bg-neon-magenta/10 border border-neon-magenta/50 rounded text-neon-magenta text-sm font-mono">
-            ⚠ Live data unavailable - please refresh
-          </div>
-        )}
-
+    <div className="min-h-screen bg-dark-charcoal py-12 px-4">
+      <div className="max-w-6xl mx-auto space-y-8">
         {/* Header */}
-        <div className="mb-16">
-          <GlitchText size="xl" variant="lime" className="mb-4">
-            Development Division
-          </GlitchText>
-          <p className="text-lg text-white/80 font-mono max-w-2xl">
-            The Development Division is played across three competitive cycles. Each cycle functions as a complete mini-bracket, where teams first establish seeding through Cashout and then compete in Final Round matchups for points. Performance carries across all three cycles, with Final Round Points (FRP) accumulating to determine the overall winner.
-          </p>
+        <div className="text-center space-y-2">
+          <GlitchText size="2xl" variant="magenta">Development Division</GlitchText>
+          <p className="text-white/60 font-mono">Live Tournament Bracket</p>
         </div>
 
-        {/* Tournament Structure */}
-        <div className="mb-16">
-          <h2 className="text-2xl font-bold font-mono text-neon-gold mb-6 uppercase">Tournament Structure</h2>
-          <div className="space-y-8">
-            {/* Cycle 1 */}
-            <div>
-              <h3 className="text-xl font-bold font-mono text-white mb-4 uppercase">Cycle 1</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <NeonCard variant="gold">
-                  <h4 className="text-lg font-bold font-mono text-neon-gold mb-3 uppercase">Stage 1: Cashout</h4>
-                  <div className="space-y-2 text-sm font-mono text-white/70">
-                    <div><span className="text-neon-gold font-bold">4 Teams Compete</span></div>
-                    <div className="text-xs">All 4 teams play one round of Cashout</div>
-                    <div className="mt-3 text-neon-gold font-bold">Placements</div>
-                    <div className="text-xs space-y-1">
-                      <div>• 1st Place</div>
-                      <div>• 2nd Place</div>
-                      <div>• 3rd Place</div>
-                      <div>• 4th Place</div>
-                    </div>
-                  </div>
-                </NeonCard>
-                <NeonCard variant="magenta">
-                  <h4 className="text-lg font-bold font-mono text-neon-magenta mb-3 uppercase">Stage 2: Final Round</h4>
-                  <div className="space-y-2 text-sm font-mono text-white/70">
-                    <div><span className="text-neon-magenta font-bold">Best of 3 Matches</span></div>
-                    <div className="text-xs space-y-1">
-                      <div>• 1st vs 2nd (BO3)</div>
-                      <div>• 3rd vs 4th (BO3)</div>
-                    </div>
-                    <div className="mt-3 text-neon-magenta font-bold">1 FRP Per Round Win</div>
-                    <div className="text-xs">Each victory = 1 FRP</div>
-                  </div>
-                </NeonCard>
-              </div>
-            </div>
+        {/* Status Panels */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Event Winner */}
+          <NeonCard variant="gold" className="p-6">
+            <h3 className="text-sm font-bold text-white/60 mb-2 font-mono">EVENT WINNER</h3>
+            <p className="text-2xl font-bold text-neon-gold font-mono">{pageState.eventWinner}</p>
+          </NeonCard>
 
-            {/* Cycle 2 */}
-            <div>
-              <h3 className="text-xl font-bold font-mono text-white mb-4 uppercase">Cycle 2</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <NeonCard variant="gold">
-                  <h4 className="text-lg font-bold font-mono text-neon-gold mb-3 uppercase">Stage 1: Cashout</h4>
-                  <div className="space-y-2 text-sm font-mono text-white/70">
-                    <div><span className="text-neon-gold font-bold">4 Teams Compete</span></div>
-                    <div className="text-xs">All 4 teams play one round of Cashout</div>
-                    <div className="mt-3 text-neon-gold font-bold">Placements</div>
-                    <div className="text-xs space-y-1">
-                      <div>• 1st Place</div>
-                      <div>• 2nd Place</div>
-                      <div>• 3rd Place</div>
-                      <div>• 4th Place</div>
-                    </div>
-                  </div>
-                </NeonCard>
-                <NeonCard variant="magenta">
-                  <h4 className="text-lg font-bold font-mono text-neon-magenta mb-3 uppercase">Stage 2: Final Round</h4>
-                  <div className="space-y-2 text-sm font-mono text-white/70">
-                    <div><span className="text-neon-magenta font-bold">Best of 3 Matches</span></div>
-                    <div className="text-xs space-y-1">
-                      <div>• 1st vs 2nd (BO3)</div>
-                      <div>• 3rd vs 4th (BO3)</div>
-                    </div>
-                    <div className="mt-3 text-neon-magenta font-bold">1 FRP Per Round Win</div>
-                    <div className="text-xs">Each victory = 1 FRP</div>
-                  </div>
-                </NeonCard>
-              </div>
-            </div>
+          {/* Status */}
+          <NeonCard variant="cyan" className="p-6">
+            <h3 className="text-sm font-bold text-white/60 mb-2 font-mono">STATUS</h3>
+            <p className="text-2xl font-bold text-neon-cyan font-mono">{pageState.status}</p>
+          </NeonCard>
 
-            {/* Cycle 3 */}
-            <div>
-              <h3 className="text-xl font-bold font-mono text-white mb-4 uppercase">Cycle 3</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <NeonCard variant="gold">
-                  <h4 className="text-lg font-bold font-mono text-neon-gold mb-3 uppercase">Stage 1: Cashout</h4>
-                  <div className="space-y-2 text-sm font-mono text-white/70">
-                    <div><span className="text-neon-gold font-bold">4 Teams Compete</span></div>
-                    <div className="text-xs">All 4 teams play one round of Cashout</div>
-                    <div className="mt-3 text-neon-gold font-bold">Placements</div>
-                    <div className="text-xs space-y-1">
-                      <div>• 1st Place</div>
-                      <div>• 2nd Place</div>
-                      <div>• 3rd Place</div>
-                      <div>• 4th Place</div>
-                    </div>
-                  </div>
-                </NeonCard>
-                <NeonCard variant="magenta">
-                  <h4 className="text-lg font-bold font-mono text-neon-magenta mb-3 uppercase">Stage 2: Final Round</h4>
-                  <div className="space-y-2 text-sm font-mono text-white/70">
-                    <div><span className="text-neon-magenta font-bold">Best of 3 Matches</span></div>
-                    <div className="text-xs space-y-1">
-                      <div>• 1st vs 2nd (BO3)</div>
-                      <div>• 3rd vs 4th (BO3)</div>
-                    </div>
-                    <div className="mt-3 text-neon-magenta font-bold">1 FRP Per Round Win</div>
-                    <div className="text-xs">Each victory = 1 FRP</div>
-                  </div>
-                </NeonCard>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Win Condition */}
-        <div className="mb-16">
-          <h2 className="text-2xl font-bold font-mono text-neon-cyan mb-6 uppercase">Win Condition</h2>
-          <NeonCard variant="cyan">
-            <div className="space-y-4 text-sm font-mono text-white/70">
-              <div>
-                <span className="text-neon-cyan font-bold">Highest FRP After 3 Cycles:</span> The team with the most accumulated Final Round Points across all three cycles wins the tournament.
-              </div>
-              <div className="border-t border-neon-cyan/30 pt-4">
-                <span className="text-neon-cyan font-bold">Tie Scenario:</span> If two or more teams are tied on FRP, a Sudden Death Final Round determines the champion.
-              </div>
-              <div className="border-t border-neon-cyan/30 pt-4">
-                <span className="text-neon-cyan font-bold">FRP Tracking:</span> FRP is tracked cumulatively throughout the tournament. Every round win in Stage 2 contributes to your total.
-              </div>
-            </div>
+          {/* Current Leader */}
+          <NeonCard variant="magenta" className="p-6">
+            <h3 className="text-sm font-bold text-white/60 mb-2 font-mono">CURRENT LEADER</h3>
+            <p className="text-2xl font-bold text-neon-magenta font-mono">{pageState.currentLeader}</p>
           </NeonCard>
         </div>
 
-        {/* PRE-EVENT STATE: Show Teams */}
-        {pageState.isPreEvent && (
-          <>
-            {/* Registered Teams (TOP) */}
-            <div className="mb-16">
-              <h2 className="text-2xl font-bold font-mono text-neon-cyan mb-6 uppercase">Registered Teams ({pageState.registeredTeams.length})</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {pageState.registeredTeams.map((team, idx) => {
-                  const roster = pageState.teamRosters[team];
-                  const isExpanded = expandedTeams.has(team);
-
-                  return (
-                    <div key={idx}>
-                      {/* Team Card Header */}
-                      <button
-                        onClick={() => toggleTeam(team)}
-                        className="w-full"
-                      >
-                        <NeonCard variant="cyan" className="cursor-pointer hover:opacity-80 transition-opacity">
-                          <div className="flex items-center justify-between">
-                            <p className="text-lg font-bold font-mono text-neon-cyan uppercase">{team}</p>
-                            <ChevronDown
-                              size={20}
-                              className={`text-neon-cyan transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                            />
-                          </div>
-                        </NeonCard>
-                      </button>
-
-                      {/* Roster Dropdown */}
-                      {isExpanded && (
-                        <div className="mt-2 p-4 bg-dark-charcoal/50 border border-neon-cyan/30 rounded text-sm font-mono text-white/70 space-y-2">
-                          {roster ? (
-                            <>
-                              {roster.teamLeader && (
-                                <div><span className="text-neon-cyan font-bold">Team Leader:</span> {roster.teamLeader}</div>
-                              )}
-                              {roster.player1 && (
-                                <div><span className="text-neon-cyan font-bold">Player 1:</span> {roster.player1}</div>
-                              )}
-                              {roster.player2 && (
-                                <div><span className="text-neon-cyan font-bold">Player 2:</span> {roster.player2}</div>
-                              )}
-                              {roster.player3 && (
-                                <div><span className="text-neon-cyan font-bold">Player 3:</span> {roster.player3}</div>
-                              )}
-                              {roster.sub && (
-                                <div><span className="text-neon-cyan font-bold">Sub:</span> {roster.sub}</div>
-                              )}
-                              {!roster.teamLeader && !roster.player1 && !roster.player2 && !roster.player3 && !roster.sub && (
-                                <div className="text-white/50 italic">Roster pending</div>
-                              )}
-                            </>
-                          ) : (
-                            <div className="text-white/50 italic">Roster pending</div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* LIVE EVENT STATE: Show Status + Standings + Cycles + Teams */}
-        {pageState.isLiveEvent && (
-          <>
-            {/* Status Panels */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-16">
-              <NeonCard variant="cyan">
-                <h3 className="text-sm font-mono text-white/50 uppercase mb-3">Status</h3>
-                <p className="text-xl font-bold font-mono text-neon-cyan">{pageState.status}</p>
-              </NeonCard>
-              {pageState.currentLeader !== 'Pending Results' && (
-                <NeonCard variant="magenta">
-                  <h3 className="text-sm font-mono text-white/50 uppercase mb-3">Current Leader</h3>
-                  <p className="text-xl font-bold font-mono text-neon-magenta">{pageState.currentLeader}</p>
-                </NeonCard>
-              )}
-            </div>
-
-            {/* Standings Leaderboard (PRIMARY) */}
-            {pageState.standings.length > 0 && (
-              <div className="mb-16">
-                <h2 className="text-2xl font-bold font-mono text-neon-gold mb-6 uppercase">Standings</h2>
-                <NeonCard variant="gold">
-                  <div className="space-y-2">
-                    <div className="grid grid-cols-3 gap-4 pb-3 border-b border-neon-gold/30 text-xs font-mono text-white/50 uppercase">
-                      <div>Team</div>
-                      <div className="text-right">Rank</div>
-                      <div className="text-right">Total FRP</div>
-                    </div>
-                    {pageState.standings.map((team, idx) => (
-                      <div key={idx} className="grid grid-cols-3 gap-4 py-2 text-sm font-mono">
-                        <div className="text-neon-gold font-bold">{team.name}</div>
-                        <div className="text-right text-white/70">#{team.rank}</div>
-                        <div className="text-right text-neon-lime font-bold">{team.frp}</div>
-                      </div>
-                    ))}
+        {/* Tournament Structure */}
+        <NeonCard variant="gold" className="p-8">
+          <h2 className="text-2xl font-bold text-neon-gold mb-8 font-mono">TOURNAMENT STRUCTURE</h2>
+          
+          {[1, 2, 3].map((cycleNum) => (
+            <div key={cycleNum} className="mb-8 last:mb-0">
+              <h3 className="text-xl font-bold text-white mb-4 font-mono">CYCLE {cycleNum}</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Stage 1: Cashout */}
+                <div className="border-2 border-neon-gold p-4">
+                  <h4 className="text-sm font-bold text-white mb-3 font-mono">STAGE 1: CASHOUT</h4>
+                  <div className="space-y-2 text-sm text-white/80 font-mono">
+                    <p>4 Teams Compete</p>
+                    <p>All 4 teams play one round of Cashout</p>
+                    <p className="mt-3 font-bold">Placements</p>
+                    <ul className="list-disc list-inside space-y-1">
+                      <li>1st Place</li>
+                      <li>2nd Place</li>
+                      <li>3rd Place</li>
+                      <li>4th Place</li>
+                    </ul>
                   </div>
-                </NeonCard>
-              </div>
-            )}
+                </div>
 
-            {/* Cycles (Collapsible) */}
-            {pageState.cycles.length > 0 && (
-              <div className="mb-16">
-                <h2 className="text-2xl font-bold font-mono text-neon-magenta mb-6 uppercase">Cycles</h2>
-                <div className="space-y-4">
-                  {pageState.cycles.map((cycle, cycleIdx) => (
-                    <div key={cycleIdx}>
-                      {/* Cycle Header (Collapsible) */}
-                      <button
-                        onClick={() => toggleCycle(cycleIdx)}
-                        className="w-full"
-                      >
-                        <NeonCard variant="gold" className="cursor-pointer hover:opacity-80 transition-opacity">
-                          <div className="flex items-center justify-between">
-                            <h3 className="text-xl font-bold font-mono text-neon-gold uppercase">Cycle {cycleIdx + 1}</h3>
-                            <ChevronDown
-                              size={24}
-                              className={`text-neon-gold transition-transform ${expandedCycles.has(cycleIdx) ? 'rotate-180' : ''}`}
-                            />
-                          </div>
-                        </NeonCard>
-                      </button>
-
-                      {/* Cycle Content (Expanded) */}
-                      {expandedCycles.has(cycleIdx) && (
-                        <div className="mt-4 space-y-4">
-                          {/* Cashout Results */}
-                          {cycle.cashout.length > 0 && (
-                            <NeonCard variant="gold">
-                              <h4 className="text-lg font-bold font-mono text-neon-gold mb-4 uppercase">Cashout Results</h4>
-                              <div className="space-y-2">
-                                {cycle.cashout.map((result, idx) => (
-                                  <div key={idx} className="text-sm font-mono text-white/70">
-                                    <span className="text-neon-gold font-bold">{result.placement}.</span> {result.team}
-                                  </div>
-                                ))}
-                              </div>
-                            </NeonCard>
-                          )}
-
-                          {/* Match Results */}
-                          {cycle.matches.length > 0 && (
-                            <NeonCard variant="magenta">
-                              <h4 className="text-lg font-bold font-mono text-neon-magenta mb-4 uppercase">Match Results</h4>
-                              <div className="space-y-2">
-                                {cycle.matches.map((match, idx) => (
-                                  <div key={idx} className="text-sm font-mono text-white/70">
-                                    <span className="text-neon-magenta font-bold">{match.winner}</span> def. {match.loser}
-                                  </div>
-                                ))}
-                              </div>
-                            </NeonCard>
-                          )}
-
-                          {/* Cycle Leader */}
-                          {cycle.leader && cycle.leader !== 'Pending Results' && (
-                            <NeonCard variant="lime">
-                              <h4 className="text-sm font-mono text-white/50 uppercase mb-2">Cycle Leader</h4>
-                              <p className="text-lg font-bold font-mono text-neon-lime">{cycle.leader}</p>
-                            </NeonCard>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                {/* Stage 2: Final Round */}
+                <div className="border-2 border-neon-magenta p-4">
+                  <h4 className="text-sm font-bold text-neon-magenta mb-3 font-mono">STAGE 2: FINAL ROUND</h4>
+                  <div className="space-y-2 text-sm text-white/80 font-mono">
+                    <p>Best of 3 Matches</p>
+                    <ul className="list-disc list-inside space-y-1">
+                      <li>1st vs 2nd (BO3)</li>
+                      <li>3rd vs 4th (BO3)</li>
+                    </ul>
+                    <p className="mt-3">1 FRP Per Round Win</p>
+                    <p>Each victory = 1 FRP</p>
+                  </div>
                 </div>
               </div>
-            )}
-
-            {/* Registered Teams (LOWER) */}
-            <div className="mb-16">
-              <h2 className="text-2xl font-bold font-mono text-neon-cyan mb-6 uppercase">Registered Teams ({pageState.registeredTeams.length})</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {pageState.registeredTeams.map((team, idx) => {
-                  const roster = pageState.teamRosters[team];
-                  const isExpanded = expandedTeams.has(team);
-
-                  return (
-                    <div key={idx}>
-                      {/* Team Card Header */}
-                      <button
-                        onClick={() => toggleTeam(team)}
-                        className="w-full"
-                      >
-                        <NeonCard variant="cyan" className="cursor-pointer hover:opacity-80 transition-opacity">
-                          <div className="flex items-center justify-between">
-                            <p className="text-lg font-bold font-mono text-neon-cyan uppercase">{team}</p>
-                            <ChevronDown
-                              size={20}
-                              className={`text-neon-cyan transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                            />
-                          </div>
-                        </NeonCard>
-                      </button>
-
-                      {/* Roster Dropdown */}
-                      {isExpanded && (
-                        <div className="mt-2 p-4 bg-dark-charcoal/50 border border-neon-cyan/30 rounded text-sm font-mono text-white/70 space-y-2">
-                          {roster ? (
-                            <>
-                              {roster.teamLeader && (
-                                <div><span className="text-neon-cyan font-bold">Team Leader:</span> {roster.teamLeader}</div>
-                              )}
-                              {roster.player1 && (
-                                <div><span className="text-neon-cyan font-bold">Player 1:</span> {roster.player1}</div>
-                              )}
-                              {roster.player2 && (
-                                <div><span className="text-neon-cyan font-bold">Player 2:</span> {roster.player2}</div>
-                              )}
-                              {roster.player3 && (
-                                <div><span className="text-neon-cyan font-bold">Player 3:</span> {roster.player3}</div>
-                              )}
-                              {roster.sub && (
-                                <div><span className="text-neon-cyan font-bold">Sub:</span> {roster.sub}</div>
-                              )}
-                              {!roster.teamLeader && !roster.player1 && !roster.player2 && !roster.player3 && !roster.sub && (
-                                <div className="text-white/50 italic">Roster pending</div>
-                              )}
-                            </>
-                          ) : (
-                            <div className="text-white/50 italic">Roster pending</div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
             </div>
-          </>
-        )}
+          ))}
+        </NeonCard>
 
-        {/* EVENT COMPLETE STATE: Show Winner + Standings + Cycles + Teams */}
-        {pageState.isEventComplete && (
-          <>
-            {/* Event Winner (TOP) */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-16">
-              <NeonCard variant="gold">
-                <h3 className="text-sm font-mono text-white/50 uppercase mb-3">Event Winner</h3>
-                <p className="text-xl font-bold font-mono text-neon-gold">{pageState.eventWinner}</p>
-              </NeonCard>
-            </div>
+        {/* Win Condition */}
+        <NeonCard variant="cyan" className="p-8">
+          <h2 className="text-2xl font-bold text-neon-cyan mb-6 font-mono">WIN CONDITION</h2>
+          <div className="space-y-4 text-white/80 font-mono text-sm">
+            <p>
+              <span className="font-bold">Highest FRP After 3 Cycles:</span> The team with the most accumulated Final Round Points across all three cycles wins the tournament.
+            </p>
+            <p>
+              <span className="font-bold">Tie Scenario:</span> If two or more teams are tied on FRP, a Sudden Death Final Round determines the champion.
+            </p>
+            <p>
+              <span className="font-bold">FRP Tracking:</span> FRP is tracked cumulatively throughout the tournament. Every round win in Stage 2 contributes to your total.
+            </p>
+          </div>
+        </NeonCard>
 
-            {/* Final Standings */}
-            {pageState.standings.length > 0 && (
-              <div className="mb-16">
-                <h2 className="text-2xl font-bold font-mono text-neon-gold mb-6 uppercase">Final Standings</h2>
-                <NeonCard variant="gold">
-                  <div className="space-y-2">
-                    <div className="grid grid-cols-3 gap-4 pb-3 border-b border-neon-gold/30 text-xs font-mono text-white/50 uppercase">
-                      <div>Team</div>
-                      <div className="text-right">Rank</div>
-                      <div className="text-right">Total FRP</div>
-                    </div>
-                    {pageState.standings.map((team, idx) => (
-                      <div key={idx} className="grid grid-cols-3 gap-4 py-2 text-sm font-mono">
-                        <div className="text-neon-gold font-bold">{team.name}</div>
-                        <div className="text-right text-white/70">#{team.rank}</div>
-                        <div className="text-right text-neon-lime font-bold">{team.frp}</div>
+        {/* Registered Teams */}
+        {pageState.registeredTeams.length > 0 && (
+          <NeonCard variant="magenta" className="p-8">
+            <h2 className="text-2xl font-bold text-neon-magenta mb-6 font-mono">REGISTERED TEAMS</h2>
+            <div className="space-y-4">
+              {pageState.registeredTeams.map((teamName) => {
+                const roster = pageState.teamRosters[teamName];
+                const isExpanded = expandedTeams.has(teamName);
+                
+                return (
+                  <div key={teamName} className="border border-neon-magenta/50 rounded">
+                    <button
+                      onClick={() => {
+                        const newExpanded = new Set(expandedTeams);
+                        if (newExpanded.has(teamName)) {
+                          newExpanded.delete(teamName);
+                        } else {
+                          newExpanded.add(teamName);
+                        }
+                        setExpandedTeams(newExpanded);
+                      }}
+                      className="w-full p-4 flex items-center justify-between hover:bg-neon-magenta/10 transition-colors"
+                    >
+                      <span className="font-bold text-white font-mono">{teamName}</span>
+                      <ChevronDown
+                        size={20}
+                        className={`text-neon-magenta transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                      />
+                    </button>
+
+                    {isExpanded && roster && (
+                      <div className="bg-dark-charcoal/50 p-4 border-t border-neon-magenta/50 space-y-2 text-sm font-mono">
+                        {roster.teamLeader && <p><span className="text-neon-magenta">Team Leader:</span> {roster.teamLeader}</p>}
+                        {roster.player1 && <p><span className="text-neon-magenta">Player 1:</span> {roster.player1}</p>}
+                        {roster.player2 && <p><span className="text-neon-magenta">Player 2:</span> {roster.player2}</p>}
+                        {roster.player3 && <p><span className="text-neon-magenta">Player 3:</span> {roster.player3}</p>}
+                        {roster.sub && <p><span className="text-neon-magenta">Sub:</span> {roster.sub}</p>}
+                        {!roster.teamLeader && !roster.player1 && <p className="text-white/60">Roster pending</p>}
                       </div>
-                    ))}
+                    )}
                   </div>
-                </NeonCard>
-              </div>
-            )}
-
-            {/* Cycles (Collapsible) */}
-            {pageState.cycles.length > 0 && (
-              <div className="mb-16">
-                <h2 className="text-2xl font-bold font-mono text-neon-magenta mb-6 uppercase">Cycles</h2>
-                <div className="space-y-4">
-                  {pageState.cycles.map((cycle, cycleIdx) => (
-                    <div key={cycleIdx}>
-                      {/* Cycle Header (Collapsible) */}
-                      <button
-                        onClick={() => toggleCycle(cycleIdx)}
-                        className="w-full"
-                      >
-                        <NeonCard variant="gold" className="cursor-pointer hover:opacity-80 transition-opacity">
-                          <div className="flex items-center justify-between">
-                            <h3 className="text-xl font-bold font-mono text-neon-gold uppercase">Cycle {cycleIdx + 1}</h3>
-                            <ChevronDown
-                              size={24}
-                              className={`text-neon-gold transition-transform ${expandedCycles.has(cycleIdx) ? 'rotate-180' : ''}`}
-                            />
-                          </div>
-                        </NeonCard>
-                      </button>
-
-                      {/* Cycle Content (Expanded) */}
-                      {expandedCycles.has(cycleIdx) && (
-                        <div className="mt-4 space-y-4">
-                          {cycle.cashout.length > 0 && (
-                            <NeonCard variant="gold">
-                              <h4 className="text-lg font-bold font-mono text-neon-gold mb-4 uppercase">Cashout Results</h4>
-                              <div className="space-y-2">
-                                {cycle.cashout.map((result, idx) => (
-                                  <div key={idx} className="text-sm font-mono text-white/70">
-                                    <span className="text-neon-gold font-bold">{result.placement}.</span> {result.team}
-                                  </div>
-                                ))}
-                              </div>
-                            </NeonCard>
-                          )}
-
-                          {cycle.matches.length > 0 && (
-                            <NeonCard variant="magenta">
-                              <h4 className="text-lg font-bold font-mono text-neon-magenta mb-4 uppercase">Match Results</h4>
-                              <div className="space-y-2">
-                                {cycle.matches.map((match, idx) => (
-                                  <div key={idx} className="text-sm font-mono text-white/70">
-                                    <span className="text-neon-magenta font-bold">{match.winner}</span> def. {match.loser}
-                                  </div>
-                                ))}
-                              </div>
-                            </NeonCard>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Registered Teams (BOTTOM) */}
-            <div className="mb-16">
-              <h2 className="text-2xl font-bold font-mono text-neon-cyan mb-6 uppercase">Registered Teams ({pageState.registeredTeams.length})</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {pageState.registeredTeams.map((team, idx) => {
-                  const roster = pageState.teamRosters[team];
-                  const isExpanded = expandedTeams.has(team);
-
-                  return (
-                    <div key={idx}>
-                      {/* Team Card Header */}
-                      <button
-                        onClick={() => toggleTeam(team)}
-                        className="w-full"
-                      >
-                        <NeonCard variant="cyan" className="cursor-pointer hover:opacity-80 transition-opacity">
-                          <div className="flex items-center justify-between">
-                            <p className="text-lg font-bold font-mono text-neon-cyan uppercase">{team}</p>
-                            <ChevronDown
-                              size={20}
-                              className={`text-neon-cyan transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                            />
-                          </div>
-                        </NeonCard>
-                      </button>
-
-                      {/* Roster Dropdown */}
-                      {isExpanded && (
-                        <div className="mt-2 p-4 bg-dark-charcoal/50 border border-neon-cyan/30 rounded text-sm font-mono text-white/70 space-y-2">
-                          {roster ? (
-                            <>
-                              {roster.teamLeader && (
-                                <div><span className="text-neon-cyan font-bold">Team Leader:</span> {roster.teamLeader}</div>
-                              )}
-                              {roster.player1 && (
-                                <div><span className="text-neon-cyan font-bold">Player 1:</span> {roster.player1}</div>
-                              )}
-                              {roster.player2 && (
-                                <div><span className="text-neon-cyan font-bold">Player 2:</span> {roster.player2}</div>
-                              )}
-                              {roster.player3 && (
-                                <div><span className="text-neon-cyan font-bold">Player 3:</span> {roster.player3}</div>
-                              )}
-                              {roster.sub && (
-                                <div><span className="text-neon-cyan font-bold">Sub:</span> {roster.sub}</div>
-                              )}
-                              {!roster.teamLeader && !roster.player1 && !roster.player2 && !roster.player3 && !roster.sub && (
-                                <div className="text-white/50 italic">Roster pending</div>
-                              )}
-                            </>
-                          ) : (
-                            <div className="text-white/50 italic">Roster pending</div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                );
+              })}
             </div>
-          </>
+          </NeonCard>
         )}
 
-        {/* Navigation */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center mt-16">
-          <Link to="/tournaments">
-            <button className="px-8 py-3 border-2 border-neon-cyan text-neon-cyan font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all">
-              Tournament History
+        {/* Cycles */}
+        {pageState.cycles.some(c => c.hasData) && (
+          <NeonCard variant="cyan" className="p-8">
+            <h2 className="text-2xl font-bold text-neon-cyan mb-6 font-mono">LIVE CYCLES</h2>
+            <div className="space-y-6">
+              {pageState.cycles.map((cycle, idx) => {
+                const isExpanded = expandedCycles.has(idx);
+                
+                return (
+                  <div key={idx} className="border border-neon-cyan/50 rounded">
+                    <button
+                      onClick={() => {
+                        const newExpanded = new Set(expandedCycles);
+                        if (newExpanded.has(idx)) {
+                          newExpanded.delete(idx);
+                        } else {
+                          newExpanded.add(idx);
+                        }
+                        setExpandedCycles(newExpanded);
+                      }}
+                      className="w-full p-4 flex items-center justify-between hover:bg-neon-cyan/10 transition-colors"
+                    >
+                      <span className="font-bold text-white font-mono">Cycle {idx + 1}</span>
+                      <ChevronDown
+                        size={20}
+                        className={`text-neon-cyan transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                      />
+                    </button>
+
+                    {isExpanded && cycle.hasData && (
+                      <div className="bg-dark-charcoal/50 p-4 border-t border-neon-cyan/50 space-y-4">
+                        {cycle.cashout.length > 0 && (
+                          <div>
+                            <h4 className="font-bold text-neon-cyan mb-2 font-mono">Cashout Results</h4>
+                            <div className="space-y-1 text-sm font-mono">
+                              {cycle.cashout.map((result) => (
+                                <p key={result.team}>
+                                  <span className="text-white/60">#{result.placement}</span> {result.team}
+                                </p>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {cycle.matches.length > 0 && (
+                          <div>
+                            <h4 className="font-bold text-neon-cyan mb-2 font-mono">Match Results</h4>
+                            <div className="space-y-1 text-sm font-mono">
+                              {cycle.matches.map((match, i) => (
+                                <p key={i}>
+                                  <span className="text-neon-magenta">{match.winner}</span> vs {match.loser}
+                                </p>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {cycle.leader && (
+                          <div>
+                            <p className="text-sm font-mono">
+                              <span className="text-neon-cyan font-bold">Cycle Leader:</span> {cycle.leader}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </NeonCard>
+        )}
+
+        {/* Standings */}
+        {pageState.standings.length > 0 && (
+          <NeonCard variant="gold" className="p-8">
+            <h2 className="text-2xl font-bold text-neon-gold mb-6 font-mono">STANDINGS</h2>
+            <div className="space-y-2">
+              {pageState.standings.map((standing) => (
+                <div key={standing.name} className="flex justify-between items-center p-3 bg-dark-charcoal/50 rounded border border-neon-gold/20">
+                  <div className="flex items-center gap-4">
+                    <span className="text-neon-gold font-bold font-mono">#{standing.rank}</span>
+                    <span className="text-white font-mono">{standing.name}</span>
+                  </div>
+                  <span className="text-neon-gold font-bold font-mono">{standing.frp} FRP</span>
+                </div>
+              ))}
+            </div>
+          </NeonCard>
+        )}
+
+        {/* Tournament History Button */}
+        <div className="flex justify-center">
+          <Link href="/tournaments">
+            <button className="px-8 py-3 border-2 border-neon-cyan text-neon-cyan font-bold font-mono hover:bg-neon-cyan/10 transition-colors">
+              TOURNAMENT HISTORY
             </button>
           </Link>
-          <a href="https://discord.gg/kcmdxmBgnC" target="_blank" rel="noopener noreferrer">
-            <button className="px-8 py-3 border-2 border-neon-gold text-neon-gold font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all">
-              Join Discord
-            </button>
-          </a>
         </div>
       </div>
     </div>
