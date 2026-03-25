@@ -110,12 +110,12 @@ export default function LiveBracket() {
           }
         }
 
-        // Extract Tiebreaker from I8 (row 8, column I is index 8)
+        // Extract Tiebreaker from I11:K13 (row 11, column J is index 9)
         let tiebreaker = 'NO TIEBREAKER NEEDED';
-        if (lines.length > 7) {
-          const tieRow = lines[7].split(',');
-          if (tieRow[8] && tieRow[8].trim()) {
-            tiebreaker = tieRow[8].trim();
+        if (lines.length > 10) {
+          const tieRow = lines[10].split(',');
+          if (tieRow[9] && tieRow[9].trim()) {
+            tiebreaker = tieRow[9].trim();
           }
         }
 
