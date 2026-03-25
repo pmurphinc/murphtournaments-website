@@ -38,12 +38,7 @@ export default function LiveBracket() {
         <div className="text-center space-y-4">
           <div>
             <GlitchText size="2xl" variant="magenta">
-              DEVELOPMENT
-            </GlitchText>
-          </div>
-          <div>
-            <GlitchText size="2xl" variant="cyan">
-              DIVISION
+              DEVELOPMENT DIVISION
             </GlitchText>
           </div>
           <p className="text-neon-cyan font-mono">Live Tournament Bracket</p>

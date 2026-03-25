@@ -6,6 +6,7 @@ import React from 'react';
  * - Glitch effect on hover
  * - Neon color support
  * - Display typography
+ * - Perfectly aligned overlay layers
  */
 
 interface GlitchTextProps {
@@ -45,31 +46,57 @@ export default function GlitchText({
         tracking-widest
         relative
         group
+        inline-block
         ${className}
       `}
+      style={{
+        lineHeight: '1.2',
+      }}
     >
-      {/* Main text */}
-      <span className="relative inline-block group-hover:glitch transition-all">
+      {/* Main text - base layer */}
+      <span className="relative inline-block">
         {children}
       </span>
 
-      {/* Glitch shadow layers (visible on hover) */}
+      {/* Glitch overlay layer 1 - magenta/cyan split */}
       <span
-        className="absolute top-0 left-0 opacity-0 group-hover:opacity-100 transition-opacity"
+        className="absolute opacity-0 group-hover:opacity-100 transition-opacity"
         style={{
+          top: 0,
+          left: 0,
           color: 'rgb(255, 0, 255)',
-          textShadow: '-2px 0 #00d9ff',
+          textShadow: '-1px 0 #00d9ff',
           clipPath: 'polygon(0 0, 100% 0, 100% 50%, 0 50%)',
+          fontWeight: 'bold',
+          fontFamily: 'monospace',
+          fontSize: 'inherit',
+          lineHeight: '1.2',
+          letterSpacing: 'inherit',
+          whiteSpace: 'pre-wrap',
+          wordWrap: 'break-word',
+          width: '100%',
         }}
       >
         {children}
       </span>
+
+      {/* Glitch overlay layer 2 - cyan/magenta split */}
       <span
-        className="absolute top-0 left-0 opacity-0 group-hover:opacity-100 transition-opacity"
+        className="absolute opacity-0 group-hover:opacity-100 transition-opacity"
         style={{
+          top: 0,
+          left: 0,
           color: 'rgb(0, 217, 255)',
-          textShadow: '2px 0 #ff00ff',
+          textShadow: '1px 0 #ff00ff',
           clipPath: 'polygon(0 50%, 100% 50%, 100% 100%, 0 100%)',
+          fontWeight: 'bold',
+          fontFamily: 'monospace',
+          fontSize: 'inherit',
+          lineHeight: '1.2',
+          letterSpacing: 'inherit',
+          whiteSpace: 'pre-wrap',
+          wordWrap: 'break-word',
+          width: '100%',
         }}
       >
         {children}
