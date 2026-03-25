@@ -5,6 +5,7 @@ import GlitchText from '@/components/GlitchText';
 import CountdownTimer from '@/components/CountdownTimer';
 import NextEventBanner from '@/components/NextEventBanner';
 import PlayerSpotlight from '@/components/PlayerSpotlight';
+import Season10Countdown from '@/components/Season10Countdown';
 
 /**
  * Home Page
@@ -17,9 +18,7 @@ import PlayerSpotlight from '@/components/PlayerSpotlight';
  */
 
 export default function Home() {
-  // The userAuth hooks provides authentication state
-  // To implement login/logout functionality, simply call logout() or redirect to getLoginUrl()
-  let { user, loading, error, isAuthenticated, logout } = useAuth();
+  const { user, loading, error, isAuthenticated, logout } = useAuth();
 
   // Next Development Division event: April 3rd, 2026 at 6 PM PST
   const nextTournamentDate = new Date('2026-04-03T18:00:00-07:00');
@@ -79,6 +78,7 @@ export default function Home() {
                   <p className="text-white/80 font-mono text-sm leading-relaxed">
                     THE FINALS Season 10 launches on <span className="text-neon-gold font-bold">March 26, 2026</span>. A bold new era for the arena with new content, gameplay updates, and competitive opportunities.
                   </p>
+                  <Season10Countdown />
                   <a href="https://www.reachthefinals.com" target="_blank" rel="noopener noreferrer" className="inline-block mt-4 px-6 py-2 border-2 border-neon-cyan text-neon-cyan font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all">
                     Learn More
                   </a>
