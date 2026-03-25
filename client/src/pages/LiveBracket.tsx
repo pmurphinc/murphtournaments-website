@@ -292,6 +292,69 @@ export default function LiveBracket() {
           </p>
         </div>
 
+        {/* Tournament Structure Card */}
+        <div className="mb-16">
+          <h2 className="text-2xl font-bold font-mono text-neon-gold mb-6 uppercase">Tournament Structure</h2>
+          <NeonCard variant="gold">
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-bold font-mono text-neon-gold mb-2 uppercase">Format Overview</h3>
+                <p className="text-sm font-mono text-white/70">Three independent cycles, each featuring a Cashout phase followed by Final Round competition.</p>
+              </div>
+              <div className="border-t border-neon-gold/30 pt-4">
+                <h3 className="text-lg font-bold font-mono text-neon-gold mb-3 uppercase">Cycle Progression</h3>
+                <div className="space-y-2 text-sm font-mono text-white/70">
+                  <div><span className="text-neon-gold font-bold">1. Cashout Phase:</span> Teams compete in Cashout mode to establish initial seeding</div>
+                  <div><span className="text-neon-gold font-bold">2. Final Round:</span> Top-seeded teams advance to Final Round matchups (3v3)</div>
+                  <div><span className="text-neon-gold font-bold">3. Points Awarded:</span> Winners earn Final Round Points (FRP) toward overall standings</div>
+                </div>
+              </div>
+            </div>
+          </NeonCard>
+        </div>
+
+        {/* Match Structure Card */}
+        <div className="mb-16">
+          <h2 className="text-2xl font-bold font-mono text-neon-magenta mb-6 uppercase">Match Structure</h2>
+          <NeonCard variant="magenta">
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-bold font-mono text-neon-magenta mb-2 uppercase">Final Round Format</h3>
+                <p className="text-sm font-mono text-white/70">Each cycle features two parallel Final Round matches with the following specifications:</p>
+              </div>
+              <div className="border-t border-neon-magenta/30 pt-4">
+                <div className="space-y-3 text-sm font-mono text-white/70">
+                  <div><span className="text-neon-magenta font-bold">Team Size:</span> 3v3 (three players per team)</div>
+                  <div><span className="text-neon-magenta font-bold">Match Format:</span> Best of 1 (BO1) - single elimination</div>
+                  <div><span className="text-neon-magenta font-bold">Rounds:</span> Three rounds per match to determine winner</div>
+                  <div><span className="text-neon-magenta font-bold">Advancement:</span> Match winner advances to next cycle or final standings</div>
+                </div>
+              </div>
+            </div>
+          </NeonCard>
+        </div>
+
+        {/* Win Condition Card */}
+        <div className="mb-16">
+          <h2 className="text-2xl font-bold font-mono text-neon-cyan mb-6 uppercase">Win Condition</h2>
+          <NeonCard variant="cyan">
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-bold font-mono text-neon-cyan mb-2 uppercase">Overall Winner</h3>
+                <p className="text-sm font-mono text-white/70">The team with the highest cumulative Final Round Points (FRP) across all three cycles is crowned the Development Division champion.</p>
+              </div>
+              <div className="border-t border-neon-cyan/30 pt-4">
+                <h3 className="text-lg font-bold font-mono text-neon-cyan mb-3 uppercase">FRP Accumulation</h3>
+                <div className="space-y-2 text-sm font-mono text-white/70">
+                  <div><span className="text-neon-cyan font-bold">Cycle 1:</span> Teams earn FRP based on Final Round performance</div>
+                  <div><span className="text-neon-cyan font-bold">Cycle 2:</span> Additional FRP added to running total</div>
+                  <div><span className="text-neon-cyan font-bold">Cycle 3:</span> Final FRP totals determine championship winner</div>
+                </div>
+              </div>
+            </div>
+          </NeonCard>
+        </div>
+
         {/* PRE-EVENT STATE: Show Registered Teams + Status */}
         {pageState.isPreEvent && (
           <>
