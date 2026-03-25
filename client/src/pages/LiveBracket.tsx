@@ -2,27 +2,32 @@ import NeonCard from '@/components/NeonCard';
 import GlitchText from '@/components/GlitchText';
 import { Link } from 'wouter';
 import { useState, useEffect } from 'react';
+import { ChevronDown } from 'lucide-react';
 
 /**
  * Live Bracket Page - Development Division
- * Refactored to use DD Scorekeeper 2.0 Google Sheet
- * - Smart data fetching from multiple tabs (Dashboard, Cycle 1-3, Standings, Lists)
- * - Intelligent visibility logic based on event state (pre-event, live, complete)
- * - Cashout results, match results, and cycle leaders
+ * Uses DD Scorekeeper 2.0 Google Sheet as single source of truth
+ * - Smart data fetching from multiple tabs
+ * - Intelligent visibility logic based on event state
+ * - Collapsible cycle sections
  * - Real-time standings leaderboard
  */
 
-interface Team {
-  name: string;
-  frp: number;
-  rank: number;
-  tieStatus: string;
+interface CashoutResult {
+  team: string;
+  placement: number;
+}
+
+interface MatchResult {
+  winner: string;
+  loser: string;
 }
 
 interface CycleData {
-  cashout: Array<{ team: string; placement: number }>;
-  matches: Array<{ winner: string; loser: string }>;
+  cashout: CashoutResult[];
+  matches: MatchResult[];
   leader: string;
+  hasData: boolean;
 }
 
 interface PageState {
@@ -30,7 +35,7 @@ interface PageState {
   status: string;
   currentLeader: string;
   registeredTeams: string[];
-  standings: Team[];
+  standings: Array<{ name: string; frp: number; rank: number }>;
   cycles: CycleData[];
   isPreEvent: boolean;
   isLiveEvent: boolean;
@@ -70,7 +75,7 @@ const getRangeValues = (data: string[][], startRow: number, endRow: number, col:
 };
 
 export default function LiveBracket() {
-  const [expandedTeam, setExpandedTeam] = useState<number | null>(null);
+  const [expandedCycles, setExpandedCycles] = useState<Set<number>>(new Set());
   const [pageState, setPageState] = useState<PageState>({
     eventWinner: 'Pending Results',
     status: 'Awaiting Results',
@@ -83,6 +88,16 @@ export default function LiveBracket() {
     isEventComplete: false,
     dataAvailable: true
   });
+
+  const toggleCycle = (idx: number) => {
+    const newSet = new Set(expandedCycles);
+    if (newSet.has(idx)) {
+      newSet.delete(idx);
+    } else {
+      newSet.add(idx);
+    }
+    setExpandedCycles(newSet);
+  };
 
   // Fetch and parse all sheet data
   useEffect(() => {
@@ -113,14 +128,13 @@ export default function LiveBracket() {
         const standingsFrps = getRangeValues(standingsData, 5, 24, 11); // Column K
         const standingsRanks = getRangeValues(standingsData, 5, 24, 12); // Column L
 
-        const standings: Team[] = [];
+        const standings: Array<{ name: string; frp: number; rank: number }> = [];
         for (let i = 0; i < standingsTeams.length; i++) {
           if (standingsTeams[i]) {
             standings.push({
               name: standingsTeams[i],
               frp: parseInt(standingsFrps[i] || '0') || 0,
-              rank: parseInt(standingsRanks[i] || '0') || 0,
-              tieStatus: ''
+              rank: parseInt(standingsRanks[i] || '0') || 0
             });
           }
         }
@@ -140,19 +154,29 @@ export default function LiveBracket() {
             const cycleData = parseCsv(cycleCsv);
 
             const cycleLeader = getCellValue(cycleData, 26, 7); // G26
+            
+            // Extract Cashout results (A7:B10)
+            const cashoutTeams = getRangeValues(cycleData, 7, 10, 1);
+            const cashoutPlacements = getRangeValues(cycleData, 7, 10, 2);
+            const cashout: CashoutResult[] = [];
+            for (let i = 0; i < cashoutTeams.length; i++) {
+              if (cashoutTeams[i]) {
+                cashout.push({
+                  team: cashoutTeams[i],
+                  placement: parseInt(cashoutPlacements[i] || '0') || 0
+                });
+              }
+            }
+
+            // Check if cycle has data
+            const hasCashout = cashout.length > 0;
+            const hasCycleLeader = cycleLeader !== 'Pending Results' && cycleLeader !== '';
+            const hasData = hasCashout || hasCycleLeader;
 
             // Only include cycle if it has data
-            if (cycleLeader !== 'Pending Results' && cycleLeader !== '') {
-              // Extract Cashout results (A7:B10)
-              const cashoutTeams = getRangeValues(cycleData, 7, 10, 1);
-              const cashoutPlacements = getRangeValues(cycleData, 7, 10, 2);
-              const cashout = cashoutTeams.map((team, idx) => ({
-                team,
-                placement: parseInt(cashoutPlacements[idx] || '0') || 0
-              })).filter(c => c.team && c.placement);
-
+            if (hasData) {
               // Extract Match results
-              const matches: Array<{ winner: string; loser: string }> = [];
+              const matches: MatchResult[] = [];
 
               // Match 1 (B17:B21)
               const match1Status = getCellValue(cycleData, 21, 2);
@@ -164,13 +188,20 @@ export default function LiveBracket() {
                 ].filter(w => w && w !== 'N/A');
                 
                 if (match1Winners.length > 0) {
+                  // Count wins per team
                   const winCount: Record<string, number> = {};
                   match1Winners.forEach(w => {
                     winCount[w] = (winCount[w] || 0) + 1;
                   });
-                  const winner = Object.entries(winCount).sort((a, b) => b[1] - a[1])[0]?.[0];
-                  if (winner) {
-                    matches.push({ winner, loser: 'TBD' });
+                  
+                  // Get winner (most wins)
+                  const sorted = Object.entries(winCount).sort((a, b) => b[1] - a[1]);
+                  if (sorted.length >= 2) {
+                    const winner = sorted[0][0];
+                    const loser = sorted[1][0];
+                    matches.push({ winner, loser });
+                  } else if (sorted.length === 1) {
+                    matches.push({ winner: sorted[0][0], loser: 'TBD' });
                   }
                 }
               }
@@ -185,13 +216,20 @@ export default function LiveBracket() {
                 ].filter(w => w && w !== 'N/A');
                 
                 if (match2Winners.length > 0) {
+                  // Count wins per team
                   const winCount: Record<string, number> = {};
                   match2Winners.forEach(w => {
                     winCount[w] = (winCount[w] || 0) + 1;
                   });
-                  const winner = Object.entries(winCount).sort((a, b) => b[1] - a[1])[0]?.[0];
-                  if (winner) {
-                    matches.push({ winner, loser: 'TBD' });
+                  
+                  // Get winner (most wins)
+                  const sorted = Object.entries(winCount).sort((a, b) => b[1] - a[1]);
+                  if (sorted.length >= 2) {
+                    const winner = sorted[0][0];
+                    const loser = sorted[1][0];
+                    matches.push({ winner, loser });
+                  } else if (sorted.length === 1) {
+                    matches.push({ winner: sorted[0][0], loser: 'TBD' });
                   }
                 }
               }
@@ -199,7 +237,8 @@ export default function LiveBracket() {
               cycles.push({
                 cashout,
                 matches,
-                leader: cycleLeader
+                leader: cycleLeader,
+                hasData: true
               });
             }
           } catch (e) {
@@ -253,18 +292,10 @@ export default function LiveBracket() {
           </p>
         </div>
 
-        {/* PRE-EVENT STATE: Show Status + Registered Teams */}
+        {/* PRE-EVENT STATE: Show Registered Teams + Status */}
         {pageState.isPreEvent && (
           <>
-            {/* Status Panel */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-16">
-              <NeonCard variant="cyan">
-                <h3 className="text-sm font-mono text-white/50 uppercase mb-3">Status</h3>
-                <p className="text-xl font-bold font-mono text-neon-cyan">{pageState.status}</p>
-              </NeonCard>
-            </div>
-
-            {/* Registered Teams */}
+            {/* Registered Teams (TOP) */}
             <div className="mb-16">
               <h2 className="text-2xl font-bold font-mono text-neon-cyan mb-6 uppercase">Registered Teams ({pageState.registeredTeams.length})</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -274,6 +305,14 @@ export default function LiveBracket() {
                   </NeonCard>
                 ))}
               </div>
+            </div>
+
+            {/* Status Panel */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-16">
+              <NeonCard variant="cyan">
+                <h3 className="text-sm font-mono text-white/50 uppercase mb-3">Status</h3>
+                <p className="text-xl font-bold font-mono text-neon-cyan">{pageState.status}</p>
+              </NeonCard>
             </div>
           </>
         )}
@@ -295,7 +334,7 @@ export default function LiveBracket() {
               )}
             </div>
 
-            {/* Standings Leaderboard */}
+            {/* Standings Leaderboard (PRIMARY) */}
             {pageState.standings.length > 0 && (
               <div className="mb-16">
                 <h2 className="text-2xl font-bold font-mono text-neon-gold mb-6 uppercase">Standings</h2>
@@ -318,49 +357,68 @@ export default function LiveBracket() {
               </div>
             )}
 
-            {/* Cycles */}
+            {/* Cycles (Collapsible) */}
             {pageState.cycles.length > 0 && (
               <div className="mb-16">
                 <h2 className="text-2xl font-bold font-mono text-neon-magenta mb-6 uppercase">Cycles</h2>
-                <div className="space-y-8">
+                <div className="space-y-4">
                   {pageState.cycles.map((cycle, cycleIdx) => (
-                    <div key={cycleIdx} className="space-y-4">
-                      <h3 className="text-xl font-bold font-mono text-neon-gold uppercase">Cycle {cycleIdx + 1}</h3>
-                      
-                      {/* Cashout Results */}
-                      {cycle.cashout.length > 0 && (
-                        <NeonCard variant="gold">
-                          <h4 className="text-lg font-bold font-mono text-neon-gold mb-4 uppercase">Cashout Results</h4>
-                          <div className="space-y-2">
-                            {cycle.cashout.map((result, idx) => (
-                              <div key={idx} className="text-sm font-mono text-white/70">
-                                <span className="text-neon-gold font-bold">{result.placement}.</span> {result.team}
-                              </div>
-                            ))}
+                    <div key={cycleIdx}>
+                      {/* Cycle Header (Collapsible) */}
+                      <button
+                        onClick={() => toggleCycle(cycleIdx)}
+                        className="w-full"
+                      >
+                        <NeonCard variant="gold" className="cursor-pointer hover:opacity-80 transition-opacity">
+                          <div className="flex items-center justify-between">
+                            <h3 className="text-xl font-bold font-mono text-neon-gold uppercase">Cycle {cycleIdx + 1}</h3>
+                            <ChevronDown
+                              size={24}
+                              className={`text-neon-gold transition-transform ${expandedCycles.has(cycleIdx) ? 'rotate-180' : ''}`}
+                            />
                           </div>
                         </NeonCard>
-                      )}
+                      </button>
 
-                      {/* Match Results */}
-                      {cycle.matches.length > 0 && (
-                        <NeonCard variant="magenta">
-                          <h4 className="text-lg font-bold font-mono text-neon-magenta mb-4 uppercase">Match Results</h4>
-                          <div className="space-y-2">
-                            {cycle.matches.map((match, idx) => (
-                              <div key={idx} className="text-sm font-mono text-white/70">
-                                <span className="text-neon-magenta font-bold">{match.winner}</span> def. {match.loser}
+                      {/* Cycle Content (Expanded) */}
+                      {expandedCycles.has(cycleIdx) && (
+                        <div className="mt-4 space-y-4">
+                          {/* Cashout Results */}
+                          {cycle.cashout.length > 0 && (
+                            <NeonCard variant="gold">
+                              <h4 className="text-lg font-bold font-mono text-neon-gold mb-4 uppercase">Cashout Results</h4>
+                              <div className="space-y-2">
+                                {cycle.cashout.map((result, idx) => (
+                                  <div key={idx} className="text-sm font-mono text-white/70">
+                                    <span className="text-neon-gold font-bold">{result.placement}.</span> {result.team}
+                                  </div>
+                                ))}
                               </div>
-                            ))}
-                          </div>
-                        </NeonCard>
-                      )}
+                            </NeonCard>
+                          )}
 
-                      {/* Cycle Leader */}
-                      {cycle.leader && cycle.leader !== 'Pending Results' && (
-                        <NeonCard variant="lime">
-                          <h4 className="text-sm font-mono text-white/50 uppercase mb-2">Cycle Leader</h4>
-                          <p className="text-lg font-bold font-mono text-neon-lime">{cycle.leader}</p>
-                        </NeonCard>
+                          {/* Match Results */}
+                          {cycle.matches.length > 0 && (
+                            <NeonCard variant="magenta">
+                              <h4 className="text-lg font-bold font-mono text-neon-magenta mb-4 uppercase">Match Results</h4>
+                              <div className="space-y-2">
+                                {cycle.matches.map((match, idx) => (
+                                  <div key={idx} className="text-sm font-mono text-white/70">
+                                    <span className="text-neon-magenta font-bold">{match.winner}</span> def. {match.loser}
+                                  </div>
+                                ))}
+                              </div>
+                            </NeonCard>
+                          )}
+
+                          {/* Cycle Leader */}
+                          {cycle.leader && cycle.leader !== 'Pending Results' && (
+                            <NeonCard variant="lime">
+                              <h4 className="text-sm font-mono text-white/50 uppercase mb-2">Cycle Leader</h4>
+                              <p className="text-lg font-bold font-mono text-neon-lime">{cycle.leader}</p>
+                            </NeonCard>
+                          )}
+                        </div>
                       )}
                     </div>
                   ))}
@@ -368,7 +426,7 @@ export default function LiveBracket() {
               </div>
             )}
 
-            {/* Registered Teams */}
+            {/* Registered Teams (LOWER) */}
             <div className="mb-16">
               <h2 className="text-2xl font-bold font-mono text-neon-cyan mb-6 uppercase">Registered Teams ({pageState.registeredTeams.length})</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -385,7 +443,7 @@ export default function LiveBracket() {
         {/* EVENT COMPLETE STATE: Show Winner + Standings + Cycles + Teams */}
         {pageState.isEventComplete && (
           <>
-            {/* Event Winner */}
+            {/* Event Winner (TOP) */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-16">
               <NeonCard variant="gold">
                 <h3 className="text-sm font-mono text-white/50 uppercase mb-3">Event Winner</h3>
@@ -416,39 +474,58 @@ export default function LiveBracket() {
               </div>
             )}
 
-            {/* Cycles */}
+            {/* Cycles (Collapsible) */}
             {pageState.cycles.length > 0 && (
               <div className="mb-16">
                 <h2 className="text-2xl font-bold font-mono text-neon-magenta mb-6 uppercase">Cycles</h2>
-                <div className="space-y-8">
+                <div className="space-y-4">
                   {pageState.cycles.map((cycle, cycleIdx) => (
-                    <div key={cycleIdx} className="space-y-4">
-                      <h3 className="text-xl font-bold font-mono text-neon-gold uppercase">Cycle {cycleIdx + 1}</h3>
-                      
-                      {cycle.cashout.length > 0 && (
-                        <NeonCard variant="gold">
-                          <h4 className="text-lg font-bold font-mono text-neon-gold mb-4 uppercase">Cashout Results</h4>
-                          <div className="space-y-2">
-                            {cycle.cashout.map((result, idx) => (
-                              <div key={idx} className="text-sm font-mono text-white/70">
-                                <span className="text-neon-gold font-bold">{result.placement}.</span> {result.team}
-                              </div>
-                            ))}
+                    <div key={cycleIdx}>
+                      {/* Cycle Header (Collapsible) */}
+                      <button
+                        onClick={() => toggleCycle(cycleIdx)}
+                        className="w-full"
+                      >
+                        <NeonCard variant="gold" className="cursor-pointer hover:opacity-80 transition-opacity">
+                          <div className="flex items-center justify-between">
+                            <h3 className="text-xl font-bold font-mono text-neon-gold uppercase">Cycle {cycleIdx + 1}</h3>
+                            <ChevronDown
+                              size={24}
+                              className={`text-neon-gold transition-transform ${expandedCycles.has(cycleIdx) ? 'rotate-180' : ''}`}
+                            />
                           </div>
                         </NeonCard>
-                      )}
+                      </button>
 
-                      {cycle.matches.length > 0 && (
-                        <NeonCard variant="magenta">
-                          <h4 className="text-lg font-bold font-mono text-neon-magenta mb-4 uppercase">Match Results</h4>
-                          <div className="space-y-2">
-                            {cycle.matches.map((match, idx) => (
-                              <div key={idx} className="text-sm font-mono text-white/70">
-                                <span className="text-neon-magenta font-bold">{match.winner}</span> def. {match.loser}
+                      {/* Cycle Content (Expanded) */}
+                      {expandedCycles.has(cycleIdx) && (
+                        <div className="mt-4 space-y-4">
+                          {cycle.cashout.length > 0 && (
+                            <NeonCard variant="gold">
+                              <h4 className="text-lg font-bold font-mono text-neon-gold mb-4 uppercase">Cashout Results</h4>
+                              <div className="space-y-2">
+                                {cycle.cashout.map((result, idx) => (
+                                  <div key={idx} className="text-sm font-mono text-white/70">
+                                    <span className="text-neon-gold font-bold">{result.placement}.</span> {result.team}
+                                  </div>
+                                ))}
                               </div>
-                            ))}
-                          </div>
-                        </NeonCard>
+                            </NeonCard>
+                          )}
+
+                          {cycle.matches.length > 0 && (
+                            <NeonCard variant="magenta">
+                              <h4 className="text-lg font-bold font-mono text-neon-magenta mb-4 uppercase">Match Results</h4>
+                              <div className="space-y-2">
+                                {cycle.matches.map((match, idx) => (
+                                  <div key={idx} className="text-sm font-mono text-white/70">
+                                    <span className="text-neon-magenta font-bold">{match.winner}</span> def. {match.loser}
+                                  </div>
+                                ))}
+                              </div>
+                            </NeonCard>
+                          )}
+                        </div>
                       )}
                     </div>
                   ))}
@@ -456,7 +533,7 @@ export default function LiveBracket() {
               </div>
             )}
 
-            {/* Registered Teams */}
+            {/* Registered Teams (BOTTOM) */}
             <div className="mb-16">
               <h2 className="text-2xl font-bold font-mono text-neon-cyan mb-6 uppercase">Registered Teams ({pageState.registeredTeams.length})</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
