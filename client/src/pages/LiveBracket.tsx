@@ -1,8 +1,11 @@
+'use client';
+
 import NeonCard from '@/components/NeonCard';
 import GlitchText from '@/components/GlitchText';
 import { Link } from 'wouter';
 import { useState, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
+import { trpc } from '@/lib/trpc';
 
 interface TeamRoster {
   teamName: string;

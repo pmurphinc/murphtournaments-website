@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, users, tournaments, teams, Tournament, Team } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -89,4 +89,116 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+// Tournament queries
+export async function getOrCreateDevDivisionTournament() {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get tournament: database not available");
+    return undefined;
+  }
+
+  try {
+    // Try to find existing Dev Division tournament
+    const existing = await db.select().from(tournaments).where(eq(tournaments.name, "Development Division")).limit(1);
+    
+    if (existing.length > 0) {
+      return existing[0];
+    }
+
+    // Create new tournament if it doesn't exist
+    const result = await db.insert(tournaments).values({
+      name: "Development Division",
+      eventStatus: "not-live",
+      currentCycle: "1",
+      currentStage: "check-in",
+      currentMatch: "Team A vs Team B",
+      eventNote: "Awaiting Results / Match In Progress / Sudden Death",
+    });
+
+    // Return the created tournament
+    const created = await db.select().from(tournaments).where(eq(tournaments.name, "Development Division")).limit(1);
+    return created[0];
+  } catch (error) {
+    console.error("[Database] Failed to get/create tournament:", error);
+    throw error;
+  }
+}
+
+export async function updateTournamentStatus(tournamentId: number, updates: Partial<Tournament>) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot update tournament: database not available");
+    return undefined;
+  }
+
+  try {
+    await db.update(tournaments).set(updates).where(eq(tournaments.id, tournamentId));
+    const result = await db.select().from(tournaments).where(eq(tournaments.id, tournamentId)).limit(1);
+    return result[0];
+  } catch (error) {
+    console.error("[Database] Failed to update tournament:", error);
+    throw error;
+  }
+}
+
+export async function getTeamsByTournament(tournamentId: number) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get teams: database not available");
+    return [];
+  }
+
+  try {
+    return await db.select().from(teams).where(eq(teams.tournamentId, tournamentId));
+  } catch (error) {
+    console.error("[Database] Failed to get teams:", error);
+    throw error;
+  }
+}
+
+export async function updateTeamFRP(teamId: number, frp: number) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot update team: database not available");
+    return undefined;
+  }
+
+  try {
+    await db.update(teams).set({ frp }).where(eq(teams.id, teamId));
+    const result = await db.select().from(teams).where(eq(teams.id, teamId)).limit(1);
+    return result[0];
+  } catch (error) {
+    console.error("[Database] Failed to update team FRP:", error);
+    throw error;
+  }
+}
+
+export async function upsertTeams(tournamentId: number, teamList: Array<{ name: string; frp: number }>) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot upsert teams: database not available");
+    return [];
+  }
+
+  try {
+    // Delete existing teams for this tournament
+    await db.delete(teams).where(eq(teams.tournamentId, tournamentId));
+
+    // Insert new teams
+    const teamValues = teamList.map(t => ({
+      tournamentId,
+      name: t.name,
+      frp: t.frp,
+    }));
+
+    if (teamValues.length > 0) {
+      await db.insert(teams).values(teamValues);
+    }
+
+    // Return all teams
+    return await db.select().from(teams).where(eq(teams.tournamentId, tournamentId));
+  } catch (error) {
+    console.error("[Database] Failed to upsert teams:", error);
+    throw error;
+  }
+}

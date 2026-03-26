@@ -25,4 +25,31 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-// TODO: Add your tables here
+// Tournament status and live data
+export const tournaments = mysqlTable("tournaments", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  eventStatus: mysqlEnum("eventStatus", ["not-live", "live", "complete"]).default("not-live").notNull(),
+  currentCycle: mysqlEnum("currentCycle", ["1", "2", "3"]).default("1").notNull(),
+  currentStage: mysqlEnum("currentStage", ["check-in", "cashout", "final-round", "finished"]).default("check-in").notNull(),
+  currentMatch: varchar("currentMatch", { length: 255 }).default("Team A vs Team B"),
+  eventNote: text("eventNote"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Tournament = typeof tournaments.$inferSelect;
+export type InsertTournament = typeof tournaments.$inferInsert;
+
+// Teams in a tournament
+export const teams = mysqlTable("teams", {
+  id: int("id").autoincrement().primaryKey(),
+  tournamentId: int("tournamentId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  frp: int("frp").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Team = typeof teams.$inferSelect;
+export type InsertTeam = typeof teams.$inferInsert;
