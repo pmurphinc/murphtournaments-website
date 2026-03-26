@@ -202,3 +202,38 @@ export async function upsertTeams(tournamentId: number, teamList: Array<{ name: 
     throw error;
   }
 }
+
+// 7th Circle tournament queries
+export async function getOrCreateSeventhCircleTournament() {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get tournament: database not available");
+    return undefined;
+  }
+
+  try {
+    // Try to find existing 7th Circle tournament
+    const existing = await db.select().from(tournaments).where(eq(tournaments.name, "7th Circle")).limit(1);
+    
+    if (existing.length > 0) {
+      return existing[0];
+    }
+
+    // Create new tournament if it doesn't exist
+    const result = await db.insert(tournaments).values({
+      name: "7th Circle",
+      eventStatus: "not-live",
+      currentCycle: "1",
+      currentStage: "check-in",
+      currentMatch: "Team A vs Team B",
+      eventNote: "Awaiting Results / Match In Progress / Sudden Death",
+    });
+
+    // Return the created tournament
+    const created = await db.select().from(tournaments).where(eq(tournaments.name, "7th Circle")).limit(1);
+    return created[0];
+  } catch (error) {
+    console.error("[Database] Failed to get/create 7th Circle tournament:", error);
+    throw error;
+  }
+}

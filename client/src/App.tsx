@@ -14,6 +14,8 @@ import About from "./pages/About";
 import Watch from "./pages/Watch";
 import Join from "./pages/Join";
 import AdminControl from "./pages/AdminControl";
+import AdminControl2 from "./pages/AdminControl2";
+import LiveBracket2 from "./pages/LiveBracket2";
 import { useEffect } from "react";
 
 /**
@@ -44,6 +46,8 @@ function Router() {
           <Route path={"/watch"} component={Watch} />
           <Route path={"/join"} component={Join} />
           <Route path={"/admin"} component={AdminControl} />
+          <Route path={"/admin2"} component={AdminControl2} />
+          <Route path={"/bracket2"} component={LiveBracket2} />
           <Route path={"/404"} component={NotFound} />
           {/* Final fallback route */}
           <Route component={NotFound} />

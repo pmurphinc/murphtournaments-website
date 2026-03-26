@@ -1,9 +1,9 @@
-import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
+import { COOKIE_NAME } from "../shared/const";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
-import { getOrCreateDevDivisionTournament, updateTournamentStatus, getTeamsByTournament, upsertTeams, updateTeamFRP } from "./db";
+import { getOrCreateDevDivisionTournament, getOrCreateSeventhCircleTournament, updateTournamentStatus, getTeamsByTournament, upsertTeams, updateTeamFRP } from "./db";
 
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -123,6 +123,65 @@ export const appRouter = router({
         }
 
         const tournament = await getOrCreateDevDivisionTournament();
+        if (!tournament) {
+          throw new Error("Failed to get tournament");
+        }
+
+        const updatedTeams = await upsertTeams(tournament.id, input.teams);
+        return updatedTeams;
+      }),
+
+    // 7th Circle tournament endpoints
+    getSeventhCircle: publicProcedure.query(async () => {
+      const tournament = await getOrCreateSeventhCircleTournament();
+      if (!tournament) {
+        throw new Error("Failed to get or create tournament");
+      }
+
+      const teamList = await getTeamsByTournament(tournament.id);
+      return {
+        ...tournament,
+        teams: teamList,
+      };
+    }),
+
+    updateStatus2: publicProcedure
+      .input(z.object({
+        tournamentId: z.number(),
+        eventStatus: z.enum(["not-live", "live", "complete"]).optional(),
+        currentCycle: z.enum(["1", "2", "3"]).optional(),
+        currentStage: z.enum(["check-in", "cashout", "final-round", "finished"]).optional(),
+        currentMatch: z.string().optional(),
+        eventNote: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const tournament = await getOrCreateSeventhCircleTournament();
+        if (!tournament) {
+          throw new Error("Failed to get tournament");
+        }
+
+        const updated = await updateTournamentStatus(tournament.id, input);
+        if (!updated) {
+          throw new Error("Failed to update tournament");
+        }
+
+        const teamList = await getTeamsByTournament(tournament.id);
+        return {
+          ...updated,
+          teams: teamList,
+        };
+      }),
+
+    updateTeams2: publicProcedure
+      .input(z.object({
+        tournamentId: z.number(),
+        teams: z.array(z.object({
+          name: z.string(),
+          frp: z.number(),
+        })),
+      }))
+      .mutation(async ({ input }) => {
+        const tournament = await getOrCreateSeventhCircleTournament();
         if (!tournament) {
           throw new Error("Failed to get tournament");
         }

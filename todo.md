@@ -75,3 +75,13 @@
 - [ ] Test admin updates reflect on public page
 - [ ] Verify data persistence across page refreshes
 - [ ] Test mobile responsiveness of admin panel
+
+
+## Second Tournament System (7th Circle)
+- [ ] Update database schema to support multiple tournaments
+- [ ] Create 7th Circle admin panel (/admin2)
+- [ ] Create 7th Circle bracket page (/bracket2)
+- [ ] Add tRPC endpoints for 7th Circle tournament
+- [ ] Seed database with 7th Circle tournament and teams
+- [ ] Test both tournament systems independently
+- [ ] Deploy and verify both admin panels working
