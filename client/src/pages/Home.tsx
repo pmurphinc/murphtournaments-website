@@ -5,7 +5,7 @@ import GlitchText from '@/components/GlitchText';
 import CountdownTimer from '@/components/CountdownTimer';
 import NextEventBanner from '@/components/NextEventBanner';
 import PlayerSpotlight from '@/components/PlayerSpotlight';
-import Season10Countdown from '@/components/Season10Countdown';
+
 
 /**
  * Home Page
@@ -18,8 +18,38 @@ import Season10Countdown from '@/components/Season10Countdown';
  */
 
 export default function Home() {
-  // Next Development Division event: April 3rd, 2026 at 6 PM PST
-  const nextTournamentDate = new Date('2026-04-03T18:00:00-07:00');
+  // Calculate next First Friday at 6 PM PST
+  const getNextFirstFriday = () => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    
+    // Start with the first day of current month
+    let firstDay = new Date(currentYear, currentMonth, 1);
+    
+    // Find the first Friday (Friday is 5)
+    let firstFriday = new Date(firstDay);
+    const dayOfWeek = firstFriday.getDay();
+    const daysUntilFriday = (5 - dayOfWeek + 7) % 7;
+    firstFriday.setDate(firstFriday.getDate() + (daysUntilFriday === 0 ? 7 : daysUntilFriday));
+    
+    // Set time to 6 PM PST
+    firstFriday.setHours(18, 0, 0, 0);
+    
+    // If this Friday has already passed, get next month's first Friday
+    if (firstFriday <= now) {
+      const nextMonth = new Date(currentYear, currentMonth + 1, 1);
+      firstFriday = new Date(nextMonth);
+      const nextDayOfWeek = firstFriday.getDay();
+      const nextDaysUntilFriday = (5 - nextDayOfWeek + 7) % 7;
+      firstFriday.setDate(firstFriday.getDate() + (nextDaysUntilFriday === 0 ? 7 : nextDaysUntilFriday));
+      firstFriday.setHours(18, 0, 0, 0);
+    }
+    
+    return firstFriday;
+  };
+  
+  const nextTournamentDate = getNextFirstFriday();
 
   return (
     <div className="min-h-screen bg-dark-charcoal">
@@ -67,19 +97,19 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Right: THE FINALS Season 10 News */}
+            {/* Right: Next Tournament Countdown */}
             <div className="hidden lg:flex items-center justify-center">
               <div className="relative w-full h-96 bg-gradient-to-br from-neon-magenta/10 to-neon-cyan/10 border-2 border-neon-gold/40 rounded-sm p-8 flex flex-col justify-center">
                 <div className="text-center space-y-4">
-                  <div className="text-neon-gold font-mono text-sm uppercase tracking-widest font-bold">Latest News</div>
-                  <h3 className="text-3xl font-bold font-mono text-neon-cyan uppercase tracking-widest">Season 10 Launch</h3>
+                  <div className="text-neon-gold font-mono text-sm uppercase tracking-widest font-bold">Next Event</div>
+                  <h3 className="text-3xl font-bold font-mono text-neon-cyan uppercase tracking-widest">Dev Division</h3>
                   <p className="text-white/80 font-mono text-sm leading-relaxed">
-                    THE FINALS Season 10 launches on <span className="text-neon-gold font-bold">March 26, 2026</span>. A bold new era for the arena with new content, gameplay updates, and competitive opportunities.
+                    Monthly tournaments on the <span className="text-neon-gold font-bold">First Friday</span> at 6 PM PST. Compete, improve, and get noticed.
                   </p>
-                  <Season10Countdown />
-                  <a href="https://www.reachthefinals.com" target="_blank" rel="noopener noreferrer" className="inline-block mt-4 px-6 py-2 border-2 border-neon-cyan text-neon-cyan font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all">
+                  <CountdownTimer targetDate={nextTournamentDate} eventName="Dev Division" />
+                  <Link href="/dev-division" className="inline-block mt-4 px-6 py-2 border-2 border-neon-cyan text-neon-cyan font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all">
                     Learn More
-                  </a>
+                  </Link>
                 </div>
               </div>
             </div>
