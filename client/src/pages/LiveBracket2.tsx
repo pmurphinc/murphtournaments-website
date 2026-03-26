@@ -15,15 +15,15 @@ interface TeamRoster {
 const REGISTERED_TEAMS: TeamRoster[] = [
   {
     teamName: "ULT",
-    players: ["Player 1", "Player 2", "Player 3"]
+    players: ["opt1ss#0322", "Proto#1032", "Tenyan#2782"]
   },
   {
     teamName: "#BuffWinch",
-    players: ["Player 1", "Player 2", "Player 3"]
+    players: ["DREX0R#1294", "bizu#7380", "Getbonkednerd#3784"]
   },
   {
     teamName: "Opium label",
-    players: ["Player 1", "Player 2", "Player 3"]
+    players: ["Mococo#6113", "Antho2throwed#3461", "877-cashnow#2876"]
   },
   {
     teamName: "Register now",
@@ -126,9 +126,16 @@ export default function LiveBracket2() {
 
                   {isExpanded && (
                     <div className="bg-dark-charcoal/50 p-4 border-t border-neon-magenta/50 space-y-2 text-sm font-mono">
-                      {team.players.map((player) => (
-                        <p key={player} className="text-white/80">{player}</p>
-                      ))}
+                      {team.players.map((player) => {
+                        const playerSlug = player.split('#')[0].toLowerCase();
+                        return (
+                          <Link key={player} href={`/player/${playerSlug}`}>
+                            <a className="text-neon-cyan hover:text-neon-magenta transition-colors cursor-pointer">
+                              {player}
+                            </a>
+                          </Link>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
