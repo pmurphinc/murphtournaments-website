@@ -1,0 +1,9 @@
+{
+  "query": "INSERT INTO tournaments (name, eventStatus) VALUES ('Dev Division', 'not-live');\nINSERT INTO teams (name, frp, tournamentId) VALUES \n('EkaZo''s Kittens', 0, LAST_INSERT_ID()),\n('Three Deadly Sins', 0, LAST_INSERT_ID()),\n('LIQR', 0, LAST_INSERT_ID()),\n('The Baiters', 0, LAST_INSERT_ID());",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user sBg9DwMAKktGayh.2aaa41cb9841 --database GzitzUSk3snQMAtW4LnLnQ --execute INSERT INTO tournaments (name, eventStatus) VALUES ('Dev Division', 'not-live');\nINSERT INTO teams (name, frp, tournamentId) VALUES \n('EkaZo''s Kittens', 0, LAST_INSERT_ID()),\n('Three Deadly Sins', 0, LAST_INSERT_ID()),\n('LIQR', 0, LAST_INSERT_ID()),\n('The Baiters', 0, LAST_INSERT_ID());",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 258
+}

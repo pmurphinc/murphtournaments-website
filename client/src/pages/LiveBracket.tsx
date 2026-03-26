@@ -37,34 +37,36 @@ export default function LiveBracket() {
   const [currentLeader, setCurrentLeader] = useState('Pending Results');
   const [eventWinner, setEventWinner] = useState('Pending Results');
 
-  // Sync with admin state from localStorage
-  useEffect(() => {
-    const syncAdminState = () => {
-      const saved = localStorage.getItem('dd-admin-control-state');
-      if (saved) {
-        try {
-          const data = JSON.parse(saved);
-          setEventStatus(data.eventStatus === 'Live' ? 'LIVE EVENT' : data.eventStatus === 'Complete' ? 'TOURNAMENT COMPLETE' : 'Awaiting Results');
-          if (data.standings && data.standings.length > 0) {
-            setCurrentLeader(data.standings[0]?.name || 'Pending Results');
-          }
-          if (data.eventStatus === 'Complete' && data.standings && data.standings.length > 0) {
-            setEventWinner(data.standings[0]?.name || 'Pending Results');
-          }
-        } catch (err) {
-          console.error('Failed to sync admin state:', err);
-        }
-      }
-    };
+  // Fetch tournament data from API
+  const { data: tournament } = trpc.tournament.getDevDivision.useQuery(undefined, {
+    refetchInterval: 2000,
+  });
 
-    syncAdminState();
-    window.addEventListener('storage', syncAdminState);
-    const interval = setInterval(syncAdminState, 2000);
-    return () => {
-      window.removeEventListener('storage', syncAdminState);
-      clearInterval(interval);
-    };
-  }, []);
+  // Update display when tournament data changes
+  useEffect(() => {
+    if (tournament) {
+      const statusMap: Record<string, string> = {
+        'not-live': 'Awaiting Results',
+        'live': 'LIVE EVENT',
+        'complete': 'TOURNAMENT COMPLETE',
+      };
+      setEventStatus(statusMap[tournament.eventStatus] || 'Awaiting Results');
+
+      if (tournament.teams && tournament.teams.length > 0) {
+        const leader = tournament.teams.reduce((prev, current) => 
+          (prev.frp > current.frp) ? prev : current
+        );
+        setCurrentLeader(leader.name || 'Pending Results');
+      }
+
+      if (tournament.eventStatus === 'complete' && tournament.teams && tournament.teams.length > 0) {
+        const winner = tournament.teams.reduce((prev, current) => 
+          (prev.frp > current.frp) ? prev : current
+        );
+        setEventWinner(winner.name || 'Pending Results');
+      }
+    }
+  }, [tournament]);
 
   return (
     <div className="min-h-screen bg-dark-charcoal py-12 px-4">
