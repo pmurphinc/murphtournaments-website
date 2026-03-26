@@ -72,9 +72,9 @@ export default function LiveBracket2() {
     <div className="min-h-screen bg-dark-charcoal py-12 px-4">
       <div className="container max-w-4xl space-y-8">
         {/* Back Button */}
-        <div className="mb-4">
-          <Link href="/bracket">
-            <a className="text-neon-cyan hover:text-neon-magenta transition-colors font-mono text-sm">← BACK TO BRACKET</a>
+        <div className="text-center mb-6">
+          <Link href="/bracket" className="inline-block px-4 py-2 border-2 border-neon-cyan text-neon-cyan hover:bg-neon-cyan/10 transition-colors font-mono text-sm uppercase">
+            ← BACK TO BRACKET
           </Link>
         </div>
 
@@ -132,15 +132,17 @@ export default function LiveBracket2() {
                   </button>
 
                   {isExpanded && (
-                    <div className="bg-dark-charcoal/50 p-4 border-t border-neon-magenta/50 space-y-2 text-sm font-mono">
+                    <div className="bg-dark-charcoal/50 p-4 border-t border-neon-magenta/50 space-y-1 text-sm font-mono">
                       {team.players.map((player) => {
                         const playerSlug = player.split('#')[0].toLowerCase();
                         return (
-                          <Link key={player} href={`/player/${playerSlug}`}>
-                            <a className="text-neon-cyan hover:text-neon-magenta transition-colors cursor-pointer">
-                              {player}
-                            </a>
-                          </Link>
+                          <div key={player} className="block">
+                            <Link href={`/player/${playerSlug}`}>
+                              <a className="text-neon-cyan hover:text-neon-magenta transition-colors cursor-pointer block py-1">
+                                {player}
+                              </a>
+                            </Link>
+                          </div>
                         );
                       })}
                     </div>

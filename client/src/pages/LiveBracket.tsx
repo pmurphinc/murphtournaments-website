@@ -130,15 +130,17 @@ export default function LiveBracket() {
                   </button>
 
                   {isExpanded && (
-                    <div className="bg-dark-charcoal/50 p-4 border-t border-neon-magenta/50 space-y-2 text-sm font-mono">
+                    <div className="bg-dark-charcoal/50 p-4 border-t border-neon-magenta/50 space-y-1 text-sm font-mono">
                       {team.players.map((player) => {
                         const playerSlug = player.split('#')[0].toLowerCase();
                         return (
-                          <Link key={player} href={`/player/${playerSlug}`}>
-                            <a className="text-neon-cyan hover:text-neon-magenta transition-colors cursor-pointer">
-                              {player}
-                            </a>
-                          </Link>
+                          <div key={player} className="block">
+                            <Link href={`/player/${playerSlug}`}>
+                              <a className="text-neon-cyan hover:text-neon-magenta transition-colors cursor-pointer block py-1">
+                                {player}
+                              </a>
+                            </Link>
+                          </div>
                         );
                       })}
                     </div>
