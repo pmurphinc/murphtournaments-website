@@ -77,7 +77,7 @@ export default function DevDivision() {
           <NeonCard variant="magenta">
             <h3 className="text-lg font-bold font-mono text-neon-magenta mb-4 uppercase">Eligibility</h3>
             <ul className="space-y-2 text-sm text-white/70 font-mono">
-              <li>✓ Platinum Rank or Higher</li>
+              <li>✓ Platinum Rank</li>
               <li>✓ Diamond Rank</li>
               <li>✓ Competitive Mindset</li>
               <li>✓ Reliable Schedule</li>
