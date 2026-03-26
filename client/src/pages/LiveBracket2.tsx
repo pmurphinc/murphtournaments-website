@@ -53,10 +53,15 @@ export default function LiveBracket2() {
       setEventStatus(statusMap[tournament.eventStatus] || 'Awaiting Results');
 
       if (tournament.teams && tournament.teams.length > 0) {
-        const leader = tournament.teams.reduce((prev: any, current: any) => 
-          (prev.frp > current.frp) ? prev : current
-        );
-        setCurrentLeader(leader.name || 'Pending Results');
+        const maxFrp = Math.max(...tournament.teams.map((t: any) => t.frp || 0));
+        if (maxFrp > 0) {
+          const leader = tournament.teams.reduce((prev: any, current: any) => 
+            (prev.frp > current.frp) ? prev : current
+          );
+          setCurrentLeader(leader.name || 'Pending Results');
+        } else {
+          setCurrentLeader('Pending Results');
+        }
       }
 
       if (tournament.eventStatus === 'complete' && tournament.teams && tournament.teams.length > 0) {
