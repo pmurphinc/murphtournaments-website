@@ -99,21 +99,59 @@ export default function Home() {
 
             {/* Right: Next Tournament Countdown */}
             <div className="hidden lg:flex items-center justify-center">
-              <div className="relative w-full h-96 bg-gradient-to-br from-neon-magenta/10 to-neon-cyan/10 border-2 border-neon-gold/40 rounded-sm p-8 flex flex-col justify-center">
+              <div className="relative w-full h-96 bg-gradient-to-br from-neon-magenta/10 to-neon-gold/10 border-2 border-neon-gold rounded-sm p-8 flex flex-col justify-center">
                 <div className="text-center space-y-4">
                   <div className="text-neon-gold font-mono text-sm uppercase tracking-widest font-bold">Next Event</div>
-                  <h3 className="text-3xl font-bold font-mono text-neon-cyan uppercase tracking-widest">Dev Division</h3>
+                  <h3 className="text-3xl font-bold font-mono text-neon-gold uppercase tracking-widest">Dev Division</h3>
                   <p className="text-white/80 font-mono text-sm leading-relaxed">
                     Monthly tournaments on the <span className="text-neon-gold font-bold">First Friday</span> at 6 PM PST. Compete, improve, and get noticed.
                   </p>
                   <CountdownTimer targetDate={nextTournamentDate} eventName="Dev Division" />
-                  <Link href="/dev-division" className="inline-block mt-4 px-6 py-2 border-2 border-neon-cyan text-neon-cyan font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all">
+                  <Link href="/dev-division" className="inline-block mt-4 px-6 py-2 border-2 border-neon-magenta text-neon-magenta font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all">
                     Learn More
                   </Link>
                 </div>
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Development Division Section */}
+      <section className="py-16 md:py-24 border-t border-neon-magenta/20">
+        <div className="container">
+          <h2 className="text-4xl font-bold font-mono text-neon-magenta mb-12 uppercase tracking-widest">
+            Development Division
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <NeonCard variant="magenta">
+              <h3 className="text-lg font-bold font-mono text-neon-magenta mb-3 uppercase">Path to Pro</h3>
+              <p className="text-sm text-white/70 font-mono">
+                Structured monthly events for Plat–Diamond players seeking competitive experience and exposure.
+              </p>
+            </NeonCard>
+
+            <NeonCard variant="cyan">
+              <h3 className="text-lg font-bold font-mono text-neon-cyan mb-3 uppercase">Skill Development</h3>
+              <p className="text-sm text-white/70 font-mono">
+                Compete against strong opponents, receive detailed feedback, and improve your competitive play.
+              </p>
+            </NeonCard>
+
+            <NeonCard variant="gold">
+              <h3 className="text-lg font-bold font-mono text-neon-gold mb-3 uppercase">Stream Coverage</h3>
+              <p className="text-sm text-white/70 font-mono">
+                Get noticed. All matches are streamed on Twitch with professional commentary and analysis.
+              </p>
+            </NeonCard>
+          </div>
+
+          <Link href="/dev-division">
+            <button className="px-8 py-3 bg-neon-cyan text-dark-black font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all">
+              Explore Dev Division
+            </button>
+          </Link>
         </div>
       </section>
 
@@ -171,82 +209,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Development Division Section */}
-      <section className="py-16 md:py-24 border-t border-neon-magenta/20">
-        <div className="container">
-          <h2 className="text-4xl font-bold font-mono text-neon-magenta mb-12 uppercase tracking-widest">
-            Development Division
-          </h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <NeonCard variant="magenta">
-              <h3 className="text-lg font-bold font-mono text-neon-magenta mb-3 uppercase">Path to Pro</h3>
-              <p className="text-sm text-white/70 font-mono">
-                Structured monthly events for Plat–Diamond players seeking competitive experience and exposure.
-              </p>
-            </NeonCard>
-
-            <NeonCard variant="cyan">
-              <h3 className="text-lg font-bold font-mono text-neon-cyan mb-3 uppercase">Skill Development</h3>
-              <p className="text-sm text-white/70 font-mono">
-                Compete against strong opponents, receive detailed feedback, and improve your competitive play.
-              </p>
-            </NeonCard>
-
-            <NeonCard variant="gold">
-              <h3 className="text-lg font-bold font-mono text-neon-gold mb-3 uppercase">Stream Coverage</h3>
-              <p className="text-sm text-white/70 font-mono">
-                Get noticed. All matches are streamed on Twitch with professional commentary and analysis.
-              </p>
-            </NeonCard>
-          </div>
-
-          <Link href="/dev-division">
-            <button className="px-8 py-3 bg-neon-cyan text-dark-black font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all">
-              Explore Dev Division
-            </button>
-          </Link>
-        </div>
-      </section>
-
-      {/* Upcoming Tournament Section */}
-      <section className="py-16 md:py-24 border-t border-neon-magenta/20">
-        <div className="container">
-          <h2 className="text-4xl font-bold font-mono text-neon-gold mb-12 uppercase tracking-widest">
-            Next Tournament
-          </h2>
-
-          <NeonCard variant="gold" className="mb-8">
-            <div className="space-y-8">
-              <CountdownTimer targetDate={nextTournamentDate} eventName="Development Division" />
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-t border-neon-gold/20 pt-8">
-                <div>
-                  <p className="text-xs text-white/60 font-mono uppercase tracking-widest mb-2">Format</p>
-                  <p className="text-lg font-bold text-neon-gold font-mono">3v3 Teams</p>
-                  <p className="text-sm text-white/60 font-mono">Plat - Diamond Players</p>
-                </div>
-                <div>
-                  <p className="text-xs text-white/60 font-mono uppercase tracking-widest mb-2">Next Event</p>
-                  <p className="text-lg font-bold text-neon-gold font-mono">April 3rd</p>
-                  <p className="text-sm text-white/60 font-mono">6 PM PST</p>
-                </div>
-                <div>
-                  <p className="text-xs text-white/60 font-mono uppercase tracking-widest mb-2">Prize Pool</p>
-                  <p className="text-lg font-bold text-neon-gold font-mono">TBA</p>
-                  <p className="text-sm text-white/60 font-mono">To Be Announced</p>
-                </div>
-              </div>
-            </div>
-          </NeonCard>
-
-          <Link href="/dev-division">
-            <button className="px-8 py-3 border-2 border-neon-gold text-neon-gold font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all">
-              Learn More About Dev Division
-            </button>
-          </Link>
-        </div>
-      </section>
 
       {/* Player Spotlight – Week 1 Section */}
       <section className="py-16 md:py-24 border-t border-neon-magenta/20">
