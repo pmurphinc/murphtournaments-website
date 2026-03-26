@@ -5,6 +5,7 @@ import GlitchText from '@/components/GlitchText';
 import CountdownTimer from '@/components/CountdownTimer';
 import NextEventBanner from '@/components/NextEventBanner';
 import PlayerSpotlight from '@/components/PlayerSpotlight';
+import PlayerSpotlightWeek1 from '@/components/PlayerSpotlightWeek1';
 import Season10Countdown from '@/components/Season10Countdown';
 
 /**
@@ -217,6 +218,45 @@ export default function Home() {
               Learn More About Dev Division
             </button>
           </Link>
+        </div>
+      </section>
+
+      {/* Player Spotlight Week 1 Section */}
+      <section className="py-16 md:py-24 border-t border-neon-gold/20">
+        <div className="container">
+          <h2 className="text-4xl font-bold font-mono text-neon-gold mb-12 uppercase tracking-widest">
+            Player Spotlight – Week 1
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <PlayerSpotlightWeek1
+              name="PLUTO"
+              level={123}
+              hours={732}
+              kd={2.10}
+              winRate={59}
+              tag="Top Fragger"
+              description="High-impact carry with elite efficiency in engagements."
+            />
+            <PlayerSpotlightWeek1
+              name="44TURNIPS"
+              level={133}
+              hours={560}
+              kd={1.55}
+              winRate={59}
+              tag="High Efficiency"
+              description="Consistent performer with strong win rate and high duel success."
+            />
+            <PlayerSpotlightWeek1
+              name="TWOCEEZ"
+              level={156}
+              hours={1955}
+              kd={1.17}
+              winRate={49}
+              tag="Support Specialist"
+              description="High-volume support player with exceptional revive and team utility impact."
+            />
+          </div>
         </div>
       </section>
 
