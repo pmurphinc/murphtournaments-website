@@ -76,13 +76,6 @@ export default function LiveBracket2() {
   return (
     <div className="min-h-screen bg-dark-charcoal py-12 px-4">
       <div className="container max-w-4xl space-y-8">
-        {/* Back Button */}
-        <div className="text-center mb-6">
-          <Link href="/bracket" className="inline-block px-4 py-2 border-2 border-neon-cyan text-neon-cyan hover:bg-neon-cyan/10 transition-colors font-mono text-sm uppercase">
-            ← BACK TO BRACKET
-          </Link>
-        </div>
-
         {/* Header */}
         <div className="text-center space-y-4">
           <div>
@@ -91,6 +84,11 @@ export default function LiveBracket2() {
             </GlitchText>
           </div>
           <p className="text-neon-cyan font-mono">Live Tournament Bracket</p>
+          <div className="pt-2">
+            <Link href="/bracket" className="inline-block px-4 py-2 border-2 border-neon-cyan text-neon-cyan hover:bg-neon-cyan/10 transition-colors font-mono text-sm uppercase">
+              ← BACK TO BRACKET
+            </Link>
+          </div>
         </div>
 
         {/* Status Boxes */}
@@ -129,7 +127,7 @@ export default function LiveBracket2() {
                     }}
                     className="w-full p-4 flex items-center justify-between hover:bg-neon-magenta/10 transition-colors"
                   >
-                    <span className="font-bold text-neon-magenta hover:text-neon-cyan font-mono cursor-pointer transition-colors">{team.teamName}</span>
+                    <span className="text-base md:text-lg font-bold text-neon-magenta hover:text-neon-cyan font-mono cursor-pointer transition-colors">{team.teamName}</span>
                     <ChevronDown
                       size={20}
                       className={`text-neon-magenta transition-transform ${isExpanded ? 'rotate-180' : ''}`}
