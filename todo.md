@@ -85,3 +85,12 @@
 - [ ] Seed database with 7th Circle tournament and teams
 - [ ] Test both tournament systems independently
 - [ ] Deploy and verify both admin panels working
+
+
+## Player Archive & Tournament History
+
+- [ ] Create player data archive page with 20 players
+- [ ] Add 7th Circle bracket link to bracket page header
+- [ ] Create tournament_history database table
+- [ ] Build tournament history archive page
+- [ ] Add tRPC endpoints for tournament history

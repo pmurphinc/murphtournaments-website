@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, users, tournaments, teams, Tournament, Team } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -234,6 +234,53 @@ export async function getOrCreateSeventhCircleTournament() {
     return created[0];
   } catch (error) {
     console.error("[Database] Failed to get/create 7th Circle tournament:", error);
+    throw error;
+  }
+}
+
+
+// Tournament history functions
+export async function getTournamentHistory() {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get tournament history: database not available");
+    return [];
+  }
+
+  try {
+    const { tournamentHistory } = await import("../drizzle/schema");
+    return await db.select().from(tournamentHistory).orderBy(desc(tournamentHistory.completedAt));
+  } catch (error) {
+    console.error("[Database] Failed to get tournament history:", error);
+    throw error;
+  }
+}
+
+export async function addTournamentToHistory(
+  tournamentId: number,
+  name: string,
+  winner: string,
+  runnerUp?: string,
+  finalFrp: number = 0
+) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot add tournament history: database not available");
+    return undefined;
+  }
+
+  try {
+    const { tournamentHistory } = await import("../drizzle/schema");
+    const result = await db.insert(tournamentHistory).values({
+      tournamentId,
+      name,
+      winner,
+      runnerUp: runnerUp || null,
+      finalFrp,
+    });
+    return result;
+  } catch (error) {
+    console.error("[Database] Failed to add tournament history:", error);
     throw error;
   }
 }

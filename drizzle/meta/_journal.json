@@ -15,6 +15,13 @@
       "when": 1774509213058,
       "tag": "0001_third_roland_deschain",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1774555394654,
+      "tag": "0002_stiff_ironclad",
+      "breakpoints": true
     }
   ]
 }

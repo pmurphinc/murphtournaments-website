@@ -79,6 +79,11 @@ export default function LiveBracket() {
             </GlitchText>
           </div>
           <p className="text-neon-cyan font-mono">Live Tournament Bracket</p>
+          <div className="pt-2">
+            <Link href="/bracket2" className="inline-block px-4 py-2 border-2 border-neon-cyan text-neon-cyan hover:bg-neon-cyan/10 transition-colors font-mono text-sm uppercase">
+              View 7th Circle Bracket →
+            </Link>
+          </div>
         </div>
 
         {/* Status Boxes */}

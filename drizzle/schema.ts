@@ -53,3 +53,17 @@ export const teams = mysqlTable("teams", {
 
 export type Team = typeof teams.$inferSelect;
 export type InsertTeam = typeof teams.$inferInsert;
+// Tournament history archive
+export const tournamentHistory = mysqlTable("tournament_history", {
+  id: int("id").autoincrement().primaryKey(),
+  tournamentId: int("tournamentId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  winner: varchar("winner", { length: 255 }).notNull(),
+  runnerUp: varchar("runner_up", { length: 255 }),
+  finalFrp: int("finalFrp").default(0).notNull(),
+  completedAt: timestamp("completedAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type TournamentHistory = typeof tournamentHistory.$inferSelect;
+export type InsertTournamentHistory = typeof tournamentHistory.$inferInsert;
