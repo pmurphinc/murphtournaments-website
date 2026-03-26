@@ -143,6 +143,28 @@ export default function DevDivision() {
           </div>
         </div>
 
+        {/* Resources Section */}
+        <div className="mb-16">
+          <h2 className="text-2xl font-bold font-mono text-neon-cyan mb-6 uppercase">Resources</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <a href="https://docs.google.com/document/d/1zn3uv5U6dIHCcl4UxpWE5SpHYl34iQEL6doh-EFKMDg/edit?usp=sharing" target="_blank" rel="noopener noreferrer">
+              <button className="w-full px-6 py-3 border-2 border-neon-cyan text-neon-cyan font-bold font-mono uppercase tracking-widest hover:bg-neon-cyan hover:text-dark-black transition-all rounded-sm">
+                What is the Development Division?
+              </button>
+            </a>
+            <a href="https://docs.google.com/document/d/1aMJuTyLSZ1OjIfqXqxbMP31b_BDB3pLbicBr_ug2r4M/edit?usp=sharing" target="_blank" rel="noopener noreferrer">
+              <button className="w-full px-6 py-3 border-2 border-neon-magenta text-neon-magenta font-bold font-mono uppercase tracking-widest hover:bg-neon-magenta hover:text-dark-black transition-all rounded-sm">
+                Rulebook
+              </button>
+            </a>
+            <a href="https://forms.gle/MzLNqg3YmPMk7gwK8" target="_blank" rel="noopener noreferrer">
+              <button className="w-full px-6 py-3 border-2 border-neon-lime text-neon-lime font-bold font-mono uppercase tracking-widest hover:bg-neon-lime hover:text-dark-black transition-all rounded-sm">
+                Sign-Up Here
+              </button>
+            </a>
+          </div>
+        </div>
+
         {/* CTA Section */}
         <div className="text-center">
           <p className="text-lg text-white/80 font-mono mb-6">
