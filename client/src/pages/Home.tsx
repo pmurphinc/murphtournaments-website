@@ -5,7 +5,6 @@ import GlitchText from '@/components/GlitchText';
 import CountdownTimer from '@/components/CountdownTimer';
 import NextEventBanner from '@/components/NextEventBanner';
 import PlayerSpotlight from '@/components/PlayerSpotlight';
-import PlayerSpotlightWeek1 from '@/components/PlayerSpotlightWeek1';
 import Season10Countdown from '@/components/Season10Countdown';
 
 /**
@@ -19,8 +18,6 @@ import Season10Countdown from '@/components/Season10Countdown';
  */
 
 export default function Home() {
-  const { user, loading, error, isAuthenticated, logout } = useAuth();
-
   // Next Development Division event: April 3rd, 2026 at 6 PM PST
   const nextTournamentDate = new Date('2026-04-03T18:00:00-07:00');
 
@@ -221,101 +218,62 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Player Spotlight Week 1 Section */}
-      <section className="py-16 md:py-24 border-t border-neon-gold/20">
+      {/* Player Spotlight – Week 1 Section */}
+      <section className="py-16 md:py-24 border-t border-neon-magenta/20">
         <div className="container">
           <h2 className="text-4xl font-bold font-mono text-neon-gold mb-12 uppercase tracking-widest">
             Player Spotlight – Week 1
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <PlayerSpotlightWeek1
-              name="PLUTO"
-              level={123}
-              hours={732}
-              kd={2.10}
-              winRate={59}
-              tag="Top Fragger"
-              description="High-impact carry with elite efficiency in engagements."
-            />
-            <PlayerSpotlightWeek1
-              name="44TURNIPS"
-              level={133}
-              hours={560}
-              kd={1.55}
-              winRate={59}
-              tag="High Efficiency"
-              description="Consistent performer with strong win rate and high duel success."
-            />
-            <PlayerSpotlightWeek1
-              name="TWOCEEZ"
-              level={156}
-              hours={1955}
-              kd={1.17}
-              winRate={49}
-              tag="Support Specialist"
-              description="High-volume support player with exceptional revive and team utility impact."
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* Player Spotlight Section */}
-      <section className="py-16 md:py-24 border-t border-neon-magenta/20">
-        <div className="container">
-          <h2 className="text-4xl font-bold font-mono text-neon-gold mb-12 uppercase tracking-widest">
-            Player Spotlight
-          </h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <PlayerSpotlight
-              name="Top Player"
-              role="IGL / Rifler"
-              rank="Diamond"
+              name="PLUTO"
+              role="Top Fragger"
+              rank="Lvl 123 • 732 hrs"
               achievements={[
-                "Tournament Winner (Murph XIV)",
-                "3x Top 3 Finishes",
-                "Dev Division Champion",
+                "K/D: 2.10",
+                "Win Rate: 59%",
+                "High-impact carry",
               ]}
               stats={[
-                { label: 'Tournaments', value: '12' },
-                { label: 'Win Rate', value: '67%' },
-                { label: 'Avg Kills', value: '8.2' },
-                { label: 'Wins', value: '8' },
+                { label: 'K/D', value: '2.10' },
+                { label: 'Win Rate', value: '59%' },
+                { label: 'Level', value: '123' },
+                { label: 'Hours', value: '732' },
               ]}
               variant="gold"
             />
             <PlayerSpotlight
-              name="Rising Star"
-              role="Operator / Support"
-              rank="Platinum"
+              name="44TURNIPS"
+              role="High Efficiency"
+              rank="Lvl 133 • 560 hrs"
               achievements={[
-                "Dev Division Finalist",
-                "Fastest Rank Up",
-                "Community Favorite",
+                "K/D: 1.55",
+                "Win Rate: 59%",
+                "Consistent performer",
               ]}
               stats={[
-                { label: 'Tournaments', value: '6' },
-                { label: 'Improvement', value: '+45%' },
-                { label: 'Avg Assists', value: '12.1' },
-                { label: 'Consistency', value: '92%' },
+                { label: 'K/D', value: '1.55' },
+                { label: 'Win Rate', value: '59%' },
+                { label: 'Level', value: '133' },
+                { label: 'Hours', value: '560' },
               ]}
               variant="cyan"
             />
             <PlayerSpotlight
-              name="Veteran Player"
-              role="Entry Fragger"
-              rank="Diamond"
+              name="TWOCEEZ"
+              role="Support Specialist"
+              rank="Lvl 156 • 1955 hrs"
               achievements={[
-                "5+ Tournament Wins",
-                "Clutch Play Master",
-                "Team Captain",
+                "K/D: 1.17",
+                "Win Rate: 49%",
+                "Exceptional support",
               ]}
               stats={[
-                { label: 'Tournaments', value: '14' },
-                { label: 'Win Rate', value: '71%' },
-                { label: 'Avg Kills', value: '9.1' },
-                { label: 'Leadership', value: 'A+' },
+                { label: 'K/D', value: '1.17' },
+                { label: 'Win Rate', value: '49%' },
+                { label: 'Level', value: '156' },
+                { label: 'Hours', value: '1955' },
               ]}
               variant="magenta"
             />
