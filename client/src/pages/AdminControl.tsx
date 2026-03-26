@@ -8,8 +8,6 @@ import { useLocation } from 'wouter';
 const ADMIN_PASSWORD = 'MURPH2026'; // Change this to a secure password
 
 export default function AdminControl() {
-  const [, setLocation] = useLocation();
-  const { user, isAuthenticated: isUserAuthenticated } = useAuth();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState('');
@@ -57,13 +55,6 @@ export default function AdminControl() {
       }));
     }
   }, [tournament]);
-
-  // Check if user is admin
-  useEffect(() => {
-    if (!isUserAuthenticated) {
-      setLocation('/');
-    }
-  }, [isUserAuthenticated, setLocation]);
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,20 +113,7 @@ export default function AdminControl() {
     setFormState(prev => ({ ...prev, teams: newTeams }));
   };
 
-  if (!isUserAuthenticated) {
-    return (
-      <div className="min-h-screen bg-dark-charcoal flex items-center justify-center p-4">
-        <div className="w-full max-w-md">
-          <div className="border-2 border-neon-cyan p-8 rounded-sm">
-            <p className="text-neon-cyan font-mono mb-4">Please log in to access the admin panel.</p>
-            <a href="/auth/login" className="text-neon-magenta hover:text-neon-gold font-mono">
-              Go to login →
-            </a>
-          </div>
-        </div>
-      </div>
-    );
-  }
+
 
   if (!isAuthenticated) {
     return (

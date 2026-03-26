@@ -43,7 +43,7 @@ function Router() {
           <Route path={"/about"} component={About} />
           <Route path={"/watch"} component={Watch} />
           <Route path={"/join"} component={Join} />
-          <Route path={"/control-dd-7x9k2m"} component={AdminControl} />
+          <Route path={"/admin"} component={AdminControl} />
           <Route path={"/404"} component={NotFound} />
           {/* Final fallback route */}
           <Route component={NotFound} />
