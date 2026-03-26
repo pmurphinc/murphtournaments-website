@@ -122,7 +122,7 @@ export default function LiveBracket() {
                     }}
                     className="w-full p-4 flex items-center justify-between hover:bg-neon-magenta/10 transition-colors"
                   >
-                    <span className="font-bold text-white font-mono">{team.teamName}</span>
+                    <span className="font-bold text-neon-magenta hover:text-neon-cyan font-mono cursor-pointer transition-colors">{team.teamName}</span>
                     <ChevronDown
                       size={20}
                       className={`text-neon-magenta transition-transform ${isExpanded ? 'rotate-180' : ''}`}
@@ -131,9 +131,16 @@ export default function LiveBracket() {
 
                   {isExpanded && (
                     <div className="bg-dark-charcoal/50 p-4 border-t border-neon-magenta/50 space-y-2 text-sm font-mono">
-                      {team.players.map((player) => (
-                        <p key={player} className="text-white/80">{player}</p>
-                      ))}
+                      {team.players.map((player) => {
+                        const playerSlug = player.split('#')[0].toLowerCase();
+                        return (
+                          <Link key={player} href={`/player/${playerSlug}`}>
+                            <a className="text-neon-cyan hover:text-neon-magenta transition-colors cursor-pointer">
+                              {player}
+                            </a>
+                          </Link>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
