@@ -116,7 +116,7 @@ export default function DevDivision() {
                 <div className="text-3xl font-bold font-mono text-neon-cyan">02</div>
                 <div>
                   <h3 className="text-lg font-bold font-mono text-neon-cyan mb-2">Compete Monthly</h3>
-                  <p className="text-white/70 font-mono">Play in structured matches, receive feedback, and improve your skills.</p>
+                  <p className="text-white/70 font-mono">Play in structured matches, receive professional feedback, and improve your skills.</p>
                 </div>
               </div>
             </NeonCard>
