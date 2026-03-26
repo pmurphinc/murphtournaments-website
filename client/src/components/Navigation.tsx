@@ -73,7 +73,7 @@ export default function Navigation() {
                 </div>
               </Link>
               {item.submenu && (
-                <div className="absolute left-0 mt-0 w-48 bg-dark-charcoal border border-neon-magenta/50 rounded hidden group-hover:block shadow-lg">
+                <div className="absolute left-0 mt-0 w-48 bg-black border border-neon-magenta/50 rounded hidden group-hover:block shadow-lg">
                   {item.submenu.map((subitem) => (
                     <Link key={subitem.href} href={subitem.href}>
                       <div className="px-4 py-2 text-sm font-mono text-white/80 hover:text-neon-magenta hover:bg-neon-magenta/10 transition-colors cursor-pointer first:rounded-t last:rounded-b">
