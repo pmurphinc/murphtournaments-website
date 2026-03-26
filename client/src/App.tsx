@@ -13,6 +13,7 @@ import DevDivision from "./pages/DevDivision";
 import About from "./pages/About";
 import Watch from "./pages/Watch";
 import Join from "./pages/Join";
+import AdminControl from "./pages/AdminControl";
 import { useEffect } from "react";
 
 /**
@@ -42,6 +43,7 @@ function Router() {
           <Route path={"/about"} component={About} />
           <Route path={"/watch"} component={Watch} />
           <Route path={"/join"} component={Join} />
+          <Route path={"/control-dd-7x9k2m"} component={AdminControl} />
           <Route path={"/404"} component={NotFound} />
           {/* Final fallback route */}
           <Route component={NotFound} />

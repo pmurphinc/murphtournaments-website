@@ -1,7 +1,7 @@
 import NeonCard from '@/components/NeonCard';
 import GlitchText from '@/components/GlitchText';
 import { Link } from 'wouter';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
 
 interface TeamRoster {
@@ -30,6 +30,38 @@ const REGISTERED_TEAMS: TeamRoster[] = [
 
 export default function LiveBracket() {
   const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
+  const [eventStatus, setEventStatus] = useState('Awaiting Results');
+  const [currentLeader, setCurrentLeader] = useState('Pending Results');
+  const [eventWinner, setEventWinner] = useState('Pending Results');
+
+  // Sync with admin state from localStorage
+  useEffect(() => {
+    const syncAdminState = () => {
+      const saved = localStorage.getItem('dd-admin-control-state');
+      if (saved) {
+        try {
+          const data = JSON.parse(saved);
+          setEventStatus(data.eventStatus === 'Live' ? 'LIVE EVENT' : data.eventStatus === 'Complete' ? 'TOURNAMENT COMPLETE' : 'Awaiting Results');
+          if (data.standings && data.standings.length > 0) {
+            setCurrentLeader(data.standings[0]?.name || 'Pending Results');
+          }
+          if (data.eventStatus === 'Complete' && data.standings && data.standings.length > 0) {
+            setEventWinner(data.standings[0]?.name || 'Pending Results');
+          }
+        } catch (err) {
+          console.error('Failed to sync admin state:', err);
+        }
+      }
+    };
+
+    syncAdminState();
+    window.addEventListener('storage', syncAdminState);
+    const interval = setInterval(syncAdminState, 2000);
+    return () => {
+      window.removeEventListener('storage', syncAdminState);
+      clearInterval(interval);
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-dark-charcoal py-12 px-4">
@@ -48,15 +80,15 @@ export default function LiveBracket() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <NeonCard variant="gold" className="p-4">
             <h3 className="text-sm font-bold text-neon-gold font-mono mb-2">EVENT WINNER</h3>
-            <p className="text-white font-mono">Pending Results</p>
+            <p className="text-white font-mono" data-testid="event-winner">{eventWinner}</p>
           </NeonCard>
           <NeonCard variant="cyan" className="p-4">
             <h3 className="text-sm font-bold text-neon-cyan font-mono mb-2">STATUS</h3>
-            <p className="text-white font-mono">Awaiting Results</p>
+            <p className="text-white font-mono" data-testid="event-status">{eventStatus}</p>
           </NeonCard>
           <NeonCard variant="magenta" className="p-4">
             <h3 className="text-sm font-bold text-neon-magenta font-mono mb-2">CURRENT LEADER</h3>
-            <p className="text-white font-mono">Pending Results</p>
+            <p className="text-white font-mono" data-testid="current-leader">{currentLeader}</p>
           </NeonCard>
         </div>
 
