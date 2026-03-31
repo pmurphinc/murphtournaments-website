@@ -43,10 +43,32 @@ export default function LiveBracket() {
     refetchInterval: 2000,
   });
 
-  // Use live state for display values, with fallbacks
-  const eventStatus = liveState.status || 'Awaiting Update';
-  const currentLeader = liveState.currentLeader || 'TBD';
-  const eventWinner = liveState.eventWinner || 'TBD';
+  // Determine tournament state from bot data
+  const isRegistration = liveState.status?.toUpperCase() === 'REGISTRATION' || liveState.status?.includes('Registration');
+  const isCompleted = liveState.status?.toUpperCase() === 'COMPLETED' || liveState.isComplete;
+  const isLive = liveState.status?.toUpperCase().includes('LIVE_CYCLE') || (liveState.cycle && liveState.cycle > 0 && !isCompleted && !isRegistration);
+  
+  // Extract cycle number from status if available
+  const cycleMatch = liveState.status?.match(/LIVE_CYCLE_(\d)/);
+  const currentCycle = cycleMatch ? parseInt(cycleMatch[1]) : liveState.cycle || 1;
+  
+  // Format status display
+  let eventStatus = 'Awaiting Update';
+  if (isRegistration) {
+    eventStatus = 'Pre-Checkin';
+  } else if (isCompleted) {
+    eventStatus = 'Completed';
+  } else if (isLive) {
+    eventStatus = `Cycle ${currentCycle} In Progress`;
+  } else if (liveState.status) {
+    eventStatus = liveState.status;
+  }
+  
+  // Current leader - show TBD for pre-tournament, otherwise use bot data
+  const currentLeader = isRegistration ? 'TBD' : (liveState.currentLeader || 'TBD');
+  
+  // Event winner - only show if tournament is completed
+  const eventWinner = isCompleted ? (liveState.eventWinner || 'TBD') : 'TBD';
 
   return (
     <div className="min-h-screen bg-dark-charcoal py-8 sm:py-12 px-4">
@@ -71,12 +93,12 @@ export default function LiveBracket() {
           <NeonCard variant="cyan" className="p-3 sm:p-4">
             <h3 className="text-xs sm:text-sm font-bold text-neon-cyan font-mono mb-2">STATUS</h3>
             <p className="text-white font-mono text-sm sm:text-base" data-testid="event-status">{eventStatus}</p>
-            <p className="text-white/50 font-mono text-xs mt-2">Cycle {liveState.cycle}</p>
+            {!isRegistration && <p className="text-white/50 font-mono text-xs mt-2">Cycle {currentCycle}</p>}
           </NeonCard>
           <NeonCard variant="magenta" className="p-3 sm:p-4">
             <h3 className="text-xs sm:text-sm font-bold text-neon-magenta font-mono mb-2">CURRENT LEADER</h3>
             <p className="text-white font-mono text-sm sm:text-base" data-testid="current-leader">{currentLeader}</p>
-            <p className="text-white/50 font-mono text-xs mt-2">{liveState.isComplete ? 'Tournament Complete' : 'In Progress'}</p>
+            <p className="text-white/50 font-mono text-xs mt-2">{isCompleted ? 'Completed' : (isRegistration ? 'Pre-Tournament' : 'In Progress')}</p>
           </NeonCard>
         </div>
 
