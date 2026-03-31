@@ -1,5 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 
+export interface Standing {
+  teamName: string;
+  frp: number;
+}
+
 export interface TournamentState {
   eventWinner: string | null;
   status: string;
@@ -8,6 +13,7 @@ export interface TournamentState {
   tournamentId: string;
   cycle: number;
   isComplete: boolean;
+  standings?: Standing[];
 }
 
 const FALLBACK_STATE: TournamentState = {
@@ -18,6 +24,7 @@ const FALLBACK_STATE: TournamentState = {
   tournamentId: '',
   cycle: 1,
   isComplete: false,
+  standings: [],
 };
 
 /**

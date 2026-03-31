@@ -2,11 +2,12 @@
 
 import NeonCard from '@/components/NeonCard';
 import GlitchText from '@/components/GlitchText';
+import FRPStandings from '@/components/FRPStandings';
 import { Link } from 'wouter';
 import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
-import { trpc } from '@/lib/trpc';
 import { useTournamentState } from '@/hooks/useTournamentState';
+import { trpc } from '@/lib/trpc';
 
 interface TeamRoster {
   teamName: string;
@@ -107,7 +108,12 @@ export default function LiveBracket2() {
           </NeonCard>
         </div>
 
-        {/* Registered Teams */}
+        {/* FRP Standings */}
+        {liveState.standings && liveState.standings.length > 0 && (
+          <FRPStandings standings={liveState.standings} variant="cyan" />
+        )}
+
+        {/* Registered Teams Section */}
         <NeonCard variant="magenta" className="p-4 sm:p-8">
           <h2 className="text-xl sm:text-2xl font-bold text-neon-magenta mb-4 sm:mb-6 font-mono">REGISTERED TEAMS</h2>
           <div className="space-y-2">
@@ -127,7 +133,7 @@ export default function LiveBracket2() {
                     }}
                     className="w-full p-3 sm:p-4 flex items-center justify-between hover:bg-neon-magenta/10 transition-colors"
                   >
-                    <span className="text-sm sm:text-base font-bold text-neon-magenta hover:text-neon-cyan font-mono cursor-pointer transition-colors">{team.teamName}</span>
+                    <span className="font-bold text-neon-magenta hover:text-neon-cyan font-mono cursor-pointer transition-colors text-sm sm:text-base">{team.teamName}</span>
                     <ChevronDown
                       size={20}
                       className={`text-neon-magenta transition-transform ${isExpanded ? 'rotate-180' : ''}`}
@@ -154,32 +160,20 @@ export default function LiveBracket2() {
               );
             })}
           </div>
-          
-          {/* Registration Button */}
-          <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-neon-magenta/50">
-            <a
-              href="https://forms.gle/RaPzBykYv58nRoav7"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-block px-4 sm:px-6 py-2 border-2 border-neon-magenta text-neon-magenta font-mono text-xs sm:text-sm uppercase hover:bg-neon-magenta hover:text-dark-charcoal transition-colors"
-            >
-              Register Now
-            </a>
-          </div>
         </NeonCard>
 
         {/* Tournament Structure */}
-        <NeonCard variant="gold" className="p-8">
-          <h2 className="text-2xl font-bold text-neon-gold mb-6 font-mono">TOURNAMENT STRUCTURE</h2>
+        <NeonCard variant="gold" className="p-4 sm:p-8">
+          <h2 className="text-xl sm:text-2xl font-bold text-neon-gold mb-4 sm:mb-6 font-mono">TOURNAMENT STRUCTURE</h2>
           
           {[1, 2, 3].map((cycleNum) => (
-            <div key={cycleNum} className="mb-8 last:mb-0">
-              <h3 className="text-lg font-bold text-white mb-4 font-mono">CYCLE {cycleNum}</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div key={cycleNum} className="mb-6 sm:mb-8 last:mb-0">
+              <h3 className="text-base sm:text-lg font-bold text-white mb-3 sm:mb-4 font-mono">CYCLE {cycleNum}</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 {/* Stage 1: Cashout */}
-                <div className="border-2 border-neon-gold p-4 rounded">
-                  <h4 className="font-bold text-neon-gold mb-3 font-mono">STAGE 1: CASHOUT</h4>
-                  <div className="space-y-2 text-sm font-mono text-white/80">
+                <div className="border-2 border-neon-gold p-3 sm:p-4 rounded">
+                  <h4 className="font-bold text-neon-gold mb-2 sm:mb-3 font-mono text-sm sm:text-base">STAGE 1: CASHOUT</h4>
+                  <div className="space-y-1 sm:space-y-2 text-xs sm:text-sm font-mono text-white/80">
                     <p><span className="font-bold">4 Teams Compete</span></p>
                     <p>All 4 teams play one round of Cashout</p>
                     <p className="font-bold mt-3">Placements</p>
@@ -193,9 +187,9 @@ export default function LiveBracket2() {
                 </div>
 
                 {/* Stage 2: Final Round */}
-                <div className="border-2 border-neon-magenta p-4 rounded">
-                  <h4 className="font-bold text-neon-magenta mb-3 font-mono">STAGE 2: FINAL ROUND</h4>
-                  <div className="space-y-2 text-sm font-mono text-white/80">
+                <div className="border-2 border-neon-magenta p-3 sm:p-4 rounded">
+                  <h4 className="font-bold text-neon-magenta mb-2 sm:mb-3 font-mono text-sm sm:text-base">STAGE 2: FINAL ROUND</h4>
+                  <div className="space-y-1 sm:space-y-2 text-xs sm:text-sm font-mono text-white/80">
                     <p><span className="font-bold">Best of 3 Matches</span></p>
                     <ul className="list-disc list-inside space-y-1">
                       <li>1st vs 2nd (BO3)</li>
@@ -210,29 +204,11 @@ export default function LiveBracket2() {
           ))}
         </NeonCard>
 
-        {/* Win Condition */}
-        <NeonCard variant="cyan" className="p-8">
-          <h2 className="text-2xl font-bold text-neon-cyan mb-6 font-mono">WIN CONDITION</h2>
-          <div className="space-y-4 font-mono text-white/80">
-            <p>
-              <span className="font-bold text-neon-cyan">Highest FRP After 3 Cycles:</span> The team with the most accumulated Final Round Points across all three cycles wins the tournament.
-            </p>
-            <p>
-              <span className="font-bold text-neon-cyan">Tie Scenario:</span> If two or more teams are tied on FRP, a Sudden Death Final Round determines the champion.
-            </p>
-            <p>
-              <span className="font-bold text-neon-cyan">FRP Tracking:</span> FRP is tracked cumulatively throughout the tournament. Every round win in Stage 2 contributes to your total.
-            </p>
-          </div>
-        </NeonCard>
-
-        {/* Back to Home */}
-        <div className="flex justify-center">
-          <Link href="/">
-            <a className="px-6 py-2 border-2 border-neon-cyan text-neon-cyan font-mono uppercase hover:bg-neon-cyan hover:text-dark-charcoal transition-colors">
-              Back to Home
-            </a>
-          </Link>
+        {/* Registration Button */}
+        <div className="text-center">
+          <button className="px-6 sm:px-8 py-3 sm:py-4 border-2 border-neon-lime text-neon-lime font-mono font-bold uppercase hover:bg-neon-lime/10 transition-colors text-sm sm:text-base">
+            Register Now
+          </button>
         </div>
       </div>
     </div>

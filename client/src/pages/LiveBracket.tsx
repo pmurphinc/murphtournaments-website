@@ -2,6 +2,7 @@
 
 import NeonCard from '@/components/NeonCard';
 import GlitchText from '@/components/GlitchText';
+import FRPStandings from '@/components/FRPStandings';
 import { Link } from 'wouter';
 import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
@@ -106,6 +107,11 @@ export default function LiveBracket() {
             <p className="text-white/50 font-mono text-xs mt-2">{isCompleted ? 'Completed' : (isRegistration ? 'Pre-Tournament' : 'In Progress')}</p>
           </NeonCard>
         </div>
+
+        {/* FRP Standings */}
+        {liveState.standings && liveState.standings.length > 0 && (
+          <FRPStandings standings={liveState.standings} variant="cyan" />
+        )}
 
         {/* Registered Teams */}
         <NeonCard variant="magenta" className="p-4 sm:p-8">
