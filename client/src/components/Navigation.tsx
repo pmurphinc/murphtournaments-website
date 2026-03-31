@@ -94,7 +94,7 @@ export default function Navigation() {
                 <div className="absolute left-0 mt-0 w-56 bg-black border-2 border-neon-magenta rounded hidden group-hover:block shadow-lg z-50 overflow-hidden">
                   {item.submenu.map((subitem) => (
                     <Link key={subitem.href} href={subitem.href}>
-                      <div className="px-4 py-3 text-sm font-mono text-white/80 hover:text-neon-magenta hover:bg-neon-magenta/20 transition-all duration-200 cursor-pointer first:rounded-t last:rounded-b border-b border-neon-magenta/30 last:border-b-0 hover:border-b-neon-magenta/50 hover:glow-magenta">
+                      <div className="px-4 py-3 text-sm font-mono text-white/80 hover:text-white hover:font-bold hover:bg-neon-magenta/20 transition-all duration-200 cursor-pointer first:rounded-t last:rounded-b border-b border-neon-magenta/30 last:border-b-0 hover:border-b-neon-magenta/50 hover:glow-magenta">
                         {subitem.label}
                       </div>
                     </Link>
@@ -149,7 +149,7 @@ export default function Navigation() {
                     {item.submenu.map((subitem) => (
                       <Link key={subitem.href} href={subitem.href}>
                         <div
-                          className="text-xs font-mono text-white/70 hover:text-neon-magenta hover:bg-neon-magenta/10 hover:glow-magenta transition-all duration-200 py-2 px-3 cursor-pointer rounded"
+                          className="text-xs font-mono text-white/70 hover:text-white hover:font-bold hover:bg-neon-magenta/10 hover:glow-magenta transition-all duration-200 py-2 px-3 cursor-pointer rounded"
                           onClick={() => setIsOpen(false)}
                         >
                           {subitem.label}
@@ -163,7 +163,7 @@ export default function Navigation() {
                     {item.submenu.map((subitem) => (
                       <Link key={subitem.href} href={subitem.href}>
                         <div
-                          className="text-xs font-mono text-white/70 hover:text-neon-magenta hover:bg-neon-magenta/10 hover:glow-magenta transition-all duration-200 py-2 px-3 cursor-pointer rounded"
+                          className="text-xs font-mono text-white/70 hover:text-white hover:font-bold hover:bg-neon-magenta/10 hover:glow-magenta transition-all duration-200 py-2 px-3 cursor-pointer rounded"
                           onClick={() => setIsOpen(false)}
                         >
                           {subitem.label}
