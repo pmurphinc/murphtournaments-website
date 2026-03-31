@@ -309,4 +309,22 @@
     box-shadow: 0 0 20px rgba(0, 217, 255, 0.8), 0 0 40px rgba(0, 217, 255, 0.5);
     transform: scale(1.02);
   }
+  
+  .hover-glow-gold {
+    transition: all 0.3s ease;
+  }
+  
+  .hover-glow-gold:hover {
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.8), 0 0 40px rgba(255, 215, 0, 0.5);
+    transform: scale(1.02);
+  }
+  
+  .hover-glow-lime {
+    transition: all 0.3s ease;
+  }
+  
+  .hover-glow-lime:hover {
+    box-shadow: 0 0 20px rgba(0, 255, 0, 0.8), 0 0 40px rgba(0, 255, 0, 0.5);
+    transform: scale(1.02);
+  }
 }
