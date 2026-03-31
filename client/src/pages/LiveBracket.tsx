@@ -18,8 +18,8 @@ const REGISTERED_TEAMS: TeamRoster[] = [
     players: ["44turnips", "Droowings", "Captain"]
   },
   {
-    teamName: "Three Deadly Sins",
-    players: ["StrmWRLD", "SWAGGYTLOL", "TwoCeez"]
+    teamName: "Goo Disciples",
+    players: ["StrmWRLD", "DOOOKYBOOTYAHBOI", "TwoCeez", "Ospuze.Gooner"]
   },
   {
     teamName: "LIQR",
