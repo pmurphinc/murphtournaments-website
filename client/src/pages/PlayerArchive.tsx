@@ -4,6 +4,7 @@ import NeonCard from '@/components/NeonCard';
 import GlitchText from '@/components/GlitchText';
 import { useState, useMemo } from 'react';
 import { ChevronDown, TrendingUp } from 'lucide-react';
+import { Link } from 'wouter';
 
 interface PlayerStats {
   name: string;
@@ -158,7 +159,9 @@ export default function PlayerArchive() {
                   className="w-full p-3 sm:p-4 flex items-center justify-between hover:bg-neon-magenta/10 transition-colors"
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 flex-1 text-left">
-                    <span className="font-bold text-white font-mono text-lg">{player.name}</span>
+                    <Link href={`/player/${player.name.toLowerCase()}`}>
+                      <span className="font-bold text-white font-mono text-lg hover:text-neon-magenta hover-glow-magenta transition-colors cursor-pointer">{player.name}</span>
+                    </Link>
                     <div className="flex flex-wrap gap-3 sm:gap-6 text-xs sm:text-sm font-mono text-white/80">
                       <div>
                         <span className="text-neon-cyan">K/D:</span> {player.kd.toFixed(2)}
