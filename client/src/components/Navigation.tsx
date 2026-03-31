@@ -77,7 +77,7 @@ export default function Navigation() {
             <div key={item.label} className="relative group">
               {item.isDropdownOnly ? (
                 // Dropdown-only item (Bracket) - not clickable
-                <div className="text-sm font-mono uppercase tracking-widest text-white/80 hover:text-neon-magenta transition-colors px-3 py-2 flex items-center gap-1">
+                <div className="text-sm font-mono uppercase tracking-widest text-white/80 hover:text-neon-magenta transition-colors hover-glow-magenta px-3 py-2 flex items-center gap-1">
                   {item.label}
                   {item.submenu && <ChevronDown size={14} />}
                 </div>
