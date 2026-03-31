@@ -46,7 +46,7 @@ export default function LiveBracket2() {
   // Determine tournament state from bot data
   const isRegistration = liveState.status?.toUpperCase() === 'REGISTRATION' || liveState.status?.includes('Registration');
   const isCompleted = liveState.status?.toUpperCase() === 'COMPLETED' || liveState.isComplete;
-  const isLive = liveState.status?.toUpperCase().includes('LIVE_CYCLE') || (liveState.cycle && liveState.cycle > 0 && !isCompleted && !isRegistration);
+  const isLive = liveState.status?.toUpperCase().includes('LIVE_CYCLE');
   
   // Extract cycle number from status if available
   const cycleMatch = liveState.status?.match(/LIVE_CYCLE_(\d)/);
@@ -60,7 +60,7 @@ export default function LiveBracket2() {
     eventStatus = 'Completed';
   } else if (isLive) {
     eventStatus = `Cycle ${currentCycle} In Progress`;
-  } else if (liveState.status) {
+  } else if (liveState.status && liveState.status !== 'Awaiting Update') {
     eventStatus = liveState.status;
   }
   
