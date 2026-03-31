@@ -1,4 +1,5 @@
 import NeonCard from './NeonCard';
+import { Link } from 'wouter';
 
 /**
  * PlayerSpotlight Component
@@ -18,6 +19,7 @@ interface PlayerSpotlightProps {
     value: string;
   }[];
   variant?: 'magenta' | 'cyan' | 'gold' | 'lime';
+  href?: string;
 }
 
 export default function PlayerSpotlight({
@@ -27,9 +29,10 @@ export default function PlayerSpotlight({
   achievements,
   stats,
   variant = 'magenta',
+  href,
 }: PlayerSpotlightProps) {
-  return (
-    <NeonCard variant={variant}>
+  const content = (
+    <NeonCard variant={variant} className={href ? 'cursor-pointer hover:opacity-90 transition-opacity' : ''}>
       <div className="space-y-4">
         {/* Header */}
         <div className="border-b border-white/10 pb-4">
@@ -78,4 +81,14 @@ export default function PlayerSpotlight({
       </div>
     </NeonCard>
   );
+
+  if (href) {
+    return (
+      <Link href={href}>
+        {content}
+      </Link>
+    );
+  }
+
+  return content;
 }

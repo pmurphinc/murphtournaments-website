@@ -235,6 +235,7 @@ export default function Home() {
                 { label: 'Hours', value: '732' },
               ]}
               variant="gold"
+              href="/player/pluto"
             />
             <PlayerSpotlight
               name="44TURNIPS"
@@ -252,6 +253,7 @@ export default function Home() {
                 { label: 'Hours', value: '560' },
               ]}
               variant="cyan"
+              href="/player/44turnips"
             />
             <PlayerSpotlight
               name="TWOCEEZ"
@@ -269,6 +271,7 @@ export default function Home() {
                 { label: 'Hours', value: '1955' },
               ]}
               variant="magenta"
+              href="/player/twoceez"
             />
           </div>
         </div>
