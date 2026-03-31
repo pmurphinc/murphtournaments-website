@@ -94,3 +94,14 @@
 - [ ] Create tournament_history database table
 - [ ] Build tournament history archive page
 - [ ] Add tRPC endpoints for tournament history
+
+## Responsive Design Optimization Pass
+
+- [ ] Audit current responsive state across all pages
+- [ ] Fix global layout overflow and alignment issues
+- [ ] Optimize typography and text scaling for mobile
+- [ ] Improve navigation bar responsiveness on mobile/tablet
+- [ ] Optimize bracket page layout for smaller screens
+- [ ] Refine card and panel spacing consistency
+- [ ] Test and verify across mobile, tablet, laptop, and desktop viewports
+- [ ] Verify no text clipping or element overlap at any breakpoint

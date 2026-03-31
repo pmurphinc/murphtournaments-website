@@ -74,37 +74,37 @@ export default function LiveBracket2() {
   }, [tournament]);
 
   return (
-    <div className="min-h-screen bg-dark-charcoal py-12 px-4">
-      <div className="container max-w-4xl space-y-8">
+    <div className="min-h-screen bg-dark-charcoal py-8 sm:py-12 px-4">
+      <div className="container max-w-4xl space-y-6 sm:space-y-8">
         {/* Header */}
-        <div className="text-center space-y-4">
+        <div className="text-center space-y-2 sm:space-y-4">
           <div>
-            <GlitchText size="2xl" variant="magenta">
+            <GlitchText size="xl" variant="magenta">
               7TH CIRCLE
             </GlitchText>
           </div>
-          <p className="text-neon-cyan font-mono">Live Tournament Bracket</p>
+          <p className="text-neon-cyan font-mono text-sm sm:text-base">Live Tournament Bracket</p>
         </div>
 
         {/* Status Boxes */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <NeonCard variant="gold" className="p-4">
-            <h3 className="text-sm font-bold text-neon-gold font-mono mb-2">EVENT WINNER</h3>
-            <p className="text-white font-mono" data-testid="event-winner">{eventWinner}</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+          <NeonCard variant="gold" className="p-3 sm:p-4">
+            <h3 className="text-xs sm:text-sm font-bold text-neon-gold font-mono mb-2">EVENT WINNER</h3>
+            <p className="text-white font-mono text-sm sm:text-base" data-testid="event-winner">{eventWinner}</p>
           </NeonCard>
-          <NeonCard variant="cyan" className="p-4">
-            <h3 className="text-sm font-bold text-neon-cyan font-mono mb-2">STATUS</h3>
-            <p className="text-white font-mono" data-testid="event-status">{eventStatus}</p>
+          <NeonCard variant="cyan" className="p-3 sm:p-4">
+            <h3 className="text-xs sm:text-sm font-bold text-neon-cyan font-mono mb-2">STATUS</h3>
+            <p className="text-white font-mono text-sm sm:text-base" data-testid="event-status">{eventStatus}</p>
           </NeonCard>
-          <NeonCard variant="magenta" className="p-4">
-            <h3 className="text-sm font-bold text-neon-magenta font-mono mb-2">CURRENT LEADER</h3>
-            <p className="text-white font-mono" data-testid="current-leader">{currentLeader}</p>
+          <NeonCard variant="magenta" className="p-3 sm:p-4">
+            <h3 className="text-xs sm:text-sm font-bold text-neon-magenta font-mono mb-2">CURRENT LEADER</h3>
+            <p className="text-white font-mono text-sm sm:text-base" data-testid="current-leader">{currentLeader}</p>
           </NeonCard>
         </div>
 
         {/* Registered Teams */}
-        <NeonCard variant="magenta" className="p-8">
-          <h2 className="text-2xl font-bold text-neon-magenta mb-6 font-mono">REGISTERED TEAMS</h2>
+        <NeonCard variant="magenta" className="p-4 sm:p-8">
+          <h2 className="text-xl sm:text-2xl font-bold text-neon-magenta mb-4 sm:mb-6 font-mono">REGISTERED TEAMS</h2>
           <div className="space-y-2">
             {REGISTERED_TEAMS.map((team) => {
               const isExpanded = expandedTeams.has(team.teamName);
@@ -120,9 +120,9 @@ export default function LiveBracket2() {
                       }
                       setExpandedTeams(newExpanded);
                     }}
-                    className="w-full p-4 flex items-center justify-between hover:bg-neon-magenta/10 transition-colors"
+                    className="w-full p-3 sm:p-4 flex items-center justify-between hover:bg-neon-magenta/10 transition-colors"
                   >
-                    <span className="text-base md:text-lg font-bold text-neon-magenta hover:text-neon-cyan font-mono cursor-pointer transition-colors">{team.teamName}</span>
+                    <span className="text-sm sm:text-base font-bold text-neon-magenta hover:text-neon-cyan font-mono cursor-pointer transition-colors">{team.teamName}</span>
                     <ChevronDown
                       size={20}
                       className={`text-neon-magenta transition-transform ${isExpanded ? 'rotate-180' : ''}`}
@@ -130,7 +130,7 @@ export default function LiveBracket2() {
                   </button>
 
                   {isExpanded && (
-                    <div className="bg-dark-charcoal/50 p-4 border-t border-neon-magenta/50 space-y-1 text-sm font-mono">
+                    <div className="bg-dark-charcoal/50 p-3 sm:p-4 border-t border-neon-magenta/50 space-y-1 text-xs sm:text-sm font-mono">
                       {team.players.map((player) => {
                         const playerSlug = player.split('#')[0].toLowerCase();
                         return (
@@ -151,12 +151,12 @@ export default function LiveBracket2() {
           </div>
           
           {/* Registration Button */}
-          <div className="mt-6 pt-6 border-t border-neon-magenta/50">
+          <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-neon-magenta/50">
             <a
               href="https://forms.gle/RaPzBykYv58nRoav7"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-block px-6 py-2 border-2 border-neon-magenta text-neon-magenta font-mono uppercase hover:bg-neon-magenta hover:text-dark-charcoal transition-colors"
+              className="inline-block px-4 sm:px-6 py-2 border-2 border-neon-magenta text-neon-magenta font-mono text-xs sm:text-sm uppercase hover:bg-neon-magenta hover:text-dark-charcoal transition-colors"
             >
               Register Now
             </a>

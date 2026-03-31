@@ -96,10 +96,10 @@ export default function PlayerArchive() {
         </div>
 
         {/* Sort Controls */}
-        <div className="flex flex-wrap gap-2 justify-center">
+        <div className="flex flex-wrap gap-2 justify-center overflow-x-auto pb-2">
           <button
             onClick={() => toggleSort('kd')}
-            className={`px-4 py-2 font-mono text-sm uppercase border-2 transition-colors ${
+            className={`px-3 sm:px-4 py-2 font-mono text-xs sm:text-sm uppercase border-2 transition-colors whitespace-nowrap ${
               sortBy === 'kd'
                 ? 'border-neon-cyan bg-neon-cyan text-dark-charcoal'
                 : 'border-neon-cyan text-neon-cyan hover:bg-neon-cyan/10'
@@ -109,17 +109,17 @@ export default function PlayerArchive() {
           </button>
           <button
             onClick={() => toggleSort('winRate')}
-            className={`px-4 py-2 font-mono text-sm uppercase border-2 transition-colors ${
+            className={`px-3 sm:px-4 py-2 font-mono text-xs sm:text-sm uppercase border-2 transition-colors whitespace-nowrap ${
               sortBy === 'winRate'
                 ? 'border-neon-magenta bg-neon-magenta text-dark-charcoal'
                 : 'border-neon-magenta text-neon-magenta hover:bg-neon-magenta/10'
             }`}
           >
-            Win Rate {sortBy === 'winRate' && (sortOrder === 'desc' ? '↓' : '↑')}
+            Win% {sortBy === 'winRate' && (sortOrder === 'desc' ? '↓' : '↑')}
           </button>
           <button
             onClick={() => toggleSort('matches')}
-            className={`px-4 py-2 font-mono text-sm uppercase border-2 transition-colors ${
+            className={`px-3 sm:px-4 py-2 font-mono text-xs sm:text-sm uppercase border-2 transition-colors whitespace-nowrap ${
               sortBy === 'matches'
                 ? 'border-neon-gold bg-neon-gold text-dark-charcoal'
                 : 'border-neon-gold text-neon-gold hover:bg-neon-gold/10'
@@ -129,7 +129,7 @@ export default function PlayerArchive() {
           </button>
           <button
             onClick={() => toggleSort('level')}
-            className={`px-4 py-2 font-mono text-sm uppercase border-2 transition-colors ${
+            className={`px-3 sm:px-4 py-2 font-mono text-xs sm:text-sm uppercase border-2 transition-colors whitespace-nowrap ${
               sortBy === 'level'
                 ? 'border-neon-lime bg-neon-lime text-dark-charcoal'
                 : 'border-neon-lime text-neon-lime hover:bg-neon-lime/10'
@@ -155,11 +155,11 @@ export default function PlayerArchive() {
                     }
                     setExpandedPlayers(newExpanded);
                   }}
-                  className="w-full p-4 flex items-center justify-between hover:bg-neon-magenta/10 transition-colors"
+                  className="w-full p-3 sm:p-4 flex items-center justify-between hover:bg-neon-magenta/10 transition-colors"
                 >
-                  <div className="flex items-center gap-4 flex-1 text-left">
-                    <span className="font-bold text-white font-mono text-lg w-32">{player.name}</span>
-                    <div className="flex gap-6 text-sm font-mono text-white/80">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 flex-1 text-left">
+                    <span className="font-bold text-white font-mono text-lg">{player.name}</span>
+                    <div className="flex flex-wrap gap-3 sm:gap-6 text-xs sm:text-sm font-mono text-white/80">
                       <div>
                         <span className="text-neon-cyan">K/D:</span> {player.kd.toFixed(2)}
                       </div>
@@ -169,7 +169,7 @@ export default function PlayerArchive() {
                       <div>
                         <span className="text-neon-lime">Level:</span> {player.level}
                       </div>
-                      <div>
+                      <div className="hidden sm:block">
                         <span className="text-neon-magenta">Matches:</span> {formatNumber(player.matches)}
                       </div>
                     </div>
@@ -181,27 +181,27 @@ export default function PlayerArchive() {
                 </button>
 
                 {isExpanded && (
-                  <div className="bg-dark-charcoal/50 p-6 border-t border-neon-magenta/50 space-y-4">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm font-mono">
+                  <div className="bg-dark-charcoal/50 p-4 sm:p-6 border-t border-neon-magenta/50 space-y-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 text-xs sm:text-sm font-mono">
                       <div>
                         <p className="text-neon-cyan text-xs uppercase mb-1">Level</p>
-                        <p className="text-white text-lg font-bold">{player.level}</p>
+                        <p className="text-white text-base sm:text-lg font-bold">{player.level}</p>
                       </div>
                       <div>
-                        <p className="text-neon-magenta text-xs uppercase mb-1">Hours Played</p>
-                        <p className="text-white text-lg font-bold">{formatNumber(player.hours)}</p>
+                        <p className="text-neon-magenta text-xs uppercase mb-1">Hours</p>
+                        <p className="text-white text-base sm:text-lg font-bold">{formatNumber(player.hours)}</p>
                       </div>
                       <div>
                         <p className="text-neon-gold text-xs uppercase mb-1">Matches</p>
-                        <p className="text-white text-lg font-bold">{formatNumber(player.matches)}</p>
+                        <p className="text-white text-base sm:text-lg font-bold">{formatNumber(player.matches)}</p>
                       </div>
                       <div>
-                        <p className="text-neon-lime text-xs uppercase mb-1">Win Rate</p>
-                        <p className="text-white text-lg font-bold">{player.winRate.toFixed(1)}%</p>
+                        <p className="text-neon-lime text-xs uppercase mb-1">Win %</p>
+                        <p className="text-white text-base sm:text-lg font-bold">{player.winRate.toFixed(1)}%</p>
                       </div>
                     </div>
 
-                    <div className="border-t border-neon-magenta/30 pt-4 grid grid-cols-2 md:grid-cols-3 gap-4 text-sm font-mono">
+                    <div className="border-t border-neon-magenta/30 pt-4 grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 text-xs sm:text-sm font-mono">
                       <div>
                         <p className="text-white/60 text-xs uppercase mb-1">Wins / Losses</p>
                         <p className="text-white">{formatNumber(player.wins)} / {formatNumber(player.losses)}</p>
@@ -235,28 +235,28 @@ export default function PlayerArchive() {
         </div>
 
         {/* Stats Summary */}
-        <NeonCard variant="cyan" className="p-8">
-          <h2 className="text-2xl font-bold text-neon-cyan mb-6 font-mono">COMMUNITY STATS</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 font-mono">
+        <NeonCard variant="cyan" className="p-4 sm:p-8">
+          <h2 className="text-xl sm:text-2xl font-bold text-neon-cyan mb-4 sm:mb-6 font-mono">COMMUNITY STATS</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 font-mono">
             <div>
-              <p className="text-white/60 text-sm uppercase mb-2">Total Players</p>
-              <p className="text-3xl font-bold text-neon-cyan">{PLAYERS.length}</p>
+              <p className="text-white/60 text-xs sm:text-sm uppercase mb-2">Total Players</p>
+              <p className="text-2xl sm:text-3xl font-bold text-neon-cyan">{PLAYERS.length}</p>
             </div>
             <div>
-              <p className="text-white/60 text-sm uppercase mb-2">Avg K/D</p>
-              <p className="text-3xl font-bold text-neon-magenta">
+              <p className="text-white/60 text-xs sm:text-sm uppercase mb-2">Avg K/D</p>
+              <p className="text-2xl sm:text-3xl font-bold text-neon-magenta">
                 {(PLAYERS.reduce((sum, p) => sum + p.kd, 0) / PLAYERS.length).toFixed(2)}
               </p>
             </div>
             <div>
-              <p className="text-white/60 text-sm uppercase mb-2">Avg Win Rate</p>
-              <p className="text-3xl font-bold text-neon-gold">
+              <p className="text-white/60 text-xs sm:text-sm uppercase mb-2">Avg Win %</p>
+              <p className="text-2xl sm:text-3xl font-bold text-neon-gold">
                 {(PLAYERS.reduce((sum, p) => sum + p.winRate, 0) / PLAYERS.length).toFixed(1)}%
               </p>
             </div>
             <div>
-              <p className="text-white/60 text-sm uppercase mb-2">Total Matches</p>
-              <p className="text-3xl font-bold text-neon-lime">
+              <p className="text-white/60 text-xs sm:text-sm uppercase mb-2">Total Matches</p>
+              <p className="text-2xl sm:text-3xl font-bold text-neon-lime">
                 {formatNumber(PLAYERS.reduce((sum, p) => sum + p.matches, 0))}
               </p>
             </div>
