@@ -33,7 +33,7 @@ export default function NeonCard({
     <div
       className={`
         border-2 ${variantClasses[variant]}
-        bg-dark-purple/50 backdrop-blur-sm
+        bg-dark-purple/50
         p-6 rounded-sm
         transition-all duration-300
         ${onClick ? 'cursor-pointer' : ''}
