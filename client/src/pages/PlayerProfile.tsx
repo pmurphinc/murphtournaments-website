@@ -70,7 +70,7 @@ const PLAYER_DATA: Record<string, any> = {
   'captain': { name: 'CAPTAIN', kd: 1.24, winRate: 59.4, level: 167, matches: 10603 },
   'lionxec': { name: 'LIONXEC', kd: 1.24, winRate: 50.4, level: 129, matches: 4300 },
   'twoceez': { name: 'TWOCEEZ', kd: 1.17, winRate: 48.9, level: 156, matches: 12126 },
-  'swaggytlol': { name: 'SWAGGYTLOL', kd: 1.14, winRate: 54.5, level: 123, matches: 9269 },
+  'doookybootyahboi': { name: 'DOOOKYBOOTYAHBOI', kd: 1.14, winRate: 54.5, level: 123, matches: 9269 },
   'mococo': { name: 'MOCOCO', kd: 1.09, winRate: 54.0, level: 120, matches: 6396 },
   'antho': { name: 'ANTHO', kd: 1.04, winRate: 51.8, level: 113, matches: 3545 },
   'strmwrld': { name: 'STRMWRLD', kd: 1.02, winRate: 48.5, level: 151, matches: 13154 },

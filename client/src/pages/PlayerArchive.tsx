@@ -30,7 +30,7 @@ const PLAYERS: PlayerStats[] = [
   { name: 'STEELSABBATH', level: 138, hours: 860, matches: 5206, wins: 2451, losses: 2755, elims: 27728, deaths: 31061, revives: 9079, cashout: 129729437, damage: 9871503, kd: 0.89, winRate: 47.1 },
   { name: '2SIKK', level: 136, hours: 953, matches: 5864, wins: 2921, losses: 2943, elims: 38677, deaths: 27291, revives: 7003, cashout: 154284780, damage: 11790709, kd: 1.42, winRate: 49.8 },
   { name: 'CAPTAIN', level: 167, hours: 1483, matches: 10603, wins: 6297, losses: 4306, elims: 72356, deaths: 58114, revives: 11610, cashout: 244999711, damage: 22180938, kd: 1.24, winRate: 59.4 },
-  { name: 'SWAGGYTLOL', level: 123, hours: 1498, matches: 9269, wins: 5050, losses: 4219, elims: 57178, deaths: 49973, revives: 14675, cashout: 272391715, damage: 20620182, kd: 1.14, winRate: 54.5 },
+  { name: 'DOOOKYBOOTYAHBOI', level: 123, hours: 1498, matches: 9269, wins: 5050, losses: 4219, elims: 57178, deaths: 49973, revives: 14675, cashout: 272391715, damage: 20620182, kd: 1.14, winRate: 54.5 },
   { name: 'DROOWINGS', level: 124, hours: 1031, matches: 6438, wins: 3809, losses: 2629, elims: 42707, deaths: 28973, revives: 12508, cashout: 178457097, damage: 14053673, kd: 1.47, winRate: 59.2 },
   { name: 'MISTERBIRDY', level: 130, hours: 943, matches: 5740, wins: 2680, losses: 3060, elims: 32664, deaths: 34619, revives: 6625, cashout: 143098675, damage: 11811352, kd: 0.94, winRate: 46.7 },
   { name: 'LIONXEC', level: 129, hours: 706, matches: 4300, wins: 2166, losses: 2134, elims: 29530, deaths: 23782, revives: 7514, cashout: 117550815, damage: 11145440, kd: 1.24, winRate: 50.4 },
