@@ -44,7 +44,7 @@ export default function LiveBracket() {
   });
 
   // Determine tournament state from bot data
-  const isRegistration = liveState.status?.toUpperCase() === 'REGISTRATION' || liveState.status?.includes('Registration');
+  const isRegistration = liveState.status?.toUpperCase().includes('REGISTRATION') || liveState.status?.toUpperCase().includes('REGISTRATION READY');
   const isCompleted = liveState.status?.toUpperCase() === 'COMPLETED' || liveState.isComplete;
   const isLive = liveState.status?.toUpperCase().includes('LIVE_CYCLE');
   
@@ -69,6 +69,11 @@ export default function LiveBracket() {
   
   // Event winner - only show if tournament is completed
   const eventWinner = isCompleted ? (liveState.eventWinner || 'TBD') : 'TBD';
+  
+  // Debug: log the state for troubleshooting
+  if (typeof window !== 'undefined') {
+    console.log('[LiveBracket] Tournament State:', { status: liveState.status, isRegistration, isCompleted, isLive, currentLeader, eventWinner });
+  }
 
   return (
     <div className="min-h-screen bg-dark-charcoal py-8 sm:py-12 px-4">
