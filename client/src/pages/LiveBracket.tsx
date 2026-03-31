@@ -141,7 +141,7 @@ export default function LiveBracket() {
                         return (
                           <div key={player} className="block">
                             <Link href={`/player/${playerSlug}`}>
-                              <a className="text-neon-cyan hover:text-neon-magenta transition-colors cursor-pointer block py-1">
+                              <a className="text-neon-cyan hover:text-neon-magenta transition-colors cursor-pointer block py-1 hover-glow-cyan">
                                 {player}
                               </a>
                             </Link>

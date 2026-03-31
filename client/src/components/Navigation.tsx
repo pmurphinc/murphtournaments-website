@@ -15,22 +15,31 @@ interface NavItem {
   label: string;
   href: string;
   submenu?: NavItem[];
+  isDropdownOnly?: boolean;
 }
 
 export default function Navigation() {
   const [isOpen, setIsOpen] = useState(false);
   const [bracketOpen, setBracketOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const navItems: NavItem[] = [
     { label: 'Home', href: '/' },
-    { label: 'History', href: '/tournaments' },
+    { 
+      label: 'History', 
+      href: '/tournaments',
+      submenu: [
+        { label: 'Tournament History', href: '/tournaments' },
+        { label: 'Player Archive', href: '/players' },
+      ]
+    },
     { 
       label: 'Bracket', 
-      href: '/bracket',
+      href: '#',
+      isDropdownOnly: true,
       submenu: [
-        { label: 'Dev Division', href: '/bracket' },
+        { label: 'Murph Tournament Community', href: '/bracket' },
         { label: '7th Circle', href: '/bracket2' },
-        { label: 'Player Archive', href: '/players' },
       ]
     },
     { label: 'Dev Division', href: '/dev-division' },
@@ -65,15 +74,24 @@ export default function Navigation() {
         {/* Desktop Navigation */}
         <div className="hidden md:flex items-center gap-8">
           {navItems.map((item) => (
-            <div key={item.href} className="relative group">
-              <Link href={item.href}>
-                <div className="text-sm font-mono uppercase tracking-widest text-white/80 hover:text-neon-magenta transition-colors hover-glow-magenta px-3 py-2 cursor-pointer flex items-center gap-1">
+            <div key={item.label} className="relative group">
+              {item.isDropdownOnly ? (
+                // Dropdown-only item (Bracket) - not clickable
+                <div className="text-sm font-mono uppercase tracking-widest text-white/80 hover:text-neon-magenta transition-colors px-3 py-2 flex items-center gap-1">
                   {item.label}
                   {item.submenu && <ChevronDown size={14} />}
                 </div>
-              </Link>
+              ) : (
+                // Regular item or item with submenu (Home, History, Dev Division, About, Watch)
+                <Link href={item.href}>
+                  <div className="text-sm font-mono uppercase tracking-widest text-white/80 hover:text-neon-magenta transition-colors hover-glow-magenta px-3 py-2 cursor-pointer flex items-center gap-1">
+                    {item.label}
+                    {item.submenu && <ChevronDown size={14} />}
+                  </div>
+                </Link>
+              )}
               {item.submenu && (
-                <div className="absolute left-0 mt-0 w-48 bg-black border border-neon-magenta/50 rounded hidden group-hover:block shadow-lg">
+                <div className="absolute left-0 mt-0 w-56 bg-black border border-neon-magenta/50 rounded hidden group-hover:block shadow-lg z-50">
                   {item.submenu.map((subitem) => (
                     <Link key={subitem.href} href={subitem.href}>
                       <div className="px-4 py-2 text-sm font-mono text-white/80 hover:text-neon-magenta hover:bg-neon-magenta/10 transition-colors cursor-pointer first:rounded-t last:rounded-b">
@@ -101,20 +119,46 @@ export default function Navigation() {
         <div className="md:hidden bg-dark-purple border-t border-neon-magenta/30">
           <div className="container py-4 flex flex-col gap-4">
             {navItems.map((item) => (
-              <div key={item.href}>
-                <Link href={item.href}>
+              <div key={item.label}>
+                {item.isDropdownOnly ? (
+                  // Dropdown-only item (Bracket) - not clickable
                   <div
                     className="text-sm font-mono uppercase tracking-widest text-white/80 hover:text-neon-magenta transition-colors py-2 cursor-pointer flex items-center justify-between"
-                    onClick={() => {
-                      if (!item.submenu) setIsOpen(false);
-                      if (item.label === 'Bracket') setBracketOpen(!bracketOpen);
-                    }}
+                    onClick={() => setBracketOpen(!bracketOpen)}
                   >
                     {item.label}
-                    {item.submenu && <ChevronDown size={14} className={`transition-transform ${bracketOpen && item.label === 'Bracket' ? 'rotate-180' : ''}`} />}
+                    {item.submenu && <ChevronDown size={14} className={`transition-transform ${bracketOpen ? 'rotate-180' : ''}`} />}
                   </div>
-                </Link>
-                {item.submenu && bracketOpen && item.label === 'Bracket' && (
+                ) : (
+                  // Regular item or item with submenu
+                  <Link href={item.href}>
+                    <div
+                      className="text-sm font-mono uppercase tracking-widest text-white/80 hover:text-neon-magenta transition-colors py-2 cursor-pointer flex items-center justify-between"
+                      onClick={() => {
+                        if (!item.submenu) setIsOpen(false);
+                        if (item.label === 'History') setHistoryOpen(!historyOpen);
+                      }}
+                    >
+                      {item.label}
+                      {item.submenu && <ChevronDown size={14} className={`transition-transform ${historyOpen && item.label === 'History' ? 'rotate-180' : ''}`} />}
+                    </div>
+                  </Link>
+                )}
+                {item.submenu && item.label === 'Bracket' && bracketOpen && (
+                  <div className="pl-4 flex flex-col gap-2 mt-2 border-l border-neon-magenta/30">
+                    {item.submenu.map((subitem) => (
+                      <Link key={subitem.href} href={subitem.href}>
+                        <div
+                          className="text-xs font-mono text-white/70 hover:text-neon-magenta transition-colors py-1 cursor-pointer"
+                          onClick={() => setIsOpen(false)}
+                        >
+                          {subitem.label}
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+                {item.submenu && item.label === 'History' && historyOpen && (
                   <div className="pl-4 flex flex-col gap-2 mt-2 border-l border-neon-magenta/30">
                     {item.submenu.map((subitem) => (
                       <Link key={subitem.href} href={subitem.href}>
