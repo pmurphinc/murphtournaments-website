@@ -5,6 +5,56 @@ import GlitchText from '@/components/GlitchText';
 import { useRoute, useLocation } from 'wouter';
 import { ArrowLeft, Trophy, TrendingUp } from 'lucide-react';
 
+function generateAchievements(player: any) {
+  const achievements = [];
+  
+  // K/D based achievements
+  if (player.kd >= 2.0) {
+    achievements.push({ title: '🔥 Lethal Operator', desc: 'Exceptional K/D ratio above 2.0 - elite elimination rate' });
+  } else if (player.kd >= 1.5) {
+    achievements.push({ title: '⚡ Sharpshooter', desc: 'Strong K/D ratio above 1.5 - consistent eliminations' });
+  } else if (player.kd >= 1.2) {
+    achievements.push({ title: '🎯 Precision Player', desc: 'Solid K/D ratio above 1.2 - reliable combat performance' });
+  } else if (player.kd >= 1.0) {
+    achievements.push({ title: '💪 Balanced Fighter', desc: 'Maintains 1:1 K/D ratio - steady competitive presence' });
+  } else {
+    achievements.push({ title: '🛡️ Support Specialist', desc: 'Focus on team support and tactical play' });
+  }
+  
+  // Win rate based achievements
+  if (player.winRate >= 59) {
+    achievements.push({ title: '🏆 Champion', desc: 'Win rate above 59% - dominant tournament performance' });
+  } else if (player.winRate >= 55) {
+    achievements.push({ title: '👑 Elite Competitor', desc: 'Win rate above 55% - exceptional winning consistency' });
+  } else if (player.winRate >= 50) {
+    achievements.push({ title: '✨ Consistent Winner', desc: 'Win rate above 50% - reliable competitive results' });
+  } else {
+    achievements.push({ title: '🎮 Dedicated Player', desc: 'Committed to improvement and competitive growth' });
+  }
+  
+  // Experience based achievements
+  if (player.matches >= 10000) {
+    achievements.push({ title: '🌟 Veteran', desc: 'Over 10,000 competitive matches - legendary experience' });
+  } else if (player.matches >= 5000) {
+    achievements.push({ title: '📈 Seasoned Pro', desc: 'Over 5,000 competitive matches - extensive expertise' });
+  } else if (player.matches >= 3000) {
+    achievements.push({ title: '🚀 Rising Star', desc: 'Over 3,000 competitive matches - building reputation' });
+  } else {
+    achievements.push({ title: '🌱 Emerging Talent', desc: 'Building competitive experience and skills' });
+  }
+  
+  // Level based achievements
+  if (player.level >= 150) {
+    achievements.push({ title: '💎 Prestige Elite', desc: 'Level 150+ - maximum rank achievement' });
+  } else if (player.level >= 130) {
+    achievements.push({ title: '⭐ High Rank', desc: 'Level 130+ - top tier player status' });
+  } else if (player.level >= 110) {
+    achievements.push({ title: '🎖️ Ranked Player', desc: 'Level 110+ - established competitive standing' });
+  }
+  
+  return achievements;
+}
+
 // Player data from the archive
 const PLAYER_DATA: Record<string, any> = {
   'pluto': { name: 'PLUTO', kd: 2.10, winRate: 59.2, level: 123, matches: 4478 },
@@ -60,6 +110,8 @@ export default function PlayerProfile() {
       </div>
     );
   }
+
+  const achievements = generateAchievements(player);
 
   return (
     <div className="min-h-screen bg-dark-charcoal py-12 px-4">
@@ -149,25 +201,12 @@ export default function PlayerProfile() {
           <h2 className="text-2xl font-bold text-neon-magenta mb-6 font-mono uppercase">Achievements</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-dark-charcoal/50 p-4 rounded border border-neon-magenta/50">
-              <p className="text-neon-magenta text-sm uppercase font-mono mb-2">🏆 Competitive Player</p>
-              <p className="text-white/70 text-xs">Maintains competitive ranking and active tournament participation</p>
-            </div>
-            
-            <div className="bg-dark-charcoal/50 p-4 rounded border border-neon-magenta/50">
-              <p className="text-neon-magenta text-sm uppercase font-mono mb-2">⭐ High Win Rate</p>
-              <p className="text-white/70 text-xs">Demonstrates consistent performance above 50% win rate</p>
-            </div>
-
-            <div className="bg-dark-charcoal/50 p-4 rounded border border-neon-magenta/50">
-              <p className="text-neon-magenta text-sm uppercase font-mono mb-2">🎯 Experienced</p>
-              <p className="text-white/70 text-xs">Extensive match history with thousands of competitive games</p>
-            </div>
-
-            <div className="bg-dark-charcoal/50 p-4 rounded border border-neon-magenta/50">
-              <p className="text-neon-magenta text-sm uppercase font-mono mb-2">🚀 Rising Star</p>
-              <p className="text-white/70 text-xs">Recognized talent in the competitive THE FINALS community</p>
-            </div>
+            {achievements.map((achievement, idx) => (
+              <div key={idx} className="bg-dark-charcoal/50 p-4 rounded border border-neon-magenta/50">
+                <p className="text-neon-magenta text-sm uppercase font-mono mb-2">{achievement.title}</p>
+                <p className="text-white/70 text-xs">{achievement.desc}</p>
+              </div>
+            ))}
           </div>
         </NeonCard>
       </div>
