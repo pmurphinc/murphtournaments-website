@@ -7,6 +7,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { handleTournamentWebhook, handleGetTournamentState } from "../webhooks";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -35,6 +36,13 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
+  
+  // Webhook endpoint for Discord bot tournament updates
+  app.post("/api/webhooks/tournament", handleTournamentWebhook);
+  
+  // Public endpoint to fetch current tournament state
+  app.get("/api/tournament/:tournamentId/state", handleGetTournamentState);
+  
   // tRPC API
   app.use(
     "/api/trpc",

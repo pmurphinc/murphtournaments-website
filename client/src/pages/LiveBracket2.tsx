@@ -3,9 +3,10 @@
 import NeonCard from '@/components/NeonCard';
 import GlitchText from '@/components/GlitchText';
 import { Link } from 'wouter';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { trpc } from '@/lib/trpc';
+import { useTournamentState } from '@/hooks/useTournamentState';
 
 interface TeamRoster {
   teamName: string;
@@ -33,45 +34,19 @@ const REGISTERED_TEAMS: TeamRoster[] = [
 
 export default function LiveBracket2() {
   const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
-  const [eventStatus, setEventStatus] = useState('Awaiting Results');
-  const [currentLeader, setCurrentLeader] = useState('Pending Results');
-  const [eventWinner, setEventWinner] = useState('Pending Results');
 
-  // Fetch tournament data from API
+  // Fetch live tournament state from webhook-updated server state
+  const { state: liveState } = useTournamentState('7th-circle');
+
+  // Fetch team FRP data from tRPC (for team rosters and FRP)
   const { data: tournament } = trpc.tournament.getSeventhCircle.useQuery(undefined, {
     refetchInterval: 2000,
   });
 
-  // Update display when tournament data changes
-  useEffect(() => {
-    if (tournament) {
-      const statusMap: Record<string, string> = {
-        'not-live': 'Awaiting Results',
-        'live': 'LIVE EVENT',
-        'complete': 'TOURNAMENT COMPLETE',
-      };
-      setEventStatus(statusMap[tournament.eventStatus] || 'Awaiting Results');
-
-      if (tournament.teams && tournament.teams.length > 0) {
-        const maxFrp = Math.max(...tournament.teams.map((t: any) => t.frp || 0));
-        if (maxFrp > 0) {
-          const leader = tournament.teams.reduce((prev: any, current: any) => 
-            (prev.frp > current.frp) ? prev : current
-          );
-          setCurrentLeader(leader.name || 'Pending Results');
-        } else {
-          setCurrentLeader('Pending Results');
-        }
-      }
-
-      if (tournament.eventStatus === 'complete' && tournament.teams && tournament.teams.length > 0) {
-        const winner = tournament.teams.reduce((prev: any, current: any) => 
-          (prev.frp > current.frp) ? prev : current
-        );
-        setEventWinner(winner.name || 'Pending Results');
-      }
-    }
-  }, [tournament]);
+  // Use live state for display values, with fallbacks
+  const eventStatus = liveState.status || 'Awaiting Update';
+  const currentLeader = liveState.currentLeader || 'TBD';
+  const eventWinner = liveState.eventWinner || 'TBD';
 
   return (
     <div className="min-h-screen bg-dark-charcoal py-8 sm:py-12 px-4">
@@ -91,14 +66,17 @@ export default function LiveBracket2() {
           <NeonCard variant="gold" className="p-3 sm:p-4">
             <h3 className="text-xs sm:text-sm font-bold text-neon-gold font-mono mb-2">EVENT WINNER</h3>
             <p className="text-white font-mono text-sm sm:text-base" data-testid="event-winner">{eventWinner}</p>
+            <p className="text-white/50 font-mono text-xs mt-2">Last updated: {new Date(liveState.updatedAt).toLocaleTimeString()}</p>
           </NeonCard>
           <NeonCard variant="cyan" className="p-3 sm:p-4">
             <h3 className="text-xs sm:text-sm font-bold text-neon-cyan font-mono mb-2">STATUS</h3>
             <p className="text-white font-mono text-sm sm:text-base" data-testid="event-status">{eventStatus}</p>
+            <p className="text-white/50 font-mono text-xs mt-2">Cycle {liveState.cycle}</p>
           </NeonCard>
           <NeonCard variant="magenta" className="p-3 sm:p-4">
             <h3 className="text-xs sm:text-sm font-bold text-neon-magenta font-mono mb-2">CURRENT LEADER</h3>
             <p className="text-white font-mono text-sm sm:text-base" data-testid="current-leader">{currentLeader}</p>
+            <p className="text-white/50 font-mono text-xs mt-2">{liveState.isComplete ? 'Tournament Complete' : 'In Progress'}</p>
           </NeonCard>
         </div>
 
