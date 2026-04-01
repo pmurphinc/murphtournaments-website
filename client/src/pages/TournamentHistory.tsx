@@ -239,8 +239,8 @@ export default function TournamentHistory() {
                   </div>
                   {tournament.youtubeLink && (
                     <div>
-                      <a href={tournament.youtubeLink} target="_blank" rel="noopener noreferrer" className="text-sm font-mono text-neon-magenta hover:text-neon-gold transition-colors">
-                        Watch on YouTube →
+                      <a href={tournament.youtubeLink} target="_blank" rel="noopener noreferrer" className="inline-block px-4 py-2 border-2 border-neon-magenta text-neon-magenta font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all">
+                        Watch on YouTube
                       </a>
                     </div>
                   )}
