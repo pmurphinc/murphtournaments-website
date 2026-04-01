@@ -148,7 +148,7 @@ export default function Home() {
           </div>
 
           <Link href="/dev-division">
-            <button className="px-8 py-3 bg-neon-cyan text-dark-black font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all">
+            <button className="px-8 py-3 bg-neon-cyan text-dark-black font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all border-2 border-neon-cyan">
               Explore Dev Division
             </button>
           </Link>
