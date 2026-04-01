@@ -11,6 +11,66 @@ import GlitchText from '@/components/GlitchText';
 export default function TournamentHistory() {
   const pastTournaments = [
     {
+      name: 'FCL – Day 6 (Finals)',
+      date: 'February 6, 2025',
+      teams: 4,
+      prizePool: 'Community-funded',
+      winners: '1 Up - EkaZo, KDKiller, JukerTTV',
+      format: 'Finals Competitive League, Final Round',
+      description: 'The final day of the FCL with the championship match. 1 Up claimed victory in the grand finals.',
+      youtubeLink: 'https://youtu.be/vJRb6i31MrU?si=GEDyLvmupP42GtOZ'
+    },
+    {
+      name: 'FCL – Day 5',
+      date: 'January 31, 2025',
+      teams: 4,
+      prizePool: 'Community-funded',
+      winners: 'TBD',
+      format: 'Finals Competitive League',
+      description: 'Day 5 of the Finals Competitive League tournament series.',
+      youtubeLink: 'https://youtu.be/x6nEeSLpSY4?si=EYMLlzeiW0fC7YpW'
+    },
+    {
+      name: 'FCL – Day 4',
+      date: 'January 24, 2025',
+      teams: 4,
+      prizePool: 'Community-funded',
+      winners: 'TBD',
+      format: 'Finals Competitive League',
+      description: 'Day 4 of the Finals Competitive League tournament series.',
+      youtubeLink: 'https://youtu.be/RpKcOJ7h-IU?si=EVsZeBVWGwBoYCDr'
+    },
+    {
+      name: 'FCL – Day 3',
+      date: 'January 17, 2025',
+      teams: 4,
+      prizePool: 'Community-funded',
+      winners: 'TBD',
+      format: 'Finals Competitive League',
+      description: 'Day 3 of the Finals Competitive League tournament series.',
+      youtubeLink: 'https://youtu.be/FQ1-12OET1I?si=wzicq1DJJFxVLsxr'
+    },
+    {
+      name: 'FCL – Day 2',
+      date: 'January 10, 2025',
+      teams: 4,
+      prizePool: 'Community-funded',
+      winners: 'TBD',
+      format: 'Finals Competitive League',
+      description: 'Day 2 of the Finals Competitive League tournament series.',
+      youtubeLink: null
+    },
+    {
+      name: 'FCL – Launch Day',
+      date: 'January 3, 2025',
+      teams: 4,
+      prizePool: 'Community-funded',
+      winners: 'TBD',
+      format: 'Finals Competitive League',
+      description: 'The inaugural day of the Finals Competitive League, a weekly tournament series.',
+      youtubeLink: null
+    },
+    {
       name: 'Murph Monthly – September',
       date: 'September 5, 2025',
       teams: 8,
@@ -138,7 +198,7 @@ export default function TournamentHistory() {
             Tournament History
           </GlitchText>
           <p className="text-lg text-white/80 font-mono max-w-2xl">
-            Murph Tournaments has hosted 13 competitive tournaments, establishing a track record of professional production, fair competition, and consistent prize pools.
+            Murph Tournaments has hosted the Finals Competitive League (FCL) and 13 Murph Tournaments, establishing a track record of professional production, fair competition, and consistent prize pools.
           </p>
         </div>
 
@@ -177,6 +237,13 @@ export default function TournamentHistory() {
                     <p className="text-xs text-white/50 font-mono uppercase">Description</p>
                     <p className="text-sm font-mono text-white/70">{tournament.description}</p>
                   </div>
+                  {tournament.youtubeLink && (
+                    <div>
+                      <a href={tournament.youtubeLink} target="_blank" rel="noopener noreferrer" className="text-sm font-mono text-neon-magenta hover:text-neon-gold transition-colors">
+                        Watch on YouTube →
+                      </a>
+                    </div>
+                  )}
                 </div>
               </NeonCard>
             ))}
