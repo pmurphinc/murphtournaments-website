@@ -12,7 +12,7 @@ export default function TournamentHistory() {
   const pastTournaments = [
     {
       name: 'FCL – Day 6 (Finals)',
-      date: 'February 6, 2025',
+      date: 'February 6, 2026',
       teams: 4,
       prizePool: 'Community-funded',
       winners: '1 Up - EkaZo, KDKiller, JukerTTV',
@@ -22,7 +22,7 @@ export default function TournamentHistory() {
     },
     {
       name: 'FCL – Day 5',
-      date: 'January 31, 2025',
+      date: 'January 31, 2026',
       teams: 4,
       prizePool: 'Community-funded',
       winners: 'TBD',
@@ -32,7 +32,7 @@ export default function TournamentHistory() {
     },
     {
       name: 'FCL – Day 4',
-      date: 'January 24, 2025',
+      date: 'January 24, 2026',
       teams: 4,
       prizePool: 'Community-funded',
       winners: 'TBD',
@@ -42,7 +42,7 @@ export default function TournamentHistory() {
     },
     {
       name: 'FCL – Day 3',
-      date: 'January 17, 2025',
+      date: 'January 17, 2026',
       teams: 4,
       prizePool: 'Community-funded',
       winners: 'TBD',
@@ -52,7 +52,7 @@ export default function TournamentHistory() {
     },
     {
       name: 'FCL – Day 2',
-      date: 'January 10, 2025',
+      date: 'January 10, 2026',
       teams: 4,
       prizePool: 'Community-funded',
       winners: 'TBD',
@@ -62,7 +62,7 @@ export default function TournamentHistory() {
     },
     {
       name: 'FCL – Launch Day',
-      date: 'January 3, 2025',
+      date: 'January 3, 2026',
       teams: 4,
       prizePool: 'Community-funded',
       winners: 'TBD',
