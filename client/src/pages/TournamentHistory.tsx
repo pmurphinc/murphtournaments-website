@@ -11,13 +11,13 @@ import GlitchText from '@/components/GlitchText';
 export default function TournamentHistory() {
   const pastTournaments = [
     {
-      name: 'FCL – Day 6 (Finals)',
+      name: 'FCL – Day 6 (Grand Finals)',
       date: 'February 6, 2026',
       teams: 4,
       prizePool: 'Community-funded',
       winners: '1 Up - EkaZo, KDKiller, JukerTTV',
-      format: 'Finals Competitive League, Final Round',
-      description: 'The final day of the FCL with the championship match. 1 Up claimed victory in the grand finals.',
+      format: 'Finals Contender League, Grand Finals',
+      description: 'The grand finals of the Finals Contender League. 1 Up claimed the championship title after 5 weeks of league play.',
       youtubeLink: 'https://youtu.be/vJRb6i31MrU?si=GEDyLvmupP42GtOZ'
     },
     {
@@ -25,9 +25,9 @@ export default function TournamentHistory() {
       date: 'January 31, 2026',
       teams: 4,
       prizePool: 'Community-funded',
-      winners: 'TBD',
-      format: 'Finals Competitive League',
-      description: 'Day 5 of the Finals Competitive League tournament series.',
+      winners: 'League Play',
+      format: 'Finals Contender League',
+      description: 'Day 5 of the Finals Contender League. League play week with no individual day winner.',
       youtubeLink: 'https://youtu.be/x6nEeSLpSY4?si=EYMLlzeiW0fC7YpW'
     },
     {
@@ -35,9 +35,9 @@ export default function TournamentHistory() {
       date: 'January 24, 2026',
       teams: 4,
       prizePool: 'Community-funded',
-      winners: 'TBD',
-      format: 'Finals Competitive League',
-      description: 'Day 4 of the Finals Competitive League tournament series.',
+      winners: 'League Play',
+      format: 'Finals Contender League',
+      description: 'Day 4 of the Finals Contender League. League play week with no individual day winner.',
       youtubeLink: 'https://youtu.be/RpKcOJ7h-IU?si=EVsZeBVWGwBoYCDr'
     },
     {
@@ -45,9 +45,9 @@ export default function TournamentHistory() {
       date: 'January 17, 2026',
       teams: 4,
       prizePool: 'Community-funded',
-      winners: 'TBD',
-      format: 'Finals Competitive League',
-      description: 'Day 3 of the Finals Competitive League tournament series.',
+      winners: 'League Play',
+      format: 'Finals Contender League',
+      description: 'Day 3 of the Finals Contender League. League play week with no individual day winner.',
       youtubeLink: 'https://youtu.be/FQ1-12OET1I?si=wzicq1DJJFxVLsxr'
     },
     {
@@ -55,9 +55,9 @@ export default function TournamentHistory() {
       date: 'January 10, 2026',
       teams: 4,
       prizePool: 'Community-funded',
-      winners: 'TBD',
-      format: 'Finals Competitive League',
-      description: 'Day 2 of the Finals Competitive League tournament series.',
+      winners: 'League Play',
+      format: 'Finals Contender League',
+      description: 'Day 2 of the Finals Contender League. League play week with no individual day winner.',
       youtubeLink: null
     },
     {
@@ -65,9 +65,9 @@ export default function TournamentHistory() {
       date: 'January 3, 2026',
       teams: 4,
       prizePool: 'Community-funded',
-      winners: 'TBD',
-      format: 'Finals Competitive League',
-      description: 'The inaugural day of the Finals Competitive League, a weekly tournament series.',
+      winners: 'League Play',
+      format: 'Finals Contender League',
+      description: 'The inaugural day of the Finals Contender League. League play week with no individual day winner.',
       youtubeLink: null
     },
     {
