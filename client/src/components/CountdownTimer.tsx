@@ -59,12 +59,14 @@ export default function CountdownTimer({ targetDate, eventName }: CountdownTimer
   if (isLive) {
     return (
       <div className="text-center">
-        <div className="text-4xl font-bold font-mono text-neon-lime pulse-neon mb-2">
+        <a
+          href="https://twitch.tv/murph"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-4xl font-bold font-mono text-neon-lime pulse-neon mb-2 inline-block hover:opacity-80 transition-opacity"
+        >
           LIVE NOW
-        </div>
-        {eventName && (
-          <p className="text-sm text-white/60 font-mono uppercase tracking-widest">{eventName}</p>
-        )}
+        </a>
       </div>
     );
   }
