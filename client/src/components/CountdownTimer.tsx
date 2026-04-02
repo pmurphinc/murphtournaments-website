@@ -60,7 +60,7 @@ export default function CountdownTimer({ targetDate, eventName }: CountdownTimer
     return (
       <div className="text-center">
         <a
-          href="https://twitch.tv/murph"
+          href="https://twitch.tv/pmurphinc"
           target="_blank"
           rel="noopener noreferrer"
           className="text-4xl font-bold font-mono text-neon-lime pulse-neon mb-2 inline-block hover:opacity-80 transition-opacity"
