@@ -62,13 +62,8 @@ export default function Footer() {
         </div>
 
         {/* Bottom Bar */}
-        <div className="border-t border-neon-magenta/20 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+        <div className="border-t border-neon-magenta/20 pt-8 flex justify-center">
           <p className="text-xs text-white/40 font-mono">© 2026 Murph Tournaments. All rights reserved.</p>
-          <div className="flex gap-6">
-            <a href="#" className="text-xs text-white/40 hover:text-neon-cyan transition-colors font-mono">Privacy</a>
-            <a href="#" className="text-xs text-white/40 hover:text-neon-cyan transition-colors font-mono">Terms</a>
-            <a href="#" className="text-xs text-white/40 hover:text-neon-cyan transition-colors font-mono">Contact</a>
-          </div>
         </div>
       </div>
     </footer>
