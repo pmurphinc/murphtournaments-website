@@ -107,9 +107,9 @@
 - [ ] Verify no text clipping or element overlap at any breakpoint
 
 ## Patch Notes Page
-- [x] Create PatchNotes.tsx page that fetches from reachthefinals.com/patchnotes
-- [x] Filter to show only Game Updates (exclude other patch note types)
-- [x] Display patches newest first with dropdown/collapsible menus
+- [x] Create PatchNotes.tsx page with hardcoded patch note data
+- [x] Display patches with expandable dropdown menus
+- [x] Show patch title and date in header, full content in dropdown
 - [x] Add PatchNotes page to History dropdown in navigation
 - [x] Style consistently with tournament history page (NeonCard, cyberpunk aesthetic)
-- [x] Test data fetching and rendering
+- [x] Test rendering and dropdown functionality
