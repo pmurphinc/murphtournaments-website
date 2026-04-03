@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import GlitchText from '@/components/GlitchText';
 import NeonCard from '@/components/NeonCard';
 import { ChevronDown } from 'lucide-react';
+import { trpc } from '@/lib/trpc';
 
 interface PatchNote {
   id: string;
@@ -15,87 +16,20 @@ interface PatchNote {
 /**
  * Patch Notes Page
  * Cyberpunk Neon Rebellion Design
- * - Fetches Game Updates from reachthefinals.com/patchnotes
+ * - Fetches Game Updates from reachthefinals.com/patchnotes via server
  * - Displays patches newest first with expandable sections
  * - Filters to show only Game Updates
  */
 
 export default function PatchNotes() {
-  const [patches, setPatches] = useState<PatchNote[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchPatchNotes = async () => {
-      try {
-        setLoading(true);
-        // Fetch from reachthefinals.com/patchnotes
-        const response = await fetch('https://reachthefinals.com/patchnotes');
-        
-        if (!response.ok) {
-          throw new Error(`Failed to fetch patch notes: ${response.statusText}`);
-        }
-
-        const html = await response.text();
-        
-        // Parse HTML to extract Game Updates
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        
-        // Look for patch note sections - adjust selectors based on actual HTML structure
-        const patchElements = doc.querySelectorAll('[data-type="game-update"], .game-update, [class*="game-update"]');
-        
-        const parsedPatches: PatchNote[] = [];
-        
-        patchElements.forEach((element, index) => {
-          const titleEl = element.querySelector('h2, h3, .title, [class*="title"]');
-          const dateEl = element.querySelector('.date, [class*="date"], time');
-          const contentEl = element.querySelector('.content, [class*="content"], p');
-          const versionEl = element.querySelector('.version, [class*="version"]');
-          
-          if (titleEl) {
-            parsedPatches.push({
-              id: `patch-${index}`,
-              title: titleEl.textContent?.trim() || 'Untitled Patch',
-              date: dateEl?.textContent?.trim() || 'Unknown Date',
-              version: versionEl?.textContent?.trim() || 'v1.0',
-              content: contentEl?.textContent?.trim() || 'No details available',
-              type: 'Game Update'
-            });
-          }
-        });
-
-        // Sort by date (newest first) - attempt to parse dates
-        parsedPatches.sort((a, b) => {
-          try {
-            const dateA = new Date(a.date).getTime();
-            const dateB = new Date(b.date).getTime();
-            return dateB - dateA;
-          } catch {
-            return 0;
-          }
-        });
-
-        if (parsedPatches.length === 0) {
-          setError('No Game Updates found. Please check back later.');
-        } else {
-          setPatches(parsedPatches);
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load patch notes');
-        console.error('Error fetching patch notes:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPatchNotes();
-  }, []);
+  const { data: patches = [], isLoading: loading, error } = trpc.patchNotes.getGameUpdates.useQuery();
 
   const toggleExpanded = (id: string) => {
     setExpandedId(expandedId === id ? null : id);
   };
+
+  const errorMessage = error?.message || null;
 
   return (
     <div className="min-h-screen bg-dark-charcoal py-20">
@@ -118,16 +52,16 @@ export default function PatchNotes() {
         )}
 
         {/* Error State */}
-        {error && !loading && (
+        {errorMessage && !loading && (
           <div className="mb-8">
             <NeonCard variant="magenta">
-              <p className="text-sm text-white/70 font-mono">{error}</p>
+              <p className="text-sm text-white/70 font-mono">{errorMessage}</p>
             </NeonCard>
           </div>
         )}
 
         {/* Patch Notes List */}
-        {!loading && patches.length > 0 && (
+        {!loading && patches && patches.length > 0 && (
           <div>
             <h2 className="text-2xl font-bold font-mono text-neon-cyan mb-6 uppercase">Recent Updates</h2>
             <div className="grid grid-cols-1 gap-4">
@@ -172,7 +106,7 @@ export default function PatchNotes() {
         )}
 
         {/* Empty State */}
-        {!loading && patches.length === 0 && !error && (
+        {!loading && (!patches || patches.length === 0) && !errorMessage && (
           <div className="text-center py-12">
             <p className="text-lg text-white/60 font-mono">No patch notes available at this time.</p>
           </div>

@@ -194,6 +194,83 @@ export const appRouter = router({
       return await getTournamentHistory();
     }),
   }),
+
+  patchNotes: router({
+    getGameUpdates: publicProcedure.query(async () => {
+      try {
+        const response = await fetch('https://reachthefinals.com/patchnotes', {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          },
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch patch notes: ${response.statusText}`);
+        }
+
+        const html = await response.text();
+        
+        // Simple HTML parsing to extract patch note sections
+        // Look for common patterns in patch note pages
+        const patches: any[] = [];
+        
+        // Extract sections that look like patch notes
+        const sectionRegex = /<(h2|h3)[^>]*>([^<]+)<\/\1>|<p[^>]*>([^<]+)<\/p>/gi;
+        let match;
+        let currentPatch: any = null;
+        
+        while ((match = sectionRegex.exec(html)) !== null) {
+          const text = (match[2] || match[3] || '').trim();
+          
+          if (match[1] && match[1].toLowerCase() === 'h2') {
+            // This is likely a patch title
+            if (currentPatch) {
+              patches.push(currentPatch);
+            }
+            currentPatch = {
+              id: `patch-${patches.length}`,
+              title: text,
+              date: 'Unknown Date',
+              version: 'v1.0',
+              content: '',
+              type: 'Game Update'
+            };
+          } else if (currentPatch && text) {
+            // Add to current patch content
+            currentPatch.content += (currentPatch.content ? '\n' : '') + text;
+          }
+        }
+        
+        if (currentPatch) {
+          patches.push(currentPatch);
+        }
+        
+        // If no patches found, return a helpful message
+        if (patches.length === 0) {
+          return [{
+            id: 'error',
+            title: 'Unable to parse patch notes',
+            date: new Date().toLocaleDateString(),
+            version: 'N/A',
+            content: 'The patch notes page structure may have changed. Please visit reachthefinals.com/patchnotes directly.',
+            type: 'Game Update'
+          }];
+        }
+        
+        return patches;
+      } catch (err) {
+        console.error('Error fetching patch notes:', err);
+        return [{
+          id: 'error',
+          title: 'Failed to load patch notes',
+          date: new Date().toLocaleDateString(),
+          version: 'N/A',
+          content: err instanceof Error ? err.message : 'An unknown error occurred while fetching patch notes.',
+          type: 'Game Update'
+        }];
+      }
+    }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;
