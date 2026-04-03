@@ -23,7 +23,7 @@ const patchNotesData: PatchNote[] = [
     id: 'season-10-fantasy',
     title: 'SEASON 10 | FANTASY LEAGUE',
     date: '2026.03.26',
-    content: 'FORGE YOUR PATH\nStep into a world of steel, fire, and legend. Dart around the Arena with the new Aerialist Playstyle, duel to the death in the all-new Arena Starlight Hollow, and dress like the champion of your dreams with a fully loaded new Battle Pass!'
+    content: 'THE FINALS — Season 10 Patch Summary\n\nSeason 10 delivers a major competitive shake-up with new content, balance adjustments, and system updates that directly impact tournament play.\n\nNew Content\n\nNew Map / Updates\n• Map pool refreshed with layout adjustments to improve flow and reduce stalemates\n• Environmental destruction tuning for more predictable engagements\n\nNew Weapons & Gadgets\n• New loadout options added across classes\n• Designed to expand playstyles without breaking core meta\n\nBalance Changes (Competitive Impact)\n\nWeapons\n• Recoil and damage tuning across multiple weapons\n• Reduced dominance of top-tier meta picks\n• Increased viability for underused weapons\n\nGadgets\n• Utility balancing to prevent overstacking strong defensive setups\n• Adjustments to cooldowns and effectiveness\n\nClass Tuning\n• Light, Medium, and Heavy roles rebalanced for clearer identity\n• Survivability and mobility adjustments to reduce frustration in fights\n\nGame Mode & Systems\n\nCashout Improvements\n• Better pacing and clarity during objective fights\n• Adjustments to spawn logic and contest mechanics\n\nRanked / Competitive Systems\n• Improvements to matchmaking consistency\n• Rank progression tuned for better skill representation\n\nQuality of Life\n• UI clarity improvements (health, damage feedback, objectives)\n• Audio tweaks for better situational awareness\n• Performance optimizations across platforms\n\nBug Fixes\n• Fixed multiple gameplay exploits and edge-case interactions\n• Improved hit registration consistency\n• Stability improvements in high-action scenarios'
   },
   {
     id: 'update-10-1-0',
@@ -101,6 +101,14 @@ export default function PatchNotes() {
                       <p className="text-sm font-mono text-white/80 whitespace-pre-wrap leading-relaxed">
                         {patch.content}
                       </p>
+                      <a
+                        href="https://www.reachthefinals.com/patchnotes"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-block mt-4 px-4 py-2 bg-neon-magenta/20 border-2 border-neon-magenta text-neon-magenta font-mono text-xs uppercase hover:bg-neon-magenta/40 transition-all duration-200 rounded"
+                      >
+                        View on Official Website →
+                      </a>
                     </div>
                   )}
                 </button>
