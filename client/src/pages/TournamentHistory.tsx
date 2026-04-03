@@ -13,7 +13,7 @@ export default function TournamentHistory() {
     {
       name: 'FCL – Day 6 (Grand Finals)',
       date: 'February 6, 2026',
-      teams: 4,
+      teams: 8,
       prizePool: 'Community-funded',
       winners: '1 Up - EkaZo, KDKiller, JukerTTV',
       format: 'Finals Contender League, Grand Finals',
@@ -23,7 +23,7 @@ export default function TournamentHistory() {
     {
       name: 'FCL – Day 5',
       date: 'January 31, 2026',
-      teams: 4,
+      teams: 8,
       prizePool: 'Community-funded',
       winners: 'League Play',
       format: 'Finals Contender League',
@@ -33,7 +33,7 @@ export default function TournamentHistory() {
     {
       name: 'FCL – Day 4',
       date: 'January 24, 2026',
-      teams: 4,
+      teams: 8,
       prizePool: 'Community-funded',
       winners: 'League Play',
       format: 'Finals Contender League',
@@ -43,7 +43,7 @@ export default function TournamentHistory() {
     {
       name: 'FCL – Day 3',
       date: 'January 17, 2026',
-      teams: 4,
+      teams: 8,
       prizePool: 'Community-funded',
       winners: 'League Play',
       format: 'Finals Contender League',
@@ -53,7 +53,7 @@ export default function TournamentHistory() {
     {
       name: 'FCL – Day 2',
       date: 'January 10, 2026',
-      teams: 4,
+      teams: 8,
       prizePool: 'Community-funded',
       winners: 'League Play',
       format: 'Finals Contender League',
@@ -63,7 +63,7 @@ export default function TournamentHistory() {
     {
       name: 'FCL – Launch Day',
       date: 'January 3, 2026',
-      teams: 4,
+      teams: 8,
       prizePool: 'Community-funded',
       winners: 'League Play',
       format: 'Finals Contender League',
