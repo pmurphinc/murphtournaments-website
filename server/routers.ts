@@ -5,6 +5,156 @@ import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
 import { getOrCreateDevDivisionTournament, getOrCreateSeventhCircleTournament, updateTournamentStatus, getTeamsByTournament, upsertTeams, updateTeamFRP, getTournamentHistory, addTournamentToHistory } from "./db";
 
+type LoadoutItemType = "weapon" | "gadget";
+type LoadoutBuildType = "Light" | "Medium" | "Heavy";
+
+interface LoadoutItem {
+  name: string;
+  normalizedName: string;
+  build: LoadoutBuildType;
+  type: LoadoutItemType;
+  imageUrl?: string;
+}
+
+const BUILDS_PAGE_API = "https://www.thefinals.wiki/api.php?action=parse&page=Builds&prop=text&formatversion=2&format=json";
+const PATCHNOTES_PAGE_API = "https://www.thefinals.wiki/api.php?action=parse&page=Patchnotes&prop=text&formatversion=2&format=json";
+
+const normalizeItemName = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/&amp;/g, "and")
+    .replace(/\+/g, "plus")
+    .replace(/[^a-z0-9]/g, "");
+
+const stripHtmlTags = (value: string) =>
+  value
+    .replace(/<br\s*\/?\s*>/gi, "\n")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .trim();
+
+const extractItemsFromBuildsHtml = (html: string): LoadoutItem[] => {
+  const buildNames: LoadoutBuildType[] = ["Light", "Medium", "Heavy"];
+  const items: LoadoutItem[] = [];
+  const seen = new Set<string>();
+
+  for (const build of buildNames) {
+    const buildStart = html.search(new RegExp(`<h2[^>]*>${build} Build`, "i"));
+    if (buildStart < 0) continue;
+
+    const remainingBuilds = buildNames.filter(name => name !== build);
+    const nextBuildIndices = remainingBuilds
+      .map(nextBuild => html.slice(buildStart + 1).search(new RegExp(`<h2[^>]*>${nextBuild} Build`, "i")))
+      .filter(index => index >= 0)
+      .map(index => index + buildStart + 1);
+    const buildEnd = nextBuildIndices.length > 0 ? Math.min(...nextBuildIndices) : html.length;
+    const buildSlice = html.slice(buildStart, buildEnd);
+
+    const typeDefinitions: Array<{ type: LoadoutItemType; heading: string; nextHeading: string }> = [
+      { type: "weapon", heading: "Weapons", nextHeading: "Gadgets" },
+      { type: "gadget", heading: "Gadgets", nextHeading: "</h2>" },
+    ];
+
+    for (const definition of typeDefinitions) {
+      const typeStart = buildSlice.search(new RegExp(`<h3[^>]*>${definition.heading}</h3>|>${definition.heading}<`, "i"));
+      if (typeStart < 0) continue;
+
+      const tail = buildSlice.slice(typeStart + 1);
+      let typeEnd = tail.search(new RegExp(`<h3[^>]*>${definition.nextHeading}</h3>|${definition.nextHeading}`, "i"));
+      if (typeEnd < 0) {
+        typeEnd = tail.length;
+      }
+
+      const typeSlice = tail.slice(0, typeEnd);
+      const anchorRegex = /<a[^>]*href="\/wiki\/[^"#]+"[^>]*title="([^"]+)"[^>]*>(?:<img[^>]*alt="([^"]*)"[^>]*src="([^"]+)"[^>]*>)?[^<]*<\/a>/gi;
+      let match: RegExpExecArray | null;
+
+      while ((match = anchorRegex.exec(typeSlice)) !== null) {
+        const name = stripHtmlTags(match[1] || "");
+        if (!name || /^(Image|Weapons|Gadgets)$/i.test(name)) continue;
+
+        const normalizedName = normalizeItemName(name);
+        if (!normalizedName) continue;
+
+        const key = `${build}-${definition.type}-${normalizedName}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+
+        let imageUrl = match[3] || undefined;
+        if (imageUrl && imageUrl.startsWith("//")) {
+          imageUrl = `https:${imageUrl}`;
+        }
+
+        items.push({
+          name,
+          normalizedName,
+          build,
+          type: definition.type,
+          imageUrl,
+        });
+      }
+    }
+  }
+
+  return items;
+};
+
+const extractPatchLinks = (html: string) => {
+  const links: Array<{ pageTitle: string; patchVersion: string; patchDate: string }> = [];
+  const seen = new Set<string>();
+  const rowRegex = /<tr[^>]*>[\s\S]*?<a[^>]*href="\/wiki\/([^"]+)"[^>]*>([^<]+)<\/a>[\s\S]*?(\d{4}-\d{2}-\d{2})[\s\S]*?<\/tr>/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = rowRegex.exec(html)) !== null) {
+    const pageTitle = decodeURIComponent(match[1]).replace(/_/g, " ").trim();
+    const patchVersion = stripHtmlTags(match[2]);
+    const patchDate = match[3];
+    const key = `${pageTitle}-${patchDate}`;
+
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    links.push({ pageTitle, patchVersion, patchDate });
+  }
+
+  return links.sort((a, b) => (a.patchDate < b.patchDate ? 1 : -1));
+};
+
+const extractItemUpdateFromPatch = (wikitext: string, itemNames: string[]) => {
+  const lines = wikitext.split("\n");
+  const normalizedItemNames = itemNames.map(name => normalizeItemName(name));
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const cleanedLine = stripHtmlTags(line.replace(/^\s*[\*#:;\-]+\s*/, ""));
+    const normalizedLine = normalizeItemName(cleanedLine);
+
+    if (!normalizedLine) continue;
+
+    const hasItemMention = normalizedItemNames.some(itemName => normalizedLine.includes(itemName));
+    if (!hasItemMention) continue;
+
+    let devNote: string | undefined;
+    for (let offset = 0; offset < 4; offset += 1) {
+      const candidate = lines[index + offset] || "";
+      if (/dev\s*note/i.test(candidate)) {
+        devNote = stripHtmlTags(candidate.replace(/^\s*[\*#:;\-]+\s*/, ""));
+        break;
+      }
+    }
+
+    return {
+      patchText: cleanedLine || "N/A",
+      devNote,
+    };
+  }
+
+  return null;
+};
+
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
@@ -287,6 +437,86 @@ export const appRouter = router({
           content: err instanceof Error ? err.message : 'An unknown error occurred while fetching patch notes. Please try again later.',
           type: 'Game Update'
         }];
+      }
+    }),
+  }),
+
+  loadoutTracker: router({
+    getItems: publicProcedure.query(async () => {
+      try {
+        const [buildsResponse, patchnotesResponse] = await Promise.all([
+          fetch(BUILDS_PAGE_API),
+          fetch(PATCHNOTES_PAGE_API),
+        ]);
+
+        if (!buildsResponse.ok || !patchnotesResponse.ok) {
+          throw new Error("Failed to fetch THE FINALS wiki pages.");
+        }
+
+        const buildsPayload = await buildsResponse.json();
+        const patchnotesPayload = await patchnotesResponse.json();
+        const buildsHtml = buildsPayload?.parse?.text as string | undefined;
+        const patchnotesHtml = patchnotesPayload?.parse?.text as string | undefined;
+
+        if (!buildsHtml || !patchnotesHtml) {
+          throw new Error("Wiki response missing expected data.");
+        }
+
+        const items = extractItemsFromBuildsHtml(buildsHtml);
+        const patchLinks = extractPatchLinks(patchnotesHtml);
+        const patchMatchMap = new Map<string, { latestPatch: string; patchDate: string; patchText: string; devNote?: string }>();
+
+        for (const patch of patchLinks.slice(0, 80)) {
+          const unfoundItems = items.filter(item => !patchMatchMap.has(`${item.build}-${item.type}-${item.normalizedName}`));
+          if (unfoundItems.length === 0) break;
+
+          const patchApiUrl = `https://www.thefinals.wiki/api.php?action=parse&page=${encodeURIComponent(patch.pageTitle)}&prop=wikitext&formatversion=2&format=json`;
+          const patchResponse = await fetch(patchApiUrl);
+          if (!patchResponse.ok) continue;
+
+          const patchPayload = await patchResponse.json();
+          const wikitext = patchPayload?.parse?.wikitext as string | undefined;
+          if (!wikitext) continue;
+
+          for (const item of unfoundItems) {
+            const match = extractItemUpdateFromPatch(wikitext, [item.name]);
+            if (!match) continue;
+
+            patchMatchMap.set(`${item.build}-${item.type}-${item.normalizedName}`, {
+              latestPatch: patch.patchVersion || "N/A",
+              patchDate: patch.patchDate || "N/A",
+              patchText: match.patchText,
+              devNote: match.devNote,
+            });
+          }
+        }
+
+        return items.map(item => {
+          const key = `${item.build}-${item.type}-${item.normalizedName}`;
+          const match = patchMatchMap.get(key);
+          if (!match) {
+            return {
+              ...item,
+              latestPatch: "NEW",
+              patchDate: null,
+              patchText: "No balance changes yet",
+              devNote: null,
+              isNew: true,
+            };
+          }
+
+          return {
+            ...item,
+            latestPatch: match.latestPatch,
+            patchDate: match.patchDate,
+            patchText: match.patchText,
+            devNote: match.devNote || null,
+            isNew: false,
+          };
+        });
+      } catch (error) {
+        console.error("loadoutTracker.getItems error", error);
+        return [];
       }
     }),
   }),
