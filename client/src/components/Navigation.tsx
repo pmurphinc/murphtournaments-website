@@ -32,7 +32,7 @@ export default function Navigation() {
         { label: 'Tournament History', href: '/tournaments' },
         { label: 'Player Archive', href: '/players' },
         { label: 'Patch Notes', href: '/patchnotes' },
-        { label: 'Loadout Tracker', href: '/loadout-tracker' },
+        // { label: 'Loadout Tracker', href: '/loadout-tracker' }, // Temporarily hidden for direct URL testing
       ]
     },
     { 
