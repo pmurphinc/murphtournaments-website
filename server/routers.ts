@@ -4,6 +4,239 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
 import { getOrCreateDevDivisionTournament, getOrCreateSeventhCircleTournament, updateTournamentStatus, getTeamsByTournament, upsertTeams, updateTeamFRP, getTournamentHistory, addTournamentToHistory } from "./db";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
+
+type LoadoutItemType = "weapon" | "gadget";
+type LoadoutBuildType = "Light" | "Medium" | "Heavy";
+
+interface LoadoutItem {
+  name: string;
+  normalizedName: string;
+  build: LoadoutBuildType;
+  type: LoadoutItemType;
+  imageUrl?: string;
+}
+
+interface LoadoutTrackerItem extends LoadoutItem {
+  latestPatch: string;
+  patchDate: string | null;
+  patchText: string;
+  devNote: string | null;
+  isNew: boolean;
+  matchQuality: "matched" | "noPatchText" | "new";
+}
+
+interface LoadoutTrackerPayload {
+  items: LoadoutTrackerItem[];
+  metadata: {
+    lastUpdated: string | null;
+    dataSourceStatus: "live" | "cache" | "degraded" | "empty";
+    isFromCache: boolean;
+    currentPatch: string | null;
+    cacheAgeMinutes: number | null;
+  };
+}
+
+const BUILDS_PAGE_API = "https://www.thefinals.wiki/api.php?action=parse&page=Builds&prop=text&formatversion=2&format=json";
+const PATCHNOTES_PAGE_API = "https://www.thefinals.wiki/api.php?action=parse&page=Patchnotes&prop=text&formatversion=2&format=json";
+const LOADOUT_CACHE_PATH = path.join(process.cwd(), "server", ".cache", "loadout-tracker-cache.json");
+const LOADOUT_REFRESH_WINDOW_MS = 1000 * 60 * 20;
+
+const ITEM_NAME_ALIASES: Record<string, string> = {
+  xp54: "xp-54",
+  "xp 54": "xp-54",
+  "akm rifle": "akm",
+  fcarrifle: "fcar",
+  "m 60": "m60",
+  "v 9 s": "v9s",
+  cl40: "cl-40",
+};
+
+const resolveItemAlias = (value: string) => ITEM_NAME_ALIASES[value.trim().toLowerCase()] || value;
+
+const normalizeItemName = (value: string) =>
+  resolveItemAlias(
+    value
+      .replace(/&amp;/g, "and")
+      .replace(/\+/g, "plus")
+      .trim(),
+  )
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+
+const stripHtmlTags = (value: string) =>
+  value
+    .replace(/<br\s*\/?\s*>/gi, "\n")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .trim();
+
+const extractItemsFromBuildsHtml = (html: string): LoadoutItem[] => {
+  const buildNames: LoadoutBuildType[] = ["Light", "Medium", "Heavy"];
+  const items: LoadoutItem[] = [];
+  const seen = new Set<string>();
+
+  for (const build of buildNames) {
+    const buildStart = html.search(new RegExp(`<h2[^>]*>${build} Build`, "i"));
+    if (buildStart < 0) continue;
+
+    const remainingBuilds = buildNames.filter(name => name !== build);
+    const nextBuildIndices = remainingBuilds
+      .map(nextBuild => html.slice(buildStart + 1).search(new RegExp(`<h2[^>]*>${nextBuild} Build`, "i")))
+      .filter(index => index >= 0)
+      .map(index => index + buildStart + 1);
+    const buildEnd = nextBuildIndices.length > 0 ? Math.min(...nextBuildIndices) : html.length;
+    const buildSlice = html.slice(buildStart, buildEnd);
+
+    const typeDefinitions: Array<{ type: LoadoutItemType; heading: string; nextHeading: string }> = [
+      { type: "weapon", heading: "Weapons", nextHeading: "Gadgets" },
+      { type: "gadget", heading: "Gadgets", nextHeading: "</h2>" },
+    ];
+
+    for (const definition of typeDefinitions) {
+      const typeStart = buildSlice.search(new RegExp(`<h3[^>]*>${definition.heading}</h3>|>${definition.heading}<`, "i"));
+      if (typeStart < 0) continue;
+
+      const tail = buildSlice.slice(typeStart + 1);
+      let typeEnd = tail.search(new RegExp(`<h3[^>]*>${definition.nextHeading}</h3>|${definition.nextHeading}`, "i"));
+      if (typeEnd < 0) {
+        typeEnd = tail.length;
+      }
+
+      const typeSlice = tail.slice(0, typeEnd);
+      const anchorRegex = /<a[^>]*href="\/wiki\/[^"#]+"[^>]*title="([^"]+)"[^>]*>(?:<img[^>]*alt="([^"]*)"[^>]*src="([^"]+)"[^>]*>)?[^<]*<\/a>/gi;
+      let match: RegExpExecArray | null;
+
+      while ((match = anchorRegex.exec(typeSlice)) !== null) {
+        const name = stripHtmlTags(match[1] || "");
+        if (!name || /^(Image|Weapons|Gadgets)$/i.test(name)) continue;
+
+        const normalizedName = normalizeItemName(name);
+        if (!normalizedName) continue;
+
+        const key = `${build}-${definition.type}-${normalizedName}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+
+        let imageUrl = match[3] || undefined;
+        if (imageUrl && imageUrl.startsWith("//")) {
+          imageUrl = `https:${imageUrl}`;
+        }
+
+        items.push({
+          name,
+          normalizedName,
+          build,
+          type: definition.type,
+          imageUrl,
+        });
+      }
+    }
+  }
+
+  return items;
+};
+
+const extractPatchLinks = (html: string) => {
+  const links: Array<{ pageTitle: string; patchVersion: string; patchDate: string }> = [];
+  const seen = new Set<string>();
+  const rowRegex = /<tr[^>]*>[\s\S]*?<a[^>]*href="\/wiki\/([^"]+)"[^>]*>([^<]+)<\/a>[\s\S]*?(\d{4}-\d{2}-\d{2})[\s\S]*?<\/tr>/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = rowRegex.exec(html)) !== null) {
+    const pageTitle = decodeURIComponent(match[1]).replace(/_/g, " ").trim();
+    const patchVersion = stripHtmlTags(match[2]);
+    const patchDate = match[3];
+    const key = `${pageTitle}-${patchDate}`;
+
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    links.push({ pageTitle, patchVersion, patchDate });
+  }
+
+  return links.sort((a, b) => (a.patchDate < b.patchDate ? 1 : -1));
+};
+
+const extractCurrentPatch = (patchLinks: Array<{ patchVersion: string }>) => {
+  const firstVersion = patchLinks.find(link => link.patchVersion?.trim())?.patchVersion || null;
+  if (!firstVersion) return null;
+  const normalized = firstVersion.toUpperCase();
+  return normalized.startsWith("UPDATE") || normalized.startsWith("PATCH")
+    ? firstVersion
+    : `Update ${firstVersion}`;
+};
+
+const extractItemUpdateFromPatch = (wikitext: string, itemNames: string[]) => {
+  const lines = wikitext.split("\n");
+  const normalizedItemNames = itemNames.map(name => normalizeItemName(name)).filter(Boolean);
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const cleanedLine = stripHtmlTags(line.replace(/^\s*[\*#:;\-]+\s*/, ""));
+    const normalizedLine = normalizeItemName(cleanedLine);
+
+    if (!normalizedLine) continue;
+
+    const hasItemMention = normalizedItemNames.some(itemName => normalizedLine.includes(itemName));
+    if (!hasItemMention) continue;
+
+    const patchText = cleanedLine || "No patch note found";
+    let devNote: string | undefined;
+    for (let offset = 0; offset < 4; offset += 1) {
+      const candidate = lines[index + offset] || "";
+      if (/dev\s*note/i.test(candidate)) {
+        devNote = stripHtmlTags(candidate.replace(/^\s*[\*#:;\-]+\s*/, ""));
+        break;
+      }
+    }
+
+    return {
+      patchText,
+      devNote,
+    };
+  }
+
+  return null;
+};
+
+const getCacheAgeMinutes = (lastUpdated: string | null) => {
+  if (!lastUpdated) return null;
+  const timestamp = new Date(lastUpdated).getTime();
+  if (Number.isNaN(timestamp)) return null;
+  return Math.max(0, Math.floor((Date.now() - timestamp) / 60000));
+};
+
+const safeEmptyLoadoutPayload = (): LoadoutTrackerPayload => ({
+  items: [],
+  metadata: {
+    lastUpdated: null,
+    dataSourceStatus: "empty",
+    isFromCache: false,
+    currentPatch: null,
+    cacheAgeMinutes: null,
+  },
+});
+
+const readLoadoutCache = async (): Promise<LoadoutTrackerPayload | null> => {
+  try {
+    const raw = await readFile(LOADOUT_CACHE_PATH, "utf8");
+    const parsed = JSON.parse(raw) as LoadoutTrackerPayload;
+    if (!Array.isArray(parsed.items) || !parsed.metadata) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const writeLoadoutCache = async (payload: LoadoutTrackerPayload) => {
+  await mkdir(path.dirname(LOADOUT_CACHE_PATH), { recursive: true });
+  await writeFile(LOADOUT_CACHE_PATH, JSON.stringify(payload, null, 2), "utf8");
+};
 
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -287,6 +520,138 @@ export const appRouter = router({
           content: err instanceof Error ? err.message : 'An unknown error occurred while fetching patch notes. Please try again later.',
           type: 'Game Update'
         }];
+      }
+    }),
+  }),
+
+  loadoutTracker: router({
+    getItems: publicProcedure.query(async () => {
+      const cachedPayload = await readLoadoutCache();
+      const cacheIsFresh =
+        cachedPayload?.metadata.lastUpdated
+          ? Date.now() - new Date(cachedPayload.metadata.lastUpdated).getTime() < LOADOUT_REFRESH_WINDOW_MS
+          : false;
+
+      if (cachedPayload && cacheIsFresh) {
+        return {
+          ...cachedPayload,
+          metadata: {
+            ...cachedPayload.metadata,
+            dataSourceStatus: "cache",
+            isFromCache: true,
+            cacheAgeMinutes: getCacheAgeMinutes(cachedPayload.metadata.lastUpdated),
+          },
+        } satisfies LoadoutTrackerPayload;
+      }
+
+      try {
+        const [buildsResponse, patchnotesResponse] = await Promise.all([
+          fetch(BUILDS_PAGE_API),
+          fetch(PATCHNOTES_PAGE_API),
+        ]);
+
+        if (!buildsResponse.ok || !patchnotesResponse.ok) {
+          throw new Error("Failed to fetch THE FINALS wiki pages.");
+        }
+
+        const buildsPayload = await buildsResponse.json();
+        const patchnotesPayload = await patchnotesResponse.json();
+        const buildsHtml = buildsPayload?.parse?.text as string | undefined;
+        const patchnotesHtml = patchnotesPayload?.parse?.text as string | undefined;
+
+        if (!buildsHtml || !patchnotesHtml) {
+          throw new Error("Wiki response missing expected data.");
+        }
+
+        const items = extractItemsFromBuildsHtml(buildsHtml);
+        if (items.length === 0) {
+          throw new Error("Build parsing produced no items.");
+        }
+
+        const patchLinks = extractPatchLinks(patchnotesHtml);
+        const currentPatch = extractCurrentPatch(patchLinks);
+        const patchMatchMap = new Map<string, { latestPatch: string; patchDate: string; patchText: string; devNote?: string }>();
+
+        for (const patch of patchLinks.slice(0, 80)) {
+          const unfoundItems = items.filter(item => !patchMatchMap.has(`${item.build}-${item.type}-${item.normalizedName}`));
+          if (unfoundItems.length === 0) break;
+
+          const patchApiUrl = `https://www.thefinals.wiki/api.php?action=parse&page=${encodeURIComponent(patch.pageTitle)}&prop=wikitext&formatversion=2&format=json`;
+          const patchResponse = await fetch(patchApiUrl);
+          if (!patchResponse.ok) continue;
+
+          const patchPayload = await patchResponse.json();
+          const wikitext = patchPayload?.parse?.wikitext as string | undefined;
+          if (!wikitext) continue;
+
+          for (const item of unfoundItems) {
+            const match = extractItemUpdateFromPatch(wikitext, [item.name]);
+            if (!match) continue;
+
+            patchMatchMap.set(`${item.build}-${item.type}-${item.normalizedName}`, {
+              latestPatch: patch.patchVersion || "N/A",
+              patchDate: patch.patchDate || "N/A",
+              patchText: match.patchText || "No patch note found",
+              devNote: match.devNote,
+            });
+          }
+        }
+
+        const preparedItems = items.map(item => {
+          const key = `${item.build}-${item.type}-${item.normalizedName}`;
+          const match = patchMatchMap.get(key);
+          if (!match) {
+            return {
+              ...item,
+              latestPatch: "NEW",
+              patchDate: null,
+              patchText: "No balance changes yet",
+              devNote: null,
+              isNew: true,
+              matchQuality: "new" as const,
+            };
+          }
+
+          const hasPatchText = Boolean(match.patchText && match.patchText.trim().length > 0);
+          return {
+            ...item,
+            latestPatch: match.latestPatch,
+            patchDate: match.patchDate,
+            patchText: hasPatchText ? match.patchText : "No patch note found",
+            devNote: match.devNote || null,
+            isNew: false,
+            matchQuality: hasPatchText ? "matched" as const : "noPatchText" as const,
+          };
+        });
+
+        const livePayload: LoadoutTrackerPayload = {
+          items: preparedItems,
+          metadata: {
+            lastUpdated: new Date().toISOString(),
+            dataSourceStatus: "live",
+            isFromCache: false,
+            currentPatch,
+            cacheAgeMinutes: 0,
+          },
+        };
+
+        await writeLoadoutCache(livePayload);
+        return livePayload;
+      } catch (error) {
+        console.error("loadoutTracker.getItems error", error);
+        if (cachedPayload) {
+          return {
+            ...cachedPayload,
+            metadata: {
+              ...cachedPayload.metadata,
+              dataSourceStatus: "degraded",
+              isFromCache: true,
+              cacheAgeMinutes: getCacheAgeMinutes(cachedPayload.metadata.lastUpdated),
+            },
+          } satisfies LoadoutTrackerPayload;
+        }
+
+        return safeEmptyLoadoutPayload();
       }
     }),
   }),
