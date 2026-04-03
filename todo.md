@@ -105,3 +105,11 @@
 - [ ] Refine card and panel spacing consistency
 - [ ] Test and verify across mobile, tablet, laptop, and desktop viewports
 - [ ] Verify no text clipping or element overlap at any breakpoint
+
+## Patch Notes Page
+- [x] Create PatchNotes.tsx page that fetches from reachthefinals.com/patchnotes
+- [x] Filter to show only Game Updates (exclude other patch note types)
+- [x] Display patches newest first with dropdown/collapsible menus
+- [x] Add PatchNotes page to History dropdown in navigation
+- [x] Style consistently with tournament history page (NeonCard, cyberpunk aesthetic)
+- [x] Test data fetching and rendering

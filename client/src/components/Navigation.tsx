@@ -31,6 +31,7 @@ export default function Navigation() {
       submenu: [
         { label: 'Tournament History', href: '/tournaments' },
         { label: 'Player Archive', href: '/players' },
+        { label: 'Patch Notes', href: '/patchnotes' },
       ]
     },
     { 

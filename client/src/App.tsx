@@ -18,6 +18,7 @@ import AdminControl2 from "./pages/AdminControl2";
 import LiveBracket2 from "./pages/LiveBracket2";
 import PlayerArchive from "./pages/PlayerArchive";
 import PlayerProfile from "./pages/PlayerProfile";
+import PatchNotes from "./pages/PatchNotes";
 import { useEffect } from "react";
 
 /**
@@ -52,6 +53,7 @@ function Router() {
           <Route path={"/bracket2"} component={LiveBracket2} />
           <Route path={"/players"} component={PlayerArchive} />
           <Route path={"/player/:id"} component={PlayerProfile} />
+          <Route path={"/patchnotes"} component={PatchNotes} />
           <Route path={"/404"} component={NotFound} />
           {/* Final fallback route */}
           <Route component={NotFound} />
