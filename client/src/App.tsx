@@ -19,6 +19,7 @@ import LiveBracket2 from "./pages/LiveBracket2";
 import PlayerArchive from "./pages/PlayerArchive";
 import PlayerProfile from "./pages/PlayerProfile";
 import PatchNotes from "./pages/PatchNotes";
+import LoadoutTracker from "./pages/LoadoutTracker";
 import { useEffect } from "react";
 
 /**
@@ -54,6 +55,7 @@ function Router() {
           <Route path={"/players"} component={PlayerArchive} />
           <Route path={"/player/:id"} component={PlayerProfile} />
           <Route path={"/patchnotes"} component={PatchNotes} />
+          <Route path={"/loadout-tracker"} component={LoadoutTracker} />
           <Route path={"/404"} component={NotFound} />
           {/* Final fallback route */}
           <Route component={NotFound} />
