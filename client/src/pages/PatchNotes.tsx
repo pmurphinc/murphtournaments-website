@@ -8,6 +8,7 @@ interface PatchNote {
   title: string;
   date: string;
   content: string;
+  url?: string;
 }
 
 /**
@@ -24,6 +25,13 @@ const patchNotesData: PatchNote[] = [
     title: 'SEASON 10 | FANTASY LEAGUE',
     date: '2026.03.26',
     content: 'THE FINALS — Season 10 Patch Summary\n\nSeason 10 delivers a major competitive shake-up with new content, balance adjustments, and system updates that directly impact tournament play.\n\nNew Content\n\nNew Map / Updates\n• Map pool refreshed with layout adjustments to improve flow and reduce stalemates\n• Environmental destruction tuning for more predictable engagements\n\nNew Weapons & Gadgets\n• New loadout options added across classes\n• Designed to expand playstyles without breaking core meta\n\nBalance Changes (Competitive Impact)\n\nWeapons\n• Recoil and damage tuning across multiple weapons\n• Reduced dominance of top-tier meta picks\n• Increased viability for underused weapons\n\nGadgets\n• Utility balancing to prevent overstacking strong defensive setups\n• Adjustments to cooldowns and effectiveness\n\nClass Tuning\n• Light, Medium, and Heavy roles rebalanced for clearer identity\n• Survivability and mobility adjustments to reduce frustration in fights\n\nGame Mode & Systems\n\nCashout Improvements\n• Better pacing and clarity during objective fights\n• Adjustments to spawn logic and contest mechanics\n\nRanked / Competitive Systems\n• Improvements to matchmaking consistency\n• Rank progression tuned for better skill representation\n\nQuality of Life\n• UI clarity improvements (health, damage feedback, objectives)\n• Audio tweaks for better situational awareness\n• Performance optimizations across platforms\n\nBug Fixes\n• Fixed multiple gameplay exploits and edge-case interactions\n• Improved hit registration consistency\n• Stability improvements in high-action scenarios'
+  },
+  {
+    id: 'update-9-9-0',
+    title: 'UPDATE 9.9.0',
+    date: '2026.02.12',
+    content: 'THE RED MOON SHALL SHINE!\n\nA beautiful moon takes over the Arena, and rising lanterns float upwards, casting a soft glow across the Arena. The Lunar New Year festivities have officially started in THE FINALS!\n\nCOLLECTION EVENT | LUNAR NEW YEAR\nComplete 3 daily contracts to light up a lantern each day and earn up to 15 free Lunar New Year-themed rewards, including the Legendary Final Mentra set! You will now only need to collect 12 out of the 14 rewards to unlock the Legendary set.\n\nLTM | BANK IT\nA classic in THE FINALS is now back as a Limited-Time Mode! Bank It makes its return as you race to eliminate your opponents and collect precious red envelopes to bring them safely to a Deposit Station.\n\nARENa UPDATES | LUNAR NEW YEAR DECOR\nThe Arena is aglow with Lunar New Year decorations lighting up selected maps. Visit Fangwai City, Las Vegas, Monaco, Seoul, and Fortune Stadium to embrace the festive spirit!\n\nSTORE | REVENANT SETS\nStep into the boots of the mysterious spirits inside THE FINALS with the Ling Shen and Graveward Revenant sets and chase down your opponents in a relentless pursuit for vengeance.\n\nBALANCE CHANGES\nWeapon adjustments including BFR Titan damage reduction, CB-01 Repeater tuning, Cerberus 12GA pellet count increase, and LH1 camera shake reduction. These changes are aimed at reducing the \'poke\' meta and improving overall weapon balance.\n\nBUG FIXES\nExtensive animation, audio, cosmetics, and gameplay fixes including improved crouch poses, fixed audio stutters, cosmetic display corrections, and map improvements across multiple arenas.',
+    url: 'https://www.reachthefinals.com/patchnotes/990'
   },
   {
     id: 'update-10-1-0',
@@ -102,7 +110,7 @@ export default function PatchNotes() {
                         {patch.content}
                       </p>
                       <a
-                        href="https://www.reachthefinals.com/patchnotes/10-00"
+                        href={patch.url || 'https://www.reachthefinals.com/patchnotes'}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-block mt-4 px-4 py-2 bg-neon-magenta/20 border-2 border-neon-magenta text-neon-magenta font-mono text-xs uppercase hover:bg-neon-magenta/40 transition-all duration-200 rounded"
