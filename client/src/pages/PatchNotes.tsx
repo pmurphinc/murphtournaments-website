@@ -47,30 +47,7 @@ const patchNotesData: PatchNote[] = [
     content: 'BACK IN ACTION!\n\nWelcome, Contestants! It\'s the first week back in 2026 and we\'ve packed this week\'s update with a long list of bug-fixes, some balance changes, and performance improvements.\n\nSNOWBALL BLITZ | LAST CHANCE\nThis is the last week of Snowball Blitz, so make a pile of snowballs and turn in those contracts!\n\nSTORE UPDATE | P1XEL REIGN CREW\nC-Pop group P1XEL REIGN have entered the Arena and they\'re here to take the spotlight from everyone! Do you have what it takes to face them?\n\nTWITCH | NEW FREE DROPS\nBrand-new free Twitch drops available until January 22nd. Watch anyone playing THE FINALS with drops enabled to earn exclusive rewards!\n\nBALANCE CHANGES\nGadgets: Breach Drill bit length increased from 83cm to 108cm for better wall penetration. Game Modes: Cashout Station spawn logic updated for consistent distances. Weapons: CB-01 Repeater ADS zoom time increased, FAMAS recoil pattern adjusted, Recurve Bow rate of fire increased from 98 to 103 RPM, V9S damage falloff end range decreased from 25m to 20m.\n\nBUG FIXES & IMPROVEMENTS\nExtensive animation fixes for .50 Akimbo pistols, Mesh Shield interactions, and cosmetic clipping issues. Audio improvements including announcer volume slider integration, deploy sound polish, and ÖRF grenade voice line adjustments. Cosmetic compatibility improvements for boots, pants, hoodies, and various outfits.',
     url: 'https://www.reachthefinals.com/patchnotes/940'
   },
-  {
-    id: 'update-10-1-0',
-    title: 'UPDATE 10.1.0',
-    date: '2026.03.20',
-    content: 'Balance changes and gameplay improvements. New weapon tuning for competitive play. Bug fixes and performance optimizations.'
-  },
-  {
-    id: 'store-update-9-14-0',
-    title: 'STORE UPDATE 9.14.0',
-    date: '2026.03.15',
-    content: 'New cosmetics and battle pass items available. Limited-time seasonal bundles. Updated shop rotation with exclusive items.'
-  },
-  {
-    id: 'hotfix-9-13-2',
-    title: 'HOTFIX 9.13.2',
-    date: '2026.03.10',
-    content: 'Critical bug fixes and stability improvements. Server performance enhancements. Fixed matchmaking issues.'
-  },
-  {
-    id: 'patch-9-13-0',
-    title: 'PATCH 9.13.0',
-    date: '2026.03.05',
-    content: 'New Arena map with dynamic weather effects. Updated weapon balance across all playstyles. New cosmetic items and emotes.'
-  },
+
 ];
 
 export default function PatchNotes() {
