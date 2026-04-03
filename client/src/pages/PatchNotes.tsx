@@ -102,7 +102,7 @@ export default function PatchNotes() {
                         {patch.content}
                       </p>
                       <a
-                        href="https://www.reachthefinals.com/patchnotes"
+                        href="https://www.reachthefinals.com/patchnotes/10-00"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-block mt-4 px-4 py-2 bg-neon-magenta/20 border-2 border-neon-magenta text-neon-magenta font-mono text-xs uppercase hover:bg-neon-magenta/40 transition-all duration-200 rounded"
