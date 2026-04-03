@@ -1,39 +1,75 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "wouter";
 import GlitchText from "@/components/GlitchText";
 import NeonCard from "@/components/NeonCard";
 import { trpc } from "@/lib/trpc";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type BuildFilter = "All" | "Light" | "Medium" | "Heavy";
 type TypeFilter = "All" | "weapon" | "gadget";
 type SortFilter = "recent" | "oldest" | "az";
 
+const formatUpdatedTime = (iso: string | null) => {
+  if (!iso) return "N/A";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "N/A";
+  return date.toLocaleString();
+};
+
+function LoadoutSkeleton() {
+  return (
+    <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+      {Array.from({ length: 10 }).map((_, index) => (
+        <div key={index} className="h-48 rounded-lg border border-white/10 bg-black/40 animate-pulse p-3">
+          <div className="h-20 rounded bg-white/10 mb-3" />
+          <div className="h-3 rounded bg-white/15 mb-2" />
+          <div className="h-3 w-2/3 rounded bg-white/10 mb-3" />
+          <div className="h-2 rounded bg-white/10" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function LoadoutTracker() {
   const [buildFilter, setBuildFilter] = useState<BuildFilter>("All");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("All");
   const [sortFilter, setSortFilter] = useState<SortFilter>("recent");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [onlyCurrentPatch, setOnlyCurrentPatch] = useState(false);
+  const [location, navigate] = useLocation();
 
   const { data, isLoading } = trpc.loadoutTracker.getItems.useQuery(undefined, {
     refetchInterval: 1000 * 60 * 10,
     staleTime: 1000 * 60 * 5,
   });
 
-  const filtered = useMemo(() => {
-    const source = data ?? [];
+  const items = data?.items ?? [];
+  const metadata = data?.metadata;
 
-    const scoped = source.filter(item => {
+  const selectedId = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    return new URLSearchParams(window.location.search).get("item");
+  }, [location]);
+
+  const selectedItem = useMemo(
+    () => items.find(item => item.normalizedName === selectedId),
+    [items, selectedId],
+  );
+
+  useEffect(() => {
+    if (!selectedId || selectedItem) return;
+    navigate("/loadout-tracker", { replace: true });
+  }, [navigate, selectedId, selectedItem]);
+
+  const filtered = useMemo(() => {
+    const scoped = items.filter(item => {
       const buildMatch = buildFilter === "All" || item.build === buildFilter;
       const typeMatch = typeFilter === "All" || item.type === typeFilter;
-      return buildMatch && typeMatch;
+      const patchMatch = !onlyCurrentPatch || !metadata?.currentPatch || item.latestPatch === metadata.currentPatch;
+      return buildMatch && typeMatch && patchMatch;
     });
 
-    return scoped.sort((a, b) => {
+    return [...scoped].sort((a, b) => {
       if (sortFilter === "az") {
         return a.name.localeCompare(b.name);
       }
@@ -44,15 +80,30 @@ export default function LoadoutTracker() {
         return (a.patchDate || "9999-12-31").localeCompare(b.patchDate || "9999-12-31");
       }
 
-      if (a.isNew && !b.isNew) return -1;
-      if (!a.isNew && b.isNew) return 1;
-      return (b.patchDate || "0000-00-00").localeCompare(a.patchDate || "0000-00-00");
-    });
-  }, [buildFilter, data, sortFilter, typeFilter]);
+      const rank = (item: (typeof scoped)[number]) => {
+        if (item.isNew) return 0;
+        if (item.matchQuality === "matched") return 1;
+        if (item.patchDate) return 2;
+        return 3;
+      };
 
-  const selectedItem = filtered.find(
-    item => `${item.build}-${item.type}-${item.normalizedName}` === selectedId,
-  );
+      const rankDiff = rank(a) - rank(b);
+      if (rankDiff !== 0) return rankDiff;
+
+      const patchCompare = (b.patchDate || "0000-00-00").localeCompare(a.patchDate || "0000-00-00");
+      if (patchCompare !== 0) return patchCompare;
+
+      return a.name.localeCompare(b.name);
+    });
+  }, [items, buildFilter, typeFilter, onlyCurrentPatch, metadata?.currentPatch, sortFilter]);
+
+  const openItem = (itemNormalizedName: string) => {
+    navigate(`/loadout-tracker?item=${encodeURIComponent(itemNormalizedName)}`, { replace: false });
+  };
+
+  const closeModal = () => {
+    navigate("/loadout-tracker", { replace: false });
+  };
 
   return (
     <div className="min-h-screen bg-dark-charcoal py-20">
@@ -66,7 +117,14 @@ export default function LoadoutTracker() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className="mb-6 rounded-lg border border-neon-cyan/30 bg-black/40 px-4 py-3 text-xs md:text-sm font-mono text-white/80 flex flex-wrap gap-x-6 gap-y-2">
+          {metadata?.currentPatch ? <span>Current Patch: <strong className="text-neon-cyan">{metadata.currentPatch}</strong></span> : null}
+          <span>Last Updated: <strong className="text-white">{formatUpdatedTime(metadata?.lastUpdated ?? null)}</strong></span>
+          {metadata?.isFromCache ? <span className="text-amber-300">Serving cached data ({metadata.cacheAgeMinutes ?? "?"}m old)</span> : null}
+          <span className="text-white/60">Source Status: {metadata?.dataSourceStatus ?? "N/A"}</span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <select
             value={buildFilter}
             onChange={e => setBuildFilter(e.target.value as BuildFilter)}
@@ -97,57 +155,77 @@ export default function LoadoutTracker() {
             <option value="oldest">Oldest</option>
             <option value="az">A–Z</option>
           </select>
+
+          {metadata?.currentPatch ? (
+            <label className="bg-black/60 border border-neon-cyan/40 rounded px-3 py-2 text-white/90 font-mono flex items-center gap-2 text-xs md:text-sm">
+              <input
+                type="checkbox"
+                checked={onlyCurrentPatch}
+                onChange={e => setOnlyCurrentPatch(e.target.checked)}
+              />
+              Only show current patch changes
+            </label>
+          ) : null}
         </div>
 
         {isLoading ? (
-          <p className="text-white/60 font-mono">Loading loadout data...</p>
+          <LoadoutSkeleton />
         ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-            {filtered.map(item => {
-              const cardId = `${item.build}-${item.type}-${item.normalizedName}`;
-              return (
-                <button key={cardId} onClick={() => setSelectedId(cardId)} className="text-left">
-                  <NeonCard
-                    variant={item.isNew ? "magenta" : "cyan"}
-                    className="h-full transition-all duration-200 hover:scale-[1.02] hover:shadow-[0_0_18px_rgba(0,255,255,0.4)]"
-                  >
-                    {item.imageUrl ? (
-                      <img
-                        src={item.imageUrl}
-                        alt={item.name}
-                        className="w-full h-24 object-contain rounded mb-3 bg-black/40"
-                        loading="lazy"
-                      />
-                    ) : null}
+          <>
+            {filtered.length === 0 ? (
+              <div className="rounded-lg border border-white/10 bg-black/40 p-8 text-center font-mono text-white/70">
+                No items matched the selected filters.
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                {filtered.map(item => {
+                  const cardPriorityClass = item.isNew
+                    ? "ring-2 ring-neon-magenta/70 shadow-[0_0_16px_rgba(255,0,127,0.35)]"
+                    : item.matchQuality === "matched"
+                      ? "ring-1 ring-neon-cyan/40"
+                      : "ring-1 ring-white/10";
 
-                    <div className="flex items-center justify-between mb-2 gap-2">
-                      <h3 className="text-sm font-bold text-white font-mono line-clamp-2">{item.name}</h3>
-                      {item.isNew && (
-                        <span className="text-[10px] font-mono px-2 py-1 border border-neon-magenta text-neon-magenta rounded">
-                          NEW
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-white/70 font-mono uppercase">{item.build} • {item.type}</p>
-                    <p className="text-xs text-neon-cyan font-mono mt-2 uppercase">
-                      Latest: {item.latestPatch || "N/A"}
-                    </p>
-                  </NeonCard>
-                </button>
-              );
-            })}
-          </div>
+                  return (
+                    <button key={`${item.build}-${item.type}-${item.normalizedName}`} onClick={() => openItem(item.normalizedName)} className="text-left">
+                      <NeonCard
+                        variant={item.isNew ? "magenta" : "cyan"}
+                        className={`h-full transition-all duration-200 hover:scale-[1.02] hover:shadow-[0_0_18px_rgba(0,255,255,0.35)] ${cardPriorityClass}`}
+                      >
+                        {item.imageUrl ? (
+                          <img
+                            src={item.imageUrl}
+                            alt={item.name}
+                            className="w-full h-24 object-contain rounded mb-3 bg-black/40"
+                            loading="lazy"
+                          />
+                        ) : null}
+
+                        <div className="flex items-center justify-between mb-2 gap-2">
+                          <h3 className="text-sm font-bold text-white font-mono line-clamp-2">{item.name}</h3>
+                          {item.isNew ? (
+                            <span className="text-[10px] font-mono px-2 py-1 border border-neon-magenta text-neon-magenta rounded bg-neon-magenta/10">
+                              NEW
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="text-xs text-white/70 font-mono uppercase">{item.build} • {item.type}</p>
+                        <p className="text-xs text-neon-cyan font-mono mt-2 uppercase">Latest: {item.latestPatch || "N/A"}</p>
+                      </NeonCard>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </>
         )}
       </div>
 
-      <Dialog open={!!selectedItem} onOpenChange={open => !open && setSelectedId(null)}>
+      <Dialog open={!!selectedItem} onOpenChange={open => !open && closeModal()}>
         <DialogContent className="bg-black border border-neon-magenta/40 text-white max-w-xl">
-          {selectedItem && (
+          {selectedItem ? (
             <>
               <DialogHeader>
-                <DialogTitle className="font-mono text-neon-magenta uppercase">
-                  {selectedItem.name}
-                </DialogTitle>
+                <DialogTitle className="font-mono text-neon-magenta uppercase">{selectedItem.name}</DialogTitle>
               </DialogHeader>
 
               {selectedItem.imageUrl ? (
@@ -158,21 +236,19 @@ export default function LoadoutTracker() {
                 />
               ) : null}
 
-              <p className="font-mono text-sm text-neon-cyan uppercase">
-                Latest Patch: {selectedItem.latestPatch || "N/A"}
-              </p>
-              <p className="font-mono text-sm text-white/85 whitespace-pre-wrap">
-                {selectedItem.patchText || "No balance changes yet"}
+              <p className="font-mono text-sm text-neon-cyan uppercase">Latest Patch: {selectedItem.latestPatch || "N/A"}</p>
+              <p className="font-mono text-sm text-white/85 whitespace-pre-wrap leading-relaxed">
+                {selectedItem.patchText || "No patch note found"}
               </p>
 
               {selectedItem.devNote ? (
                 <div className="mt-2 border-t border-white/10 pt-3">
                   <p className="font-mono text-xs text-neon-magenta uppercase mb-1">Dev Note</p>
-                  <p className="font-mono text-sm text-white/80">{selectedItem.devNote}</p>
+                  <p className="font-mono text-sm text-white/80 whitespace-pre-wrap leading-relaxed">{selectedItem.devNote}</p>
                 </div>
               ) : null}
             </>
-          )}
+          ) : null}
         </DialogContent>
       </Dialog>
     </div>

@@ -4,6 +4,8 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
 import { getOrCreateDevDivisionTournament, getOrCreateSeventhCircleTournament, updateTournamentStatus, getTeamsByTournament, upsertTeams, updateTeamFRP, getTournamentHistory, addTournamentToHistory } from "./db";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
 
 type LoadoutItemType = "weapon" | "gadget";
 type LoadoutBuildType = "Light" | "Medium" | "Heavy";
@@ -16,14 +18,51 @@ interface LoadoutItem {
   imageUrl?: string;
 }
 
+interface LoadoutTrackerItem extends LoadoutItem {
+  latestPatch: string;
+  patchDate: string | null;
+  patchText: string;
+  devNote: string | null;
+  isNew: boolean;
+  matchQuality: "matched" | "noPatchText" | "new";
+}
+
+interface LoadoutTrackerPayload {
+  items: LoadoutTrackerItem[];
+  metadata: {
+    lastUpdated: string | null;
+    dataSourceStatus: "live" | "cache" | "degraded" | "empty";
+    isFromCache: boolean;
+    currentPatch: string | null;
+    cacheAgeMinutes: number | null;
+  };
+}
+
 const BUILDS_PAGE_API = "https://www.thefinals.wiki/api.php?action=parse&page=Builds&prop=text&formatversion=2&format=json";
 const PATCHNOTES_PAGE_API = "https://www.thefinals.wiki/api.php?action=parse&page=Patchnotes&prop=text&formatversion=2&format=json";
+const LOADOUT_CACHE_PATH = path.join(process.cwd(), "server", ".cache", "loadout-tracker-cache.json");
+const LOADOUT_REFRESH_WINDOW_MS = 1000 * 60 * 20;
+
+const ITEM_NAME_ALIASES: Record<string, string> = {
+  xp54: "xp-54",
+  "xp 54": "xp-54",
+  "akm rifle": "akm",
+  fcarrifle: "fcar",
+  "m 60": "m60",
+  "v 9 s": "v9s",
+  cl40: "cl-40",
+};
+
+const resolveItemAlias = (value: string) => ITEM_NAME_ALIASES[value.trim().toLowerCase()] || value;
 
 const normalizeItemName = (value: string) =>
-  value
+  resolveItemAlias(
+    value
+      .replace(/&amp;/g, "and")
+      .replace(/\+/g, "plus")
+      .trim(),
+  )
     .toLowerCase()
-    .replace(/&amp;/g, "and")
-    .replace(/\+/g, "plus")
     .replace(/[^a-z0-9]/g, "");
 
 const stripHtmlTags = (value: string) =>
@@ -123,9 +162,18 @@ const extractPatchLinks = (html: string) => {
   return links.sort((a, b) => (a.patchDate < b.patchDate ? 1 : -1));
 };
 
+const extractCurrentPatch = (patchLinks: Array<{ patchVersion: string }>) => {
+  const firstVersion = patchLinks.find(link => link.patchVersion?.trim())?.patchVersion || null;
+  if (!firstVersion) return null;
+  const normalized = firstVersion.toUpperCase();
+  return normalized.startsWith("UPDATE") || normalized.startsWith("PATCH")
+    ? firstVersion
+    : `Update ${firstVersion}`;
+};
+
 const extractItemUpdateFromPatch = (wikitext: string, itemNames: string[]) => {
   const lines = wikitext.split("\n");
-  const normalizedItemNames = itemNames.map(name => normalizeItemName(name));
+  const normalizedItemNames = itemNames.map(name => normalizeItemName(name)).filter(Boolean);
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
@@ -137,6 +185,7 @@ const extractItemUpdateFromPatch = (wikitext: string, itemNames: string[]) => {
     const hasItemMention = normalizedItemNames.some(itemName => normalizedLine.includes(itemName));
     if (!hasItemMention) continue;
 
+    const patchText = cleanedLine || "No patch note found";
     let devNote: string | undefined;
     for (let offset = 0; offset < 4; offset += 1) {
       const candidate = lines[index + offset] || "";
@@ -147,12 +196,46 @@ const extractItemUpdateFromPatch = (wikitext: string, itemNames: string[]) => {
     }
 
     return {
-      patchText: cleanedLine || "N/A",
+      patchText,
       devNote,
     };
   }
 
   return null;
+};
+
+const getCacheAgeMinutes = (lastUpdated: string | null) => {
+  if (!lastUpdated) return null;
+  const timestamp = new Date(lastUpdated).getTime();
+  if (Number.isNaN(timestamp)) return null;
+  return Math.max(0, Math.floor((Date.now() - timestamp) / 60000));
+};
+
+const safeEmptyLoadoutPayload = (): LoadoutTrackerPayload => ({
+  items: [],
+  metadata: {
+    lastUpdated: null,
+    dataSourceStatus: "empty",
+    isFromCache: false,
+    currentPatch: null,
+    cacheAgeMinutes: null,
+  },
+});
+
+const readLoadoutCache = async (): Promise<LoadoutTrackerPayload | null> => {
+  try {
+    const raw = await readFile(LOADOUT_CACHE_PATH, "utf8");
+    const parsed = JSON.parse(raw) as LoadoutTrackerPayload;
+    if (!Array.isArray(parsed.items) || !parsed.metadata) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const writeLoadoutCache = async (payload: LoadoutTrackerPayload) => {
+  await mkdir(path.dirname(LOADOUT_CACHE_PATH), { recursive: true });
+  await writeFile(LOADOUT_CACHE_PATH, JSON.stringify(payload, null, 2), "utf8");
 };
 
 export const appRouter = router({
@@ -443,6 +526,24 @@ export const appRouter = router({
 
   loadoutTracker: router({
     getItems: publicProcedure.query(async () => {
+      const cachedPayload = await readLoadoutCache();
+      const cacheIsFresh =
+        cachedPayload?.metadata.lastUpdated
+          ? Date.now() - new Date(cachedPayload.metadata.lastUpdated).getTime() < LOADOUT_REFRESH_WINDOW_MS
+          : false;
+
+      if (cachedPayload && cacheIsFresh) {
+        return {
+          ...cachedPayload,
+          metadata: {
+            ...cachedPayload.metadata,
+            dataSourceStatus: "cache",
+            isFromCache: true,
+            cacheAgeMinutes: getCacheAgeMinutes(cachedPayload.metadata.lastUpdated),
+          },
+        } satisfies LoadoutTrackerPayload;
+      }
+
       try {
         const [buildsResponse, patchnotesResponse] = await Promise.all([
           fetch(BUILDS_PAGE_API),
@@ -463,7 +564,12 @@ export const appRouter = router({
         }
 
         const items = extractItemsFromBuildsHtml(buildsHtml);
+        if (items.length === 0) {
+          throw new Error("Build parsing produced no items.");
+        }
+
         const patchLinks = extractPatchLinks(patchnotesHtml);
+        const currentPatch = extractCurrentPatch(patchLinks);
         const patchMatchMap = new Map<string, { latestPatch: string; patchDate: string; patchText: string; devNote?: string }>();
 
         for (const patch of patchLinks.slice(0, 80)) {
@@ -485,13 +591,13 @@ export const appRouter = router({
             patchMatchMap.set(`${item.build}-${item.type}-${item.normalizedName}`, {
               latestPatch: patch.patchVersion || "N/A",
               patchDate: patch.patchDate || "N/A",
-              patchText: match.patchText,
+              patchText: match.patchText || "No patch note found",
               devNote: match.devNote,
             });
           }
         }
 
-        return items.map(item => {
+        const preparedItems = items.map(item => {
           const key = `${item.build}-${item.type}-${item.normalizedName}`;
           const match = patchMatchMap.get(key);
           if (!match) {
@@ -502,21 +608,50 @@ export const appRouter = router({
               patchText: "No balance changes yet",
               devNote: null,
               isNew: true,
+              matchQuality: "new" as const,
             };
           }
 
+          const hasPatchText = Boolean(match.patchText && match.patchText.trim().length > 0);
           return {
             ...item,
             latestPatch: match.latestPatch,
             patchDate: match.patchDate,
-            patchText: match.patchText,
+            patchText: hasPatchText ? match.patchText : "No patch note found",
             devNote: match.devNote || null,
             isNew: false,
+            matchQuality: hasPatchText ? "matched" as const : "noPatchText" as const,
           };
         });
+
+        const livePayload: LoadoutTrackerPayload = {
+          items: preparedItems,
+          metadata: {
+            lastUpdated: new Date().toISOString(),
+            dataSourceStatus: "live",
+            isFromCache: false,
+            currentPatch,
+            cacheAgeMinutes: 0,
+          },
+        };
+
+        await writeLoadoutCache(livePayload);
+        return livePayload;
       } catch (error) {
         console.error("loadoutTracker.getItems error", error);
-        return [];
+        if (cachedPayload) {
+          return {
+            ...cachedPayload,
+            metadata: {
+              ...cachedPayload.metadata,
+              dataSourceStatus: "degraded",
+              isFromCache: true,
+              cacheAgeMinutes: getCacheAgeMinutes(cachedPayload.metadata.lastUpdated),
+            },
+          } satisfies LoadoutTrackerPayload;
+        }
+
+        return safeEmptyLoadoutPayload();
       }
     }),
   }),
