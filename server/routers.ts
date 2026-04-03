@@ -198,7 +198,7 @@ export const appRouter = router({
   patchNotes: router({
     getGameUpdates: publicProcedure.query(async () => {
       try {
-        const response = await fetch('https://reachthefinals.com/patchnotes', {
+        const response = await fetch('https://www.reachthefinals.com/patchnotes', {
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
           },
@@ -210,40 +210,59 @@ export const appRouter = router({
 
         const html = await response.text();
         
-        // Simple HTML parsing to extract patch note sections
-        // Look for common patterns in patch note pages
+        // Parse the patch notes grid structure
+        // Looking for card titles and links
         const patches: any[] = [];
         
-        // Extract sections that look like patch notes
-        const sectionRegex = /<(h2|h3)[^>]*>([^<]+)<\/\1>|<p[^>]*>([^<]+)<\/p>/gi;
+        // Extract patch note cards - looking for href patterns like /patchnotes/10-00
+        const cardRegex = /href=["']([^"']*\/patchnotes\/[^"']*)["'][^>]*>\s*<[^>]*>\s*([^<]+)<\/[^>]*>/gi;
         let match;
-        let currentPatch: any = null;
         
-        while ((match = sectionRegex.exec(html)) !== null) {
-          const text = (match[2] || match[3] || '').trim();
+        while ((match = cardRegex.exec(html)) !== null) {
+          const url = match[1];
+          const title = match[2]?.trim() || 'Patch Note';
           
-          if (match[1] && match[1].toLowerCase() === 'h2') {
-            // This is likely a patch title
-            if (currentPatch) {
-              patches.push(currentPatch);
-            }
-            currentPatch = {
+          // Skip if title is too short or generic
+          if (title.length > 3) {
+            patches.push({
               id: `patch-${patches.length}`,
-              title: text,
-              date: 'Unknown Date',
-              version: 'v1.0',
-              content: '',
-              type: 'Game Update'
-            };
-          } else if (currentPatch && text) {
-            // Add to current patch content
-            currentPatch.content += (currentPatch.content ? '\n' : '') + text;
+              title: title,
+              date: new Date().toLocaleDateString(),
+              version: title.match(/\d+\.\d+/)?.[0] || 'v1.0',
+              content: `Click to view details at ${url}`,
+              type: 'Game Update',
+              url: url.startsWith('http') ? url : `https://www.reachthefinals.com${url}`
+            });
           }
         }
         
-        if (currentPatch) {
-          patches.push(currentPatch);
+        // If regex didn't work, try a simpler approach - look for text patterns
+        if (patches.length === 0) {
+          // Look for common patch title patterns
+          const titleRegex = /(UPDATE|PATCH|HOTFIX|STORE UPDATE|SEASON)\s+([\d\.]+|\d+)/gi;
+          const matches = Array.from(html.matchAll(titleRegex));
+          
+          for (const match of matches) {
+            const title = match[0];
+            if (!patches.find(p => p.title === title)) {
+              patches.push({
+                id: `patch-${patches.length}`,
+                title: title,
+                date: new Date().toLocaleDateString(),
+                version: match[2] || 'v1.0',
+                content: 'Game Update from The Finals',
+                type: 'Game Update'
+              });
+            }
+          }
         }
+        
+        // Sort by version number (newest first) if possible
+        patches.sort((a, b) => {
+          const versionA = parseFloat(a.version.replace(/[^0-9.]/g, '')) || 0;
+          const versionB = parseFloat(b.version.replace(/[^0-9.]/g, '')) || 0;
+          return versionB - versionA;
+        });
         
         // If no patches found, return a helpful message
         if (patches.length === 0) {
@@ -252,7 +271,7 @@ export const appRouter = router({
             title: 'Unable to parse patch notes',
             date: new Date().toLocaleDateString(),
             version: 'N/A',
-            content: 'The patch notes page structure may have changed. Please visit reachthefinals.com/patchnotes directly.',
+            content: 'The patch notes page structure may have changed. Please visit www.reachthefinals.com/patchnotes directly.',
             type: 'Game Update'
           }];
         }
@@ -265,7 +284,7 @@ export const appRouter = router({
           title: 'Failed to load patch notes',
           date: new Date().toLocaleDateString(),
           version: 'N/A',
-          content: err instanceof Error ? err.message : 'An unknown error occurred while fetching patch notes.',
+          content: err instanceof Error ? err.message : 'An unknown error occurred while fetching patch notes. Please try again later.',
           type: 'Game Update'
         }];
       }
