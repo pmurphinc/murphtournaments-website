@@ -34,6 +34,13 @@ const patchNotesData: PatchNote[] = [
     url: 'https://www.reachthefinals.com/patchnotes/990'
   },
   {
+    id: 'update-9-7-0',
+    title: 'UPDATE 9.7.0',
+    date: '2026.01.29',
+    content: 'STAY ON THE MOVE!\n\nThis week, we are bringing a bunch of bug fixes, some performance improvements, changes to Point Break, balance changes and more! The recent DDoS attacks have also been largely mitigated by now, so the game should be back to normal service!\n\nSOCIAL | DISPLAY NAME\nNew rules for Embark ID Display Names to protect the game from bad actors. If your Display Name did not fit the new rule system, it was changed with no cooldown so you can pick a new one easily.\n\nNEW REWARD | THE VOLTAGE MARAUDER SET\nEarn the Voltage Marauder Set in THE FINALS when you own ARC Raiders! Simply connect your same Embark ID account across both games.\n\nSTORE UPDATE | PEAK-FORM STRIKER\nSend your opponents down a slippery slope in style with the Peak-Form Striker and the Slope Slammer sets. We also added Finger guns!\n\nWORLD TOUR | ORBITAL BREACH\nOrbital Breach has been enabled in the Arena. This event combines Hackout (see nearby opponents through walls) and Orbital Lasers (targeting anyone standing still for too long).\n\nDLC | GLITCH PROWLER SET\nLet your feline side take over with the Glitch Prowler Set. Embrace the cuteness and strike!\n\nBALANCE CHANGES\nGadget adjustments: Dome Shield health reduced from 300 to 250, Glitch Grenade ammo increased to 2 with cooldown raised to 25 seconds. Weapon tuning for FCAR, M60, P90, Pike-556, and XP-54 to improve automatic weapon viability and balance the meta.\n\nBUG FIXES & IMPROVEMENTS\nExtensive fixes for Gateway animations, audio issues, cosmetics, map improvements across Fangwai City, Kyoto, Las Vegas, Monaco, and Skyway Stadium. Performance optimizations for GPU and movement systems. Social features updated with new animations and offline appearance option.',
+    url: 'https://www.reachthefinals.com/patchnotes/970'
+  },
+  {
     id: 'update-10-1-0',
     title: 'UPDATE 10.1.0',
     date: '2026.03.20',
@@ -113,7 +120,7 @@ export default function PatchNotes() {
                         href={patch.url || 'https://www.reachthefinals.com/patchnotes'}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-block mt-4 px-4 py-2 bg-neon-magenta/20 border-2 border-neon-magenta text-neon-magenta font-mono text-xs uppercase hover:bg-neon-magenta/40 transition-all duration-200 rounded"
+                        className="inline-block mt-4 px-4 py-2 bg-neon-magenta/20 border-2 border-neon-magenta text-neon-magenta font-mono text-xs uppercase transition-all duration-200 rounded cursor-pointer hover:bg-neon-magenta/40 hover:shadow-[0_0_20px_rgba(255,0,127,0.6)] hover:shadow-neon-magenta"
                       >
                         View on Official Website →
                       </a>
