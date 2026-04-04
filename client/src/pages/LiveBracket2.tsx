@@ -30,10 +30,6 @@ const REGISTERED_TEAMS: TeamRoster[] = [
   {
     teamName: "TLTED Warlords",
     players: ["IanT182", "Noctis", "Diarrhea04"]
-  },
-  {
-    teamName: "Register now",
-    players: ["Join the tournament", "Click button below"]
   }
 ];
 
