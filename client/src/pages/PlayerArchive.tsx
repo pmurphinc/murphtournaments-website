@@ -44,6 +44,11 @@ const PLAYERS: PlayerStats[] = [
   { name: '877-CASHNOW', level: 86, hours: 260, matches: 1614, wins: 796, losses: 818, elims: 8095, deaths: 8092, revives: 1883, cashout: 39719076, damage: 3084509, kd: 1.00, winRate: 49.3 },
   { name: 'GETBONKEDNERD', level: 130, hours: 1340, matches: 7780, wins: 3292, losses: 4488, elims: 73716, deaths: 52286, revives: 10635, cashout: 127578636, damage: 20156502, kd: 1.41, winRate: 42.3 },
   { name: 'TENYAN', level: 75, hours: 246, matches: 1475, wins: 790, losses: 685, elims: 12616, deaths: 9315, revives: 2599, cashout: 36004078, damage: 4339936, kd: 1.35, winRate: 53.6 },
+  { name: 'LLAMA', level: 99, hours: 391, matches: 2380, wins: 1121, losses: 1259, elims: 13809, deaths: 12793, revives: 2346, cashout: 55133493, damage: 5175169, kd: 1.08, winRate: 47.1 },
+  { name: 'WEI_FAOSTEST', level: 141, hours: 932, matches: 5883, wins: 4044, losses: 1839, elims: 41853, deaths: 23053, revives: 7879, cashout: 204357182, damage: 11787183, kd: 1.82, winRate: 68.7 },
+  { name: 'WEI_FAOSTER', level: 128, hours: 803, matches: 5060, wins: 3388, losses: 1672, elims: 31211, deaths: 17673, revives: 8392, cashout: 173369354, damage: 9743655, kd: 1.77, winRate: 67.0 },
+  { name: 'WEI_FAO', level: 117, hours: 750, matches: 4735, wins: 3065, losses: 1670, elims: 29441, deaths: 18685, revives: 3982, cashout: 159429120, damage: 8098666, kd: 1.58, winRate: 64.7 },
+  { name: 'WEI_FAOSTIFY', level: 108, hours: 286, matches: 1765, wins: 1160, losses: 605, elims: 6562, deaths: 8545, revives: 3473, cashout: 56135051, damage: 2330980, kd: 0.77, winRate: 65.7 },
 ];
 
 type SortKey = 'name' | 'level' | 'hours' | 'kd' | 'winRate' | 'matches';
