@@ -4,8 +4,9 @@ import NeonCard from '@/components/NeonCard';
 import GlitchText from '@/components/GlitchText';
 import { useRoute, useLocation } from 'wouter';
 import { ArrowLeft, Trophy, TrendingUp } from 'lucide-react';
+import { PLAYER_DATA, type PlayerStats } from '@/data/players';
 
-function generateAchievements(player: any) {
+function generateAchievements(player: PlayerStats) {
   const achievements = [];
   
   // K/D based achievements
@@ -54,36 +55,6 @@ function generateAchievements(player: any) {
   
   return achievements;
 }
-
-// Player data from the archive
-const PLAYER_DATA: Record<string, any> = {
-  'pluto': { name: 'PLUTO', kd: 2.10, winRate: 59.2, level: 123, matches: 4478 },
-  'proto': { name: 'PROTO', kd: 1.73, winRate: 50.5, level: 122, matches: 3554 },
-  '44turnips': { name: '44TURNIPS', kd: 1.55, winRate: 58.8, level: 133, matches: 4069 },
-  'mrthirdparty': { name: 'MRTHIRDPARTY', kd: 1.48, winRate: 49.8, level: 116, matches: 3429 },
-  'droowings': { name: 'DROOWINGS', kd: 1.47, winRate: 59.2, level: 124, matches: 6438 },
-  'bizu': { name: 'BIZU', kd: 1.43, winRate: 49.8, level: 109, matches: 2992 },
-  '2sikk': { name: '2SIKK', kd: 1.42, winRate: 49.8, level: 136, matches: 5864 },
-  'getbonkednerd': { name: 'GETBONKEDNERD', kd: 1.41, winRate: 42.3, level: 130, matches: 7780 },
-  'tenyan': { name: 'TENYAN', kd: 1.35, winRate: 53.6, level: 75, matches: 1475 },
-  'opt1ss': { name: 'OPT1SS', kd: 1.34, winRate: 55.5, level: 127, matches: 3900 },
-  'captain': { name: 'CAPTAIN', kd: 1.24, winRate: 59.4, level: 167, matches: 10603 },
-  'lionxec': { name: 'LIONXEC', kd: 1.24, winRate: 50.4, level: 129, matches: 4300 },
-  'twoceez': { name: 'TWOCEEZ', kd: 1.17, winRate: 48.9, level: 156, matches: 12126 },
-  'doookybootyahboi': { name: 'DOOOKYBOOTYAHBOI', kd: 1.14, winRate: 54.5, level: 123, matches: 9269 },
-  'mococo': { name: 'MOCOCO', kd: 1.09, winRate: 54.0, level: 120, matches: 6396 },
-  'antho': { name: 'ANTHO', kd: 1.04, winRate: 51.8, level: 113, matches: 3545 },
-  'strmwrld': { name: 'STRMWRLD', kd: 1.02, winRate: 48.5, level: 151, matches: 13154 },
-  '877-cashnow': { name: '877-CASHNOW', kd: 1.00, winRate: 49.3, level: 86, matches: 1614 },
-  'drexor': { name: 'DREXOR', kd: 0.97, winRate: 46.6, level: 133, matches: 4036 },
-  'misterbirdy': { name: 'MISTERBIRDY', kd: 0.94, winRate: 46.7, level: 130, matches: 5740 },
-  'steelsabbath': { name: 'STEELSABBATH', kd: 0.89, winRate: 47.1, level: 138, matches: 5206 },
-  'llama': { name: 'LLAMA', kd: 1.08, winRate: 47.1, level: 99, matches: 2380 },
-  'wei_faostest': { name: 'WEI_FAOSTEST', kd: 1.82, winRate: 68.7, level: 141, matches: 5883 },
-  'wei_faoster': { name: 'WEI_FAOSTER', kd: 1.77, winRate: 67.0, level: 128, matches: 5060 },
-  'wei_fao': { name: 'WEI_FAO', kd: 1.58, winRate: 64.7, level: 117, matches: 4735 },
-  'wei_faostify': { name: 'WEI_FAOSTIFY', kd: 0.77, winRate: 65.7, level: 108, matches: 1765 },
-};
 
 export default function PlayerProfile() {
   const [match, params] = useRoute('/player/:id');
