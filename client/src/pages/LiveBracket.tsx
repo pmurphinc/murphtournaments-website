@@ -24,8 +24,8 @@ const REGISTERED_TEAMS: TeamRoster[] = [
     players: ["StrmWRLD", "DOOOKYBOOTYAHBOI", "TwoCeez", "Ospuze.Gooner"]
   },
   {
-    teamName: "LIQR",
-    players: ["2sikk", "MisterBirdy", "Lionxec"]
+    teamName: "Dojo of Fao",
+    players: ["WEI_FAOSTEST", "WEI_FAOSTER", "WEI_FAO", "WEI_FAOSTIFY"]
   },
   {
     teamName: "The Baiters",
