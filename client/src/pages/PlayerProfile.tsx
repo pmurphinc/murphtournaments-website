@@ -78,6 +78,11 @@ const PLAYER_DATA: Record<string, any> = {
   'drexor': { name: 'DREXOR', kd: 0.97, winRate: 46.6, level: 133, matches: 4036 },
   'misterbirdy': { name: 'MISTERBIRDY', kd: 0.94, winRate: 46.7, level: 130, matches: 5740 },
   'steelsabbath': { name: 'STEELSABBATH', kd: 0.89, winRate: 47.1, level: 138, matches: 5206 },
+  'llama': { name: 'LLAMA', kd: 1.08, winRate: 47.1, level: 99, matches: 2380 },
+  'wei_faostest': { name: 'WEI_FAOSTEST', kd: 1.82, winRate: 68.7, level: 141, matches: 5883 },
+  'wei_faoster': { name: 'WEI_FAOSTER', kd: 1.77, winRate: 67.0, level: 128, matches: 5060 },
+  'wei_fao': { name: 'WEI_FAO', kd: 1.58, winRate: 64.7, level: 117, matches: 4735 },
+  'wei_faostify': { name: 'WEI_FAOSTIFY', kd: 0.77, winRate: 65.7, level: 108, matches: 1765 },
 };
 
 export default function PlayerProfile() {
