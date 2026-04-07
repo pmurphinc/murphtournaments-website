@@ -33,6 +33,8 @@ const REGISTERED_TEAMS: TeamRoster[] = [
   }
 ];
 
+const SHOW_LIVE_TOURNAMENT_BRACKET = false;
+
 export default function LiveBracket2() {
   const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
 
@@ -79,38 +81,43 @@ export default function LiveBracket2() {
   return (
     <div className="min-h-screen bg-dark-charcoal py-8 sm:py-12 px-4">
       <div className="container max-w-4xl space-y-6 sm:space-y-8">
-        {/* Header */}
-        <div className="text-center space-y-2 sm:space-y-4">
-          <div>
-            <GlitchText size="xl" variant="magenta">
-              7TH CIRCLE
-            </GlitchText>
-          </div>
-          <p className="text-neon-cyan font-mono text-sm sm:text-base">Live Tournament Bracket</p>
-        </div>
+        {/* Live Tournament Bracket temporarily disabled - do not delete */}
+        {SHOW_LIVE_TOURNAMENT_BRACKET && (
+          <>
+            {/* Header */}
+            <div className="text-center space-y-2 sm:space-y-4">
+              <div>
+                <GlitchText size="xl" variant="magenta">
+                  7TH CIRCLE
+                </GlitchText>
+              </div>
+              <p className="text-neon-cyan font-mono text-sm sm:text-base">Live Tournament Bracket</p>
+            </div>
 
-        {/* Status Boxes */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-          <NeonCard variant="gold" className="p-3 sm:p-4">
-            <h3 className="text-xs sm:text-sm font-bold text-neon-gold font-mono mb-2">EVENT WINNER</h3>
-            <p className="text-white font-mono text-sm sm:text-base" data-testid="event-winner">{eventWinner}</p>
-            <p className="text-white/50 font-mono text-xs mt-2">Last updated: {new Date(liveState.updatedAt).toLocaleTimeString()}</p>
-          </NeonCard>
-          <NeonCard variant="cyan" className="p-3 sm:p-4">
-            <h3 className="text-xs sm:text-sm font-bold text-neon-cyan font-mono mb-2">STATUS</h3>
-            <p className="text-white font-mono text-sm sm:text-base" data-testid="event-status">{eventStatus}</p>
-            {!isRegistration && <p className="text-white/50 font-mono text-xs mt-2">Cycle {currentCycle}</p>}
-          </NeonCard>
-          <NeonCard variant="magenta" className="p-3 sm:p-4">
-            <h3 className="text-xs sm:text-sm font-bold text-neon-magenta font-mono mb-2">CURRENT LEADER</h3>
-            <p className="text-white font-mono text-sm sm:text-base" data-testid="current-leader">{currentLeader}</p>
-            <p className="text-white/50 font-mono text-xs mt-2">{isCompleted ? 'Completed' : (isRegistration ? 'Pre-Tournament' : 'In Progress')}</p>
-          </NeonCard>
-        </div>
+            {/* Status Boxes */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+              <NeonCard variant="gold" className="p-3 sm:p-4">
+                <h3 className="text-xs sm:text-sm font-bold text-neon-gold font-mono mb-2">EVENT WINNER</h3>
+                <p className="text-white font-mono text-sm sm:text-base" data-testid="event-winner">{eventWinner}</p>
+                <p className="text-white/50 font-mono text-xs mt-2">Last updated: {new Date(liveState.updatedAt).toLocaleTimeString()}</p>
+              </NeonCard>
+              <NeonCard variant="cyan" className="p-3 sm:p-4">
+                <h3 className="text-xs sm:text-sm font-bold text-neon-cyan font-mono mb-2">STATUS</h3>
+                <p className="text-white font-mono text-sm sm:text-base" data-testid="event-status">{eventStatus}</p>
+                {!isRegistration && <p className="text-white/50 font-mono text-xs mt-2">Cycle {currentCycle}</p>}
+              </NeonCard>
+              <NeonCard variant="magenta" className="p-3 sm:p-4">
+                <h3 className="text-xs sm:text-sm font-bold text-neon-magenta font-mono mb-2">CURRENT LEADER</h3>
+                <p className="text-white font-mono text-sm sm:text-base" data-testid="current-leader">{currentLeader}</p>
+                <p className="text-white/50 font-mono text-xs mt-2">{isCompleted ? 'Completed' : (isRegistration ? 'Pre-Tournament' : 'In Progress')}</p>
+              </NeonCard>
+            </div>
 
-        {/* FRP Standings */}
-        {liveState.standings && liveState.standings.length > 0 && (
-          <FRPStandings standings={liveState.standings} variant="cyan" />
+            {/* FRP Standings */}
+            {liveState.standings && liveState.standings.length > 0 && (
+              <FRPStandings standings={liveState.standings} variant="cyan" />
+            )}
+          </>
         )}
 
         {/* Registered Teams Section */}
@@ -206,7 +213,7 @@ export default function LiveBracket2() {
 
         {/* Registration Button */}
         <div className="text-center">
-          <button className="px-6 sm:px-8 py-3 sm:py-4 border-2 border-neon-lime text-neon-lime font-mono font-bold uppercase hover:bg-neon-lime/10 transition-colors text-sm sm:text-base">
+          <button className="px-6 sm:px-8 py-3 sm:py-4 border-2 border-neon-lime text-neon-lime font-mono font-bold uppercase tracking-widest hover-glow-lime rounded-sm transition-all text-sm sm:text-base">
             Register Now
           </button>
         </div>
