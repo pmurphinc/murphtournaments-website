@@ -1,0 +1,142 @@
+{
+  "weeks": [
+    {
+      "week": 1,
+      "startDate": "2026-04-06",
+      "label": "Week 1",
+      "players": [
+        {
+          "playerName": "PLUTO",
+          "titleTagline": "Top Fragger",
+          "level": 123,
+          "hours": 732,
+          "kd": 2.10,
+          "winRate": 59,
+          "achievement1": "K/D: 2.10",
+          "achievement2": "Win Rate: 59%",
+          "achievement3": "High-impact carry",
+          "accentColor": "gold",
+          "profileSlug": "pluto"
+        },
+        {
+          "playerName": "44TURNIPS",
+          "titleTagline": "High Efficiency",
+          "level": 133,
+          "hours": 560,
+          "kd": 1.55,
+          "winRate": 59,
+          "achievement1": "K/D: 1.55",
+          "achievement2": "Win Rate: 59%",
+          "achievement3": "Consistent performer",
+          "accentColor": "cyan",
+          "profileSlug": "44turnips"
+        },
+        {
+          "playerName": "PROTO",
+          "titleTagline": "Tactical Genius",
+          "level": 122,
+          "hours": 680,
+          "kd": 1.73,
+          "winRate": 50,
+          "achievement1": "K/D: 1.73",
+          "achievement2": "Win Rate: 50%",
+          "achievement3": "Strategic leader",
+          "accentColor": "magenta",
+          "profileSlug": "proto"
+        }
+      ]
+    },
+    {
+      "week": 2,
+      "startDate": "2026-04-13",
+      "label": "Week 2",
+      "players": [
+        {
+          "playerName": "MRTHIRDPARTY",
+          "titleTagline": "Clutch Player",
+          "level": 116,
+          "hours": 645,
+          "kd": 1.48,
+          "winRate": 49,
+          "achievement1": "K/D: 1.48",
+          "achievement2": "Win Rate: 49%",
+          "achievement3": "Pressure performer",
+          "accentColor": "lime",
+          "profileSlug": "mrthirdparty"
+        },
+        {
+          "playerName": "DROOWINGS",
+          "titleTagline": "Grind Master",
+          "level": 124,
+          "hours": 890,
+          "kd": 1.47,
+          "winRate": 59,
+          "achievement1": "K/D: 1.47",
+          "achievement2": "Win Rate: 59%",
+          "achievement3": "Most hours played",
+          "accentColor": "gold",
+          "profileSlug": "droowings"
+        },
+        {
+          "playerName": "LLAMA",
+          "titleTagline": "Rising Star",
+          "level": 118,
+          "hours": 520,
+          "kd": 1.62,
+          "winRate": 55,
+          "achievement1": "K/D: 1.62",
+          "achievement2": "Win Rate: 55%",
+          "achievement3": "Rapid improvement",
+          "accentColor": "cyan",
+          "profileSlug": "llama"
+        }
+      ]
+    },
+    {
+      "week": 3,
+      "startDate": "2026-04-20",
+      "label": "Week 3",
+      "players": [
+        {
+          "playerName": "WEI_FAO",
+          "titleTagline": "Team Leader",
+          "level": 128,
+          "hours": 750,
+          "kd": 1.85,
+          "winRate": 62,
+          "achievement1": "K/D: 1.85",
+          "achievement2": "Win Rate: 62%",
+          "achievement3": "Dojo of Fao captain",
+          "accentColor": "magenta",
+          "profileSlug": "wei_fao"
+        },
+        {
+          "playerName": "WEI_FAOSTEST",
+          "titleTagline": "Aggressive Playstyle",
+          "level": 125,
+          "hours": 710,
+          "kd": 1.92,
+          "winRate": 60,
+          "achievement1": "K/D: 1.92",
+          "achievement2": "Win Rate: 60%",
+          "achievement3": "High-risk plays",
+          "accentColor": "gold",
+          "profileSlug": "wei_faostest"
+        },
+        {
+          "playerName": "WEI_FAOSTER",
+          "titleTagline": "Defensive Expert",
+          "level": 121,
+          "hours": 680,
+          "kd": 1.71,
+          "winRate": 58,
+          "achievement1": "K/D: 1.71",
+          "achievement2": "Win Rate: 58%",
+          "achievement3": "Lockdown defender",
+          "accentColor": "cyan",
+          "profileSlug": "wei_faoster"
+        }
+      ]
+    }
+  ]
+}

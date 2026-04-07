@@ -113,3 +113,13 @@
 - [x] Add PatchNotes page to History dropdown in navigation
 - [x] Style consistently with tournament history page (NeonCard, cyberpunk aesthetic)
 - [x] Test rendering and dropdown functionality
+
+## Weekly Player Spotlight Feature
+- [x] Create playerSpotlights.json data file with weekly structure
+- [x] Build DynamicPlayerSpotlight component with date-based rotation logic
+- [x] Replace hardcoded Player Spotlight section on homepage with dynamic component
+- [x] Implement automatic weekly rotation based on current date
+- [x] Add fallback behavior for missing/future weeks
+- [x] Write comprehensive unit tests for weekly rotation logic (12 tests)
+- [x] Verify responsive design across desktop and mobile
+- [x] All 50 tests passing (38 existing + 12 new)

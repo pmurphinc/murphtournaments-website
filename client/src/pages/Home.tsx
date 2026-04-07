@@ -4,7 +4,7 @@ import NeonCard from '@/components/NeonCard';
 import GlitchText from '@/components/GlitchText';
 import CountdownTimer from '@/components/CountdownTimer';
 import NextEventBanner from '@/components/NextEventBanner';
-import PlayerSpotlight from '@/components/PlayerSpotlight';
+import DynamicPlayerSpotlight from '@/components/DynamicPlayerSpotlight';
 
 
 /**
@@ -211,71 +211,8 @@ export default function Home() {
 
 
 
-      {/* Player Spotlight – Week 1 Section */}
-      <section className="py-16 md:py-24 border-t border-neon-magenta/20">
-        <div className="container">
-          <h2 className="text-4xl font-bold font-mono text-neon-gold mb-12 uppercase tracking-widest">
-            Player Spotlight – Week 1
-          </h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <PlayerSpotlight
-              name="PLUTO"
-              role="Top Fragger"
-              rank="Lvl 123 • 732 hrs"
-              achievements={[
-                "K/D: 2.10",
-                "Win Rate: 59%",
-                "High-impact carry",
-              ]}
-              stats={[
-                { label: 'K/D', value: '2.10' },
-                { label: 'Win Rate', value: '59%' },
-                { label: 'Level', value: '123' },
-                { label: 'Hours', value: '732' },
-              ]}
-              variant="gold"
-              href="/player/pluto"
-            />
-            <PlayerSpotlight
-              name="44TURNIPS"
-              role="High Efficiency"
-              rank="Lvl 133 • 560 hrs"
-              achievements={[
-                "K/D: 1.55",
-                "Win Rate: 59%",
-                "Consistent performer",
-              ]}
-              stats={[
-                { label: 'K/D', value: '1.55' },
-                { label: 'Win Rate', value: '59%' },
-                { label: 'Level', value: '133' },
-                { label: 'Hours', value: '560' },
-              ]}
-              variant="cyan"
-              href="/player/44turnips"
-            />
-            <PlayerSpotlight
-              name="TWOCEEZ"
-              role="Support Specialist"
-              rank="Lvl 156 • 1955 hrs"
-              achievements={[
-                "K/D: 1.17",
-                "Win Rate: 49%",
-                "Exceptional support",
-              ]}
-              stats={[
-                { label: 'K/D', value: '1.17' },
-                { label: 'Win Rate', value: '49%' },
-                { label: 'Level', value: '156' },
-                { label: 'Hours', value: '1955' },
-              ]}
-              variant="magenta"
-              href="/player/twoceez"
-            />
-          </div>
-        </div>
-      </section>
+      {/* Dynamic Player Spotlight Section */}
+      <DynamicPlayerSpotlight />
 
       {/* Featured Clips Section */}
       <section className="py-16 md:py-24 border-t border-neon-magenta/20">
