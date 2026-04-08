@@ -112,7 +112,7 @@ export default function Home() {
                   <div className="text-neon-gold font-mono text-sm uppercase tracking-widest font-bold">Next Event</div>
                   <h3 className="text-3xl font-bold font-mono text-neon-gold uppercase tracking-widest">Dev Division</h3>
                   <p className="text-white/80 font-mono text-sm leading-relaxed">
-                    Monthly tournaments on the <span className="text-neon-gold font-bold">First Friday</span> at 6 PM PST. Compete, improve, and get noticed.
+                    Monthly tournaments. Compete, improve, and get noticed.
                   </p>
                   <CountdownTimer targetDate={nextTournamentDate} eventName="Dev Division" />
                   <Link href="/dev-division" className="inline-block mt-4 px-6 py-2 border-2 border-neon-magenta text-neon-magenta font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all">
