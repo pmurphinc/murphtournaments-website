@@ -28,8 +28,8 @@ export default function DevDivision() {
       color: 'gold' as const,
     },
     {
-      title: 'Monthly Events',
-      description: 'First Friday of every month. Regular competition schedule.',
+      title: 'Tournament Schedule',
+      description: 'Regular competitive events starting April 24th at 4 PM PST.',
       color: 'lime' as const,
     },
   ];
@@ -49,7 +49,7 @@ export default function DevDivision() {
             Part of Murph Tournaments. Monthly competitive tournaments for Plat–Diamond players seeking competitive experience, skill development, and exposure.
           </p>
           <p className="text-sm text-white/60 font-mono max-w-3xl">
-            Structured matches, detailed feedback, and professional stream coverage. First Friday of each month, 6 PM PST.
+            Structured matches, detailed feedback, and professional stream coverage. Next event: April 24th at 4 PM PST.
           </p>
         </div>
 
@@ -88,11 +88,11 @@ export default function DevDivision() {
           <NeonCard variant="cyan">
             <h3 className="text-lg font-bold font-mono text-neon-cyan mb-4 uppercase">Upcoming Events</h3>
             <ul className="space-y-2 text-sm text-white/70 font-mono">
-              <li>📅 April 3rd, 2026</li>
-              <li>📅 May 1st, 2026</li>
-              <li>📅 June 5th, 2026</li>
-              <li>📅 July 3rd, 2026</li>
-              <li>🕘 Always 6 PM - 9 PM PST</li>
+              <li>📅 April 24th, 2026</li>
+              <li>📅 May 29th, 2026</li>
+              <li>📅 June 26th, 2026</li>
+              <li>📅 July 31st, 2026</li>
+              <li>🕘 4 PM - 7 PM PST</li>
             </ul>
           </NeonCard>
         </div>

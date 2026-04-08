@@ -205,7 +205,7 @@ export default function Join() {
             <NeonCard variant="gold">
               <h3 className="text-lg font-bold font-mono text-neon-gold mb-3 uppercase">When are tournaments?</h3>
               <p className="text-white/70 font-mono text-sm">
-                Murph Tournaments: Monthly or as announced. Dev Division: First Friday of each month, 8 PM PST. Check Discord for exact dates.
+                Dev Division: April 24th at 4 PM PST. Future events scheduled monthly. Check Discord for exact dates and registration deadlines.
               </p>
             </NeonCard>
 
