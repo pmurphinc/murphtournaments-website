@@ -18,8 +18,38 @@ import DynamicPlayerSpotlight from '@/components/DynamicPlayerSpotlight';
  */
 
 export default function Home() {
-  // Next tournament: April 24th, 2026 at 4 PM PST (overriding the usual First Friday schedule)
-  const nextTournamentDate = new Date(2026, 3, 24, 16, 0, 0, 0);
+  // Calculate next First Friday at 6 PM PST
+  const getNextFirstFriday = () => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    
+    // Start with the first day of current month
+    let firstDay = new Date(currentYear, currentMonth, 1);
+    
+    // Find the first Friday (Friday is 5)
+    let firstFriday = new Date(firstDay);
+    const dayOfWeek = firstFriday.getDay();
+    const daysUntilFriday = (5 - dayOfWeek + 7) % 7;
+    firstFriday.setDate(firstFriday.getDate() + (daysUntilFriday === 0 ? 7 : daysUntilFriday));
+    
+    // Set time to 6 PM PST
+    firstFriday.setHours(18, 0, 0, 0);
+    
+    // If this Friday has already passed, get next month's first Friday
+    if (firstFriday <= now) {
+      const nextMonth = new Date(currentYear, currentMonth + 1, 1);
+      firstFriday = new Date(nextMonth);
+      const nextDayOfWeek = firstFriday.getDay();
+      const nextDaysUntilFriday = (5 - nextDayOfWeek + 7) % 7;
+      firstFriday.setDate(firstFriday.getDate() + (nextDaysUntilFriday === 0 ? 7 : nextDaysUntilFriday));
+      firstFriday.setHours(18, 0, 0, 0);
+    }
+    
+    return firstFriday;
+  };
+  
+  const nextTournamentDate = getNextFirstFriday();
 
   return (
     <div className="min-h-screen bg-dark-charcoal">
@@ -73,8 +103,8 @@ export default function Home() {
                 <div className="text-center space-y-4">
                   <div className="text-neon-gold font-mono text-sm uppercase tracking-widest font-bold">Next Event</div>
                   <h3 className="text-3xl font-bold font-mono text-neon-gold uppercase tracking-widest">Dev Division</h3>
-                  <p className="text-white/80 font-mono text-sm leading-relaxed max-w-md">
-                    Next tournament: <span className="text-neon-gold font-bold">April 24th</span> at 4 PM PST. Compete, improve, and get noticed.
+                  <p className="text-white/80 font-mono text-sm leading-relaxed">
+                    Monthly tournaments on the <span className="text-neon-gold font-bold">First Friday</span> at 6 PM PST. Compete, improve, and get noticed.
                   </p>
                   <CountdownTimer targetDate={nextTournamentDate} eventName="Dev Division" />
                   <Link href="/dev-division" className="inline-block mt-4 px-6 py-2 border-2 border-neon-magenta text-neon-magenta font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all">
