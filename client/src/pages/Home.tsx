@@ -18,9 +18,17 @@ import DynamicPlayerSpotlight from '@/components/DynamicPlayerSpotlight';
  */
 
 export default function Home() {
-  // Calculate next First Friday at 6 PM PST
-  const getNextFirstFriday = () => {
+  // April 24th is a special date (not First Friday), then return to First Friday schedule
+  const getNextTournamentDate = () => {
     const now = new Date();
+    const aprilTournament = new Date(2026, 3, 24, 16, 0, 0, 0); // April 24th at 4 PM PST
+    
+    // If April 24th hasn't passed, use it
+    if (aprilTournament > now) {
+      return aprilTournament;
+    }
+    
+    // Otherwise, calculate next First Friday at 6 PM PST
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
     
@@ -49,7 +57,7 @@ export default function Home() {
     return firstFriday;
   };
   
-  const nextTournamentDate = getNextFirstFriday();
+  const nextTournamentDate = getNextTournamentDate();
 
   return (
     <div className="min-h-screen bg-dark-charcoal">
