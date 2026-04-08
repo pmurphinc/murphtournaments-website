@@ -88,11 +88,11 @@ export default function DevDivision() {
           <NeonCard variant="cyan">
             <h3 className="text-lg font-bold font-mono text-neon-cyan mb-4 uppercase">Upcoming Events</h3>
             <ul className="space-y-2 text-sm text-white/70 font-mono">
-              <li>📅 April 3rd, 2026</li>
-              <li>📅 May 1st, 2026</li>
+              <li>📅 April 24th, 2026 <span className="text-neon-cyan text-xs">(4 PM PST)</span></li>
               <li>📅 June 5th, 2026</li>
               <li>📅 July 3rd, 2026</li>
-              <li>🕘 Always 6 PM - 9 PM PST</li>
+              <li>📅 August 7th, 2026</li>
+              <li>🕘 6 PM - 9 PM PST</li>
             </ul>
           </NeonCard>
         </div>
