@@ -143,3 +143,6 @@
 - [x] Fix wiki API URL from /api.php to /w/api.php
 - [x] Write vitest tests for patchNotes router (5 tests passing)
 - [x] Scraped 90 total patch notes from wiki (Season 1 through Update 10.3.0)
+
+## Navigation Update
+- [x] Hide App Alpha from navigation (can stay hidden for now)

@@ -45,7 +45,7 @@ export default function Navigation() {
       ]
     },
     { label: 'Dev Division', href: '/dev-division' },
-    { label: 'App Alpha', href: '/app' },
+    // { label: 'App Alpha', href: '/app' }, // Hidden for now
     { label: 'About', href: '/about' },
     { label: 'Watch', href: '/watch' },
   ];
