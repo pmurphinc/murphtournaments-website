@@ -1,6 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, tournaments, teams, Tournament, Team } from "../drizzle/schema";
+import { InsertUser, users, tournaments, teams, Tournament, Team, patchNotes, InsertPatchNote, PatchNote } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -281,6 +281,55 @@ export async function addTournamentToHistory(
     return result;
   } catch (error) {
     console.error("[Database] Failed to add tournament history:", error);
+    throw error;
+  }
+}
+
+// Patch notes functions
+export async function getAllPatchNotes() {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get patch notes: database not available");
+    return [];
+  }
+
+  try {
+    return await db.select().from(patchNotes).where(eq(patchNotes.isGameUpdate, 1)).orderBy(desc(patchNotes.date));
+  } catch (error) {
+    console.error("[Database] Failed to get patch notes:", error);
+    throw error;
+  }
+}
+
+export async function addPatchNote(patch: InsertPatchNote) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot add patch note: database not available");
+    return undefined;
+  }
+
+  try {
+    await db.insert(patchNotes).values(patch);
+    const result = await db.select().from(patchNotes).orderBy(desc(patchNotes.id)).limit(1);
+    return result[0];
+  } catch (error) {
+    console.error("[Database] Failed to add patch note:", error);
+    throw error;
+  }
+}
+
+export async function getPatchNoteByVersion(version: string) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get patch note: database not available");
+    return undefined;
+  }
+
+  try {
+    const result = await db.select().from(patchNotes).where(eq(patchNotes.version, version)).limit(1);
+    return result.length > 0 ? result[0] : undefined;
+  } catch (error) {
+    console.error("[Database] Failed to get patch note by version:", error);
     throw error;
   }
 }

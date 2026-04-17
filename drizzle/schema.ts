@@ -67,3 +67,20 @@ export const tournamentHistory = mysqlTable("tournament_history", {
 
 export type TournamentHistory = typeof tournamentHistory.$inferSelect;
 export type InsertTournamentHistory = typeof tournamentHistory.$inferInsert;
+
+// Patch notes from The Finals
+export const patchNotes = mysqlTable("patch_notes", {
+  id: int("id").autoincrement().primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  date: varchar("date", { length: 64 }).notNull(),
+  content: text("content").notNull(),
+  url: varchar("url", { length: 512 }),
+  sourceUrl: varchar("sourceUrl", { length: 512 }),
+  version: varchar("version", { length: 64 }),
+  isGameUpdate: int("isGameUpdate").default(1).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type PatchNote = typeof patchNotes.$inferSelect;
+export type InsertPatchNote = typeof patchNotes.$inferInsert;

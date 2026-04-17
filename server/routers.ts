@@ -3,7 +3,8 @@ import { COOKIE_NAME } from "../shared/const";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
-import { getOrCreateDevDivisionTournament, getOrCreateSeventhCircleTournament, updateTournamentStatus, getTeamsByTournament, upsertTeams, updateTeamFRP, getTournamentHistory, addTournamentToHistory } from "./db";
+import { getOrCreateDevDivisionTournament, getOrCreateSeventhCircleTournament, updateTournamentStatus, getTeamsByTournament, upsertTeams, updateTeamFRP, getTournamentHistory, addTournamentToHistory, getAllPatchNotes } from "./db";
+import { scrapeAndStorePatchNotes } from "./patchNoteScraper";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -38,8 +39,8 @@ interface LoadoutTrackerPayload {
   };
 }
 
-const BUILDS_PAGE_API = "https://www.thefinals.wiki/api.php?action=parse&page=Builds&prop=text&formatversion=2&format=json";
-const PATCHNOTES_PAGE_API = "https://www.thefinals.wiki/api.php?action=parse&page=Patchnotes&prop=text&formatversion=2&format=json";
+const BUILDS_PAGE_API = "https://www.thefinals.wiki/w/api.php?action=parse&page=Builds&prop=text&formatversion=2&format=json";
+const PATCHNOTES_PAGE_API = "https://www.thefinals.wiki/w/api.php?action=parse&page=Patchnotes&prop=text&formatversion=2&format=json";
 const LOADOUT_CACHE_PATH = path.join(process.cwd(), "server", ".cache", "loadout-tracker-cache.json");
 const LOADOUT_REFRESH_WINDOW_MS = 1000 * 60 * 20;
 
@@ -429,98 +430,31 @@ export const appRouter = router({
   }),
 
   patchNotes: router({
-    getGameUpdates: publicProcedure.query(async () => {
+    // Get all game update patch notes from the database
+    getAll: publicProcedure.query(async () => {
       try {
-        const response = await fetch('https://www.reachthefinals.com/patchnotes', {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          },
-        });
-        
-        if (!response.ok) {
-          throw new Error(`Failed to fetch patch notes: ${response.statusText}`);
+        const dbNotes = await getAllPatchNotes();
+        if (dbNotes.length > 0) {
+          return dbNotes.map(note => ({
+            id: note.id,
+            title: note.title,
+            date: note.date,
+            content: note.content,
+            url: note.url,
+            version: note.version,
+          }));
         }
-
-        const html = await response.text();
-        
-        // Parse the patch notes grid structure
-        // Looking for card titles and links
-        const patches: any[] = [];
-        
-        // Extract patch note cards - looking for href patterns like /patchnotes/10-00
-        const cardRegex = /href=["']([^"']*\/patchnotes\/[^"']*)["'][^>]*>\s*<[^>]*>\s*([^<]+)<\/[^>]*>/gi;
-        let match;
-        
-        while ((match = cardRegex.exec(html)) !== null) {
-          const url = match[1];
-          const title = match[2]?.trim() || 'Patch Note';
-          
-          // Skip if title is too short or generic
-          if (title.length > 3) {
-            patches.push({
-              id: `patch-${patches.length}`,
-              title: title,
-              date: new Date().toLocaleDateString(),
-              version: title.match(/\d+\.\d+/)?.[0] || 'v1.0',
-              content: `Click to view details at ${url}`,
-              type: 'Game Update',
-              url: url.startsWith('http') ? url : `https://www.reachthefinals.com${url}`
-            });
-          }
-        }
-        
-        // If regex didn't work, try a simpler approach - look for text patterns
-        if (patches.length === 0) {
-          // Look for common patch title patterns
-          const titleRegex = /(UPDATE|PATCH|HOTFIX|STORE UPDATE|SEASON)\s+([\d\.]+|\d+)/gi;
-          const matches = Array.from(html.matchAll(titleRegex));
-          
-          for (const match of matches) {
-            const title = match[0];
-            if (!patches.find(p => p.title === title)) {
-              patches.push({
-                id: `patch-${patches.length}`,
-                title: title,
-                date: new Date().toLocaleDateString(),
-                version: match[2] || 'v1.0',
-                content: 'Game Update from The Finals',
-                type: 'Game Update'
-              });
-            }
-          }
-        }
-        
-        // Sort by version number (newest first) if possible
-        patches.sort((a, b) => {
-          const versionA = parseFloat(a.version.replace(/[^0-9.]/g, '')) || 0;
-          const versionB = parseFloat(b.version.replace(/[^0-9.]/g, '')) || 0;
-          return versionB - versionA;
-        });
-        
-        // If no patches found, return a helpful message
-        if (patches.length === 0) {
-          return [{
-            id: 'error',
-            title: 'Unable to parse patch notes',
-            date: new Date().toLocaleDateString(),
-            version: 'N/A',
-            content: 'The patch notes page structure may have changed. Please visit www.reachthefinals.com/patchnotes directly.',
-            type: 'Game Update'
-          }];
-        }
-        
-        return patches;
+        // Fallback: return empty array if DB is empty (seed should populate it)
+        return [];
       } catch (err) {
-        console.error('Error fetching patch notes:', err);
-        return [{
-          id: 'error',
-          title: 'Failed to load patch notes',
-          date: new Date().toLocaleDateString(),
-          version: 'N/A',
-          content: err instanceof Error ? err.message : 'An unknown error occurred while fetching patch notes. Please try again later.',
-          type: 'Game Update'
-        }];
+        console.error('[patchNotes.getAll] Error:', err);
+        return [];
       }
+    }),
+
+    // Scrape thefinals.wiki for new game updates and store them in the database
+    scrapeAndStore: publicProcedure.mutation(async () => {
+      return await scrapeAndStorePatchNotes();
     }),
   }),
 
@@ -576,7 +510,7 @@ export const appRouter = router({
           const unfoundItems = items.filter(item => !patchMatchMap.has(`${item.build}-${item.type}-${item.normalizedName}`));
           if (unfoundItems.length === 0) break;
 
-          const patchApiUrl = `https://www.thefinals.wiki/api.php?action=parse&page=${encodeURIComponent(patch.pageTitle)}&prop=wikitext&formatversion=2&format=json`;
+          const patchApiUrl = `https://www.thefinals.wiki/w/api.php?action=parse&page=${encodeURIComponent(patch.pageTitle)}&prop=wikitext&formatversion=2&format=json`;
           const patchResponse = await fetch(patchApiUrl);
           if (!patchResponse.ok) continue;
 

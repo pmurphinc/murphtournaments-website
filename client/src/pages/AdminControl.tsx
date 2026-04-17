@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { trpc } from '@/lib/trpc';
 import { useAuth } from '@/_core/hooks/useAuth';
 import { useLocation } from 'wouter';
+import LoadingThrobber from '@/components/LoadingThrobber';
 
 const ADMIN_PASSWORD = 'MURPH2026'; // Change this to a secure password
 
@@ -152,11 +153,7 @@ export default function AdminControl() {
   }
 
   if (isTournamentLoading) {
-    return (
-      <div className="min-h-screen bg-dark-charcoal flex items-center justify-center">
-        <p className="text-white font-mono">Loading tournament data...</p>
-      </div>
-    );
+    return <LoadingThrobber />;
   }
 
   return (

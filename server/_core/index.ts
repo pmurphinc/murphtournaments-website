@@ -8,6 +8,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { handleTournamentWebhook, handleGetTournamentState } from "../webhooks";
+import { scrapeAndStorePatchNotes } from "../patchNoteScraper";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -70,4 +71,31 @@ async function startServer() {
   });
 }
 
-startServer().catch(console.error);
+// Weekly patch notes scraper scheduler
+const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+
+async function runPatchNoteScraper() {
+  console.log(`[scheduler] Running patch notes scraper at ${new Date().toISOString()}`);
+  try {
+    const result = await scrapeAndStorePatchNotes();
+    console.log(`[scheduler] Patch notes scrape complete: ${result.added} added, ${result.skipped} skipped, ${result.errors} errors`);
+  } catch (err) {
+    console.error('[scheduler] Patch notes scraper failed:', err);
+  }
+}
+
+startServer()
+  .then(() => {
+    // Run scraper once on startup (after a short delay to let DB connect)
+    setTimeout(() => {
+      runPatchNoteScraper();
+    }, 10_000);
+
+    // Schedule weekly scrape
+    setInterval(() => {
+      runPatchNoteScraper();
+    }, ONE_WEEK_MS);
+
+    console.log('[scheduler] Patch notes scraper scheduled: runs on startup + every 7 days');
+  })
+  .catch(console.error);

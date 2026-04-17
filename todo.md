@@ -123,3 +123,23 @@
 - [x] Write comprehensive unit tests for weekly rotation logic (12 tests)
 - [x] Verify responsive design across desktop and mobile
 - [x] All 50 tests passing (38 existing + 12 new)
+
+## Loading Throbber
+- [ ] Replace loading throbber with murph_profile2.png image
+- [ ] Simple centered looping animation, no text
+
+## Patch Notes - UPDATE 10.3.0
+- [x] Fetch UPDATE 10.3.0 content from thefinals.wiki
+- [x] Add UPDATE 10.3.0 to patch notes page
+- [x] Explore automating future patch note additions
+
+## Patch Notes Automation
+- [x] Create database table for patch notes (patchNotes table in drizzle schema)
+- [x] Migrate hardcoded patch data to database (seed script + wiki scraper)
+- [x] Build scraper to fetch patches from thefinals.wiki (patchNoteScraper.ts)
+- [x] Create tRPC endpoints for patch notes CRUD (getAll + scrapeAndStore)
+- [x] Update frontend to pull from database (PatchNotes.tsx uses trpc.patchNotes.getAll)
+- [x] Set up weekly scheduled task to check for new patches (server startup + 7-day interval)
+- [x] Fix wiki API URL from /api.php to /w/api.php
+- [x] Write vitest tests for patchNotes router (5 tests passing)
+- [x] Scraped 90 total patch notes from wiki (Season 1 through Update 10.3.0)

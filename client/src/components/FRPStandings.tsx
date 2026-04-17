@@ -22,7 +22,14 @@ export default function FRPStandings({
     return (
       <NeonCard variant={variant} className="p-6">
         <h3 className="text-lg font-bold text-white mb-4 font-mono uppercase">FRP Standings</h3>
-        <div className="text-center text-white/60 font-mono">Loading standings...</div>
+        <div className="flex justify-center py-4">
+          <img
+            src="https://d2xsxph8kpxj0f.cloudfront.net/310519663462787524/GzitzUSk3snQMAtW4LnLnQ/murph_profile2_52a2b30d.png"
+            alt=""
+            className="w-12 h-12 object-contain"
+            style={{ animation: 'throb 1.2s ease-in-out infinite' }}
+          />
+        </div>
       </NeonCard>
     );
   }

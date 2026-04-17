@@ -327,4 +327,16 @@
     box-shadow: 0 0 20px rgba(0, 255, 0, 0.8), 0 0 40px rgba(0, 255, 0, 0.5);
     transform: scale(1.02);
   }
+
+  /* Loading Throbber Animation */
+  @keyframes throb {
+    0%, 100% {
+      opacity: 0.4;
+      transform: scale(0.9);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.1);
+    }
+  }
 }
