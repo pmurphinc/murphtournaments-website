@@ -165,3 +165,8 @@
 
 ## Bug Fix - Text Cursor
 - [x] Fix blinking text cursor appearing when clicking on text elements across the site
+
+## About Page - YouTube Stats Column
+- [x] Scrape YouTube channel stats from @pmurphinc
+- [x] Add YouTube stats column next to TikTok stats in the By The Numbers card
+- [x] Include stats like content duration, total videos, time posting, hours rendered

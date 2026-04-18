@@ -52,22 +52,53 @@ export default function About() {
           {/* Stats Card */}
           <NeonCard variant="magenta">
             <h3 className="text-lg font-bold font-mono text-neon-magenta mb-6 uppercase">By The Numbers</h3>
-            <div className="space-y-4">
-              <div className="border-b border-neon-magenta/20 pb-3">
-                <p className="text-xs text-white/50 font-mono uppercase mb-1">TikTok Followers</p>
-                <p className="text-3xl font-bold font-mono text-neon-magenta">10K+</p>
+            <div className="grid grid-cols-2 gap-4">
+              {/* TikTok Column */}
+              <div className="space-y-4">
+                <div className="border-b border-neon-magenta/20 pb-2">
+                  <p className="text-[10px] text-white/40 font-mono uppercase tracking-wider mb-0.5">Platform</p>
+                  <p className="text-sm font-bold font-mono text-neon-magenta uppercase">TikTok</p>
+                </div>
+                <div className="border-b border-neon-magenta/20 pb-2">
+                  <p className="text-[10px] text-white/40 font-mono uppercase mb-0.5">Followers</p>
+                  <p className="text-2xl font-bold font-mono text-neon-magenta">10K+</p>
+                </div>
+                <div className="border-b border-neon-magenta/20 pb-2">
+                  <p className="text-[10px] text-white/40 font-mono uppercase mb-0.5">Likes</p>
+                  <p className="text-2xl font-bold font-mono text-neon-cyan">400K+</p>
+                </div>
+                <div className="border-b border-neon-magenta/20 pb-2">
+                  <p className="text-[10px] text-white/40 font-mono uppercase mb-0.5">Views</p>
+                  <p className="text-2xl font-bold font-mono text-neon-gold">5M+</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-white/40 font-mono uppercase mb-0.5">Content Style</p>
+                  <p className="text-xs font-mono text-white/70">Short-Form Clips</p>
+                </div>
               </div>
-              <div className="border-b border-neon-magenta/20 pb-3">
-                <p className="text-xs text-white/50 font-mono uppercase mb-1">TikTok Likes</p>
-                <p className="text-3xl font-bold font-mono text-neon-cyan">400K+</p>
-              </div>
-              <div className="border-b border-neon-magenta/20 pb-3">
-                <p className="text-xs text-white/50 font-mono uppercase mb-1">TikTok Views</p>
-                <p className="text-3xl font-bold font-mono text-neon-gold">5M+</p>
-              </div>
-              <div>
-                <p className="text-xs text-white/50 font-mono uppercase mb-1">Community Reach</p>
-                <p className="text-3xl font-bold font-mono text-neon-lime">Growing</p>
+
+              {/* YouTube Column */}
+              <div className="space-y-4 border-l border-white/10 pl-4">
+                <div className="border-b border-neon-cyan/20 pb-2">
+                  <p className="text-[10px] text-white/40 font-mono uppercase tracking-wider mb-0.5">Platform</p>
+                  <p className="text-sm font-bold font-mono text-neon-cyan uppercase">YouTube</p>
+                </div>
+                <div className="border-b border-neon-cyan/20 pb-2">
+                  <p className="text-[10px] text-white/40 font-mono uppercase mb-0.5">Subscribers</p>
+                  <p className="text-2xl font-bold font-mono text-neon-magenta">205</p>
+                </div>
+                <div className="border-b border-neon-cyan/20 pb-2">
+                  <p className="text-[10px] text-white/40 font-mono uppercase mb-0.5">Videos Posted</p>
+                  <p className="text-2xl font-bold font-mono text-neon-cyan">621</p>
+                </div>
+                <div className="border-b border-neon-cyan/20 pb-2">
+                  <p className="text-[10px] text-white/40 font-mono uppercase mb-0.5">Creating Since</p>
+                  <p className="text-2xl font-bold font-mono text-neon-gold">2009</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-white/40 font-mono uppercase mb-0.5">Content Style</p>
+                  <p className="text-xs font-mono text-white/70">VODs & Breakdowns</p>
+                </div>
               </div>
             </div>
           </NeonCard>
