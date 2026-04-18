@@ -146,3 +146,12 @@
 
 ## Navigation Update
 - [x] Hide App Alpha from navigation (can stay hidden for now)
+
+## App Alpha Launch Page
+- [x] Upload QR code image for app download
+- [x] Build App Alpha page with download instructions
+- [x] Include QR code and direct download link (https://manus.im/share/njv6VbaLUjq8Lo6UgQAQ8o)
+- [x] Add Expo Go instructions for iOS users
+- [x] Add install approval notice for Android (unsigned app)
+- [x] Re-enable App Alpha in navigation bar
+- [x] Test page rendering and links
