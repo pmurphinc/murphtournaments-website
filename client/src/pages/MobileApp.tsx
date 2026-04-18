@@ -86,13 +86,11 @@ export default function MobileApp() {
 
             {/* QR Code Card */}
             <NeonCard variant="gold" className="h-full flex flex-col items-center justify-center text-center gap-4 md:gap-5">
-              <a href={APP_SHARE_URL} target="_blank" rel="noopener noreferrer">
-                <img
-                  src={QR_CODE_URL}
-                  alt="QR code to download the Murph Tournament Mobile App"
-                  className="w-56 h-56 md:w-64 md:h-64 rounded-sm border-2 border-neon-gold bg-white p-2"
-                />
-              </a>
+              <img
+                src={QR_CODE_URL}
+                alt="QR code to download the Murph Tournament Mobile App"
+                className="w-56 h-56 md:w-64 md:h-64 rounded-sm border-2 border-neon-gold bg-white p-2"
+              />
               <div className="space-y-1">
                 <p className="text-neon-gold font-mono uppercase tracking-widest text-sm">Scan to Download</p>
                 <p className="text-white/60 font-mono text-xs">Open with your phone camera</p>
