@@ -84,8 +84,8 @@ export default function About() {
                   <p className="text-sm font-bold font-mono text-neon-cyan uppercase">YouTube</p>
                 </div>
                 <div className="border-b border-neon-cyan/20 pb-2">
-                  <p className="text-[10px] text-white/40 font-mono uppercase mb-0.5">Subscribers</p>
-                  <p className="text-2xl font-bold font-mono text-neon-magenta">205</p>
+                  <p className="text-[10px] text-white/40 font-mono uppercase mb-0.5">Hours Rendered</p>
+                  <p className="text-2xl font-bold font-mono text-neon-magenta">170+</p>
                 </div>
                 <div className="border-b border-neon-cyan/20 pb-2">
                   <p className="text-[10px] text-white/40 font-mono uppercase mb-0.5">Videos Posted</p>
