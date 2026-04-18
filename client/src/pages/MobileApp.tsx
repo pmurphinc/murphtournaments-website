@@ -3,16 +3,17 @@ import GlitchText from '@/components/GlitchText';
 import NeonCard from '@/components/NeonCard';
 
 const APP_SHARE_URL = 'https://manus.im/share/njv6VbaLUjq8Lo6UgQAQ8o';
+const APK_URL = 'https://vida-prod-webdev-app.s3.us-east-1.amazonaws.com/android-builds/310519663462787524/af48971d-ca1b-4cd5-8e48-d6445dfe5dbd/murph-tournaments-app-v1_6_3.apk?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAZV3A2ECZO4N7RSPW%2F20260418%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260418T005332Z&X-Amz-Expires=604800&X-Amz-SignedHeaders=host&x-id=GetObject&X-Amz-Signature=4e521a81f083d93175333b7888ab862c193c1ffd365bc3e12df0b50b5891547c';
 const QR_CODE_URL = 'https://d2xsxph8kpxj0f.cloudfront.net/310519663462787524/GzitzUSk3snQMAtW4LnLnQ/app-qr-code_8b0ee436.png';
 
 const showcaseRows = [
   {
-    label: 'Tournament Feed',
-    value: 'Fast access to bracket links, stream windows, and event checkpoints.',
+    label: 'Balance Archive',
+    value: 'Fast access to all weapons, gadgets, and specs, what changed and when.',
     color: 'text-neon-cyan',
   },
   {
-    label: 'Archive Timeline',
+    label: 'Update Archive',
     value: 'Patch-by-patch snapshots that show how weapons changed over time.',
     color: 'text-neon-gold',
   },
@@ -75,7 +76,7 @@ export default function MobileApp() {
                 <span className="px-3 py-2 border border-neon-gold text-neon-gold rounded-sm">Alpha Build</span>
               </div>
               <div className="flex flex-col sm:flex-row gap-3 pt-1">
-                <a href={APP_SHARE_URL} target="_blank" rel="noopener noreferrer" className="inline-block px-8 py-3.5 bg-neon-magenta text-dark-black font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all border-2 border-neon-magenta text-center">
+                <a href={APK_URL} target="_blank" rel="noopener noreferrer" className="inline-block px-8 py-3.5 bg-neon-magenta text-dark-black font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all border-2 border-neon-magenta text-center">
                   Download the App
                 </a>
                 <a href="https://discord.gg/kcmdxmBgnC" target="_blank" rel="noopener noreferrer" className="inline-block px-8 py-3.5 border-2 border-neon-cyan text-neon-cyan font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all text-center">
@@ -113,7 +114,7 @@ export default function MobileApp() {
               <p className="text-white/85 font-mono mb-5">
                 Download the APK directly to your Android device. No Play Store required.
               </p>
-              <a href={APP_SHARE_URL} target="_blank" rel="noopener noreferrer" className="inline-block w-full sm:w-auto px-8 py-3.5 bg-neon-cyan text-dark-black font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all border-2 border-neon-cyan text-center mb-5">
+              <a href={APK_URL} target="_blank" rel="noopener noreferrer" className="inline-block w-full sm:w-auto px-8 py-3.5 bg-neon-cyan text-dark-black font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all border-2 border-neon-cyan text-center mb-5">
                 Download for Android
               </a>
               <div className="rounded-sm border border-neon-cyan/40 bg-dark-charcoal/50 p-4 space-y-3 text-sm font-mono text-white/80">
@@ -265,7 +266,7 @@ export default function MobileApp() {
             Get early access, test what&apos;s coming, and help shape the next phase of Murph Tournament tools.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <a href={APP_SHARE_URL} target="_blank" rel="noopener noreferrer" className="inline-block px-8 py-3.5 bg-neon-magenta text-dark-black font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all border-2 border-neon-magenta">
+            <a href={APK_URL} target="_blank" rel="noopener noreferrer" className="inline-block px-8 py-3.5 bg-neon-magenta text-dark-black font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all border-2 border-neon-magenta">
               Download the App
             </a>
             <a href="https://discord.gg/kcmdxmBgnC" target="_blank" rel="noopener noreferrer" className="inline-block px-8 py-3.5 border-2 border-neon-gold text-neon-gold font-bold font-mono uppercase tracking-widest hover-glow-gold rounded-sm transition-all">

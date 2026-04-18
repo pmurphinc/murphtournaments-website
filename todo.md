@@ -155,3 +155,7 @@
 - [x] Add install approval notice for Android (unsigned app)
 - [x] Re-enable App Alpha in navigation bar
 - [x] Test page rendering and links
+- [x] Update APK download URL to v1.6.3
+- [x] Rename nav item from 'App Alpha' to 'Mobile App'
+- [x] Rename 'Tournament Feed' to 'Balance Archive' with updated description
+- [x] Rename 'Archive Timeline' to 'Update Archive'
