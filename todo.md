@@ -162,3 +162,6 @@
 
 ## Link Audit
 - [x] Remove all Manus workflow/chat links from the site (only keep direct download links)
+
+## Bug Fix - Text Cursor
+- [x] Fix blinking text cursor appearing when clicking on text elements across the site

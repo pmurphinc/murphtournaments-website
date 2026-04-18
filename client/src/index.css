@@ -135,6 +135,21 @@
     @apply text-foreground;
     min-height: 100vh;
     font-family: 'IBM Plex Sans', sans-serif;
+    cursor: default;
+    -webkit-user-select: none;
+    user-select: none;
+    caret-color: transparent;
+  }
+  /* Allow text selection in inputs, textareas, and content areas where it makes sense */
+  input,
+  textarea,
+  [contenteditable="true"],
+  pre,
+  code {
+    -webkit-user-select: text;
+    user-select: text;
+    caret-color: auto;
+    cursor: text;
   }
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),
