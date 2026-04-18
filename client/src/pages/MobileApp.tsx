@@ -1,4 +1,3 @@
-import { Link } from 'wouter';
 import GlitchText from '@/components/GlitchText';
 import NeonCard from '@/components/NeonCard';
 
@@ -272,9 +271,6 @@ export default function MobileApp() {
             <a href="https://discord.gg/kcmdxmBgnC" target="_blank" rel="noopener noreferrer" className="inline-block px-8 py-3.5 border-2 border-neon-gold text-neon-gold font-bold font-mono uppercase tracking-widest hover-glow-gold rounded-sm transition-all">
               Join the Community
             </a>
-            <Link href="/patchnotes" className="inline-block px-8 py-3.5 border-2 border-neon-cyan text-neon-cyan font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all">
-              Follow Development
-            </Link>
           </div>
         </section>
       </div>
