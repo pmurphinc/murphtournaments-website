@@ -77,9 +77,7 @@ export default function MobileApp() {
                 <a href={APK_URL} target="_blank" rel="noopener noreferrer" className="inline-block px-8 py-3.5 bg-neon-magenta text-dark-black font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all border-2 border-neon-magenta text-center">
                   Download the App
                 </a>
-                <a href="https://discord.gg/kcmdxmBgnC" target="_blank" rel="noopener noreferrer" className="inline-block px-8 py-3.5 border-2 border-neon-cyan text-neon-cyan font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all text-center">
-                  Follow in Discord
-                </a>
+
               </div>
             </div>
 
