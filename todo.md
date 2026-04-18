@@ -159,3 +159,6 @@
 - [x] Rename nav item from 'App Alpha' to 'Mobile App'
 - [x] Rename 'Tournament Feed' to 'Balance Archive' with updated description
 - [x] Rename 'Archive Timeline' to 'Update Archive'
+
+## Link Audit
+- [x] Remove all Manus workflow/chat links from the site (only keep direct download links)

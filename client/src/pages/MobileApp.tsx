@@ -1,7 +1,6 @@
 import GlitchText from '@/components/GlitchText';
 import NeonCard from '@/components/NeonCard';
 
-const APP_SHARE_URL = 'https://manus.im/share/njv6VbaLUjq8Lo6UgQAQ8o';
 const APK_URL = 'https://vida-prod-webdev-app.s3.us-east-1.amazonaws.com/android-builds/310519663462787524/af48971d-ca1b-4cd5-8e48-d6445dfe5dbd/murph-tournaments-app-v1_6_3.apk?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAZV3A2ECZO4N7RSPW%2F20260418%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260418T005332Z&X-Amz-Expires=604800&X-Amz-SignedHeaders=host&x-id=GetObject&X-Amz-Signature=4e521a81f083d93175333b7888ab862c193c1ffd365bc3e12df0b50b5891547c';
 const QR_CODE_URL = 'https://d2xsxph8kpxj0f.cloudfront.net/310519663462787524/GzitzUSk3snQMAtW4LnLnQ/app-qr-code_8b0ee436.png';
 
@@ -153,7 +152,7 @@ export default function MobileApp() {
                 </div>
                 <div className="flex items-start gap-2">
                   <span className="text-neon-lime font-bold shrink-0">2.</span>
-                  <p>Open the camera app and scan the QR code above, or visit the <a href={APP_SHARE_URL} target="_blank" rel="noopener noreferrer" className="text-neon-lime underline hover:text-white transition-colors">download page</a>.</p>
+                  <p>Open the camera app and scan the QR code above.</p>
                 </div>
                 <div className="flex items-start gap-2">
                   <span className="text-neon-lime font-bold shrink-0">3.</span>
