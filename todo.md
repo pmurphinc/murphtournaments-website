@@ -170,3 +170,8 @@
 - [x] Scrape YouTube channel stats from @pmurphinc
 - [x] Add YouTube stats column next to TikTok stats in the By The Numbers card
 - [x] Include stats like content duration, total videos, time posting, hours rendered
+
+## Tournament Suspension Update
+- [x] Remove countdown timer from home page
+- [x] Remove future tournament dates from Development Division section
+- [x] Add suspension notice/banner to the website
