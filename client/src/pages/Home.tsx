@@ -105,7 +105,21 @@ export default function Home() {
               </div>
             </div>
 
-
+            {/* Right: Tournament Suspension Notice */}
+            <div className="hidden lg:flex items-center justify-center">
+              <div className="relative w-full h-96 bg-gradient-to-br from-neon-magenta/10 to-neon-gold/10 border-2 border-neon-magenta rounded-sm p-8 flex flex-col justify-center">
+                <div className="text-center space-y-4">
+                  <div className="text-neon-magenta font-mono text-sm uppercase tracking-widest font-bold">Notice</div>
+                  <h3 className="text-3xl font-bold font-mono text-neon-magenta uppercase tracking-widest">Tournaments Suspended</h3>
+                  <p className="text-white/80 font-mono text-sm leading-relaxed">
+                    All tournaments are currently suspended. Check back for updates or join the Discord for announcements.
+                  </p>
+                  <a href="https://discord.gg/kcmdxmBgnC" target="_blank" rel="noopener noreferrer" className="inline-block mt-4 px-6 py-2 border-2 border-neon-cyan text-neon-cyan font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all">
+                    Join Discord
+                  </a>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
