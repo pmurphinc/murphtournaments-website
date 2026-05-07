@@ -35,15 +35,15 @@ export default function Navigation() {
         // { label: 'Loadout Tracker', href: '/loadout-tracker' }, // Temporarily hidden for direct URL testing
       ]
     },
-    { 
-      label: 'Bracket', 
-      href: '#',
-      isDropdownOnly: true,
-      submenu: [
-        { label: 'Murph Tournament Community', href: '/bracket' },
-        { label: '7th Circle', href: '/bracket2' },
-      ]
-    },
+    // { 
+    //   label: 'Bracket', 
+    //   href: '#',
+    //   isDropdownOnly: true,
+    //   submenu: [
+    //     { label: 'Murph Tournament Community', href: '/bracket' },
+    //     { label: '7th Circle', href: '/bracket2' },
+    //   ]
+    // },
     { label: 'Dev Division', href: '/dev-division' },
     { label: 'Balance Archive', href: '/balance-archive' },
     { label: 'About', href: '/about' },

@@ -182,3 +182,6 @@
 - [x] Integrate Balance Archive page from external build (via iframe)
 - [x] Add Balance Archive to website navigation
 - [x] Test Balance Archive functionality on the website
+
+## Navigation Updates
+- [x] Disable Bracket dropdown (Murph Tournament Community, 7th Circle) from navigation
