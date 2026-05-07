@@ -1,0 +1,868 @@
+[
+  {
+    "id": "patch_10_3_0",
+    "versionLabel": "10.3.0",
+    "title": "Season 10 \u2014 Patch 10.3.0",
+    "patchDate": "2026-04-16",
+    "seasonLabel": "Season 10",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:10.3.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_10_0_0",
+    "versionLabel": "10.0.0",
+    "title": "Season 10 \u2014 Patch 10.0.0",
+    "patchDate": "2026-03-26",
+    "seasonLabel": "Season 10",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:10.0.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_9_12_0",
+    "versionLabel": "9.12.0",
+    "title": "Season 9 \u2014 Patch 9.12.0",
+    "patchDate": "2026-03-05",
+    "seasonLabel": "Season 9",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:9.12.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_9_9_0",
+    "versionLabel": "9.9.0",
+    "title": "Season 9 \u2014 Patch 9.9.0",
+    "patchDate": "2026-02-12",
+    "seasonLabel": "Season 9",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:9.9.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_9_8_1",
+    "versionLabel": "9.8.1",
+    "title": "Season 9 \u2014 Patch 9.8.1",
+    "patchDate": "2026-02-06",
+    "seasonLabel": "Season 9",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:9.8.1",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_9_8_0",
+    "versionLabel": "9.8.0",
+    "title": "Season 9 \u2014 Patch 9.8.0",
+    "patchDate": "2026-02-05",
+    "seasonLabel": "Season 9",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:9.8.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_9_7_1",
+    "versionLabel": "9.7.1",
+    "title": "Season 9 \u2014 Patch 9.7.1",
+    "patchDate": "2026-01-29",
+    "seasonLabel": "Season 9",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:9.7.1",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_9_7_0",
+    "versionLabel": "9.7.0",
+    "title": "Season 9 \u2014 Patch 9.7.0",
+    "patchDate": "2026-01-22",
+    "seasonLabel": "Season 9",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:9.7.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_9_6_0",
+    "versionLabel": "9.6.0",
+    "title": "Season 9 \u2014 Patch 9.6.0",
+    "patchDate": "2026-01-08",
+    "seasonLabel": "Season 9",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:9.6.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_9_5_0",
+    "versionLabel": "9.5.0",
+    "title": "Season 9 \u2014 Patch 9.5.0",
+    "patchDate": "2025-12-18",
+    "seasonLabel": "Season 9",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:9.5.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_9_4_0",
+    "versionLabel": "9.4.0",
+    "title": "Season 9 \u2014 Patch 9.4.0",
+    "patchDate": "2025-12-04",
+    "seasonLabel": "Season 9",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:9.4.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_9_1_1",
+    "versionLabel": "9.1.1",
+    "title": "Season 9 \u2014 Patch 9.1.1",
+    "patchDate": "2025-11-13",
+    "seasonLabel": "Season 9",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:9.1.1",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_9_1_0",
+    "versionLabel": "9.1.0",
+    "title": "Season 9 \u2014 Patch 9.1.0",
+    "patchDate": "2025-11-12",
+    "seasonLabel": "Season 9",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:9.1.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_9_0_0",
+    "versionLabel": "9.0.0",
+    "title": "Season 9 \u2014 Patch 9.0.0",
+    "patchDate": "2025-11-05",
+    "seasonLabel": "Season 9",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:9.0.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_8_9_0",
+    "versionLabel": "8.9.0",
+    "title": "Season 8 \u2014 Patch 8.9.0",
+    "patchDate": "2025-10-22",
+    "seasonLabel": "Season 8",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:8.9.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_8_6_1",
+    "versionLabel": "8.6.1",
+    "title": "Season 8 \u2014 Patch 8.6.1",
+    "patchDate": "2025-10-02",
+    "seasonLabel": "Season 8",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:8.6.1",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_8_6_0",
+    "versionLabel": "8.6.0",
+    "title": "Season 8 \u2014 Patch 8.6.0",
+    "patchDate": "2025-10-01",
+    "seasonLabel": "Season 8",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:8.6.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_8_3_1",
+    "versionLabel": "8.3.1",
+    "title": "Season 8 \u2014 Patch 8.3.1",
+    "patchDate": "2025-09-11",
+    "seasonLabel": "Season 8",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:8.3.1",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_8_3_0",
+    "versionLabel": "8.3.0",
+    "title": "Season 8 \u2014 Patch 8.3.0",
+    "patchDate": "2025-09-10",
+    "seasonLabel": "Season 8",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:8.3.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_8_1_0",
+    "versionLabel": "8.1.0",
+    "title": "Season 8 \u2014 Patch 8.1.0",
+    "patchDate": "2025-08-27",
+    "seasonLabel": "Season 8",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:8.1.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_8_0_1",
+    "versionLabel": "8.0.1",
+    "title": "Season 8 \u2014 Patch 8.0.1",
+    "patchDate": "2025-08-14",
+    "seasonLabel": "Season 8",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:8.0.1",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_8_0_0",
+    "versionLabel": "8.0.0",
+    "title": "Season 8 \u2014 Patch 8.0.0",
+    "patchDate": "2025-08-13",
+    "seasonLabel": "Season 8",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:8.0.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_7_9_0",
+    "versionLabel": "7.9.0",
+    "title": "Season 7 \u2014 Patch 7.9.0",
+    "patchDate": "2025-07-30",
+    "seasonLabel": "Season 7",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:7.9.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_7_6_0",
+    "versionLabel": "7.6.0",
+    "title": "Season 7 \u2014 Patch 7.6.0",
+    "patchDate": "2025-07-09",
+    "seasonLabel": "Season 7",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:7.6.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_7_3_1",
+    "versionLabel": "7.3.1",
+    "title": "Season 7 \u2014 Patch 7.3.1",
+    "patchDate": "2025-06-19",
+    "seasonLabel": "Season 7",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:7.3.1",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_7_3_0",
+    "versionLabel": "7.3.0",
+    "title": "Season 7 \u2014 Patch 7.3.0",
+    "patchDate": "2025-06-18",
+    "seasonLabel": "Season 7",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:7.3.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_7_1_0",
+    "versionLabel": "7.1.0",
+    "title": "Season 7 \u2014 Patch 7.1.0",
+    "patchDate": "2025-06-04",
+    "seasonLabel": "Season 7",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:7.1.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_7_0_1",
+    "versionLabel": "7.0.1",
+    "title": "Season 7 \u2014 Patch 7.0.1",
+    "patchDate": "2025-05-22",
+    "seasonLabel": "Season 7",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:7.0.1",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_7_0_0",
+    "versionLabel": "7.0.0",
+    "title": "Season 7 \u2014 Patch 7.0.0",
+    "patchDate": "2025-05-21",
+    "seasonLabel": "Season 7",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:7.0.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_6_9_0",
+    "versionLabel": "6.9.0",
+    "title": "Season 6 \u2014 Patch 6.9.0",
+    "patchDate": "2025-05-07",
+    "seasonLabel": "Season 6",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:6.9.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_6_6_0",
+    "versionLabel": "6.6.0",
+    "title": "Season 6 \u2014 Patch 6.6.0",
+    "patchDate": "2025-04-16",
+    "seasonLabel": "Season 6",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:6.6.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_6_4_0",
+    "versionLabel": "6.4.0",
+    "title": "Season 6 \u2014 Patch 6.4.0",
+    "patchDate": "2025-04-02",
+    "seasonLabel": "Season 6",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:6.4.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_6_3_0",
+    "versionLabel": "6.3.0",
+    "title": "Season 6 \u2014 Patch 6.3.0",
+    "patchDate": "2025-03-26",
+    "seasonLabel": "Season 6",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:6.3.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_6_1_0",
+    "versionLabel": "6.1.0",
+    "title": "Season 6 \u2014 Patch 6.1.0",
+    "patchDate": "2025-03-12",
+    "seasonLabel": "Season 6",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:6.1.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_6_0_0",
+    "versionLabel": "6.0.0",
+    "title": "Season 6 \u2014 Patch 6.0.0",
+    "patchDate": "2025-03-05",
+    "seasonLabel": "Season 6",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:6.0.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_5_13_0",
+    "versionLabel": "5.13.0",
+    "title": "Season 5 \u2014 Patch 5.13.0",
+    "patchDate": "2025-02-19",
+    "seasonLabel": "Season 5",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:5.13.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_5_12_0",
+    "versionLabel": "5.12.0",
+    "title": "Season 5 \u2014 Patch 5.12.0",
+    "patchDate": "2025-02-12",
+    "seasonLabel": "Season 5",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:5.12.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_5_11_0",
+    "versionLabel": "5.11.0",
+    "title": "Season 5 \u2014 Patch 5.11.0",
+    "patchDate": "2025-02-05",
+    "seasonLabel": "Season 5",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:5.11.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_5_10_0",
+    "versionLabel": "5.10.0",
+    "title": "Season 5 \u2014 Patch 5.10.0",
+    "patchDate": "2025-01-29",
+    "seasonLabel": "Season 5",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:5.10.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_5_9_0",
+    "versionLabel": "5.9.0",
+    "title": "Season 5 \u2014 Patch 5.9.0",
+    "patchDate": "2025-01-22",
+    "seasonLabel": "Season 5",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:5.9.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_5_8_1",
+    "versionLabel": "5.8.1",
+    "title": "Season 5 \u2014 Patch 5.8.1",
+    "patchDate": "2025-01-16",
+    "seasonLabel": "Season 5",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:5.8.1",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_5_8_0",
+    "versionLabel": "5.8.0",
+    "title": "Season 5 \u2014 Patch 5.8.0",
+    "patchDate": "2025-01-15",
+    "seasonLabel": "Season 5",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:5.8.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_5_7_0",
+    "versionLabel": "5.7.0",
+    "title": "Season 5 \u2014 Patch 5.7.0",
+    "patchDate": "2025-01-08",
+    "seasonLabel": "Season 5",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:5.7.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_5_6_1",
+    "versionLabel": "5.6.1",
+    "title": "Season 5 \u2014 Patch 5.6.1",
+    "patchDate": "2024-12-19",
+    "seasonLabel": "Season 5",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:5.6.1",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_5_6_0",
+    "versionLabel": "5.6.0",
+    "title": "Season 5 \u2014 Patch 5.6.0",
+    "patchDate": "2024-12-18",
+    "seasonLabel": "Season 5",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:5.6.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_5_5_0",
+    "versionLabel": "5.5.0",
+    "title": "Season 5 \u2014 Patch 5.5.0",
+    "patchDate": "2024-12-11",
+    "seasonLabel": "Season 5",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:5.5.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_5_4_0",
+    "versionLabel": "5.4.0",
+    "title": "Season 5 \u2014 Patch 5.4.0",
+    "patchDate": "2024-12-04",
+    "seasonLabel": "Season 5",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:5.4.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_5_3_0",
+    "versionLabel": "5.3.0",
+    "title": "Season 5 \u2014 Patch 5.3.0",
+    "patchDate": "2024-11-27",
+    "seasonLabel": "Season 5",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:5.3.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_5_2_0",
+    "versionLabel": "5.2.0",
+    "title": "Season 5 \u2014 Patch 5.2.0",
+    "patchDate": "2024-11-20",
+    "seasonLabel": "Season 5",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:5.2.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_5_1_0",
+    "versionLabel": "5.1.0",
+    "title": "Season 5 \u2014 Patch 5.1.0",
+    "patchDate": "2024-11-13",
+    "seasonLabel": "Season 5",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:5.1.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_5_0_0",
+    "versionLabel": "5.0.0",
+    "title": "Season 5 \u2014 Patch 5.0.0",
+    "patchDate": "2024-11-06",
+    "seasonLabel": "Season 5",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:5.0.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_4_9_0",
+    "versionLabel": "4.9.0",
+    "title": "Season 4 \u2014 Patch 4.9.0",
+    "patchDate": "2024-10-23",
+    "seasonLabel": "Season 4",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:4.9.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_4_8_0",
+    "versionLabel": "4.8.0",
+    "title": "Season 4 \u2014 Patch 4.8.0",
+    "patchDate": "2024-10-09",
+    "seasonLabel": "Season 4",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:4.8.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_4_7_0",
+    "versionLabel": "4.7.0",
+    "title": "Season 4 \u2014 Patch 4.7.0",
+    "patchDate": "2024-09-25",
+    "seasonLabel": "Season 4",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:4.7.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_4_6_0",
+    "versionLabel": "4.6.0",
+    "title": "Season 4 \u2014 Patch 4.6.0",
+    "patchDate": "2024-09-11",
+    "seasonLabel": "Season 4",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:4.6.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_4_5_0",
+    "versionLabel": "4.5.0",
+    "title": "Season 4 \u2014 Patch 4.5.0",
+    "patchDate": "2024-08-28",
+    "seasonLabel": "Season 4",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:4.5.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_4_4_0",
+    "versionLabel": "4.4.0",
+    "title": "Season 4 \u2014 Patch 4.4.0",
+    "patchDate": "2024-08-14",
+    "seasonLabel": "Season 4",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:4.4.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_4_3_0",
+    "versionLabel": "4.3.0",
+    "title": "Season 4 \u2014 Patch 4.3.0",
+    "patchDate": "2024-07-31",
+    "seasonLabel": "Season 4",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:4.3.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_4_2_0",
+    "versionLabel": "4.2.0",
+    "title": "Season 4 \u2014 Patch 4.2.0",
+    "patchDate": "2024-07-17",
+    "seasonLabel": "Season 4",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:4.2.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_4_1_0",
+    "versionLabel": "4.1.0",
+    "title": "Season 4 \u2014 Patch 4.1.0",
+    "patchDate": "2024-07-03",
+    "seasonLabel": "Season 4",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:4.1.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_4_0_0",
+    "versionLabel": "4.0.0",
+    "title": "Season 4 \u2014 Patch 4.0.0",
+    "patchDate": "2024-06-19",
+    "seasonLabel": "Season 4",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:4.0.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_3_14_0",
+    "versionLabel": "3.14.0",
+    "title": "Season 3 \u2014 Patch 3.14.0",
+    "patchDate": "2024-06-05",
+    "seasonLabel": "Season 3",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:3.14.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_3_13_0",
+    "versionLabel": "3.13.0",
+    "title": "Season 3 \u2014 Patch 3.13.0",
+    "patchDate": "2024-05-22",
+    "seasonLabel": "Season 3",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:3.13.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_3_12_0",
+    "versionLabel": "3.12.0",
+    "title": "Season 3 \u2014 Patch 3.12.0",
+    "patchDate": "2024-05-08",
+    "seasonLabel": "Season 3",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:3.12.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_3_11_0",
+    "versionLabel": "3.11.0",
+    "title": "Season 3 \u2014 Patch 3.11.0",
+    "patchDate": "2024-04-24",
+    "seasonLabel": "Season 3",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:3.11.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_3_10_0",
+    "versionLabel": "3.10.0",
+    "title": "Season 3 \u2014 Patch 3.10.0",
+    "patchDate": "2024-04-10",
+    "seasonLabel": "Season 3",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:3.10.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_3_9_0",
+    "versionLabel": "3.9.0",
+    "title": "Season 3 \u2014 Patch 3.9.0",
+    "patchDate": "2024-03-27",
+    "seasonLabel": "Season 3",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:3.9.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_3_8_2",
+    "versionLabel": "3.8.2",
+    "title": "Season 3 \u2014 Patch 3.8.2",
+    "patchDate": "2024-03-21",
+    "seasonLabel": "Season 3",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:3.8.2",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_3_8_1",
+    "versionLabel": "3.8.1",
+    "title": "Season 3 \u2014 Patch 3.8.1",
+    "patchDate": "2024-03-20",
+    "seasonLabel": "Season 3",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:3.8.1",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_3_8_0",
+    "versionLabel": "3.8.0",
+    "title": "Season 3 \u2014 Patch 3.8.0",
+    "patchDate": "2024-03-13",
+    "seasonLabel": "Season 3",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:3.8.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_3_7_0",
+    "versionLabel": "3.7.0",
+    "title": "Season 3 \u2014 Patch 3.7.0",
+    "patchDate": "2024-02-28",
+    "seasonLabel": "Season 3",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:3.7.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_3_6_0",
+    "versionLabel": "3.6.0",
+    "title": "Season 3 \u2014 Patch 3.6.0",
+    "patchDate": "2024-02-14",
+    "seasonLabel": "Season 3",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:3.6.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_3_5_0",
+    "versionLabel": "3.5.0",
+    "title": "Season 3 \u2014 Patch 3.5.0",
+    "patchDate": "2024-01-31",
+    "seasonLabel": "Season 3",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:3.5.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_3_4_0",
+    "versionLabel": "3.4.0",
+    "title": "Season 3 \u2014 Patch 3.4.0",
+    "patchDate": "2024-01-17",
+    "seasonLabel": "Season 3",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:3.4.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_3_3_0",
+    "versionLabel": "3.3.0",
+    "title": "Season 3 \u2014 Patch 3.3.0",
+    "patchDate": "2024-01-10",
+    "seasonLabel": "Season 3",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:3.3.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_3_2_0",
+    "versionLabel": "3.2.0",
+    "title": "Season 3 \u2014 Patch 3.2.0",
+    "patchDate": "2024-01-03",
+    "seasonLabel": "Season 3",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:3.2.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_3_1_0",
+    "versionLabel": "3.1.0",
+    "title": "Season 3 \u2014 Patch 3.1.0",
+    "patchDate": "2023-12-20",
+    "seasonLabel": "Season 3",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:3.1.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_3_0_0",
+    "versionLabel": "3.0.0",
+    "title": "Season 3 \u2014 Patch 3.0.0",
+    "patchDate": "2023-12-07",
+    "seasonLabel": "Season 3",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:3.0.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_2_11_0",
+    "versionLabel": "2.11.0",
+    "title": "Season 2 \u2014 Patch 2.11.0",
+    "patchDate": "2024-04-17",
+    "seasonLabel": "Season 2",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:2.11.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_2_10_0",
+    "versionLabel": "2.10.0",
+    "title": "Season 2 \u2014 Patch 2.10.0",
+    "patchDate": "2024-04-03",
+    "seasonLabel": "Season 2",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:2.10.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_2_9_0",
+    "versionLabel": "2.9.0",
+    "title": "Season 2 \u2014 Patch 2.9.0",
+    "patchDate": "2024-03-20",
+    "seasonLabel": "Season 2",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:2.9.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_2_8_0",
+    "versionLabel": "2.8.0",
+    "title": "Season 2 \u2014 Patch 2.8.0",
+    "patchDate": "2024-03-06",
+    "seasonLabel": "Season 2",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:2.8.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_2_7_0",
+    "versionLabel": "2.7.0",
+    "title": "Season 2 \u2014 Patch 2.7.0",
+    "patchDate": "2024-02-21",
+    "seasonLabel": "Season 2",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:2.7.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_2_6_0",
+    "versionLabel": "2.6.0",
+    "title": "Season 2 \u2014 Patch 2.6.0",
+    "patchDate": "2024-02-07",
+    "seasonLabel": "Season 2",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:2.6.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_2_5_0",
+    "versionLabel": "2.5.0",
+    "title": "Season 2 \u2014 Patch 2.5.0",
+    "patchDate": "2024-01-24",
+    "seasonLabel": "Season 2",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:2.5.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_2_4_0",
+    "versionLabel": "2.4.0",
+    "title": "Season 2 \u2014 Patch 2.4.0",
+    "patchDate": "2024-01-10",
+    "seasonLabel": "Season 2",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:2.4.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_2_3_0",
+    "versionLabel": "2.3.0",
+    "title": "Season 2 \u2014 Patch 2.3.0",
+    "patchDate": "2023-12-27",
+    "seasonLabel": "Season 2",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:2.3.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_2_2_0",
+    "versionLabel": "2.2.0",
+    "title": "Season 2 \u2014 Patch 2.2.0",
+    "patchDate": "2023-12-13",
+    "seasonLabel": "Season 2",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:2.2.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_2_1_0",
+    "versionLabel": "2.1.0",
+    "title": "Season 2 \u2014 Patch 2.1.0",
+    "patchDate": "2023-11-29",
+    "seasonLabel": "Season 2",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:2.1.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_2_0_0",
+    "versionLabel": "2.0.0",
+    "title": "Season 2 \u2014 Patch 2.0.0",
+    "patchDate": "2023-11-15",
+    "seasonLabel": "Season 2",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:2.0.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_1_6_0",
+    "versionLabel": "1.6.0",
+    "title": "Season 1 \u2014 Patch 1.6.0",
+    "patchDate": "2023-11-01",
+    "seasonLabel": "Season 1",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:1.6.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_1_5_5",
+    "versionLabel": "1.5.5",
+    "title": "THE FINALS Patch 1.5.5",
+    "patchDate": null,
+    "seasonLabel": null,
+    "sourceUrl": null,
+    "sourceType": "manual",
+    "rawContent": null
+  },
+  {
+    "id": "patch_1_5_0",
+    "versionLabel": "1.5.0",
+    "title": "Season 1 \u2014 Patch 1.5.0",
+    "patchDate": "2023-10-18",
+    "seasonLabel": "Season 1",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:1.5.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_1_4_0",
+    "versionLabel": "1.4.0",
+    "title": "Season 1 \u2014 Patch 1.4.0",
+    "patchDate": "2023-10-04",
+    "seasonLabel": "Season 1",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:1.4.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_1_3_0",
+    "versionLabel": "1.3.0",
+    "title": "Season 1 \u2014 Patch 1.3.0",
+    "patchDate": "2023-09-20",
+    "seasonLabel": "Season 1",
+    "sourceUrl": "https://www.thefinals.wiki/wiki/Update:1.3.0",
+    "sourceType": "wiki"
+  },
+  {
+    "id": "patch_1_2_0",
+    "versionLabel": "1.2.0",
+    "title": "THE FINALS Patch 1.2.0",
+    "patchDate": null,
+    "seasonLabel": null,
+    "sourceUrl": null,
+    "sourceType": "manual",
+    "rawContent": null
+  }
+]

@@ -7,6 +7,7 @@ import { getOrCreateDevDivisionTournament, getOrCreateSeventhCircleTournament, u
 import { scrapeAndStorePatchNotes } from "./patchNoteScraper";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { getWeaponArchiveDetail, listWeaponArchiveItems } from "./weaponArchiveData";
 
 type LoadoutItemType = "weapon" | "gadget";
 type LoadoutBuildType = "Light" | "Medium" | "Heavy";
@@ -588,6 +589,32 @@ export const appRouter = router({
         return safeEmptyLoadoutPayload();
       }
     }),
+  }),
+
+  weaponArchive: router({
+    list: publicProcedure
+      .input(
+        z
+          .object({
+            class: z.enum(["Light", "Medium", "Heavy", "multi"]).optional(),
+            category: z.enum(["Weapon", "Gadget", "Specialization"]).optional(),
+            search: z.string().optional(),
+            sort: z
+              .enum(["alphabetical", "recently-changed", "most-changed"])
+              .optional()
+              .default("alphabetical"),
+          })
+          .optional(),
+      )
+      .query(async ({ input }) => {
+        return listWeaponArchiveItems(input);
+      }),
+
+    getBySlug: publicProcedure
+      .input(z.object({ slug: z.string() }))
+      .query(async ({ input }) => {
+        return getWeaponArchiveDetail(input.slug);
+      }),
   }),
 });
 

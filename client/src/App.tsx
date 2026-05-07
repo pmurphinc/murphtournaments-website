@@ -21,6 +21,7 @@ import PlayerProfile from "./pages/PlayerProfile";
 import PatchNotes from "./pages/PatchNotes";
 import LoadoutTracker from "./pages/LoadoutTracker";
 import BalanceArchive from "./pages/BalanceArchive";
+import BalanceArchiveDetail from "./pages/BalanceArchiveDetail";
 import { useEffect } from "react";
 
 /**
@@ -57,6 +58,7 @@ function Router() {
           <Route path={"/player/:id"} component={PlayerProfile} />
           <Route path={"/patchnotes"} component={PatchNotes} />
           <Route path={"/loadout-tracker"} component={LoadoutTracker} />
+          <Route path={"/balance-archive/:slug"} component={BalanceArchiveDetail} />
           <Route path={"/balance-archive"} component={BalanceArchive} />
           <Route path={"/404"} component={NotFound} />
           {/* Final fallback route */}
