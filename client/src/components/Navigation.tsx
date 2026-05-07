@@ -45,7 +45,7 @@ export default function Navigation() {
       ]
     },
     { label: 'Dev Division', href: '/dev-division' },
-    { label: 'Mobile App', href: '/app' },
+    { label: 'Balance Archive', href: '/balance-archive' },
     { label: 'About', href: '/about' },
     { label: 'Watch', href: '/watch' },
   ];

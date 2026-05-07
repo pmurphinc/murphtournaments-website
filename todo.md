@@ -175,3 +175,10 @@
 - [x] Remove countdown timer from home page
 - [x] Remove future tournament dates from Development Division section
 - [x] Add suspension notice/banner to the website
+
+## Mobile App Removal & Balance Archive Integration
+- [x] Remove Mobile App page (MobileApp.tsx)
+- [x] Remove Mobile App from navigation
+- [x] Integrate Balance Archive page from external build (via iframe)
+- [x] Add Balance Archive to website navigation
+- [x] Test Balance Archive functionality on the website
