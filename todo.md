@@ -185,3 +185,8 @@
 
 ## Navigation Updates
 - [x] Disable Bracket dropdown (Murph Tournament Community, 7th Circle) from navigation
+
+## UPDATE 10.3.1 Addition
+- [x] Add UPDATE 10.3.1 to Patch Notes page
+- [x] Scrape 10.3.1 content from thefinals.wiki
+- [ ] Balance Archive will auto-update once wiki item data is complete for 10.3.1
