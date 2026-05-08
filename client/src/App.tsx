@@ -24,6 +24,7 @@ import BalanceArchive from "./pages/BalanceArchive";
 import BalanceArchiveDetail from "./pages/BalanceArchiveDetail";
 import VodAnalysis from "./pages/VodAnalysis";
 import VodAnalysisDetail from "./pages/VodAnalysisDetail";
+import VodTeamInsights from "./pages/VodTeamInsights";
 import { useEffect } from "react";
 
 /**
@@ -52,6 +53,10 @@ function Router() {
           <Route path={"/dev-division"} component={DevDivision} />
           <Route path={"/about"} component={About} />
           <Route path={"/watch"} component={Watch} />
+          <Route
+            path={"/vod/:id/team-summary/:teamName"}
+            component={VodTeamInsights}
+          />
           <Route path={"/vod/:id"} component={VodAnalysisDetail} />
           <Route path={"/vod"} component={VodAnalysis} />
           <Route path={"/join"} component={Join} />
@@ -62,7 +67,10 @@ function Router() {
           <Route path={"/player/:id"} component={PlayerProfile} />
           <Route path={"/patchnotes"} component={PatchNotes} />
           <Route path={"/loadout-tracker"} component={LoadoutTracker} />
-          <Route path={"/balance-archive/:slug"} component={BalanceArchiveDetail} />
+          <Route
+            path={"/balance-archive/:slug"}
+            component={BalanceArchiveDetail}
+          />
           <Route path={"/balance-archive"} component={BalanceArchive} />
           <Route path={"/404"} component={NotFound} />
           {/* Final fallback route */}

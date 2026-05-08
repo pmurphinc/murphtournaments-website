@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildVodTeamSummaries,
+  type VodTeamSummary,
   type VodTeamSummaryEvent,
 } from "./team-summary";
 
@@ -127,5 +128,108 @@ describe("buildVodTeamSummaries", () => {
 
     expect(summary).not.toHaveProperty("wipeToSpawnAvgSeconds");
     expect(summary).not.toHaveProperty("averageWipeToSpawnSeconds");
+  });
+});
+
+describe("getVodTeamAttributedEvents", () => {
+  it("attributes selected-team events by teamLabel and excludes other teams and non-summary event types", async () => {
+    const { getVodTeamAttributedEvents } = await import("./team-summary");
+    const events = [
+      { id: 1, eventType: "death", timestampSeconds: 10, teamLabel: "Orange" },
+      {
+        id: 2,
+        eventType: "team_wipe",
+        timestampSeconds: 20,
+        teamLabel: "Blue",
+      },
+      {
+        id: 3,
+        eventType: "cashout",
+        timestampSeconds: 30,
+        teamLabel: "Orange",
+      },
+      { id: 4, eventType: "tap", timestampSeconds: 40, teamLabel: "Orange" },
+      {
+        id: 5,
+        eventType: "defib",
+        timestampSeconds: 50,
+        teamLabel: " Orange ",
+      },
+    ] as const;
+
+    expect(
+      getVodTeamAttributedEvents("Orange", [...events]).map(event => event.id)
+    ).toEqual([1, 3, 5]);
+  });
+
+  it("sorts selected-team timeline events by timestamp and then id", async () => {
+    const { getVodTeamAttributedEvents } = await import("./team-summary");
+    const events = [
+      {
+        id: 5,
+        eventType: "cashout",
+        timestampSeconds: 30,
+        teamLabel: "Orange",
+      },
+      { id: 3, eventType: "death", timestampSeconds: 10, teamLabel: "Orange" },
+      { id: 2, eventType: "defib", timestampSeconds: 10, teamLabel: "Orange" },
+      { id: 1, eventType: "revive", timestampSeconds: 40, teamLabel: "Orange" },
+    ] as const;
+
+    expect(
+      getVodTeamAttributedEvents("Orange", [...events]).map(event => event.id)
+    ).toEqual([2, 3, 5, 1]);
+  });
+});
+
+describe("getVodTeamInsightCallouts", () => {
+  const summary = (overrides: Partial<VodTeamSummary>): VodTeamSummary => ({
+    teamName: "Orange",
+    deaths: 0,
+    teamWipes: 0,
+    teamSpawns: 0,
+    cashouts: 0,
+    revives: 0,
+    defibs: 0,
+    firstDeathToWipeAvgSeconds: null,
+    ...overrides,
+  });
+
+  it("generates a survivability callout for high deaths and low recovery", async () => {
+    const { getVodTeamInsightCallouts } = await import("./team-summary");
+
+    expect(
+      getVodTeamInsightCallouts(summary({ deaths: 4, revives: 1 }))
+    ).toContain(
+      "Survivability and reset discipline need attention. This team is losing players without enough recovery events."
+    );
+  });
+
+  it("generates an objective conversion callout for high cashouts", async () => {
+    const { getVodTeamInsightCallouts } = await import("./team-summary");
+
+    expect(getVodTeamInsightCallouts(summary({ cashouts: 2 }))).toContain(
+      "Objective conversion is a strength. This team is getting paid when opportunities appear."
+    );
+  });
+
+  it("generates a collapse-speed callout for short first-death-to-wipe average", async () => {
+    const { getVodTeamInsightCallouts } = await import("./team-summary");
+
+    expect(
+      getVodTeamInsightCallouts(
+        summary({ deaths: 1, teamWipes: 1, firstDeathToWipeAvgSeconds: 12 })
+      )
+    ).toContain(
+      "The team collapses quickly after first death. Focus on spacing, disengage timing, and delaying the wipe."
+    );
+  });
+
+  it("generates a not-enough-data callout when team-labeled volume is low", async () => {
+    const { getVodTeamInsightCallouts } = await import("./team-summary");
+
+    expect(getVodTeamInsightCallouts(summary({ deaths: 1 }))).toEqual([
+      "Add more team-labeled events to unlock stronger insights.",
+    ]);
   });
 });

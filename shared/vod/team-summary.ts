@@ -6,6 +6,12 @@ export type VodTeamSummaryEvent = {
   teamLabel?: string | null;
 };
 
+export type VodTeamAttributedEvent = VodTeamSummaryEvent & {
+  id: number;
+  actorLabel?: string | null;
+  targetLabel?: string | null;
+};
+
 export type VodTeamSummary = {
   teamName: string;
   deaths: number;
@@ -119,4 +125,79 @@ export function buildVodTeamSummaries(
       firstDeathToWipeAvgSeconds: averageDurations(firstDeathToWipeDurations),
     }))
     .sort((left, right) => left.teamName.localeCompare(right.teamName));
+}
+
+export function getVodTeamAttributedEvents<
+  TEvent extends VodTeamAttributedEvent,
+>(teamName: string, events: TEvent[]): TEvent[] {
+  const selectedTeamName = teamName.trim();
+
+  if (!selectedTeamName) return [];
+
+  return events
+    .filter(event => {
+      const eventTeamName = getTeamName(event);
+      return (
+        eventTeamName === selectedTeamName &&
+        countedEventTypes.has(event.eventType)
+      );
+    })
+    .sort((left, right) => {
+      const timestampDiff = left.timestampSeconds - right.timestampSeconds;
+      return timestampDiff === 0 ? left.id - right.id : timestampDiff;
+    });
+}
+
+export function getVodTeamInsightCallouts(
+  summary: VodTeamSummary,
+  allSummaries: VodTeamSummary[] = []
+): string[] {
+  const recoveryEvents = summary.revives + summary.defibs;
+  const labeledEventCount =
+    summary.deaths +
+    summary.teamWipes +
+    summary.teamSpawns +
+    summary.cashouts +
+    recoveryEvents;
+
+  if (labeledEventCount < 2) {
+    return ["Add more team-labeled events to unlock stronger insights."];
+  }
+
+  const callouts: string[] = [];
+  const maxCashouts = Math.max(
+    summary.cashouts,
+    ...allSummaries.map(team => team.cashouts)
+  );
+
+  if (summary.deaths >= 4 && recoveryEvents <= 1) {
+    callouts.push(
+      "Survivability and reset discipline need attention. This team is losing players without enough recovery events."
+    );
+  }
+
+  if (summary.cashouts >= 2 && summary.cashouts === maxCashouts) {
+    callouts.push(
+      "Objective conversion is a strength. This team is getting paid when opportunities appear."
+    );
+  }
+
+  if (
+    summary.firstDeathToWipeAvgSeconds !== null &&
+    summary.firstDeathToWipeAvgSeconds <= 15
+  ) {
+    callouts.push(
+      "The team collapses quickly after first death. Focus on spacing, disengage timing, and delaying the wipe."
+    );
+  }
+
+  if (recoveryEvents >= 3) {
+    callouts.push(
+      "Recovery support looks strong. This team is extending fights through revive pressure."
+    );
+  }
+
+  return callouts.length > 0
+    ? callouts
+    : ["Add more team-labeled events to unlock stronger insights."];
 }

@@ -128,7 +128,13 @@ const formatAverageSeconds = (value: number | null) => {
   return `${Math.round(value)}s`;
 };
 
-function TeamSummarySection({ summaries }: { summaries: VodTeamSummary[] }) {
+function TeamSummarySection({
+  summaries,
+  vodAnalysisId,
+}: {
+  summaries: VodTeamSummary[];
+  vodAnalysisId: number;
+}) {
   return (
     <div className="rounded-lg border border-white/10 bg-black/30 p-5">
       <div className="flex items-start justify-between gap-3">
@@ -160,6 +166,14 @@ function TeamSummarySection({ summaries }: { summaries: VodTeamSummary[] }) {
                 <h4 className="font-mono text-sm font-bold uppercase tracking-widest text-white">
                   {summary.teamName}
                 </h4>
+                <Link
+                  href={`/vod/${vodAnalysisId}/team-summary/${encodeURIComponent(
+                    summary.teamName
+                  )}`}
+                  className="rounded border border-neon-cyan/50 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-neon-cyan transition-all hover:bg-neon-cyan/10"
+                >
+                  View insights
+                </Link>
                 {summary.firstDeathToWipeAvgSeconds !== null ? (
                   <span className="rounded border border-neon-gold/40 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-neon-gold">
                     FD→Wipe avg{" "}
@@ -179,10 +193,6 @@ function TeamSummarySection({ summaries }: { summaries: VodTeamSummary[] }) {
           ))}
         </div>
       )}
-
-      <p className="mt-4 font-mono text-xs text-white/35">
-        Detailed team insights coming later.
-      </p>
     </div>
   );
 }
@@ -618,7 +628,10 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
               </div>
 
               <div className="space-y-4">
-                <TeamSummarySection summaries={teamSummaries} />
+                <TeamSummarySection
+                  summaries={teamSummaries}
+                  vodAnalysisId={vodAnalysisId}
+                />
                 <WorkflowPlaceholder title="Auto-capture Setup" />
               </div>
             </section>
