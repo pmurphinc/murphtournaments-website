@@ -5,6 +5,7 @@ import {
   vodSuggestedEvents,
 } from "../drizzle/schema";
 import {
+  addPendingSuggestedCountsToVodAnalyses,
   approveVodSuggestedEvent,
   buildVodAnalysisEventInsert,
   buildVodAnalysisInsert,
@@ -15,6 +16,7 @@ import {
   createVodAnalysisInputSchema,
   createVodSuggestedEvent,
   createVodSuggestedEventInputSchema,
+  getPendingSuggestedEventCountsByVodAnalysisIds,
   getVodAnalysisById,
   listVodAnalysisEvents,
   listVodAnalyses,
@@ -23,7 +25,7 @@ import {
   sortVodSuggestedEventRecords,
   vodAnalysisIdInputSchema,
   type VodAnalysisEventRecord,
-  type VodAnalysisListItem,
+  type PendingSuggestedEventCountRow,
   type VodAnalysisRecord,
   type VodSuggestedEventRecord,
 } from "./vodAnalysis";
@@ -42,12 +44,30 @@ function createEventInsertDb() {
   return { db: { insert }, insert, values };
 }
 
-function createListDb(rows: VodAnalysisListItem[]) {
+function createListDb(
+  rows: VodAnalysisRecord[],
+  countRows: PendingSuggestedEventCountRow[] = []
+) {
   const orderBy = vi.fn().mockResolvedValue(rows);
-  const from = vi.fn(() => ({ orderBy }));
+  const groupBy = vi.fn().mockResolvedValue(countRows);
+  const where = vi.fn(() => ({ groupBy }));
+  const from = vi.fn(table =>
+    table === vodAnalyses ? { orderBy } : { where }
+  );
   const select = vi.fn(() => ({ from }));
 
-  return { db: { select }, select, from, orderBy };
+  return { db: { select }, select, from, orderBy, where, groupBy };
+}
+
+function createSuggestedEventCountDb(
+  countRows: PendingSuggestedEventCountRow[]
+) {
+  const groupBy = vi.fn().mockResolvedValue(countRows);
+  const where = vi.fn(() => ({ groupBy }));
+  const from = vi.fn(() => ({ where }));
+  const select = vi.fn(() => ({ from }));
+
+  return { db: { select }, select, from, where, groupBy };
 }
 
 function createGetByIdDb(rows: VodAnalysisRecord[]) {
@@ -254,11 +274,86 @@ describe("createVodAnalysis", () => {
   });
 });
 
+describe("getPendingSuggestedEventCountsByVodAnalysisIds", () => {
+  it("returns an empty result for empty ids without querying the DB", async () => {
+    const { db, select } = createSuggestedEventCountDb([
+      { vodAnalysisId: 1, pendingSuggestedCount: 1 },
+    ]);
+
+    await expect(
+      getPendingSuggestedEventCountsByVodAnalysisIds([], db)
+    ).resolves.toEqual({});
+    expect(select).not.toHaveBeenCalled();
+  });
+
+  it("counts pending suggestions with one grouped query", async () => {
+    const { db, select, from, where, groupBy } = createSuggestedEventCountDb([
+      { vodAnalysisId: 1, pendingSuggestedCount: 2 },
+      { vodAnalysisId: 3, pendingSuggestedCount: "4" },
+    ]);
+
+    await expect(
+      getPendingSuggestedEventCountsByVodAnalysisIds([1, 3], db)
+    ).resolves.toEqual({ 1: 2, 3: 4 });
+
+    expect(select).toHaveBeenCalledWith({
+      vodAnalysisId: vodSuggestedEvents.vodAnalysisId,
+      pendingSuggestedCount: expect.anything(),
+    });
+    expect(from).toHaveBeenCalledWith(vodSuggestedEvents);
+    expect(where).toHaveBeenCalledTimes(1);
+    expect(groupBy).toHaveBeenCalledWith(vodSuggestedEvents.vodAnalysisId);
+  });
+});
+
+describe("addPendingSuggestedCountsToVodAnalyses", () => {
+  it("maps grouped count results onto list rows", () => {
+    const createdAt = new Date("2026-01-01T00:00:00Z");
+    const rows: VodAnalysisRecord[] = [
+      {
+        id: 1,
+        title: "With pending",
+        sourceType: "youtube",
+        sourceUrl: "https://youtu.be/ONE",
+        normalizedSourceUrl: "https://www.youtube.com/watch?v=ONE",
+        sourceId: "ONE",
+        sourceRef: "ONE",
+        thumbnailUrl: null,
+        durationSeconds: null,
+        videoPov: "player",
+        status: "created",
+        createdAt,
+        updatedAt: createdAt,
+      },
+      {
+        id: 2,
+        title: "Without pending",
+        sourceType: "twitch",
+        sourceUrl: "https://www.twitch.tv/videos/1234567890",
+        normalizedSourceUrl: "https://www.twitch.tv/videos/1234567890",
+        sourceId: "1234567890",
+        sourceRef: "v1234567890",
+        thumbnailUrl: null,
+        durationSeconds: null,
+        videoPov: "spectator",
+        status: "created",
+        createdAt,
+        updatedAt: createdAt,
+      },
+    ];
+
+    expect(addPendingSuggestedCountsToVodAnalyses(rows, { 1: 5 })).toEqual([
+      { ...rows[0], pendingSuggestedCount: 5 },
+      { ...rows[1], pendingSuggestedCount: 0 },
+    ]);
+  });
+});
+
 describe("listVodAnalyses", () => {
   it("selects list card fields newest-first", async () => {
     const firstCreatedAt = new Date("2026-01-02T00:00:00Z");
     const secondCreatedAt = new Date("2026-01-01T00:00:00Z");
-    const rows: VodAnalysisListItem[] = [
+    const rows: VodAnalysisRecord[] = [
       {
         id: 2,
         title: "Newest",
@@ -290,9 +385,14 @@ describe("listVodAnalyses", () => {
         updatedAt: secondCreatedAt,
       },
     ];
-    const { db, select, from, orderBy } = createListDb(rows);
+    const { db, select, from, orderBy, where, groupBy } = createListDb(rows, [
+      { vodAnalysisId: 2, pendingSuggestedCount: 3 },
+    ]);
 
-    await expect(listVodAnalyses(db)).resolves.toEqual(rows);
+    await expect(listVodAnalyses(db)).resolves.toEqual([
+      { ...rows[0], pendingSuggestedCount: 3 },
+      { ...rows[1], pendingSuggestedCount: 0 },
+    ]);
 
     expect(select).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -305,7 +405,36 @@ describe("listVodAnalyses", () => {
       })
     );
     expect(from).toHaveBeenCalledWith(vodAnalyses);
+    expect(from).toHaveBeenCalledWith(vodSuggestedEvents);
+    expect(where).toHaveBeenCalledTimes(1);
+    expect(groupBy).toHaveBeenCalledWith(vodSuggestedEvents.vodAnalysisId);
     expect(orderBy).toHaveBeenCalledTimes(1);
+  });
+
+  it("includes zero pendingSuggestedCount when a list row has no grouped count", async () => {
+    const createdAt = new Date("2026-01-03T00:00:00Z");
+    const rows: VodAnalysisRecord[] = [
+      {
+        id: 9,
+        title: "No suggestions",
+        sourceType: "youtube",
+        sourceUrl: "https://youtu.be/NONE",
+        normalizedSourceUrl: "https://www.youtube.com/watch?v=NONE",
+        sourceId: "NONE",
+        sourceRef: "NONE",
+        thumbnailUrl: null,
+        durationSeconds: null,
+        videoPov: "player",
+        status: "created",
+        createdAt,
+        updatedAt: createdAt,
+      },
+    ];
+    const { db } = createListDb(rows);
+
+    await expect(listVodAnalyses(db)).resolves.toEqual([
+      { ...rows[0], pendingSuggestedCount: 0 },
+    ]);
   });
 });
 
