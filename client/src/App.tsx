@@ -23,6 +23,7 @@ import LoadoutTracker from "./pages/LoadoutTracker";
 import BalanceArchive from "./pages/BalanceArchive";
 import BalanceArchiveDetail from "./pages/BalanceArchiveDetail";
 import VodAnalysis from "./pages/VodAnalysis";
+import VodAnalysisDetail from "./pages/VodAnalysisDetail";
 import { useEffect } from "react";
 
 /**
@@ -51,6 +52,7 @@ function Router() {
           <Route path={"/dev-division"} component={DevDivision} />
           <Route path={"/about"} component={About} />
           <Route path={"/watch"} component={Watch} />
+          <Route path={"/vod/:id"} component={VodAnalysisDetail} />
           <Route path={"/vod"} component={VodAnalysis} />
           <Route path={"/join"} component={Join} />
           <Route path={"/admin"} component={AdminControl} />

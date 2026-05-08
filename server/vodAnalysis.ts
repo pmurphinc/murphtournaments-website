@@ -1,4 +1,4 @@
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import {
   vodAnalyses,
   type InsertVodAnalysis,
@@ -19,7 +19,7 @@ export type CreateVodAnalysisInput = {
   durationSeconds?: number | null;
 };
 
-export type VodAnalysisListItem = Pick<
+export type VodAnalysisRecord = Pick<
   VodAnalysis,
   | "id"
   | "title"
@@ -36,6 +36,8 @@ export type VodAnalysisListItem = Pick<
   | "updatedAt"
 >;
 
+export type VodAnalysisListItem = VodAnalysisRecord;
+
 type InsertableDb = {
   insert: (table: typeof vodAnalyses) => {
     values: (values: InsertVodAnalysis) => Promise<unknown>;
@@ -50,7 +52,19 @@ type ListableDb = {
   };
 };
 
+type GetByIdDb = {
+  select: (fields: Record<string, unknown>) => {
+    from: (table: typeof vodAnalyses) => {
+      where: (condition: unknown) => {
+        limit: (limit: number) => Promise<VodAnalysisRecord[]>;
+      };
+    };
+  };
+};
+
 const VALID_VIDEO_POVS: readonly VideoPov[] = ["player", "spectator"];
+
+export const vodAnalysisIdInputSchema = z.number().int().positive();
 
 export const createVodAnalysisInputSchema = z.object({
   title: z.string().trim().min(1, "VOD analysis title is required."),
@@ -124,7 +138,7 @@ export async function createVodAnalysis(
   return values;
 }
 
-const vodAnalysisListFields = {
+const vodAnalysisFields = {
   id: vodAnalyses.id,
   title: vodAnalyses.title,
   sourceType: vodAnalyses.sourceType,
@@ -145,7 +159,7 @@ export async function listVodAnalyses(
 ): Promise<VodAnalysisListItem[]> {
   if (dbClient) {
     return dbClient
-      .select(vodAnalysisListFields)
+      .select(vodAnalysisFields)
       .from(vodAnalyses)
       .orderBy(desc(vodAnalyses.createdAt), desc(vodAnalyses.id));
   }
@@ -157,7 +171,35 @@ export async function listVodAnalyses(
   }
 
   return db
-    .select(vodAnalysisListFields)
+    .select(vodAnalysisFields)
     .from(vodAnalyses)
     .orderBy(desc(vodAnalyses.createdAt), desc(vodAnalyses.id));
+}
+
+export async function getVodAnalysisById(
+  id: number,
+  dbClient?: GetByIdDb | null
+): Promise<VodAnalysisRecord | null> {
+  const parsedId = vodAnalysisIdInputSchema.parse(id);
+
+  const runQuery = (db: GetByIdDb) =>
+    db
+      .select(vodAnalysisFields)
+      .from(vodAnalyses)
+      .where(eq(vodAnalyses.id, parsedId))
+      .limit(1);
+
+  if (dbClient) {
+    const [vodAnalysis] = await runQuery(dbClient);
+    return vodAnalysis ?? null;
+  }
+
+  const db = await getDb();
+
+  if (!db) {
+    throw new Error("Database is not available for VOD analysis lookup.");
+  }
+
+  const [vodAnalysis] = await runQuery(db as unknown as GetByIdDb);
+  return vodAnalysis ?? null;
 }
