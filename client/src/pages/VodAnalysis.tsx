@@ -3,6 +3,7 @@ import GlitchText from "@/components/GlitchText";
 import NeonCard from "@/components/NeonCard";
 import { trpc } from "@/lib/trpc";
 import { getVodSourceLabel, parseVodSource } from "@shared/vod/source";
+import { Link } from "wouter";
 
 type VideoPov = "player" | "spectator";
 
@@ -274,14 +275,22 @@ export default function VodAnalysis() {
                         </span>
                       </div>
 
-                      <a
-                        href={sourceHref}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-block rounded-sm border-2 border-neon-cyan px-4 py-2 font-mono text-sm font-bold uppercase tracking-widest text-neon-cyan transition-all hover:bg-neon-cyan/10 hover-glow-cyan"
-                      >
-                        Open source
-                      </a>
+                      <div className="flex flex-wrap gap-3">
+                        <Link
+                          href={`/vod/${vod.id}`}
+                          className="inline-block rounded-sm border-2 border-neon-magenta px-4 py-2 font-mono text-sm font-bold uppercase tracking-widest text-neon-magenta transition-all hover:bg-neon-magenta/10 hover-glow-magenta"
+                        >
+                          View details
+                        </Link>
+                        <a
+                          href={sourceHref}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-block rounded-sm border-2 border-neon-cyan px-4 py-2 font-mono text-sm font-bold uppercase tracking-widest text-neon-cyan transition-all hover:bg-neon-cyan/10 hover-glow-cyan"
+                        >
+                          Open source
+                        </a>
+                      </div>
                     </NeonCard>
                   );
                 })}

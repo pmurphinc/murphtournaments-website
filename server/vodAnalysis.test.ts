@@ -4,8 +4,11 @@ import {
   buildVodAnalysisInsert,
   createVodAnalysis,
   createVodAnalysisInputSchema,
+  getVodAnalysisById,
   listVodAnalyses,
+  vodAnalysisIdInputSchema,
   type VodAnalysisListItem,
+  type VodAnalysisRecord,
 } from "./vodAnalysis";
 
 function createInsertDb() {
@@ -22,6 +25,28 @@ function createListDb(rows: VodAnalysisListItem[]) {
 
   return { db: { select }, select, from, orderBy };
 }
+
+function createGetByIdDb(rows: VodAnalysisRecord[]) {
+  const limit = vi.fn().mockResolvedValue(rows);
+  const where = vi.fn(() => ({ limit }));
+  const from = vi.fn(() => ({ where }));
+  const select = vi.fn(() => ({ from }));
+
+  return { db: { select }, select, from, where, limit };
+}
+
+
+describe("vodAnalysisIdInputSchema", () => {
+  it("accepts positive integer ids", () => {
+    expect(vodAnalysisIdInputSchema.parse(42)).toBe(42);
+  });
+
+  it("rejects non-positive and non-integer ids", () => {
+    expect(vodAnalysisIdInputSchema.safeParse(0).success).toBe(false);
+    expect(vodAnalysisIdInputSchema.safeParse(-1).success).toBe(false);
+    expect(vodAnalysisIdInputSchema.safeParse(1.5).success).toBe(false);
+  });
+});
 
 describe("createVodAnalysisInputSchema", () => {
   it("rejects invalid source URLs", () => {
@@ -202,5 +227,54 @@ describe("listVodAnalyses", () => {
     );
     expect(from).toHaveBeenCalledWith(vodAnalyses);
     expect(orderBy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("getVodAnalysisById", () => {
+  it("selects one VOD analysis by id", async () => {
+    const createdAt = new Date("2026-01-02T00:00:00Z");
+    const row: VodAnalysisRecord = {
+      id: 7,
+      title: "Detail",
+      sourceType: "youtube",
+      sourceUrl: "https://youtu.be/DETAIL",
+      normalizedSourceUrl: "https://www.youtube.com/watch?v=DETAIL",
+      sourceId: "DETAIL",
+      sourceRef: "DETAIL",
+      thumbnailUrl: "https://example.com/detail.jpg",
+      durationSeconds: 75,
+      videoPov: "player",
+      status: "created",
+      createdAt,
+      updatedAt: createdAt,
+    };
+    const { db, select, from, where, limit } = createGetByIdDb([row]);
+
+    await expect(getVodAnalysisById(7, db)).resolves.toEqual(row);
+
+    expect(select).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: vodAnalyses.id,
+        title: vodAnalyses.title,
+        sourceUrl: vodAnalyses.sourceUrl,
+        updatedAt: vodAnalyses.updatedAt,
+      })
+    );
+    expect(from).toHaveBeenCalledWith(vodAnalyses);
+    expect(where).toHaveBeenCalledTimes(1);
+    expect(limit).toHaveBeenCalledWith(1);
+  });
+
+  it("returns null when no VOD analysis matches", async () => {
+    const { db } = createGetByIdDb([]);
+
+    await expect(getVodAnalysisById(999, db)).resolves.toBeNull();
+  });
+
+  it("rejects invalid ids before database access", async () => {
+    const { db, select } = createGetByIdDb([]);
+
+    await expect(getVodAnalysisById(0, db)).rejects.toThrow();
+    expect(select).not.toHaveBeenCalled();
   });
 });
