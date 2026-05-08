@@ -36,6 +36,13 @@
       "when": 1778273643561,
       "tag": "0004_add_vod_analyses",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1778275864754,
+      "tag": "0005_add_vod_analysis_events",
+      "breakpoints": true
     }
   ]
 }
