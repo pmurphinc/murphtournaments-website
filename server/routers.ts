@@ -3,15 +3,31 @@ import { COOKIE_NAME } from "../shared/const";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
-import { getOrCreateDevDivisionTournament, getOrCreateSeventhCircleTournament, updateTournamentStatus, getTeamsByTournament, upsertTeams, updateTeamFRP, getTournamentHistory, addTournamentToHistory, getAllPatchNotes } from "./db";
+import {
+  getOrCreateDevDivisionTournament,
+  getOrCreateSeventhCircleTournament,
+  updateTournamentStatus,
+  getTeamsByTournament,
+  upsertTeams,
+  updateTeamFRP,
+  getTournamentHistory,
+  addTournamentToHistory,
+  getAllPatchNotes,
+} from "./db";
 import { scrapeAndStorePatchNotes } from "./patchNoteScraper";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { getWeaponArchiveDetail, listWeaponArchiveItems } from "./weaponArchiveData";
+import {
+  getWeaponArchiveDetail,
+  listWeaponArchiveItems,
+} from "./weaponArchiveData";
 import {
   createVodAnalysis,
+  createVodAnalysisEvent,
+  createVodAnalysisEventInputSchema,
   createVodAnalysisInputSchema,
   getVodAnalysisById,
+  listVodAnalysisEvents,
   listVodAnalyses,
   vodAnalysisIdInputSchema,
 } from "./vodAnalysis";
@@ -47,9 +63,16 @@ interface LoadoutTrackerPayload {
   };
 }
 
-const BUILDS_PAGE_API = "https://www.thefinals.wiki/w/api.php?action=parse&page=Builds&prop=text&formatversion=2&format=json";
-const PATCHNOTES_PAGE_API = "https://www.thefinals.wiki/w/api.php?action=parse&page=Patchnotes&prop=text&formatversion=2&format=json";
-const LOADOUT_CACHE_PATH = path.join(process.cwd(), "server", ".cache", "loadout-tracker-cache.json");
+const BUILDS_PAGE_API =
+  "https://www.thefinals.wiki/w/api.php?action=parse&page=Builds&prop=text&formatversion=2&format=json";
+const PATCHNOTES_PAGE_API =
+  "https://www.thefinals.wiki/w/api.php?action=parse&page=Patchnotes&prop=text&formatversion=2&format=json";
+const LOADOUT_CACHE_PATH = path.join(
+  process.cwd(),
+  "server",
+  ".cache",
+  "loadout-tracker-cache.json"
+);
 const LOADOUT_REFRESH_WINDOW_MS = 1000 * 60 * 20;
 
 const ITEM_NAME_ALIASES: Record<string, string> = {
@@ -62,15 +85,11 @@ const ITEM_NAME_ALIASES: Record<string, string> = {
   cl40: "cl-40",
 };
 
-const resolveItemAlias = (value: string) => ITEM_NAME_ALIASES[value.trim().toLowerCase()] || value;
+const resolveItemAlias = (value: string) =>
+  ITEM_NAME_ALIASES[value.trim().toLowerCase()] || value;
 
 const normalizeItemName = (value: string) =>
-  resolveItemAlias(
-    value
-      .replace(/&amp;/g, "and")
-      .replace(/\+/g, "plus")
-      .trim(),
-  )
+  resolveItemAlias(value.replace(/&amp;/g, "and").replace(/\+/g, "plus").trim())
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "");
 
@@ -95,29 +114,49 @@ const extractItemsFromBuildsHtml = (html: string): LoadoutItem[] => {
 
     const remainingBuilds = buildNames.filter(name => name !== build);
     const nextBuildIndices = remainingBuilds
-      .map(nextBuild => html.slice(buildStart + 1).search(new RegExp(`<h2[^>]*>${nextBuild} Build`, "i")))
+      .map(nextBuild =>
+        html
+          .slice(buildStart + 1)
+          .search(new RegExp(`<h2[^>]*>${nextBuild} Build`, "i"))
+      )
       .filter(index => index >= 0)
       .map(index => index + buildStart + 1);
-    const buildEnd = nextBuildIndices.length > 0 ? Math.min(...nextBuildIndices) : html.length;
+    const buildEnd =
+      nextBuildIndices.length > 0 ? Math.min(...nextBuildIndices) : html.length;
     const buildSlice = html.slice(buildStart, buildEnd);
 
-    const typeDefinitions: Array<{ type: LoadoutItemType; heading: string; nextHeading: string }> = [
+    const typeDefinitions: Array<{
+      type: LoadoutItemType;
+      heading: string;
+      nextHeading: string;
+    }> = [
       { type: "weapon", heading: "Weapons", nextHeading: "Gadgets" },
       { type: "gadget", heading: "Gadgets", nextHeading: "</h2>" },
     ];
 
     for (const definition of typeDefinitions) {
-      const typeStart = buildSlice.search(new RegExp(`<h3[^>]*>${definition.heading}</h3>|>${definition.heading}<`, "i"));
+      const typeStart = buildSlice.search(
+        new RegExp(
+          `<h3[^>]*>${definition.heading}</h3>|>${definition.heading}<`,
+          "i"
+        )
+      );
       if (typeStart < 0) continue;
 
       const tail = buildSlice.slice(typeStart + 1);
-      let typeEnd = tail.search(new RegExp(`<h3[^>]*>${definition.nextHeading}</h3>|${definition.nextHeading}`, "i"));
+      let typeEnd = tail.search(
+        new RegExp(
+          `<h3[^>]*>${definition.nextHeading}</h3>|${definition.nextHeading}`,
+          "i"
+        )
+      );
       if (typeEnd < 0) {
         typeEnd = tail.length;
       }
 
       const typeSlice = tail.slice(0, typeEnd);
-      const anchorRegex = /<a[^>]*href="\/wiki\/[^"#]+"[^>]*title="([^"]+)"[^>]*>(?:<img[^>]*alt="([^"]*)"[^>]*src="([^"]+)"[^>]*>)?[^<]*<\/a>/gi;
+      const anchorRegex =
+        /<a[^>]*href="\/wiki\/[^"#]+"[^>]*title="([^"]+)"[^>]*>(?:<img[^>]*alt="([^"]*)"[^>]*src="([^"]+)"[^>]*>)?[^<]*<\/a>/gi;
       let match: RegExpExecArray | null;
 
       while ((match = anchorRegex.exec(typeSlice)) !== null) {
@@ -151,9 +190,14 @@ const extractItemsFromBuildsHtml = (html: string): LoadoutItem[] => {
 };
 
 const extractPatchLinks = (html: string) => {
-  const links: Array<{ pageTitle: string; patchVersion: string; patchDate: string }> = [];
+  const links: Array<{
+    pageTitle: string;
+    patchVersion: string;
+    patchDate: string;
+  }> = [];
   const seen = new Set<string>();
-  const rowRegex = /<tr[^>]*>[\s\S]*?<a[^>]*href="\/wiki\/([^"]+)"[^>]*>([^<]+)<\/a>[\s\S]*?(\d{4}-\d{2}-\d{2})[\s\S]*?<\/tr>/gi;
+  const rowRegex =
+    /<tr[^>]*>[\s\S]*?<a[^>]*href="\/wiki\/([^"]+)"[^>]*>([^<]+)<\/a>[\s\S]*?(\d{4}-\d{2}-\d{2})[\s\S]*?<\/tr>/gi;
   let match: RegExpExecArray | null;
 
   while ((match = rowRegex.exec(html)) !== null) {
@@ -172,7 +216,8 @@ const extractPatchLinks = (html: string) => {
 };
 
 const extractCurrentPatch = (patchLinks: Array<{ patchVersion: string }>) => {
-  const firstVersion = patchLinks.find(link => link.patchVersion?.trim())?.patchVersion || null;
+  const firstVersion =
+    patchLinks.find(link => link.patchVersion?.trim())?.patchVersion || null;
   if (!firstVersion) return null;
   const normalized = firstVersion.toUpperCase();
   return normalized.startsWith("UPDATE") || normalized.startsWith("PATCH")
@@ -182,7 +227,9 @@ const extractCurrentPatch = (patchLinks: Array<{ patchVersion: string }>) => {
 
 const extractItemUpdateFromPatch = (wikitext: string, itemNames: string[]) => {
   const lines = wikitext.split("\n");
-  const normalizedItemNames = itemNames.map(name => normalizeItemName(name)).filter(Boolean);
+  const normalizedItemNames = itemNames
+    .map(name => normalizeItemName(name))
+    .filter(Boolean);
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
@@ -191,7 +238,9 @@ const extractItemUpdateFromPatch = (wikitext: string, itemNames: string[]) => {
 
     if (!normalizedLine) continue;
 
-    const hasItemMention = normalizedItemNames.some(itemName => normalizedLine.includes(itemName));
+    const hasItemMention = normalizedItemNames.some(itemName =>
+      normalizedLine.includes(itemName)
+    );
     if (!hasItemMention) continue;
 
     const patchText = cleanedLine || "No patch note found";
@@ -248,7 +297,7 @@ const writeLoadoutCache = async (payload: LoadoutTrackerPayload) => {
 };
 
 export const appRouter = router({
-    // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
+  // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
@@ -264,40 +313,52 @@ export const appRouter = router({
   // Bracket data fetching
   bracket: router({
     getSheetData: publicProcedure
-      .input(z.object({
-        sheetId: z.string(),
-        range: z.string(),
-      }))
+      .input(
+        z.object({
+          sheetId: z.string(),
+          range: z.string(),
+        })
+      )
       .query(async ({ input }) => {
         try {
-          console.log(`[bracket.getSheetData] Fetching from Google Sheets: ${input.range}`);
-          
+          console.log(
+            `[bracket.getSheetData] Fetching from Google Sheets: ${input.range}`
+          );
+
           // Use the Google Sheets API v4 with public access
           // This works for sheets shared publicly or with "Anyone with the link" access
           const encodedRange = encodeURIComponent(input.range);
           const url = `https://sheets.googleapis.com/v4/spreadsheets/${input.sheetId}/values/${encodedRange}?key=AIzaSyDaRi0zyNFzCEHGXxKPKLfnGbqJqKqkiYU`;
-          
+
           const response = await fetch(url, {
-            method: 'GET',
+            method: "GET",
             headers: {
-              'Accept': 'application/json'
-            }
+              Accept: "application/json",
+            },
           });
-          
+
           if (!response.ok) {
             // If API key fails, try the CSV export fallback
-            console.log(`[bracket.getSheetData] API key failed (${response.status}), trying CSV export...`);
+            console.log(
+              `[bracket.getSheetData] API key failed (${response.status}), trying CSV export...`
+            );
             throw new Error(`API failed: ${response.status}`);
           }
-          
+
           const data = await response.json();
           const values = data.values || [];
-          
-          console.log(`[bracket.getSheetData] Received ${values.length} rows from range: ${input.range}`);
+
+          console.log(
+            `[bracket.getSheetData] Received ${values.length} rows from range: ${input.range}`
+          );
           return { success: true, values };
         } catch (error) {
           console.error(`[bracket.getSheetData] Error:`, error);
-          return { success: false, error: error instanceof Error ? error.message : 'Unknown error', values: [] };
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : "Unknown error",
+            values: [],
+          };
         }
       }),
   }),
@@ -320,13 +381,17 @@ export const appRouter = router({
 
     // Update tournament status (admin only)
     updateStatus: protectedProcedure
-      .input(z.object({
-        eventStatus: z.enum(["not-live", "live", "complete"]).optional(),
-        currentCycle: z.enum(["1", "2", "3"]).optional(),
-        currentStage: z.enum(["check-in", "cashout", "final-round", "finished"]).optional(),
-        currentMatch: z.string().optional(),
-        eventNote: z.string().optional(),
-      }))
+      .input(
+        z.object({
+          eventStatus: z.enum(["not-live", "live", "complete"]).optional(),
+          currentCycle: z.enum(["1", "2", "3"]).optional(),
+          currentStage: z
+            .enum(["check-in", "cashout", "final-round", "finished"])
+            .optional(),
+          currentMatch: z.string().optional(),
+          eventNote: z.string().optional(),
+        })
+      )
       .mutation(async ({ input, ctx }) => {
         // Only admins can update tournament
         if (ctx.user?.role !== "admin") {
@@ -352,12 +417,16 @@ export const appRouter = router({
 
     // Update teams and their FRP
     updateTeams: protectedProcedure
-      .input(z.object({
-        teams: z.array(z.object({
-          name: z.string(),
-          frp: z.number(),
-        })),
-      }))
+      .input(
+        z.object({
+          teams: z.array(
+            z.object({
+              name: z.string(),
+              frp: z.number(),
+            })
+          ),
+        })
+      )
       .mutation(async ({ input, ctx }) => {
         // Only admins can update teams
         if (ctx.user?.role !== "admin") {
@@ -388,14 +457,18 @@ export const appRouter = router({
     }),
 
     updateStatus2: publicProcedure
-      .input(z.object({
-        tournamentId: z.number(),
-        eventStatus: z.enum(["not-live", "live", "complete"]).optional(),
-        currentCycle: z.enum(["1", "2", "3"]).optional(),
-        currentStage: z.enum(["check-in", "cashout", "final-round", "finished"]).optional(),
-        currentMatch: z.string().optional(),
-        eventNote: z.string().optional(),
-      }))
+      .input(
+        z.object({
+          tournamentId: z.number(),
+          eventStatus: z.enum(["not-live", "live", "complete"]).optional(),
+          currentCycle: z.enum(["1", "2", "3"]).optional(),
+          currentStage: z
+            .enum(["check-in", "cashout", "final-round", "finished"])
+            .optional(),
+          currentMatch: z.string().optional(),
+          eventNote: z.string().optional(),
+        })
+      )
       .mutation(async ({ input }) => {
         const tournament = await getOrCreateSeventhCircleTournament();
         if (!tournament) {
@@ -415,13 +488,17 @@ export const appRouter = router({
       }),
 
     updateTeams2: publicProcedure
-      .input(z.object({
-        tournamentId: z.number(),
-        teams: z.array(z.object({
-          name: z.string(),
-          frp: z.number(),
-        })),
-      }))
+      .input(
+        z.object({
+          tournamentId: z.number(),
+          teams: z.array(
+            z.object({
+              name: z.string(),
+              frp: z.number(),
+            })
+          ),
+        })
+      )
       .mutation(async ({ input }) => {
         const tournament = await getOrCreateSeventhCircleTournament();
         if (!tournament) {
@@ -455,7 +532,7 @@ export const appRouter = router({
         // Fallback: return empty array if DB is empty (seed should populate it)
         return [];
       } catch (err) {
-        console.error('[patchNotes.getAll] Error:', err);
+        console.error("[patchNotes.getAll] Error:", err);
         return [];
       }
     }),
@@ -469,10 +546,10 @@ export const appRouter = router({
   loadoutTracker: router({
     getItems: publicProcedure.query(async () => {
       const cachedPayload = await readLoadoutCache();
-      const cacheIsFresh =
-        cachedPayload?.metadata.lastUpdated
-          ? Date.now() - new Date(cachedPayload.metadata.lastUpdated).getTime() < LOADOUT_REFRESH_WINDOW_MS
-          : false;
+      const cacheIsFresh = cachedPayload?.metadata.lastUpdated
+        ? Date.now() - new Date(cachedPayload.metadata.lastUpdated).getTime() <
+          LOADOUT_REFRESH_WINDOW_MS
+        : false;
 
       if (cachedPayload && cacheIsFresh) {
         return {
@@ -481,7 +558,9 @@ export const appRouter = router({
             ...cachedPayload.metadata,
             dataSourceStatus: "cache",
             isFromCache: true,
-            cacheAgeMinutes: getCacheAgeMinutes(cachedPayload.metadata.lastUpdated),
+            cacheAgeMinutes: getCacheAgeMinutes(
+              cachedPayload.metadata.lastUpdated
+            ),
           },
         } satisfies LoadoutTrackerPayload;
       }
@@ -499,7 +578,9 @@ export const appRouter = router({
         const buildsPayload = await buildsResponse.json();
         const patchnotesPayload = await patchnotesResponse.json();
         const buildsHtml = buildsPayload?.parse?.text as string | undefined;
-        const patchnotesHtml = patchnotesPayload?.parse?.text as string | undefined;
+        const patchnotesHtml = patchnotesPayload?.parse?.text as
+          | string
+          | undefined;
 
         if (!buildsHtml || !patchnotesHtml) {
           throw new Error("Wiki response missing expected data.");
@@ -512,10 +593,23 @@ export const appRouter = router({
 
         const patchLinks = extractPatchLinks(patchnotesHtml);
         const currentPatch = extractCurrentPatch(patchLinks);
-        const patchMatchMap = new Map<string, { latestPatch: string; patchDate: string; patchText: string; devNote?: string }>();
+        const patchMatchMap = new Map<
+          string,
+          {
+            latestPatch: string;
+            patchDate: string;
+            patchText: string;
+            devNote?: string;
+          }
+        >();
 
         for (const patch of patchLinks.slice(0, 80)) {
-          const unfoundItems = items.filter(item => !patchMatchMap.has(`${item.build}-${item.type}-${item.normalizedName}`));
+          const unfoundItems = items.filter(
+            item =>
+              !patchMatchMap.has(
+                `${item.build}-${item.type}-${item.normalizedName}`
+              )
+          );
           if (unfoundItems.length === 0) break;
 
           const patchApiUrl = `https://www.thefinals.wiki/w/api.php?action=parse&page=${encodeURIComponent(patch.pageTitle)}&prop=wikitext&formatversion=2&format=json`;
@@ -530,12 +624,15 @@ export const appRouter = router({
             const match = extractItemUpdateFromPatch(wikitext, [item.name]);
             if (!match) continue;
 
-            patchMatchMap.set(`${item.build}-${item.type}-${item.normalizedName}`, {
-              latestPatch: patch.patchVersion || "N/A",
-              patchDate: patch.patchDate || "N/A",
-              patchText: match.patchText || "No patch note found",
-              devNote: match.devNote,
-            });
+            patchMatchMap.set(
+              `${item.build}-${item.type}-${item.normalizedName}`,
+              {
+                latestPatch: patch.patchVersion || "N/A",
+                patchDate: patch.patchDate || "N/A",
+                patchText: match.patchText || "No patch note found",
+                devNote: match.devNote,
+              }
+            );
           }
         }
 
@@ -554,7 +651,9 @@ export const appRouter = router({
             };
           }
 
-          const hasPatchText = Boolean(match.patchText && match.patchText.trim().length > 0);
+          const hasPatchText = Boolean(
+            match.patchText && match.patchText.trim().length > 0
+          );
           return {
             ...item,
             latestPatch: match.latestPatch,
@@ -562,7 +661,9 @@ export const appRouter = router({
             patchText: hasPatchText ? match.patchText : "No patch note found",
             devNote: match.devNote || null,
             isNew: false,
-            matchQuality: hasPatchText ? "matched" as const : "noPatchText" as const,
+            matchQuality: hasPatchText
+              ? ("matched" as const)
+              : ("noPatchText" as const),
           };
         });
 
@@ -588,7 +689,9 @@ export const appRouter = router({
               ...cachedPayload.metadata,
               dataSourceStatus: "degraded",
               isFromCache: true,
-              cacheAgeMinutes: getCacheAgeMinutes(cachedPayload.metadata.lastUpdated),
+              cacheAgeMinutes: getCacheAgeMinutes(
+                cachedPayload.metadata.lastUpdated
+              ),
             },
           } satisfies LoadoutTrackerPayload;
         }
@@ -614,6 +717,18 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         return createVodAnalysis(input);
       }),
+
+    createEvent: publicProcedure
+      .input(createVodAnalysisEventInputSchema)
+      .mutation(async ({ input }) => {
+        return createVodAnalysisEvent(input);
+      }),
+
+    listEvents: publicProcedure
+      .input(vodAnalysisIdInputSchema)
+      .query(async ({ input }) => {
+        return listVodAnalysisEvents(input);
+      }),
   }),
 
   weaponArchive: router({
@@ -629,7 +744,7 @@ export const appRouter = router({
               .optional()
               .default("alphabetical"),
           })
-          .optional(),
+          .optional()
       )
       .query(async ({ input }) => {
         return listWeaponArchiveItems(input);

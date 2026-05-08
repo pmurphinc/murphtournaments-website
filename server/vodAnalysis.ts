@@ -1,10 +1,18 @@
-import { desc, eq } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 import {
   vodAnalyses,
+  vodAnalysisEvents,
   type InsertVodAnalysis,
+  type InsertVodAnalysisEvent,
   type VodAnalysis,
+  type VodAnalysisEvent,
 } from "../drizzle/schema";
 import { parseVodSource, type VodSourceType } from "../shared/vod/source";
+import {
+  VOD_ANALYSIS_EVENT_REQUIRED_FIELDS,
+  VOD_ANALYSIS_EVENT_TYPES,
+  type VodAnalysisEventType,
+} from "../shared/vod/events";
 import { z } from "zod";
 import { getDb } from "./db";
 
@@ -38,9 +46,39 @@ export type VodAnalysisRecord = Pick<
 
 export type VodAnalysisListItem = VodAnalysisRecord;
 
+export type CreateVodAnalysisEventInput = {
+  vodAnalysisId: number;
+  eventType: VodAnalysisEventType;
+  timestampSeconds: number;
+  actorLabel?: string | null;
+  targetLabel?: string | null;
+  teamLabel?: string | null;
+  metadata?: unknown;
+};
+
+export type VodAnalysisEventRecord = Pick<
+  VodAnalysisEvent,
+  | "id"
+  | "vodAnalysisId"
+  | "eventType"
+  | "timestampSeconds"
+  | "actorLabel"
+  | "targetLabel"
+  | "teamLabel"
+  | "metadata"
+  | "createdAt"
+  | "updatedAt"
+>;
+
 type InsertableDb = {
   insert: (table: typeof vodAnalyses) => {
     values: (values: InsertVodAnalysis) => Promise<unknown>;
+  };
+};
+
+type EventInsertableDb = {
+  insert: (table: typeof vodAnalysisEvents) => {
+    values: (values: InsertVodAnalysisEvent) => Promise<unknown>;
   };
 };
 
@@ -62,22 +100,64 @@ type GetByIdDb = {
   };
 };
 
+type EventListableDb = {
+  select: (fields: Record<string, unknown>) => {
+    from: (table: typeof vodAnalysisEvents) => {
+      where: (condition: unknown) => {
+        orderBy: (...columns: unknown[]) => Promise<VodAnalysisEventRecord[]>;
+      };
+    };
+  };
+};
+
 const VALID_VIDEO_POVS: readonly VideoPov[] = ["player", "spectator"];
 
 export const vodAnalysisIdInputSchema = z.number().int().positive();
 
+export const createVodAnalysisEventInputSchema = z
+  .object({
+    vodAnalysisId: vodAnalysisIdInputSchema,
+    eventType: z.enum(VOD_ANALYSIS_EVENT_TYPES, {
+      error: "VOD analysis event type is not supported.",
+    }),
+    timestampSeconds: z
+      .number()
+      .int("Event timestamp must be a whole number of seconds.")
+      .nonnegative("Event timestamp must be zero or greater."),
+    actorLabel: z.string().trim().optional().nullable(),
+    targetLabel: z.string().trim().optional().nullable(),
+    teamLabel: z.string().trim().optional().nullable(),
+    metadata: z.unknown().optional(),
+  })
+  .superRefine((input, ctx) => {
+    const requiredFields = VOD_ANALYSIS_EVENT_REQUIRED_FIELDS[input.eventType];
+
+    for (const field of requiredFields) {
+      if (!input[field]?.trim()) {
+        ctx.addIssue({
+          code: "custom",
+          path: [field],
+          message: `${field} is required for ${input.eventType} events.`,
+        });
+      }
+    }
+  });
+
 export const createVodAnalysisInputSchema = z.object({
   title: z.string().trim().min(1, "VOD analysis title is required."),
-  sourceUrl: z.string().trim().superRefine((sourceUrl, ctx) => {
-    const parsedSource = parseVodSource(sourceUrl);
+  sourceUrl: z
+    .string()
+    .trim()
+    .superRefine((sourceUrl, ctx) => {
+      const parsedSource = parseVodSource(sourceUrl);
 
-    if (!parsedSource.valid) {
-      ctx.addIssue({
-        code: "custom",
-        message: parsedSource.error,
-      });
-    }
-  }),
+      if (!parsedSource.valid) {
+        ctx.addIssue({
+          code: "custom",
+          message: parsedSource.error,
+        });
+      }
+    }),
   videoPov: z.enum(["player", "spectator"], {
     error: "VOD analysis videoPov must be player or spectator.",
   }),
@@ -202,4 +282,90 @@ export async function getVodAnalysisById(
 
   const [vodAnalysis] = await runQuery(db as unknown as GetByIdDb);
   return vodAnalysis ?? null;
+}
+
+const vodAnalysisEventFields = {
+  id: vodAnalysisEvents.id,
+  vodAnalysisId: vodAnalysisEvents.vodAnalysisId,
+  eventType: vodAnalysisEvents.eventType,
+  timestampSeconds: vodAnalysisEvents.timestampSeconds,
+  actorLabel: vodAnalysisEvents.actorLabel,
+  targetLabel: vodAnalysisEvents.targetLabel,
+  teamLabel: vodAnalysisEvents.teamLabel,
+  metadata: vodAnalysisEvents.metadata,
+  createdAt: vodAnalysisEvents.createdAt,
+  updatedAt: vodAnalysisEvents.updatedAt,
+};
+
+function normalizeEventLabel(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+export function buildVodAnalysisEventInsert(
+  input: CreateVodAnalysisEventInput
+): InsertVodAnalysisEvent {
+  const parsedInput = createVodAnalysisEventInputSchema.parse(input);
+
+  return {
+    vodAnalysisId: parsedInput.vodAnalysisId,
+    eventType: parsedInput.eventType,
+    timestampSeconds: parsedInput.timestampSeconds,
+    actorLabel: normalizeEventLabel(parsedInput.actorLabel),
+    targetLabel: normalizeEventLabel(parsedInput.targetLabel),
+    teamLabel: normalizeEventLabel(parsedInput.teamLabel),
+    metadata:
+      parsedInput.metadata === undefined || parsedInput.metadata === null
+        ? null
+        : JSON.stringify(parsedInput.metadata),
+  };
+}
+
+export async function createVodAnalysisEvent(
+  input: CreateVodAnalysisEventInput,
+  dbClient?: EventInsertableDb | null
+): Promise<InsertVodAnalysisEvent> {
+  const values = buildVodAnalysisEventInsert(input);
+  const db = dbClient ?? (await getDb());
+
+  if (!db) {
+    throw new Error(
+      "Database is not available for VOD analysis event creation."
+    );
+  }
+
+  await db.insert(vodAnalysisEvents).values(values);
+
+  return values;
+}
+
+export async function listVodAnalysisEvents(
+  vodAnalysisId: number,
+  dbClient?: EventListableDb | null
+): Promise<VodAnalysisEventRecord[]> {
+  const parsedVodAnalysisId = vodAnalysisIdInputSchema.parse(vodAnalysisId);
+
+  const runQuery = (db: EventListableDb) =>
+    db
+      .select(vodAnalysisEventFields)
+      .from(vodAnalysisEvents)
+      .where(eq(vodAnalysisEvents.vodAnalysisId, parsedVodAnalysisId))
+      .orderBy(
+        asc(vodAnalysisEvents.timestampSeconds),
+        asc(vodAnalysisEvents.id)
+      );
+
+  if (dbClient) {
+    return runQuery(dbClient);
+  }
+
+  const db = await getDb();
+
+  if (!db) {
+    throw new Error(
+      "Database is not available for VOD analysis event listing."
+    );
+  }
+
+  return runQuery(db as unknown as EventListableDb);
 }

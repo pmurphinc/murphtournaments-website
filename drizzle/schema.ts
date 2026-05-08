@@ -1,4 +1,14 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { sql } from "drizzle-orm";
+import {
+  check,
+  index,
+  int,
+  mysqlEnum,
+  mysqlTable,
+  text,
+  timestamp,
+  varchar,
+} from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -29,10 +39,23 @@ export type InsertUser = typeof users.$inferInsert;
 export const tournaments = mysqlTable("tournaments", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
-  eventStatus: mysqlEnum("eventStatus", ["not-live", "live", "complete"]).default("not-live").notNull(),
-  currentCycle: mysqlEnum("currentCycle", ["1", "2", "3"]).default("1").notNull(),
-  currentStage: mysqlEnum("currentStage", ["check-in", "cashout", "final-round", "finished"]).default("check-in").notNull(),
-  currentMatch: varchar("currentMatch", { length: 255 }).default("Team A vs Team B"),
+  eventStatus: mysqlEnum("eventStatus", ["not-live", "live", "complete"])
+    .default("not-live")
+    .notNull(),
+  currentCycle: mysqlEnum("currentCycle", ["1", "2", "3"])
+    .default("1")
+    .notNull(),
+  currentStage: mysqlEnum("currentStage", [
+    "check-in",
+    "cashout",
+    "final-round",
+    "finished",
+  ])
+    .default("check-in")
+    .notNull(),
+  currentMatch: varchar("currentMatch", { length: 255 }).default(
+    "Team A vs Team B"
+  ),
   eventNote: text("eventNote"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -111,3 +134,45 @@ export const vodAnalyses = mysqlTable("vod_analyses", {
 
 export type VodAnalysis = typeof vodAnalyses.$inferSelect;
 export type InsertVodAnalysis = typeof vodAnalyses.$inferInsert;
+
+// Manual timeline events recorded against a VOD analysis.
+export const vodAnalysisEvents = mysqlTable(
+  "vod_analysis_events",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    vodAnalysisId: int("vodAnalysisId")
+      .notNull()
+      .references(() => vodAnalyses.id, { onDelete: "cascade" }),
+    eventType: mysqlEnum("eventType", [
+      "death",
+      "tap",
+      "plug",
+      "cashout",
+      "team_wipe",
+      "team_spawn",
+      "revive",
+      "defib",
+    ]).notNull(),
+    timestampSeconds: int("timestampSeconds").notNull(),
+    actorLabel: varchar("actorLabel", { length: 255 }),
+    targetLabel: varchar("targetLabel", { length: 255 }),
+    teamLabel: varchar("teamLabel", { length: 255 }),
+    metadata: text("metadata"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    index("vod_analysis_events_vodAnalysisId_idx").on(table.vodAnalysisId),
+    index("vod_analysis_events_eventType_idx").on(table.eventType),
+    index("vod_analysis_events_timestampSeconds_idx").on(
+      table.timestampSeconds
+    ),
+    check(
+      "vod_analysis_events_timestampSeconds_non_negative",
+      sql`${table.timestampSeconds} >= 0`
+    ),
+  ]
+);
+
+export type VodAnalysisEvent = typeof vodAnalysisEvents.$inferSelect;
+export type InsertVodAnalysisEvent = typeof vodAnalysisEvents.$inferInsert;
