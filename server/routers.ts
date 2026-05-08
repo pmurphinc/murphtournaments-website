@@ -8,6 +8,7 @@ import { scrapeAndStorePatchNotes } from "./patchNoteScraper";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { getWeaponArchiveDetail, listWeaponArchiveItems } from "./weaponArchiveData";
+import { createVodAnalysis, createVodAnalysisInputSchema, listVodAnalyses } from "./vodAnalysis";
 
 type LoadoutItemType = "weapon" | "gadget";
 type LoadoutBuildType = "Light" | "Medium" | "Heavy";
@@ -589,6 +590,18 @@ export const appRouter = router({
         return safeEmptyLoadoutPayload();
       }
     }),
+  }),
+
+  vodAnalysis: router({
+    list: publicProcedure.query(async () => {
+      return listVodAnalyses();
+    }),
+
+    create: publicProcedure
+      .input(createVodAnalysisInputSchema)
+      .mutation(async ({ input }) => {
+        return createVodAnalysis(input);
+      }),
   }),
 
   weaponArchive: router({
