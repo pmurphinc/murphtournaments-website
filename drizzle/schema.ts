@@ -176,3 +176,63 @@ export const vodAnalysisEvents = mysqlTable(
 
 export type VodAnalysisEvent = typeof vodAnalysisEvents.$inferSelect;
 export type InsertVodAnalysisEvent = typeof vodAnalysisEvents.$inferInsert;
+
+// Suggested timeline events queued for human review before confirmation.
+export const vodSuggestedEvents = mysqlTable(
+  "vod_suggested_events",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    vodAnalysisId: int("vodAnalysisId")
+      .notNull()
+      .references(() => vodAnalyses.id, { onDelete: "cascade" }),
+    eventType: mysqlEnum("eventType", [
+      "death",
+      "tap",
+      "plug",
+      "cashout",
+      "team_wipe",
+      "team_spawn",
+      "revive",
+      "defib",
+    ]).notNull(),
+    timestampSeconds: int("timestampSeconds").notNull(),
+    actorLabel: varchar("actorLabel", { length: 255 }),
+    targetLabel: varchar("targetLabel", { length: 255 }),
+    teamLabel: varchar("teamLabel", { length: 255 }),
+    metadata: text("metadata"),
+    source: mysqlEnum("source", [
+      "manual_test",
+      "debug",
+      "automation",
+    ]).notNull(),
+    confidence: int("confidence"),
+    status: mysqlEnum("status", ["pending", "approved", "rejected"])
+      .default("pending")
+      .notNull(),
+    confirmedVodEventId: int("confirmedVodEventId").references(
+      () => vodAnalysisEvents.id,
+      { onDelete: "set null" }
+    ),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    index("vod_suggested_events_vodAnalysisId_idx").on(table.vodAnalysisId),
+    index("vod_suggested_events_status_idx").on(table.status),
+    index("vod_suggested_events_eventType_idx").on(table.eventType),
+    index("vod_suggested_events_timestampSeconds_idx").on(
+      table.timestampSeconds
+    ),
+    check(
+      "vod_suggested_events_timestampSeconds_non_negative",
+      sql`${table.timestampSeconds} >= 0`
+    ),
+    check(
+      "vod_suggested_events_confidence_range",
+      sql`${table.confidence} IS NULL OR (${table.confidence} >= 0 AND ${table.confidence} <= 100)`
+    ),
+  ]
+);
+
+export type VodSuggestedEvent = typeof vodSuggestedEvents.$inferSelect;
+export type InsertVodSuggestedEvent = typeof vodSuggestedEvents.$inferInsert;

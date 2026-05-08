@@ -222,6 +222,13 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
   const [teamLabel, setTeamLabel] = useState("");
   const [eventErrors, setEventErrors] = useState<EventFormErrors>({});
   const [timelineOpen, setTimelineOpen] = useState(false);
+  const [suggestedEventsOpen, setSuggestedEventsOpen] = useState(false);
+  const [activeSuggestedEventId, setActiveSuggestedEventId] = useState<
+    number | null
+  >(null);
+  const [suggestedEventError, setSuggestedEventError] = useState<string | null>(
+    null
+  );
   const [eventFilter, setEventFilter] = useState<EventFilter>("all");
 
   const query = trpc.vodAnalysis.getById.useQuery(vodAnalysisId, {
@@ -232,6 +239,20 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
     enabled: isValidId,
     staleTime: 1000 * 10,
   });
+  const suggestedEventsQuery = trpc.vodAnalysis.listSuggestedEvents.useQuery(
+    vodAnalysisId,
+    {
+      enabled: isValidId,
+      staleTime: 1000 * 10,
+    }
+  );
+
+  const refreshSuggestedEventReview = async () => {
+    await Promise.all([
+      utils.vodAnalysis.listSuggestedEvents.invalidate(vodAnalysisId),
+      utils.vodAnalysis.listEvents.invalidate(vodAnalysisId),
+    ]);
+  };
 
   const createEventMutation = trpc.vodAnalysis.createEvent.useMutation({
     onSuccess: async () => {
@@ -246,6 +267,48 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
       setEventErrors({ form: error.message });
     },
   });
+
+  const createSuggestedEventMutation =
+    trpc.vodAnalysis.createSuggestedEvent.useMutation({
+      onSuccess: async () => {
+        setSuggestedEventError(null);
+        setSuggestedEventsOpen(true);
+        await utils.vodAnalysis.listSuggestedEvents.invalidate(vodAnalysisId);
+      },
+      onError: error => {
+        setSuggestedEventError(error.message);
+      },
+    });
+
+  const approveSuggestedEventMutation =
+    trpc.vodAnalysis.approveSuggestedEvent.useMutation({
+      onMutate: id => {
+        setActiveSuggestedEventId(id);
+        setSuggestedEventError(null);
+      },
+      onSuccess: refreshSuggestedEventReview,
+      onError: error => {
+        setSuggestedEventError(error.message);
+      },
+      onSettled: () => {
+        setActiveSuggestedEventId(null);
+      },
+    });
+
+  const rejectSuggestedEventMutation =
+    trpc.vodAnalysis.rejectSuggestedEvent.useMutation({
+      onMutate: id => {
+        setActiveSuggestedEventId(id);
+        setSuggestedEventError(null);
+      },
+      onSuccess: refreshSuggestedEventReview,
+      onError: error => {
+        setSuggestedEventError(error.message);
+      },
+      onSettled: () => {
+        setActiveSuggestedEventId(null);
+      },
+    });
 
   const requiredFields = VOD_ANALYSIS_EVENT_REQUIRED_FIELDS[selectedEventType];
   const parsedTimestamp = parseVodEventTimestamp(timestampInput);
@@ -297,6 +360,10 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
       })
     : null;
   const events = eventsQuery.data ?? [];
+  const suggestedEvents = suggestedEventsQuery.data ?? [];
+  const pendingSuggestedEventCount = suggestedEvents.filter(
+    suggestion => suggestion.status === "pending"
+  ).length;
   const teamSummaries = useMemo(() => buildVodTeamSummaries(events), [events]);
   const filteredEvents =
     eventFilter === "all"
@@ -319,6 +386,23 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
       actorLabel: actorLabel || undefined,
       targetLabel: targetLabel || undefined,
       teamLabel: teamLabel || undefined,
+    });
+  };
+
+  const handleCreateTestSuggestion = () => {
+    createSuggestedEventMutation.mutate({
+      vodAnalysisId,
+      eventType: "death",
+      timestampSeconds: Math.max(
+        0,
+        events.length * 15 + suggestedEvents.length
+      ),
+      actorLabel: "Test Eliminator",
+      targetLabel: "Test Contestant",
+      teamLabel: "Test Team",
+      source: "manual_test",
+      confidence: 75,
+      metadata: { note: "Development-only suggested event seed." },
     });
   };
 
@@ -534,6 +618,146 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
                       {createEventMutation.isPending ? "Saving…" : "Add Event"}
                     </button>
                   </form>
+                </NeonCard>
+
+                <NeonCard variant="cyan">
+                  <button
+                    type="button"
+                    onClick={() => setSuggestedEventsOpen(open => !open)}
+                    className="flex w-full items-center justify-between gap-4 text-left"
+                  >
+                    <span>
+                      <span className="block font-mono text-xl font-bold uppercase text-neon-cyan">
+                        Suggested Events
+                      </span>
+                      <span className="mt-1 block font-mono text-xs uppercase tracking-widest text-white/45">
+                        {pendingSuggestedEventCount} pending
+                      </span>
+                    </span>
+                    <span className="font-mono text-sm uppercase tracking-widest text-neon-cyan">
+                      {suggestedEventsOpen ? "Collapse" : "Expand"}
+                    </span>
+                  </button>
+
+                  <p className="mt-3 font-mono text-sm text-white/65">
+                    Suggested events are review-only. Approved suggestions
+                    become manual timeline events.
+                  </p>
+
+                  {import.meta.env.DEV ? (
+                    <button
+                      type="button"
+                      onClick={handleCreateTestSuggestion}
+                      disabled={createSuggestedEventMutation.isPending}
+                      className="mt-4 rounded-sm border border-neon-gold/70 px-3 py-2 font-mono text-xs font-bold uppercase tracking-widest text-neon-gold transition hover:bg-neon-gold/10 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {createSuggestedEventMutation.isPending
+                        ? "Creating…"
+                        : "Create test suggestion"}
+                    </button>
+                  ) : null}
+
+                  {suggestedEventError ? (
+                    <div className="mt-4 rounded border border-red-500/40 bg-red-950/30 p-3 font-mono text-sm text-red-100">
+                      {suggestedEventError}
+                    </div>
+                  ) : null}
+
+                  {suggestedEventsOpen ? (
+                    <div className="mt-5 space-y-3">
+                      {suggestedEventsQuery.isLoading ? (
+                        <div className="rounded border border-white/10 bg-black/30 p-4 font-mono text-sm text-white/50">
+                          Loading suggested events…
+                        </div>
+                      ) : suggestedEvents.length === 0 ? (
+                        <div className="rounded border border-white/10 bg-black/30 p-4 font-mono text-sm text-white/50">
+                          No suggested events are waiting for review.
+                        </div>
+                      ) : (
+                        suggestedEvents.map(suggestion => {
+                          const isPendingAction =
+                            activeSuggestedEventId === suggestion.id &&
+                            (approveSuggestedEventMutation.isPending ||
+                              rejectSuggestedEventMutation.isPending);
+                          const canReview = suggestion.status === "pending";
+
+                          return (
+                            <div
+                              key={suggestion.id}
+                              className="rounded border border-white/10 bg-black/30 p-4"
+                            >
+                              <div className="flex flex-wrap items-center gap-3">
+                                <span className="rounded border border-neon-cyan/50 px-2 py-1 font-mono text-xs font-bold text-neon-cyan">
+                                  {formatVodEventTimestamp(
+                                    suggestion.timestampSeconds
+                                  )}
+                                </span>
+                                <span className="font-mono text-sm font-bold uppercase tracking-widest text-white">
+                                  {
+                                    VOD_ANALYSIS_EVENT_LABELS[
+                                      suggestion.eventType
+                                    ]
+                                  }
+                                </span>
+                                <span className="rounded border border-white/10 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-white/55">
+                                  {suggestion.status}
+                                </span>
+                              </div>
+                              <div className="mt-3 flex flex-wrap gap-2 font-mono text-xs text-white/65">
+                                <span>Source: {suggestion.source}</span>
+                                {suggestion.confidence !== null ? (
+                                  <span>
+                                    Confidence: {suggestion.confidence}%
+                                  </span>
+                                ) : null}
+                                {suggestion.actorLabel ? (
+                                  <span>Actor: {suggestion.actorLabel}</span>
+                                ) : null}
+                                {suggestion.targetLabel ? (
+                                  <span>Target: {suggestion.targetLabel}</span>
+                                ) : null}
+                                {suggestion.teamLabel ? (
+                                  <span>Team: {suggestion.teamLabel}</span>
+                                ) : null}
+                              </div>
+                              <div className="mt-4 flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  disabled={!canReview || isPendingAction}
+                                  onClick={() =>
+                                    approveSuggestedEventMutation.mutate(
+                                      suggestion.id
+                                    )
+                                  }
+                                  className="rounded-sm border border-neon-gold/70 px-3 py-2 font-mono text-xs font-bold uppercase tracking-widest text-neon-gold transition hover:bg-neon-gold/10 disabled:cursor-not-allowed disabled:opacity-35"
+                                >
+                                  {isPendingAction &&
+                                  approveSuggestedEventMutation.isPending
+                                    ? "Approving…"
+                                    : "Approve"}
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={!canReview || isPendingAction}
+                                  onClick={() =>
+                                    rejectSuggestedEventMutation.mutate(
+                                      suggestion.id
+                                    )
+                                  }
+                                  className="rounded-sm border border-white/20 px-3 py-2 font-mono text-xs font-bold uppercase tracking-widest text-white/65 transition hover:border-red-300/70 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-35"
+                                >
+                                  {isPendingAction &&
+                                  rejectSuggestedEventMutation.isPending
+                                    ? "Rejecting…"
+                                    : "Reject"}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  ) : null}
                 </NeonCard>
 
                 <NeonCard variant="magenta">

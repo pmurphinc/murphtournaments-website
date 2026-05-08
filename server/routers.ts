@@ -23,12 +23,18 @@ import {
 } from "./weaponArchiveData";
 import {
   createVodAnalysis,
+  approveVodSuggestedEvent,
   createVodAnalysisEvent,
   createVodAnalysisEventInputSchema,
+  createVodSuggestedEvent,
+  createVodSuggestedEventInputSchema,
   createVodAnalysisInputSchema,
   getVodAnalysisById,
   listVodAnalysisEvents,
   listVodAnalyses,
+  listVodSuggestedEvents,
+  rejectVodSuggestedEvent,
+  suggestedEventIdInputSchema,
   vodAnalysisIdInputSchema,
 } from "./vodAnalysis";
 
@@ -728,6 +734,30 @@ export const appRouter = router({
       .input(vodAnalysisIdInputSchema)
       .query(async ({ input }) => {
         return listVodAnalysisEvents(input);
+      }),
+
+    listSuggestedEvents: publicProcedure
+      .input(vodAnalysisIdInputSchema)
+      .query(async ({ input }) => {
+        return listVodSuggestedEvents(input);
+      }),
+
+    createSuggestedEvent: publicProcedure
+      .input(createVodSuggestedEventInputSchema)
+      .mutation(async ({ input }) => {
+        return createVodSuggestedEvent(input);
+      }),
+
+    approveSuggestedEvent: publicProcedure
+      .input(suggestedEventIdInputSchema)
+      .mutation(async ({ input }) => {
+        return approveVodSuggestedEvent(input);
+      }),
+
+    rejectSuggestedEvent: publicProcedure
+      .input(suggestedEventIdInputSchema)
+      .mutation(async ({ input }) => {
+        return rejectVodSuggestedEvent(input);
       }),
   }),
 

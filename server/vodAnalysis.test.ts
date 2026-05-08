@@ -1,19 +1,31 @@
 import { describe, expect, it, vi } from "vitest";
-import { vodAnalyses, vodAnalysisEvents } from "../drizzle/schema";
 import {
+  vodAnalyses,
+  vodAnalysisEvents,
+  vodSuggestedEvents,
+} from "../drizzle/schema";
+import {
+  approveVodSuggestedEvent,
   buildVodAnalysisEventInsert,
   buildVodAnalysisInsert,
+  buildVodSuggestedEventInsert,
   createVodAnalysis,
   createVodAnalysisEvent,
   createVodAnalysisEventInputSchema,
   createVodAnalysisInputSchema,
+  createVodSuggestedEvent,
+  createVodSuggestedEventInputSchema,
   getVodAnalysisById,
   listVodAnalysisEvents,
   listVodAnalyses,
+  listVodSuggestedEvents,
+  rejectVodSuggestedEvent,
+  sortVodSuggestedEventRecords,
   vodAnalysisIdInputSchema,
   type VodAnalysisEventRecord,
   type VodAnalysisListItem,
   type VodAnalysisRecord,
+  type VodSuggestedEventRecord,
 } from "./vodAnalysis";
 
 function createInsertDb() {
@@ -54,6 +66,53 @@ function createEventListDb(rows: VodAnalysisEventRecord[]) {
   const select = vi.fn(() => ({ from }));
 
   return { db: { select }, select, from, where, orderBy };
+}
+
+function createSuggestedEventInsertDb() {
+  const values = vi.fn().mockResolvedValue(undefined);
+  const insert = vi.fn(() => ({ values }));
+
+  return { db: { insert }, insert, values };
+}
+
+function createSuggestedEventListDb(rows: VodSuggestedEventRecord[]) {
+  const orderBy = vi.fn().mockResolvedValue(rows);
+  const where = vi.fn(() => ({ orderBy }));
+  const from = vi.fn(() => ({ where }));
+  const select = vi.fn(() => ({ from }));
+
+  return { db: { select }, select, from, where, orderBy };
+}
+
+function createSuggestedEventWorkflowDb(rows: VodSuggestedEventRecord[]) {
+  const storedRows = [...rows];
+  const insertedEvents: unknown[] = [];
+  const set = vi.fn((values: Partial<VodSuggestedEventRecord>) => ({
+    where: vi.fn(async () => {
+      Object.assign(storedRows[0], values);
+    }),
+  }));
+  const update = vi.fn(() => ({ set }));
+  const values = vi.fn(async (event: unknown) => {
+    insertedEvents.push(event);
+    return { insertId: insertedEvents.length + 100 };
+  });
+  const insert = vi.fn(() => ({ values }));
+  const limit = vi.fn(async () => [...storedRows]);
+  const where = vi.fn(() => ({ limit }));
+  const from = vi.fn(() => ({ where }));
+  const select = vi.fn(() => ({ from }));
+
+  return {
+    db: { select, insert, update },
+    select,
+    insert,
+    values,
+    update,
+    set,
+    insertedEvents,
+    storedRows,
+  };
 }
 
 describe("vodAnalysisIdInputSchema", () => {
@@ -510,5 +569,241 @@ describe("listVodAnalysisEvents", () => {
     expect(from).toHaveBeenCalledWith(vodAnalysisEvents);
     expect(where).toHaveBeenCalledTimes(1);
     expect(orderBy).toHaveBeenCalledTimes(1);
+  });
+});
+
+const suggestedCreatedAt = new Date("2026-01-03T00:00:00Z");
+
+function suggestedEvent(
+  overrides: Partial<VodSuggestedEventRecord> = {}
+): VodSuggestedEventRecord {
+  return {
+    id: 1,
+    vodAnalysisId: 7,
+    eventType: "death",
+    timestampSeconds: 30,
+    actorLabel: "Player A",
+    targetLabel: "Player B",
+    teamLabel: "Orange",
+    metadata: null,
+    source: "manual_test",
+    confidence: null,
+    status: "pending",
+    confirmedVodEventId: null,
+    createdAt: suggestedCreatedAt,
+    updatedAt: suggestedCreatedAt,
+    ...overrides,
+  };
+}
+
+describe("createVodSuggestedEventInputSchema", () => {
+  it("validates suggested events with the same required field rules as manual events", () => {
+    const result = createVodSuggestedEventInputSchema.safeParse({
+      vodAnalysisId: 7,
+      eventType: "death",
+      timestampSeconds: 30,
+      actorLabel: "Player A",
+      source: "manual_test",
+    });
+
+    expect(result.success).toBe(false);
+    expect(
+      result.error?.issues.some(issue => issue.path[0] === "targetLabel")
+    ).toBe(true);
+  });
+
+  it("validates confidence range", () => {
+    expect(
+      createVodSuggestedEventInputSchema.safeParse({
+        vodAnalysisId: 7,
+        eventType: "cashout",
+        timestampSeconds: 30,
+        teamLabel: "Orange",
+        source: "debug",
+        confidence: -1,
+      }).success
+    ).toBe(false);
+    expect(
+      createVodSuggestedEventInputSchema.safeParse({
+        vodAnalysisId: 7,
+        eventType: "cashout",
+        timestampSeconds: 30,
+        teamLabel: "Orange",
+        source: "debug",
+        confidence: 101,
+      }).success
+    ).toBe(false);
+  });
+
+  it("defaults status to pending", () => {
+    expect(
+      createVodSuggestedEventInputSchema.parse({
+        vodAnalysisId: 7,
+        eventType: "cashout",
+        timestampSeconds: 30,
+        teamLabel: "Orange",
+        source: "automation",
+      }).status
+    ).toBe("pending");
+  });
+});
+
+describe("createVodSuggestedEvent", () => {
+  it("inserts pending suggestions without creating confirmed manual events", async () => {
+    const { db, insert, values } = createSuggestedEventInsertDb();
+
+    await expect(
+      createVodSuggestedEvent(
+        {
+          vodAnalysisId: 7,
+          eventType: "cashout",
+          timestampSeconds: 45,
+          teamLabel: "Orange",
+          source: "manual_test",
+          confidence: 88,
+        },
+        db
+      )
+    ).resolves.toMatchObject({
+      status: "pending",
+      confirmedVodEventId: null,
+      confidence: 88,
+    });
+
+    expect(insert).toHaveBeenCalledTimes(1);
+    expect(insert).toHaveBeenCalledWith(vodSuggestedEvents);
+    expect(insert).not.toHaveBeenCalledWith(vodAnalysisEvents);
+    expect(values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        vodAnalysisId: 7,
+        eventType: "cashout",
+        source: "manual_test",
+        status: "pending",
+      })
+    );
+  });
+
+  it("builds inserts with normalized labels and JSON metadata", () => {
+    expect(
+      buildVodSuggestedEventInsert({
+        vodAnalysisId: 7,
+        eventType: "death",
+        timestampSeconds: 12,
+        actorLabel: " Player A ",
+        targetLabel: " Player B ",
+        teamLabel: " ",
+        metadata: { sourceFrame: 123 },
+        source: "debug",
+      })
+    ).toMatchObject({
+      actorLabel: "Player A",
+      targetLabel: "Player B",
+      teamLabel: null,
+      metadata: JSON.stringify({ sourceFrame: 123 }),
+      status: "pending",
+    });
+  });
+});
+
+describe("approveVodSuggestedEvent", () => {
+  it("creates exactly one confirmed manual event and marks suggestion approved", async () => {
+    const { db, insert, values, set, insertedEvents } =
+      createSuggestedEventWorkflowDb([suggestedEvent({ id: 22 })]);
+
+    await expect(approveVodSuggestedEvent(22, db)).resolves.toMatchObject({
+      confirmedEventId: 101,
+      suggestion: { status: "approved", confirmedVodEventId: 101 },
+    });
+
+    expect(insert).toHaveBeenCalledTimes(1);
+    expect(insert).toHaveBeenCalledWith(vodAnalysisEvents);
+    expect(values).toHaveBeenCalledTimes(1);
+    expect(insertedEvents).toHaveLength(1);
+    expect(set).toHaveBeenCalledWith({
+      status: "approved",
+      confirmedVodEventId: 101,
+    });
+  });
+
+  it("is idempotent when already approved with a confirmed event id", async () => {
+    const { db, insert } = createSuggestedEventWorkflowDb([
+      suggestedEvent({
+        id: 22,
+        status: "approved",
+        confirmedVodEventId: 101,
+      }),
+    ]);
+
+    await expect(approveVodSuggestedEvent(22, db)).resolves.toMatchObject({
+      confirmedEventId: 101,
+    });
+
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("does not approve rejected suggestions", async () => {
+    const { db, insert } = createSuggestedEventWorkflowDb([
+      suggestedEvent({ id: 22, status: "rejected" }),
+    ]);
+
+    await expect(approveVodSuggestedEvent(22, db)).rejects.toThrow(
+      "Rejected suggested events cannot be approved."
+    );
+    expect(insert).not.toHaveBeenCalled();
+  });
+});
+
+describe("rejectVodSuggestedEvent", () => {
+  it("marks pending suggestions rejected without deleting them", async () => {
+    const { db, set, storedRows } = createSuggestedEventWorkflowDb([
+      suggestedEvent({ id: 22 }),
+    ]);
+
+    await expect(rejectVodSuggestedEvent(22, db)).resolves.toMatchObject({
+      status: "rejected",
+    });
+
+    expect(set).toHaveBeenCalledWith({ status: "rejected" });
+    expect(storedRows).toHaveLength(1);
+  });
+
+  it("does not reject approved suggestions", async () => {
+    const { db, update } = createSuggestedEventWorkflowDb([
+      suggestedEvent({
+        id: 22,
+        status: "approved",
+        confirmedVodEventId: 101,
+      }),
+    ]);
+
+    await expect(rejectVodSuggestedEvent(22, db)).rejects.toThrow(
+      "Approved suggested events cannot be rejected."
+    );
+    expect(update).not.toHaveBeenCalled();
+  });
+});
+
+describe("listVodSuggestedEvents", () => {
+  it("sorts pending suggestions first, then timestamp, then id", async () => {
+    const rows = [
+      suggestedEvent({ id: 3, status: "rejected", timestampSeconds: 1 }),
+      suggestedEvent({ id: 2, status: "pending", timestampSeconds: 20 }),
+      suggestedEvent({ id: 1, status: "pending", timestampSeconds: 10 }),
+      suggestedEvent({ id: 4, status: "approved", timestampSeconds: 5 }),
+    ];
+    const { db, from, orderBy } = createSuggestedEventListDb(rows);
+
+    await expect(listVodSuggestedEvents(7, db)).resolves.toEqual([
+      rows[2],
+      rows[1],
+      rows[3],
+      rows[0],
+    ]);
+
+    expect(from).toHaveBeenCalledWith(vodSuggestedEvents);
+    expect(orderBy).toHaveBeenCalledTimes(1);
+    expect(sortVodSuggestedEventRecords(rows).map(row => row.id)).toEqual([
+      1, 2, 4, 3,
+    ]);
   });
 });
