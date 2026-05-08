@@ -84,3 +84,19 @@ export const patchNotes = mysqlTable("patch_notes", {
 
 export type PatchNote = typeof patchNotes.$inferSelect;
 export type InsertPatchNote = typeof patchNotes.$inferInsert;
+
+// Base VOD analysis records. Provider metadata and analysis events are added in later slices.
+export const vodAnalyses = mysqlTable("vod_analyses", {
+  id: int("id").autoincrement().primaryKey(),
+  title: varchar("title", { length: 255 }),
+  sourceType: mysqlEnum("sourceType", ["twitch", "youtube", "google_drive", "generic"]).notNull(),
+  sourceId: varchar("sourceId", { length: 255 }),
+  sourceRef: varchar("sourceRef", { length: 255 }),
+  sourceUrl: varchar("sourceUrl", { length: 2048 }).notNull(),
+  normalizedUrl: varchar("normalizedUrl", { length: 2048 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type VodAnalysis = typeof vodAnalyses.$inferSelect;
+export type InsertVodAnalysis = typeof vodAnalyses.$inferInsert;
