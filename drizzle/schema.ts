@@ -84,3 +84,30 @@ export const patchNotes = mysqlTable("patch_notes", {
 
 export type PatchNote = typeof patchNotes.$inferSelect;
 export type InsertPatchNote = typeof patchNotes.$inferInsert;
+
+// VOD analysis intake records
+export const vodAnalyses = mysqlTable("vod_analyses", {
+  id: int("id").autoincrement().primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  sourceType: mysqlEnum("sourceType", [
+    "twitch",
+    "youtube",
+    "google_drive",
+    "generic",
+  ]).notNull(),
+  sourceUrl: varchar("sourceUrl", { length: 1024 }).notNull(),
+  normalizedSourceUrl: varchar("normalizedSourceUrl", {
+    length: 1024,
+  }).notNull(),
+  sourceId: varchar("sourceId", { length: 255 }),
+  sourceRef: varchar("sourceRef", { length: 255 }),
+  thumbnailUrl: varchar("thumbnailUrl", { length: 1024 }),
+  durationSeconds: int("durationSeconds"),
+  videoPov: mysqlEnum("videoPov", ["player", "spectator"]).notNull(),
+  status: mysqlEnum("status", ["created"]).default("created").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type VodAnalysis = typeof vodAnalyses.$inferSelect;
+export type InsertVodAnalysis = typeof vodAnalyses.$inferInsert;
