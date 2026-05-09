@@ -10,7 +10,11 @@ import {
   VOD_ANALYSIS_EVENT_TYPES,
   type VodAnalysisEventType,
 } from "@shared/vod/events";
-import { getVodSourceLabel } from "@shared/vod/source";
+import {
+  formatCaptureReadinessLabel,
+  getVodCaptureReadiness,
+} from "@shared/vod/frame-sampling";
+import { formatVodSourceType, getVodSourceLabel } from "@shared/vod/source";
 import {
   buildVodTeamSummaries,
   type VodTeamSummary,
@@ -194,6 +198,95 @@ function TeamSummarySection({
         </div>
       )}
     </div>
+  );
+}
+
+function CaptureReadinessPanel({
+  vod,
+}: {
+  vod: {
+    sourceType: string;
+    sourceUrl: string | null;
+    normalizedSourceUrl: string | null;
+    durationSeconds: number | null;
+  };
+}) {
+  const readiness = getVodCaptureReadiness(vod);
+  const samplePlan = readiness.samplePlan;
+  const firstTimestamps = samplePlan.timestamps.slice(0, 5);
+  const durationLabel = formatDuration(vod.durationSeconds) ?? "Unavailable";
+  const sourceTypeLabel =
+    vod.sourceType === "twitch" ||
+    vod.sourceType === "youtube" ||
+    vod.sourceType === "google_drive" ||
+    vod.sourceType === "generic"
+      ? formatVodSourceType(vod.sourceType)
+      : "Unknown";
+
+  return (
+    <details className="group rounded-lg border border-neon-cyan/20 bg-black/30 p-5">
+      <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
+        <div>
+          <h3 className="font-mono text-lg font-bold uppercase tracking-widest text-neon-cyan">
+            Capture Readiness
+          </h3>
+          <p className="mt-2 font-mono text-sm text-white/50">
+            Frame sampling is not active yet. This shows whether the VOD has
+            enough metadata for future capture.
+          </p>
+        </div>
+        <span className="rounded border border-white/10 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-white/50">
+          {formatCaptureReadinessLabel(readiness.status)}
+        </span>
+      </summary>
+
+      <div className="mt-4 space-y-4 border-t border-white/10 pt-4">
+        <div className="grid gap-2 sm:grid-cols-2">
+          <DetailPill
+            label="Status"
+            value={formatCaptureReadinessLabel(readiness.status)}
+          />
+          <DetailPill label="Source type" value={sourceTypeLabel} />
+          <DetailPill label="Duration" value={durationLabel} />
+          <DetailPill
+            label="Sample interval"
+            value={`${samplePlan.intervalSeconds}s`}
+          />
+          <DetailPill
+            label="Planned samples"
+            value={String(samplePlan.timestamps.length)}
+          />
+        </div>
+
+        <div className="rounded border border-white/10 bg-black/30 p-3">
+          <div className="font-mono text-[10px] uppercase tracking-widest text-white/45">
+            First 5 timestamps
+          </div>
+          {firstTimestamps.length > 0 ? (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {firstTimestamps.map(timestamp => (
+                <span
+                  key={timestamp}
+                  className="rounded border border-neon-cyan/30 px-2 py-1 font-mono text-xs text-neon-cyan"
+                >
+                  {formatVodEventTimestamp(timestamp)}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-2 font-mono text-sm text-white/50">
+              No timestamps planned until duration metadata is available.
+            </p>
+          )}
+        </div>
+
+        {!readiness.isReady ? (
+          <p className="rounded border border-neon-gold/30 bg-neon-gold/10 p-3 font-mono text-sm text-neon-gold">
+            {readiness.reason}
+          </p>
+        ) : null}
+      </div>
+    </details>
   );
 }
 
@@ -935,6 +1028,7 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
                   summaries={teamSummaries}
                   vodAnalysisId={vodAnalysisId}
                 />
+                {vod ? <CaptureReadinessPanel vod={vod} /> : null}
                 <WorkflowPlaceholder title="Auto-capture Setup" />
               </div>
             </section>
