@@ -34,6 +34,7 @@ import {
   listVodAnalyses,
   listVodSuggestedEvents,
   rejectVodSuggestedEvent,
+  refreshTwitchMetadataForVodAnalysis,
   suggestedEventIdInputSchema,
   vodAnalysisIdInputSchema,
 } from "./vodAnalysis";
@@ -728,6 +729,12 @@ export const appRouter = router({
       .input(createVodAnalysisEventInputSchema)
       .mutation(async ({ input }) => {
         return createVodAnalysisEvent(input);
+      }),
+
+    refreshTwitchMetadata: publicProcedure
+      .input(vodAnalysisIdInputSchema)
+      .mutation(async ({ input }) => {
+        return refreshTwitchMetadataForVodAnalysis(input);
       }),
 
     listEvents: publicProcedure

@@ -9,6 +9,7 @@ import {
   approveVodSuggestedEvent,
   buildVodAnalysisEventInsert,
   buildVodAnalysisInsert,
+  buildVodAnalysisMetadataUpdate,
   buildVodSuggestedEventInsert,
   createVodAnalysis,
   createVodAnalysisEvent,
@@ -22,6 +23,7 @@ import {
   listVodAnalyses,
   listVodSuggestedEvents,
   rejectVodSuggestedEvent,
+  refreshTwitchMetadataForVodAnalysis,
   sortVodSuggestedEventRecords,
   vodAnalysisIdInputSchema,
   type VodAnalysisEventRecord,
@@ -934,5 +936,151 @@ describe("listVodSuggestedEvents", () => {
     expect(sortVodSuggestedEventRecords(rows).map(row => row.id)).toEqual([
       1, 2, 4, 3,
     ]);
+  });
+});
+
+function createRefreshMetadataDb(rows: VodAnalysisRecord[]) {
+  const limit = vi.fn().mockResolvedValue(rows);
+  const whereSelect = vi.fn(() => ({ limit }));
+  const from = vi.fn(() => ({ where: whereSelect }));
+  const select = vi.fn(() => ({ from }));
+  const whereUpdate = vi.fn().mockResolvedValue(undefined);
+  const set = vi.fn(() => ({ where: whereUpdate }));
+  const update = vi.fn(() => ({ set }));
+
+  return {
+    db: { select, update },
+    select,
+    from,
+    limit,
+    update,
+    set,
+    whereUpdate,
+  };
+}
+
+describe("buildVodAnalysisMetadataUpdate", () => {
+  it("does not include null or missing Twitch fields in the update shape", () => {
+    expect(
+      buildVodAnalysisMetadataUpdate({
+        title: "   ",
+        thumbnailUrl: undefined,
+        durationSeconds: 0,
+      })
+    ).toEqual({});
+  });
+
+  it("maps successful Twitch metadata to VOD update fields", () => {
+    expect(
+      buildVodAnalysisMetadataUpdate({
+        title: " Finals VOD ",
+        thumbnailUrl: "https://example.com/thumb.jpg",
+        durationSeconds: 3723,
+      })
+    ).toEqual({
+      title: "Finals VOD",
+      thumbnailUrl: "https://example.com/thumb.jpg",
+      durationSeconds: 3723,
+    });
+  });
+});
+
+describe("refreshTwitchMetadataForVodAnalysis", () => {
+  const createdAt = new Date("2026-01-02T00:00:00Z");
+  const twitchVod: VodAnalysisRecord = {
+    id: 77,
+    title: "Existing title",
+    sourceType: "twitch",
+    sourceUrl: "https://www.twitch.tv/videos/1234567890",
+    normalizedSourceUrl: "https://www.twitch.tv/videos/1234567890",
+    sourceId: "1234567890",
+    sourceRef: "v1234567890",
+    thumbnailUrl: "https://example.com/existing.jpg",
+    durationSeconds: 60,
+    videoPov: "player",
+    status: "created",
+    createdAt,
+    updatedAt: createdAt,
+  };
+
+  it("returns not_twitch without calling Twitch for non-Twitch VODs", async () => {
+    const youtubeVod: VodAnalysisRecord = {
+      ...twitchVod,
+      sourceType: "youtube",
+      sourceUrl: "https://youtu.be/VIDEO_ID",
+      normalizedSourceUrl: "https://www.youtube.com/watch?v=VIDEO_ID",
+      sourceId: "VIDEO_ID",
+      sourceRef: "VIDEO_ID",
+    };
+    const { db, update } = createRefreshMetadataDb([youtubeVod]);
+    const metadataFetcher = vi.fn();
+
+    await expect(
+      refreshTwitchMetadataForVodAnalysis(77, db, metadataFetcher)
+    ).resolves.toEqual({ status: "not_twitch", vodAnalysis: youtubeVod });
+    expect(metadataFetcher).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("does not wipe existing metadata when Twitch omits fields", async () => {
+    const { db, update } = createRefreshMetadataDb([twitchVod]);
+    const metadataFetcher = vi.fn().mockResolvedValue({
+      status: "success",
+      metadata: {},
+    });
+
+    await expect(
+      refreshTwitchMetadataForVodAnalysis(77, db, metadataFetcher)
+    ).resolves.toEqual({
+      status: "updated",
+      vodAnalysis: twitchVod,
+      metadata: {},
+    });
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("updates title, thumbnail, and duration on successful Twitch refresh", async () => {
+    const { db, update, set } = createRefreshMetadataDb([twitchVod]);
+    const metadataFetcher = vi.fn().mockResolvedValue({
+      status: "success",
+      metadata: {
+        title: "Updated Twitch title",
+        thumbnailUrl: "https://example.com/new.jpg",
+        durationSeconds: 3723,
+      },
+    });
+
+    await expect(
+      refreshTwitchMetadataForVodAnalysis(77, db, metadataFetcher)
+    ).resolves.toMatchObject({
+      status: "updated",
+      vodAnalysis: {
+        title: "Updated Twitch title",
+        thumbnailUrl: "https://example.com/new.jpg",
+        durationSeconds: 3723,
+      },
+    });
+    expect(metadataFetcher).toHaveBeenCalledWith("1234567890");
+    expect(update).toHaveBeenCalledWith(vodAnalyses);
+    expect(set).toHaveBeenCalledWith({
+      title: "Updated Twitch title",
+      thumbnailUrl: "https://example.com/new.jpg",
+      durationSeconds: 3723,
+    });
+  });
+
+  it("returns credentials_missing from the Twitch helper without updating", async () => {
+    const { db, update } = createRefreshMetadataDb([twitchVod]);
+    const metadataFetcher = vi.fn().mockResolvedValue({
+      status: "credentials_missing",
+    });
+
+    await expect(
+      refreshTwitchMetadataForVodAnalysis(77, db, metadataFetcher)
+    ).resolves.toEqual({
+      status: "credentials_missing",
+      vodAnalysis: twitchVod,
+    });
+    expect(update).not.toHaveBeenCalled();
   });
 });

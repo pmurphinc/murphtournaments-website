@@ -238,6 +238,10 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
   const [suggestedEventError, setSuggestedEventError] = useState<string | null>(
     null
   );
+  const [metadataRefreshMessage, setMetadataRefreshMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
   const [eventFilter, setEventFilter] = useState<EventFilter>("all");
 
   const query = trpc.vodAnalysis.getById.useQuery(vodAnalysisId, {
@@ -286,6 +290,43 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
       },
       onError: error => {
         setSuggestedEventError(error.message);
+      },
+    });
+
+  const refreshTwitchMetadataMutation =
+    trpc.vodAnalysis.refreshTwitchMetadata.useMutation({
+      onMutate: () => {
+        setMetadataRefreshMessage(null);
+      },
+      onSuccess: async result => {
+        if (result.status === "updated") {
+          setMetadataRefreshMessage({
+            type: "success",
+            text: "Twitch metadata refreshed.",
+          });
+          await Promise.all([
+            utils.vodAnalysis.getById.invalidate(vodAnalysisId),
+            utils.vodAnalysis.list.invalidate(),
+          ]);
+          return;
+        }
+
+        const messages: Record<typeof result.status, string> = {
+          credentials_missing:
+            "Twitch credentials are not configured on the server.",
+          not_twitch: "This VOD is not a Twitch VOD.",
+          not_found: "Twitch metadata was not found for this VOD.",
+          fetch_failed:
+            "Twitch metadata could not be refreshed right now. Please try again later.",
+        };
+
+        setMetadataRefreshMessage({
+          type: "error",
+          text: messages[result.status],
+        });
+      },
+      onError: error => {
+        setMetadataRefreshMessage({ type: "error", text: error.message });
       },
     });
 
@@ -358,6 +399,7 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
 
   const vod = query.data;
   const durationLabel = vod ? formatDuration(vod.durationSeconds) : null;
+  const showTwitchMetadataRefresh = vod?.sourceType === "twitch";
   const sourceHref = vod?.normalizedSourceUrl || vod?.sourceUrl;
   const sourceLabel = vod
     ? getVodSourceLabel({
@@ -515,15 +557,43 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
                     ) : null}
                   </div>
 
-                  {sourceHref ? (
-                    <a
-                      href={sourceHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-6 inline-block rounded-sm border-2 border-neon-cyan px-5 py-2 font-mono text-sm font-bold uppercase tracking-widest text-neon-cyan transition-all hover:bg-neon-cyan/10 hover-glow-cyan"
+                  <div className="mt-6 flex flex-wrap items-center gap-3">
+                    {sourceHref ? (
+                      <a
+                        href={sourceHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-block rounded-sm border-2 border-neon-cyan px-5 py-2 font-mono text-sm font-bold uppercase tracking-widest text-neon-cyan transition-all hover:bg-neon-cyan/10 hover-glow-cyan"
+                      >
+                        Open source
+                      </a>
+                    ) : null}
+                    {showTwitchMetadataRefresh ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          refreshTwitchMetadataMutation.mutate(vodAnalysisId)
+                        }
+                        disabled={refreshTwitchMetadataMutation.isPending}
+                        className="rounded-sm border border-white/20 px-4 py-2 font-mono text-xs font-bold uppercase tracking-widest text-white/70 transition hover:border-neon-magenta hover:text-neon-magenta disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {refreshTwitchMetadataMutation.isPending
+                          ? "Refreshing…"
+                          : "Refresh Twitch metadata"}
+                      </button>
+                    ) : null}
+                  </div>
+
+                  {metadataRefreshMessage ? (
+                    <div
+                      className={`mt-4 rounded border p-3 font-mono text-sm ${
+                        metadataRefreshMessage.type === "success"
+                          ? "border-emerald-500/40 bg-emerald-950/30 text-emerald-100"
+                          : "border-red-500/40 bg-red-950/30 text-red-100"
+                      }`}
                     >
-                      Open source
-                    </a>
+                      {metadataRefreshMessage.text}
+                    </div>
                   ) : null}
                 </div>
 
