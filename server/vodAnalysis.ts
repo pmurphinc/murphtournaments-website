@@ -119,6 +119,22 @@ export type VodCaptureJobRecord = Pick<
   | "updatedAt"
 >;
 
+export type UpdateVodCaptureJobStatusInput = {
+  id: number;
+  vodAnalysisId: number;
+  status: VodCaptureJobStatus;
+  processedSamples?: number;
+  failedSamples?: number;
+  errorMessage?: string | null;
+};
+
+export type UpdateVodCaptureJobStatusResult = {
+  status: "updated";
+  id: number;
+  vodAnalysisId: number;
+  update: Partial<InsertVodCaptureJob>;
+};
+
 export type CreateVodCaptureJobResult =
   | {
       status: "created";
@@ -372,6 +388,14 @@ type CaptureJobListableDb = {
   };
 };
 
+type CaptureJobUpdateableDb = {
+  update: (table: typeof vodCaptureJobs) => {
+    set: (values: Partial<InsertVodCaptureJob>) => {
+      where: (condition: unknown) => Promise<unknown>;
+    };
+  };
+};
+
 type CaptureJobLatestDb = {
   select: (fields: Record<string, unknown>) => {
     from: (table: typeof vodCaptureJobs) => {
@@ -487,6 +511,25 @@ export const createVodCaptureJobInputSchema = z.object({
       error: "Capture job source is not supported.",
     })
     .optional(),
+});
+
+export const updateVodCaptureJobStatusInputSchema = z.object({
+  id: z.number().int().positive(),
+  vodAnalysisId: vodAnalysisIdInputSchema,
+  status: z.enum(VOD_CAPTURE_JOB_STATUSES, {
+    error: "Capture job status is not supported.",
+  }),
+  processedSamples: z
+    .number()
+    .int("Processed samples must be a whole number.")
+    .nonnegative("Processed samples must be zero or greater.")
+    .optional(),
+  failedSamples: z
+    .number()
+    .int("Failed samples must be a whole number.")
+    .nonnegative("Failed samples must be zero or greater.")
+    .optional(),
+  errorMessage: z.string().trim().optional().nullable(),
 });
 
 const vodAnalysisEventPayloadBaseSchema = z.object({
@@ -879,6 +922,68 @@ export async function createVodCaptureJob(
     readiness,
     captureJob,
   };
+}
+
+export function buildVodCaptureJobStatusUpdate(
+  input: UpdateVodCaptureJobStatusInput
+): UpdateVodCaptureJobStatusResult {
+  const parsedInput = updateVodCaptureJobStatusInputSchema.parse(input);
+  const update: Partial<InsertVodCaptureJob> = {
+    status: parsedInput.status,
+  };
+
+  if (parsedInput.processedSamples !== undefined) {
+    update.processedSamples = parsedInput.processedSamples;
+  }
+
+  if (parsedInput.failedSamples !== undefined) {
+    update.failedSamples = parsedInput.failedSamples;
+  }
+
+  if (parsedInput.status === "processing") {
+    update.startedAt = new Date();
+  }
+
+  if (["complete", "failed", "cancelled"].includes(parsedInput.status)) {
+    update.completedAt = new Date();
+  }
+
+  if (parsedInput.status === "failed") {
+    update.errorMessage = parsedInput.errorMessage?.trim() || null;
+  }
+
+  return {
+    status: "updated",
+    id: parsedInput.id,
+    vodAnalysisId: parsedInput.vodAnalysisId,
+    update,
+  };
+}
+
+export async function updateVodCaptureJobStatus(
+  input: UpdateVodCaptureJobStatusInput,
+  dbClient?: CaptureJobUpdateableDb | null
+): Promise<UpdateVodCaptureJobStatusResult> {
+  const result = buildVodCaptureJobStatusUpdate(input);
+  const db = dbClient ?? ((await getDb()) as CaptureJobUpdateableDb | null);
+
+  if (!db) {
+    throw new Error(
+      "Database is not available for VOD capture job status updates."
+    );
+  }
+
+  await db
+    .update(vodCaptureJobs)
+    .set(result.update)
+    .where(
+      and(
+        eq(vodCaptureJobs.id, result.id),
+        eq(vodCaptureJobs.vodAnalysisId, result.vodAnalysisId)
+      )
+    );
+
+  return result;
 }
 
 export async function listVodCaptureJobs(

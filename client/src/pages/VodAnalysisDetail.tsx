@@ -573,6 +573,10 @@ function CaptureReadinessPanel({
     type: "success" | "error";
     text: string;
   } | null>(null);
+  const [captureJobStatusMessage, setCaptureJobStatusMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
   const readiness = getVodCaptureReadiness(vod);
   const samplePlan = readiness.samplePlan;
   const firstTimestamps = samplePlan.timestamps.slice(0, 5);
@@ -587,6 +591,26 @@ function CaptureReadinessPanel({
     trpc.vodAnalysis.createCaptureJob.useMutation({
       onSuccess: async () => {
         await utils.vodAnalysis.getAutomationStatus.invalidate(vodAnalysisId);
+      },
+    });
+  const updateCaptureJobStatusMutation =
+    trpc.vodAnalysis.updateCaptureJobStatus.useMutation({
+      onMutate: () => {
+        setCaptureJobStatusMessage(null);
+      },
+      onSuccess: async result => {
+        await Promise.all([
+          utils.vodAnalysis.getAutomationStatus.invalidate(vodAnalysisId),
+          utils.vodAnalysis.getLatestCaptureJob.invalidate(vodAnalysisId),
+          utils.vodAnalysis.listCaptureJobs.invalidate(vodAnalysisId),
+        ]);
+        setCaptureJobStatusMessage({
+          type: "success",
+          text: `Marked capture job ${result.id} ${result.update.status}.`,
+        });
+      },
+      onError: error => {
+        setCaptureJobStatusMessage({ type: "error", text: error.message });
       },
     });
   const mockAutomationMutation =
@@ -758,6 +782,69 @@ function CaptureReadinessPanel({
               <p className="mt-3 rounded border border-red-500/40 bg-red-950/30 p-3 font-mono text-sm text-red-100">
                 {latestCaptureJob.errorMessage}
               </p>
+            ) : null}
+            {import.meta.env.DEV ? (
+              <div className="mt-3 rounded border border-neon-cyan/25 bg-neon-cyan/10 p-3">
+                <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-neon-cyan">
+                  Dev capture lifecycle
+                </div>
+                <p className="mt-1 font-mono text-xs text-white/60">
+                  Dev only. Simulates capture job lifecycle. No frames are
+                  processed.
+                </p>
+                {captureJobStatusMessage ? (
+                  <p
+                    className={`mt-2 rounded border p-2 font-mono text-xs ${
+                      captureJobStatusMessage.type === "success"
+                        ? "border-neon-cyan/30 bg-neon-cyan/10 text-neon-cyan"
+                        : "border-red-500/40 bg-red-950/30 text-red-100"
+                    }`}
+                  >
+                    {captureJobStatusMessage.text}
+                  </p>
+                ) : null}
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {[
+                    {
+                      label: "Mark processing",
+                      status: "processing" as const,
+                      errorMessage: undefined,
+                    },
+                    {
+                      label: "Mark complete",
+                      status: "complete" as const,
+                      errorMessage: undefined,
+                    },
+                    {
+                      label: "Mark failed",
+                      status: "failed" as const,
+                      errorMessage: "Mock capture failure.",
+                    },
+                    {
+                      label: "Cancel job",
+                      status: "cancelled" as const,
+                      errorMessage: undefined,
+                    },
+                  ].map(action => (
+                    <button
+                      key={action.status}
+                      type="button"
+                      onClick={() =>
+                        updateCaptureJobStatusMutation.mutate({
+                          id: latestCaptureJob.id,
+                          vodAnalysisId,
+                          status: action.status,
+                          errorMessage: action.errorMessage,
+                        })
+                      }
+                      disabled={updateCaptureJobStatusMutation.isPending}
+                      className="rounded-sm border border-neon-cyan/60 px-3 py-2 font-mono text-xs font-bold uppercase tracking-widest text-neon-cyan transition hover:bg-neon-cyan/10 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {action.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             ) : null}
           </div>
         ) : (

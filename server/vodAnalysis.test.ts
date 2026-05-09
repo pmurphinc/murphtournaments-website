@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   vodAnalyses,
   vodAnalysisEvents,
@@ -50,7 +50,30 @@ import {
   type VodSuggestedEventRecord,
   type ManualEventCountRow,
   type SuggestedEventStatusCountRow,
+  buildVodCaptureJobStatusUpdate,
+  updateVodCaptureJobStatus,
+  updateVodCaptureJobStatusInputSchema,
+  type UpdateVodCaptureJobStatusInput,
 } from "./vodAnalysis";
+import { appRouter } from "./routers";
+import type { TrpcContext } from "./_core/context";
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
+function createPublicContext(): TrpcContext {
+  return {
+    user: null,
+    req: {
+      protocol: "https",
+      headers: {},
+    } as TrpcContext["req"],
+    res: {
+      clearCookie: vi.fn(),
+    } as unknown as TrpcContext["res"],
+  };
+}
 
 function createInsertDb() {
   const values = vi.fn().mockResolvedValue(undefined);
@@ -149,6 +172,16 @@ function createCaptureJobDb(vodRows: VodAnalysisRecord[]) {
     values,
     insertedCaptureJobs,
   };
+}
+
+
+function createCaptureJobUpdateDb() {
+  const where = vi.fn().mockResolvedValue(undefined);
+  const set = vi.fn(() => ({ where }));
+  const update = vi.fn(() => ({ set }));
+  const insert = vi.fn();
+
+  return { db: { update, insert }, update, set, where, insert };
 }
 
 function createCaptureJobListDb(rows: VodCaptureJobRecord[]) {
@@ -1831,6 +1864,155 @@ describe("createVodCaptureJob", () => {
     expect(insert).toHaveBeenCalledWith(vodCaptureJobs);
     expect(insert).not.toHaveBeenCalledWith(vodAnalysisEvents);
     expect(insert).not.toHaveBeenCalledWith(vodSuggestedEvents);
+  });
+});
+
+
+describe("updateVodCaptureJobStatus", () => {
+  it("scopes updates by id and vodAnalysisId", async () => {
+    const { db, update, set, where } = createCaptureJobUpdateDb();
+
+    await expect(
+      updateVodCaptureJobStatus(
+        { id: 99, vodAnalysisId: 44, status: "queued" },
+        db
+      )
+    ).resolves.toMatchObject({
+      status: "updated",
+      id: 99,
+      vodAnalysisId: 44,
+      update: { status: "queued" },
+    });
+
+    expect(update).toHaveBeenCalledWith(vodCaptureJobs);
+    expect(set).toHaveBeenCalledWith({ status: "queued" });
+    expect(where).toHaveBeenCalledTimes(1);
+  });
+
+  it("writes processing status without creating suggestions or manual events", async () => {
+    const { db, set, insert } = createCaptureJobUpdateDb();
+
+    const result = await updateVodCaptureJobStatus(
+      {
+        id: 99,
+        vodAnalysisId: 44,
+        status: "processing",
+        processedSamples: 1,
+      },
+      db
+    );
+
+    expect(result.update).toMatchObject({
+      status: "processing",
+      processedSamples: 1,
+      startedAt: expect.any(Date),
+    });
+    expect(result.update).not.toHaveProperty("completedAt");
+    expect(set).toHaveBeenCalledWith(result.update);
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("sets complete status and terminal timestamp", async () => {
+    const { db } = createCaptureJobUpdateDb();
+
+    await expect(
+      updateVodCaptureJobStatus(
+        { id: 99, vodAnalysisId: 44, status: "complete", processedSamples: 4 },
+        db
+      )
+    ).resolves.toMatchObject({
+      update: {
+        status: "complete",
+        processedSamples: 4,
+        completedAt: expect.any(Date),
+      },
+    });
+  });
+
+  it("stores failed status error messages", async () => {
+    const { db } = createCaptureJobUpdateDb();
+
+    await expect(
+      updateVodCaptureJobStatus(
+        {
+          id: 99,
+          vodAnalysisId: 44,
+          status: "failed",
+          failedSamples: 2,
+          errorMessage: " Mock capture failure. ",
+        },
+        db
+      )
+    ).resolves.toMatchObject({
+      update: {
+        status: "failed",
+        failedSamples: 2,
+        errorMessage: "Mock capture failure.",
+        completedAt: expect.any(Date),
+      },
+    });
+  });
+
+  it("supports cancelled status", async () => {
+    const { db } = createCaptureJobUpdateDb();
+
+    await expect(
+      updateVodCaptureJobStatus(
+        { id: 99, vodAnalysisId: 44, status: "cancelled" },
+        db
+      )
+    ).resolves.toMatchObject({
+      update: { status: "cancelled", completedAt: expect.any(Date) },
+    });
+  });
+
+  it("rejects negative sample counts before database writes", async () => {
+    const { db, update } = createCaptureJobUpdateDb();
+
+    await expect(
+      updateVodCaptureJobStatus(
+        { id: 99, vodAnalysisId: 44, status: "processing", processedSamples: -1 },
+        db
+      )
+    ).rejects.toThrow();
+    await expect(
+      updateVodCaptureJobStatus(
+        { id: 99, vodAnalysisId: 44, status: "processing", failedSamples: -1 },
+        db
+      )
+    ).rejects.toThrow();
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid statuses before database writes", async () => {
+    const { db, update } = createCaptureJobUpdateDb();
+    const input: UpdateVodCaptureJobStatusInput = {
+      id: 99,
+      vodAnalysisId: 44,
+      status: "paused" as unknown as UpdateVodCaptureJobStatusInput["status"],
+    };
+
+    expect(() => buildVodCaptureJobStatusUpdate(input)).toThrow();
+    expect(
+      updateVodCaptureJobStatusInputSchema.safeParse(input).success
+    ).toBe(false);
+    await expect(updateVodCaptureJobStatus(input, db)).rejects.toThrow();
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("rejects production tRPC access before running the service", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    const caller = appRouter.createCaller(createPublicContext());
+
+    await expect(
+      caller.vodAnalysis.updateCaptureJobStatus({
+        id: 99,
+        vodAnalysisId: 44,
+        status: "processing",
+      })
+    ).rejects.toThrow(
+      "Capture job status controls are only available in development."
+    );
   });
 });
 
