@@ -135,6 +135,46 @@ export const vodAnalyses = mysqlTable("vod_analyses", {
 export type VodAnalysis = typeof vodAnalyses.$inferSelect;
 export type InsertVodAnalysis = typeof vodAnalyses.$inferInsert;
 
+// VOD capture job records for planned future frame capture work.
+export const vodCaptureJobs = mysqlTable(
+  "vod_capture_jobs",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    vodAnalysisId: int("vodAnalysisId")
+      .notNull()
+      .references(() => vodAnalyses.id, { onDelete: "cascade" }),
+    status: mysqlEnum("status", [
+      "queued",
+      "processing",
+      "complete",
+      "failed",
+      "cancelled",
+    ])
+      .default("queued")
+      .notNull(),
+    source: mysqlEnum("source", ["manual_debug", "automation"])
+      .default("manual_debug")
+      .notNull(),
+    sampleIntervalSeconds: int("sampleIntervalSeconds").notNull(),
+    plannedSamples: int("plannedSamples").notNull(),
+    processedSamples: int("processedSamples").default(0).notNull(),
+    failedSamples: int("failedSamples").default(0).notNull(),
+    errorMessage: text("errorMessage"),
+    startedAt: timestamp("startedAt"),
+    completedAt: timestamp("completedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    index("vod_capture_jobs_vodAnalysisId_idx").on(table.vodAnalysisId),
+    index("vod_capture_jobs_status_idx").on(table.status),
+    index("vod_capture_jobs_createdAt_idx").on(table.createdAt),
+  ]
+);
+
+export type VodCaptureJob = typeof vodCaptureJobs.$inferSelect;
+export type InsertVodCaptureJob = typeof vodCaptureJobs.$inferInsert;
+
 // Manual timeline events recorded against a VOD analysis.
 export const vodAnalysisEvents = mysqlTable(
   "vod_analysis_events",

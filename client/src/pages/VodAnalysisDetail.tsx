@@ -202,8 +202,10 @@ function TeamSummarySection({
 }
 
 function CaptureReadinessPanel({
+  vodAnalysisId,
   vod,
 }: {
+  vodAnalysisId: number;
   vod: {
     sourceType: string;
     sourceUrl: string | null;
@@ -211,10 +213,31 @@ function CaptureReadinessPanel({
     durationSeconds: number | null;
   };
 }) {
+  const utils = trpc.useUtils();
   const readiness = getVodCaptureReadiness(vod);
   const samplePlan = readiness.samplePlan;
   const firstTimestamps = samplePlan.timestamps.slice(0, 5);
   const durationLabel = formatDuration(vod.durationSeconds) ?? "Unavailable";
+  const latestCaptureJobQuery = trpc.vodAnalysis.getLatestCaptureJob.useQuery(
+    vodAnalysisId,
+    {
+      staleTime: 1000 * 10,
+    }
+  );
+  trpc.vodAnalysis.listCaptureJobs.useQuery(vodAnalysisId, {
+    staleTime: 1000 * 10,
+  });
+  const createCaptureJobMutation =
+    trpc.vodAnalysis.createCaptureJob.useMutation({
+      onSuccess: async () => {
+        await Promise.all([
+          utils.vodAnalysis.getLatestCaptureJob.invalidate(vodAnalysisId),
+          utils.vodAnalysis.listCaptureJobs.invalidate(vodAnalysisId),
+        ]);
+      },
+    });
+  const latestCaptureJob = latestCaptureJobQuery.data;
+  const captureJobDisabledReason = readiness.isReady ? null : readiness.reason;
   const sourceTypeLabel =
     vod.sourceType === "twitch" ||
     vod.sourceType === "youtube" ||
@@ -280,9 +303,79 @@ function CaptureReadinessPanel({
           )}
         </div>
 
+        <div className="rounded border border-neon-magenta/30 bg-neon-magenta/10 p-3 font-mono text-sm text-white/70">
+          Capture jobs are not processing frames yet. This records the planned
+          capture work for a future automation pass.
+        </div>
+
+        {latestCaptureJobQuery.isLoading ? (
+          <div className="rounded border border-white/10 bg-black/30 p-3 font-mono text-sm text-white/50">
+            Loading latest capture job…
+          </div>
+        ) : latestCaptureJob ? (
+          <div className="rounded border border-white/10 bg-black/30 p-3">
+            <div className="font-mono text-[10px] uppercase tracking-widest text-white/45">
+              Latest capture job
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <DetailPill label="Status" value={latestCaptureJob.status} />
+              <DetailPill label="Source" value={latestCaptureJob.source} />
+              <DetailPill
+                label="Planned"
+                value={String(latestCaptureJob.plannedSamples)}
+              />
+              <DetailPill
+                label="Processed / failed"
+                value={`${latestCaptureJob.processedSamples} / ${latestCaptureJob.failedSamples}`}
+              />
+              <DetailPill
+                label="Created"
+                value={formatDateTime(latestCaptureJob.createdAt)}
+              />
+            </div>
+            {latestCaptureJob.errorMessage ? (
+              <p className="mt-3 rounded border border-red-500/40 bg-red-950/30 p-3 font-mono text-sm text-red-100">
+                {latestCaptureJob.errorMessage}
+              </p>
+            ) : null}
+          </div>
+        ) : (
+          <div className="rounded border border-white/10 bg-black/30 p-3 font-mono text-sm text-white/50">
+            No capture jobs have been recorded for this VOD yet.
+          </div>
+        )}
+
         {!readiness.isReady ? (
           <p className="rounded border border-neon-gold/30 bg-neon-gold/10 p-3 font-mono text-sm text-neon-gold">
             {readiness.reason}
+          </p>
+        ) : null}
+
+        {createCaptureJobMutation.isError ? (
+          <p className="rounded border border-red-500/40 bg-red-950/30 p-3 font-mono text-sm text-red-100">
+            {createCaptureJobMutation.error.message}
+          </p>
+        ) : null}
+
+        <button
+          type="button"
+          onClick={() =>
+            createCaptureJobMutation.mutate({
+              vodAnalysisId,
+              source: "manual_debug",
+            })
+          }
+          disabled={!readiness.isReady || createCaptureJobMutation.isPending}
+          title={captureJobDisabledReason ?? undefined}
+          className="w-full rounded-sm border-2 border-neon-cyan px-4 py-2 font-mono text-xs font-bold uppercase tracking-widest text-neon-cyan transition hover:bg-neon-cyan/10 hover-glow-cyan disabled:cursor-not-allowed disabled:border-white/15 disabled:text-white/35 disabled:hover:bg-transparent"
+        >
+          {createCaptureJobMutation.isPending
+            ? "Creating capture job…"
+            : "Create capture job"}
+        </button>
+        {captureJobDisabledReason ? (
+          <p className="font-mono text-xs text-white/45">
+            Capture job creation is disabled: {captureJobDisabledReason}
           </p>
         ) : null}
       </div>
@@ -1028,7 +1121,12 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
                   summaries={teamSummaries}
                   vodAnalysisId={vodAnalysisId}
                 />
-                {vod ? <CaptureReadinessPanel vod={vod} /> : null}
+                {vod ? (
+                  <CaptureReadinessPanel
+                    vodAnalysisId={vodAnalysisId}
+                    vod={vod}
+                  />
+                ) : null}
                 <WorkflowPlaceholder title="Auto-capture Setup" />
               </div>
             </section>

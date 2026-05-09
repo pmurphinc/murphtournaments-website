@@ -2,12 +2,15 @@ import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   vodAnalyses,
   vodAnalysisEvents,
+  vodCaptureJobs,
   vodSuggestedEvents,
   type InsertVodAnalysis,
   type InsertVodAnalysisEvent,
+  type InsertVodCaptureJob,
   type InsertVodSuggestedEvent,
   type VodAnalysis,
   type VodAnalysisEvent,
+  type VodCaptureJob,
   type VodSuggestedEvent,
 } from "../drizzle/schema";
 import { parseVodSource, type VodSourceType } from "../shared/vod/source";
@@ -23,9 +26,26 @@ import {
 } from "../shared/vod/events";
 import { z } from "zod";
 import { getDb } from "./db";
+import {
+  buildFrameSamplingPlan,
+  getVodCaptureReadiness,
+  type VodCaptureReadiness,
+} from "../shared/vod/frame-sampling";
 
 export type VideoPov = "player" | "spectator";
 export type VodAnalysisStatus = "created";
+
+export const VOD_CAPTURE_JOB_STATUSES = [
+  "queued",
+  "processing",
+  "complete",
+  "failed",
+  "cancelled",
+] as const;
+export const VOD_CAPTURE_JOB_SOURCES = ["manual_debug", "automation"] as const;
+
+export type VodCaptureJobStatus = (typeof VOD_CAPTURE_JOB_STATUSES)[number];
+export type VodCaptureJobSource = (typeof VOD_CAPTURE_JOB_SOURCES)[number];
 
 export type CreateVodAnalysisInput = {
   title: string;
@@ -62,6 +82,37 @@ export type PendingSuggestedEventCountsByVodAnalysisId = Record<number, number>;
 export type VodAnalysisListItem = VodAnalysisRecord & {
   pendingSuggestedCount: number;
 };
+
+export type VodCaptureJobRecord = Pick<
+  VodCaptureJob,
+  | "id"
+  | "vodAnalysisId"
+  | "status"
+  | "source"
+  | "sampleIntervalSeconds"
+  | "plannedSamples"
+  | "processedSamples"
+  | "failedSamples"
+  | "errorMessage"
+  | "startedAt"
+  | "completedAt"
+  | "createdAt"
+  | "updatedAt"
+>;
+
+export type CreateVodCaptureJobResult =
+  | {
+      status: "created";
+      vodAnalysis: VodAnalysisRecord;
+      readiness: VodCaptureReadiness;
+      captureJob: InsertVodCaptureJob;
+    }
+  | {
+      status: "not_ready";
+      vodAnalysis: VodAnalysisRecord;
+      readiness: VodCaptureReadiness;
+    }
+  | { status: "not_found"; vodAnalysis: null };
 
 export type RefreshTwitchMetadataStatus =
   | "updated"
@@ -209,6 +260,34 @@ type EventListableDb = {
   };
 };
 
+type CaptureJobInsertableDb = GetByIdDb & {
+  insert: (table: typeof vodCaptureJobs) => {
+    values: (values: InsertVodCaptureJob) => Promise<unknown>;
+  };
+};
+
+type CaptureJobListableDb = {
+  select: (fields: Record<string, unknown>) => {
+    from: (table: typeof vodCaptureJobs) => {
+      where: (condition: unknown) => {
+        orderBy: (...columns: unknown[]) => Promise<VodCaptureJobRecord[]>;
+      };
+    };
+  };
+};
+
+type CaptureJobLatestDb = {
+  select: (fields: Record<string, unknown>) => {
+    from: (table: typeof vodCaptureJobs) => {
+      where: (condition: unknown) => {
+        orderBy: (...columns: unknown[]) => {
+          limit: (limit: number) => Promise<VodCaptureJobRecord[]>;
+        };
+      };
+    };
+  };
+};
+
 type SuggestedEventInsertableDb = {
   insert: (table: typeof vodSuggestedEvents) => {
     values: (values: InsertVodSuggestedEvent) => Promise<unknown>;
@@ -249,6 +328,15 @@ type SuggestedEventWorkflowDb = {
 const VALID_VIDEO_POVS: readonly VideoPov[] = ["player", "spectator"];
 
 export const vodAnalysisIdInputSchema = z.number().int().positive();
+
+export const createVodCaptureJobInputSchema = z.object({
+  vodAnalysisId: vodAnalysisIdInputSchema,
+  source: z
+    .enum(VOD_CAPTURE_JOB_SOURCES, {
+      error: "Capture job source is not supported.",
+    })
+    .optional(),
+});
 
 export const createVodAnalysisEventInputSchema = z
   .object({
@@ -508,6 +596,114 @@ export async function getVodAnalysisById(
 
   const [vodAnalysis] = await runQuery(db as unknown as GetByIdDb);
   return vodAnalysis ?? null;
+}
+
+const vodCaptureJobFields = {
+  id: vodCaptureJobs.id,
+  vodAnalysisId: vodCaptureJobs.vodAnalysisId,
+  status: vodCaptureJobs.status,
+  source: vodCaptureJobs.source,
+  sampleIntervalSeconds: vodCaptureJobs.sampleIntervalSeconds,
+  plannedSamples: vodCaptureJobs.plannedSamples,
+  processedSamples: vodCaptureJobs.processedSamples,
+  failedSamples: vodCaptureJobs.failedSamples,
+  errorMessage: vodCaptureJobs.errorMessage,
+  startedAt: vodCaptureJobs.startedAt,
+  completedAt: vodCaptureJobs.completedAt,
+  createdAt: vodCaptureJobs.createdAt,
+  updatedAt: vodCaptureJobs.updatedAt,
+};
+
+export async function createVodCaptureJob(
+  vodAnalysisId: number,
+  source: VodCaptureJobSource = "manual_debug",
+  dbClient?: CaptureJobInsertableDb | null
+): Promise<CreateVodCaptureJobResult> {
+  const parsedVodAnalysisId = vodAnalysisIdInputSchema.parse(vodAnalysisId);
+  const parsedSource = z.enum(VOD_CAPTURE_JOB_SOURCES).parse(source);
+  const db = dbClient ?? ((await getDb()) as CaptureJobInsertableDb | null);
+
+  if (!db) {
+    throw new Error("Database is not available for VOD capture job creation.");
+  }
+
+  const vodAnalysis = await getVodAnalysisById(parsedVodAnalysisId, db);
+
+  if (!vodAnalysis) {
+    return { status: "not_found", vodAnalysis: null };
+  }
+
+  const readiness = getVodCaptureReadiness(vodAnalysis);
+
+  if (!readiness.isReady) {
+    return { status: "not_ready", vodAnalysis, readiness };
+  }
+
+  const samplePlan = buildFrameSamplingPlan(vodAnalysis.durationSeconds);
+  const captureJob: InsertVodCaptureJob = {
+    vodAnalysisId: parsedVodAnalysisId,
+    status: "queued",
+    source: parsedSource,
+    sampleIntervalSeconds: samplePlan.intervalSeconds,
+    plannedSamples: samplePlan.timestamps.length,
+    processedSamples: 0,
+    failedSamples: 0,
+  };
+
+  await db.insert(vodCaptureJobs).values(captureJob);
+
+  return {
+    status: "created",
+    vodAnalysis,
+    readiness,
+    captureJob,
+  };
+}
+
+export async function listVodCaptureJobs(
+  vodAnalysisId: number,
+  dbClient?: CaptureJobListableDb | null
+): Promise<VodCaptureJobRecord[]> {
+  const parsedVodAnalysisId = vodAnalysisIdInputSchema.parse(vodAnalysisId);
+  const runQuery = (db: CaptureJobListableDb) =>
+    db
+      .select(vodCaptureJobFields)
+      .from(vodCaptureJobs)
+      .where(eq(vodCaptureJobs.vodAnalysisId, parsedVodAnalysisId))
+      .orderBy(desc(vodCaptureJobs.createdAt), desc(vodCaptureJobs.id));
+
+  const db = dbClient ?? ((await getDb()) as CaptureJobListableDb | null);
+
+  if (!db) {
+    throw new Error("Database is not available for VOD capture job listing.");
+  }
+
+  return runQuery(db);
+}
+
+export async function getLatestVodCaptureJob(
+  vodAnalysisId: number,
+  dbClient?: CaptureJobLatestDb | null
+): Promise<VodCaptureJobRecord | null> {
+  const parsedVodAnalysisId = vodAnalysisIdInputSchema.parse(vodAnalysisId);
+  const runQuery = (db: CaptureJobLatestDb) =>
+    db
+      .select(vodCaptureJobFields)
+      .from(vodCaptureJobs)
+      .where(eq(vodCaptureJobs.vodAnalysisId, parsedVodAnalysisId))
+      .orderBy(desc(vodCaptureJobs.createdAt), desc(vodCaptureJobs.id))
+      .limit(1);
+
+  const db = dbClient ?? ((await getDb()) as CaptureJobLatestDb | null);
+
+  if (!db) {
+    throw new Error(
+      "Database is not available for latest VOD capture job lookup."
+    );
+  }
+
+  const [captureJob] = await runQuery(db);
+  return captureJob ?? null;
 }
 
 const vodAnalysisEventFields = {

@@ -50,6 +50,13 @@
       "when": 1778283835649,
       "tag": "0006_add_vod_suggested_events",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1778288722176,
+      "tag": "0007_add_vod_capture_jobs",
+      "breakpoints": true
     }
   ]
 }
