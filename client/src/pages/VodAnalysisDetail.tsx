@@ -15,6 +15,9 @@ import {
 } from "@shared/vod/events";
 import {
   formatCaptureReadinessLabel,
+  formatVodCaptureJobStatus,
+  getVodCaptureJobProgress,
+  getVodCaptureJobStatusTone,
   getVodCaptureReadiness,
 } from "@shared/vod/frame-sampling";
 import {
@@ -570,25 +573,26 @@ function CaptureReadinessPanel({
   const samplePlan = readiness.samplePlan;
   const firstTimestamps = samplePlan.timestamps.slice(0, 5);
   const durationLabel = formatDuration(vod.durationSeconds) ?? "Unavailable";
-  const latestCaptureJobQuery = trpc.vodAnalysis.getLatestCaptureJob.useQuery(
+  const automationStatusQuery = trpc.vodAnalysis.getAutomationStatus.useQuery(
     vodAnalysisId,
     {
       staleTime: 1000 * 10,
     }
   );
-  trpc.vodAnalysis.listCaptureJobs.useQuery(vodAnalysisId, {
-    staleTime: 1000 * 10,
-  });
   const createCaptureJobMutation =
     trpc.vodAnalysis.createCaptureJob.useMutation({
       onSuccess: async () => {
-        await Promise.all([
-          utils.vodAnalysis.getLatestCaptureJob.invalidate(vodAnalysisId),
-          utils.vodAnalysis.listCaptureJobs.invalidate(vodAnalysisId),
-        ]);
+        await utils.vodAnalysis.getAutomationStatus.invalidate(vodAnalysisId);
       },
     });
-  const latestCaptureJob = latestCaptureJobQuery.data;
+  const automationStatus = automationStatusQuery.data;
+  const latestCaptureJob = automationStatus?.latestCaptureJob ?? null;
+  const captureJobProgress = latestCaptureJob
+    ? getVodCaptureJobProgress(latestCaptureJob)
+    : null;
+  const latestCaptureJobTone = latestCaptureJob
+    ? getVodCaptureJobStatusTone(latestCaptureJob.status)
+    : null;
   const captureJobDisabledReason = readiness.isReady ? null : readiness.reason;
   const sourceTypeLabel =
     vod.sourceType === "twitch" ||
@@ -603,11 +607,11 @@ function CaptureReadinessPanel({
       <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
         <div>
           <h3 className="font-mono text-lg font-bold uppercase tracking-widest text-neon-cyan">
-            Capture Readiness
+            Automation Status
           </h3>
           <p className="mt-2 font-mono text-sm text-white/50">
-            Frame sampling is not active yet. This shows whether the VOD has
-            enough metadata for future capture.
+            Frame scanning is not active yet. This panel shows the automation
+            pipeline state that future scanning will use.
           </p>
         </div>
         <span className="rounded border border-white/10 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-white/50">
@@ -656,29 +660,70 @@ function CaptureReadinessPanel({
         </div>
 
         <div className="rounded border border-neon-magenta/30 bg-neon-magenta/10 p-3 font-mono text-sm text-white/70">
-          Capture jobs are not processing frames yet. This records the planned
-          capture work for a future automation pass.
+          Capture jobs plan frame-sampling work. Suggested events are the review
+          queue output. Confirmed manual events are the approved output used by
+          Team Summary and Team Insights.
         </div>
 
-        {latestCaptureJobQuery.isLoading ? (
-          <div className="rounded border border-white/10 bg-black/30 p-3 font-mono text-sm text-white/50">
-            Loading latest capture job…
+        {automationStatus ? (
+          <div className="grid gap-2 sm:grid-cols-4">
+            <DetailPill
+              label="Pending suggestions"
+              value={String(automationStatus.pendingSuggestedCount)}
+            />
+            <DetailPill
+              label="Approved suggestions"
+              value={String(automationStatus.approvedSuggestedCount)}
+            />
+            <DetailPill
+              label="Rejected suggestions"
+              value={String(automationStatus.rejectedSuggestedCount)}
+            />
+            <DetailPill
+              label="Confirmed events"
+              value={String(automationStatus.confirmedManualEventCount)}
+            />
           </div>
-        ) : latestCaptureJob ? (
+        ) : null}
+
+        {automationStatusQuery.isLoading ? (
+          <div className="rounded border border-white/10 bg-black/30 p-3 font-mono text-sm text-white/50">
+            Loading automation status…
+          </div>
+        ) : latestCaptureJob && captureJobProgress ? (
           <div className="rounded border border-white/10 bg-black/30 p-3">
             <div className="font-mono text-[10px] uppercase tracking-widest text-white/45">
               Latest capture job
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              <DetailPill label="Status" value={latestCaptureJob.status} />
-              <DetailPill label="Source" value={latestCaptureJob.source} />
               <DetailPill
-                label="Planned"
-                value={String(latestCaptureJob.plannedSamples)}
+                label="Status"
+                value={formatVodCaptureJobStatus(latestCaptureJob.status)}
               />
               <DetailPill
-                label="Processed / failed"
-                value={`${latestCaptureJob.processedSamples} / ${latestCaptureJob.failedSamples}`}
+                label="Status tone"
+                value={latestCaptureJobTone ?? "neutral"}
+              />
+              <DetailPill label="Source" value={latestCaptureJob.source} />
+              <DetailPill
+                label="Planned samples"
+                value={String(captureJobProgress.plannedSamples)}
+              />
+              <DetailPill
+                label="Processed samples"
+                value={String(captureJobProgress.processedSamples)}
+              />
+              <DetailPill
+                label="Failed samples"
+                value={String(captureJobProgress.failedSamples)}
+              />
+              <DetailPill
+                label="Percent complete"
+                value={`${captureJobProgress.percentComplete}%`}
+              />
+              <DetailPill
+                label="Remaining samples"
+                value={String(captureJobProgress.remainingSamples)}
               />
               <DetailPill
                 label="Created"
@@ -722,9 +767,13 @@ function CaptureReadinessPanel({
           className="w-full rounded-sm border-2 border-neon-cyan px-4 py-2 font-mono text-xs font-bold uppercase tracking-widest text-neon-cyan transition hover:bg-neon-cyan/10 hover-glow-cyan disabled:cursor-not-allowed disabled:border-white/15 disabled:text-white/35 disabled:hover:bg-transparent"
         >
           {createCaptureJobMutation.isPending
-            ? "Creating capture job…"
-            : "Create capture job"}
+            ? "Queueing capture job…"
+            : "Queue capture job"}
         </button>
+        <p className="font-mono text-xs text-white/45">
+          This records planned sampling work. Actual frame processing will be
+          added later.
+        </p>
         {captureJobDisabledReason ? (
           <p className="font-mono text-xs text-white/45">
             Capture job creation is disabled: {captureJobDisabledReason}
@@ -812,11 +861,19 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
       staleTime: 1000 * 10,
     }
   );
+  const automationStatusQuery = trpc.vodAnalysis.getAutomationStatus.useQuery(
+    vodAnalysisId,
+    {
+      enabled: isValidId,
+      staleTime: 1000 * 10,
+    }
+  );
 
   const refreshSuggestedEventReview = async () => {
     await Promise.all([
       utils.vodAnalysis.listSuggestedEvents.invalidate(vodAnalysisId),
       utils.vodAnalysis.listEvents.invalidate(vodAnalysisId),
+      utils.vodAnalysis.getAutomationStatus.invalidate(vodAnalysisId),
     ]);
   };
 
@@ -833,7 +890,10 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
   const createEventMutation = trpc.vodAnalysis.createEvent.useMutation({
     onSuccess: async () => {
       resetEventForm();
-      await utils.vodAnalysis.listEvents.invalidate(vodAnalysisId);
+      await Promise.all([
+        utils.vodAnalysis.listEvents.invalidate(vodAnalysisId),
+        utils.vodAnalysis.getAutomationStatus.invalidate(vodAnalysisId),
+      ]);
     },
     onError: error => {
       setEventErrors({ form: error.message });
@@ -843,7 +903,10 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
   const updateEventMutation = trpc.vodAnalysis.updateEvent.useMutation({
     onSuccess: async () => {
       resetEventForm();
-      await utils.vodAnalysis.listEvents.invalidate(vodAnalysisId);
+      await Promise.all([
+        utils.vodAnalysis.listEvents.invalidate(vodAnalysisId),
+        utils.vodAnalysis.getAutomationStatus.invalidate(vodAnalysisId),
+      ]);
     },
     onError: error => {
       setEventErrors({ form: error.message });
@@ -859,7 +922,10 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
       if (editingEventId === deletedEvent.id) {
         resetEventForm();
       }
-      await utils.vodAnalysis.listEvents.invalidate(vodAnalysisId);
+      await Promise.all([
+        utils.vodAnalysis.listEvents.invalidate(vodAnalysisId),
+        utils.vodAnalysis.getAutomationStatus.invalidate(vodAnalysisId),
+      ]);
     },
     onError: error => {
       setEventErrors({ form: error.message });
@@ -875,7 +941,10 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
         setSuggestedEventError(null);
         setSuggestedEventActionError(null);
         setSuggestedEventsOpen(true);
-        await utils.vodAnalysis.listSuggestedEvents.invalidate(vodAnalysisId);
+        await Promise.all([
+          utils.vodAnalysis.listSuggestedEvents.invalidate(vodAnalysisId),
+          utils.vodAnalysis.getAutomationStatus.invalidate(vodAnalysisId),
+        ]);
       },
       onError: error => {
         setSuggestedEventError(error.message);
@@ -968,7 +1037,10 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
       onSuccess: async () => {
         setEditingSuggestedEvent(null);
         setSuggestedEventEditError(null);
-        await utils.vodAnalysis.listSuggestedEvents.invalidate(vodAnalysisId);
+        await Promise.all([
+          utils.vodAnalysis.listSuggestedEvents.invalidate(vodAnalysisId),
+          utils.vodAnalysis.getAutomationStatus.invalidate(vodAnalysisId),
+        ]);
       },
       onError: (error, input) => {
         setSuggestedEventEditError({ id: input.id, message: error.message });
@@ -1046,6 +1118,7 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
       )
     : null;
   const events = eventsQuery.data ?? [];
+  const automationStatus = automationStatusQuery.data;
   const suggestedEvents = suggestedEventsQuery.data ?? [];
   const suggestedEventCounts: Record<SuggestedEventStatus, number> = {
     pending: 0,
@@ -1921,10 +1994,16 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
                         Automation Suggestions
                       </span>
                       <span className="mt-1 block font-mono text-xs uppercase tracking-widest text-white/45">
-                        {suggestedEvents.length} total •{" "}
-                        {pendingSuggestedEventCount} pending •{" "}
-                        {suggestedEventCounts.approved} approved •{" "}
-                        {suggestedEventCounts.rejected} rejected
+                        {suggestedEvents.length} loaded •{" "}
+                        {automationStatus?.pendingSuggestedCount ??
+                          pendingSuggestedEventCount}{" "}
+                        pending •{" "}
+                        {automationStatus?.approvedSuggestedCount ??
+                          suggestedEventCounts.approved}{" "}
+                        approved •{" "}
+                        {automationStatus?.rejectedSuggestedCount ??
+                          suggestedEventCounts.rejected}{" "}
+                        rejected
                       </span>
                     </span>
                     <span className="font-mono text-sm uppercase tracking-widest text-neon-cyan">
@@ -1939,9 +2018,10 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
                       before becoming confirmed manual events.
                     </p>
                     <p className="rounded border border-neon-magenta/25 bg-neon-magenta/10 p-3 text-xs text-white/60">
-                      Capture jobs currently record planned frame-sampling work.
-                      Future automation will convert detected frame events into
-                      suggestions for this queue.
+                      Capture jobs plan frame-sampling work; suggested events
+                      are the review queue output; approved suggestions create
+                      confirmed manual events for Team Summary and Team
+                      Insights.
                     </p>
                   </div>
 

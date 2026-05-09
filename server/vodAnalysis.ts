@@ -79,6 +79,25 @@ export type PendingSuggestedEventCountRow = {
 
 export type PendingSuggestedEventCountsByVodAnalysisId = Record<number, number>;
 
+export type SuggestedEventStatusCountRow = {
+  status: VodSuggestedEventStatus;
+  suggestedCount: number | string | bigint;
+};
+
+export type ManualEventCountRow = {
+  confirmedManualEventCount: number | string | bigint;
+};
+
+export type VodAutomationStatusSummary = {
+  vodAnalysisId: number;
+  readiness: VodCaptureReadiness;
+  latestCaptureJob: VodCaptureJobRecord | null;
+  pendingSuggestedCount: number;
+  approvedSuggestedCount: number;
+  rejectedSuggestedCount: number;
+  confirmedManualEventCount: number;
+};
+
 export type VodAnalysisListItem = VodAnalysisRecord & {
   pendingSuggestedCount: number;
 };
@@ -324,6 +343,31 @@ type SuggestedEventInsertableDb = {
     values: (values: InsertVodSuggestedEvent) => Promise<unknown>;
   };
 };
+
+type SuggestedEventStatusCountDb = {
+  select: (fields: Record<string, unknown>) => {
+    from: (table: typeof vodSuggestedEvents) => {
+      where: (condition: unknown) => {
+        groupBy: (
+          column: typeof vodSuggestedEvents.status
+        ) => Promise<SuggestedEventStatusCountRow[]>;
+      };
+    };
+  };
+};
+
+type ManualEventCountDb = {
+  select: (fields: Record<string, unknown>) => {
+    from: (table: typeof vodAnalysisEvents) => {
+      where: (condition: unknown) => Promise<ManualEventCountRow[]>;
+    };
+  };
+};
+
+type AutomationStatusDb = GetByIdDb &
+  CaptureJobLatestDb &
+  SuggestedEventStatusCountDb &
+  ManualEventCountDb;
 
 type SuggestedEventListableDb = {
   select: (fields: Record<string, unknown>) => {
@@ -794,6 +838,72 @@ export async function getLatestVodCaptureJob(
 
   const [captureJob] = await runQuery(db);
   return captureJob ?? null;
+}
+
+function normalizeCountValue(value: number | string | bigint): number {
+  return Number(value);
+}
+
+export async function getVodAutomationStatus(
+  vodAnalysisId: number,
+  dbClient?: AutomationStatusDb | null
+): Promise<VodAutomationStatusSummary | null> {
+  const parsedVodAnalysisId = vodAnalysisIdInputSchema.parse(vodAnalysisId);
+  const db = dbClient ?? ((await getDb()) as AutomationStatusDb | null);
+
+  if (!db) {
+    throw new Error("Database is not available for VOD automation status.");
+  }
+
+  const vodAnalysis = await getVodAnalysisById(
+    parsedVodAnalysisId,
+    db as GetByIdDb
+  );
+
+  if (!vodAnalysis) {
+    return null;
+  }
+
+  const suggestedCountDb = db as SuggestedEventStatusCountDb;
+  const manualCountDb = db as ManualEventCountDb;
+  const [latestCaptureJob, suggestedCountRows, manualCountRows] =
+    await Promise.all([
+      getLatestVodCaptureJob(parsedVodAnalysisId, db as CaptureJobLatestDb),
+      suggestedCountDb
+        .select({
+          status: vodSuggestedEvents.status,
+          suggestedCount: count(),
+        })
+        .from(vodSuggestedEvents)
+        .where(eq(vodSuggestedEvents.vodAnalysisId, parsedVodAnalysisId))
+        .groupBy(vodSuggestedEvents.status),
+      manualCountDb
+        .select({ confirmedManualEventCount: count() })
+        .from(vodAnalysisEvents)
+        .where(eq(vodAnalysisEvents.vodAnalysisId, parsedVodAnalysisId)),
+    ]);
+
+  const suggestedCounts: Record<VodSuggestedEventStatus, number> = {
+    pending: 0,
+    approved: 0,
+    rejected: 0,
+  };
+
+  for (const row of suggestedCountRows) {
+    suggestedCounts[row.status] = normalizeCountValue(row.suggestedCount);
+  }
+
+  return {
+    vodAnalysisId: parsedVodAnalysisId,
+    readiness: getVodCaptureReadiness(vodAnalysis),
+    latestCaptureJob,
+    pendingSuggestedCount: suggestedCounts.pending,
+    approvedSuggestedCount: suggestedCounts.approved,
+    rejectedSuggestedCount: suggestedCounts.rejected,
+    confirmedManualEventCount: normalizeCountValue(
+      manualCountRows[0]?.confirmedManualEventCount ?? 0
+    ),
+  };
 }
 
 const vodAnalysisEventFields = {

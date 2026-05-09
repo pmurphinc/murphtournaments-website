@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   buildFrameSamplingPlan,
   formatCaptureReadinessLabel,
+  formatVodCaptureJobStatus,
+  getVodCaptureJobProgress,
+  getVodCaptureJobStatusTone,
   getVodCaptureReadiness,
 } from "./frame-sampling";
 
@@ -144,5 +147,79 @@ describe("formatCaptureReadinessLabel", () => {
     expect(formatCaptureReadinessLabel("unsupported_source")).toBe(
       "Unsupported source"
     );
+  });
+});
+
+describe("getVodCaptureJobProgress", () => {
+  it("calculates percent complete for the normal case", () => {
+    expect(
+      getVodCaptureJobProgress({
+        plannedSamples: 10,
+        processedSamples: 4,
+        failedSamples: 1,
+      })
+    ).toMatchObject({
+      completedSamples: 5,
+      percentComplete: 50,
+      remainingSamples: 5,
+    });
+  });
+
+  it("returns 0 percent when plannedSamples is 0", () => {
+    expect(
+      getVodCaptureJobProgress({
+        plannedSamples: 0,
+        processedSamples: 4,
+        failedSamples: 1,
+      }).percentComplete
+    ).toBe(0);
+  });
+
+  it("includes failed samples in completed samples", () => {
+    expect(
+      getVodCaptureJobProgress({
+        plannedSamples: 8,
+        processedSamples: 2,
+        failedSamples: 3,
+      }).completedSamples
+    ).toBe(5);
+  });
+
+  it("caps percent complete at 100", () => {
+    expect(
+      getVodCaptureJobProgress({
+        plannedSamples: 5,
+        processedSamples: 8,
+        failedSamples: 2,
+      }).percentComplete
+    ).toBe(100);
+  });
+
+  it("never returns negative remaining samples", () => {
+    expect(
+      getVodCaptureJobProgress({
+        plannedSamples: 5,
+        processedSamples: 6,
+        failedSamples: 2,
+      }).remainingSamples
+    ).toBe(0);
+  });
+});
+
+describe("VOD capture job status helpers", () => {
+  it("formats capture job statuses", () => {
+    expect(formatVodCaptureJobStatus("queued")).toBe("Queued");
+    expect(formatVodCaptureJobStatus("processing")).toBe("Processing");
+    expect(formatVodCaptureJobStatus("complete")).toBe("Complete");
+    expect(formatVodCaptureJobStatus("failed")).toBe("Failed");
+    expect(formatVodCaptureJobStatus("cancelled")).toBe("Cancelled");
+  });
+
+  it("maps capture job statuses to UI tones", () => {
+    expect(getVodCaptureJobStatusTone("queued")).toBe("neutral");
+    expect(getVodCaptureJobStatusTone("processing")).toBe("active");
+    expect(getVodCaptureJobStatusTone("complete")).toBe("success");
+    expect(getVodCaptureJobStatusTone("failed")).toBe("danger");
+    expect(getVodCaptureJobStatusTone("cancelled")).toBe("muted");
   });
 });
