@@ -184,6 +184,14 @@ export type CreateVodSuggestedEventInput = CreateVodAnalysisEventInput & {
   status?: VodSuggestedEventStatus;
 };
 
+export type UpdateVodSuggestedEventInput = Omit<
+  CreateVodAnalysisEventInput,
+  "vodAnalysisId"
+> & {
+  id: number;
+  confidence?: number | null;
+};
+
 export type VodSuggestedEventRecord = Pick<
   VodSuggestedEvent,
   | "id"
@@ -327,6 +335,21 @@ type SuggestedEventListableDb = {
   };
 };
 
+type SuggestedEventUpdateableDb = {
+  select: (fields: Record<string, unknown>) => {
+    from: (table: typeof vodSuggestedEvents) => {
+      where: (condition: unknown) => {
+        limit: (limit: number) => Promise<VodSuggestedEventRecord[]>;
+      };
+    };
+  };
+  update: (table: typeof vodSuggestedEvents) => {
+    set: (values: Partial<InsertVodSuggestedEvent>) => {
+      where: (condition: unknown) => Promise<unknown>;
+    };
+  };
+};
+
 type SuggestedEventWorkflowDb = {
   select: (fields: Record<string, unknown>) => {
     from: (table: typeof vodSuggestedEvents) => {
@@ -361,34 +384,49 @@ export const createVodCaptureJobInputSchema = z.object({
     .optional(),
 });
 
-const vodAnalysisEventPayloadSchema = z
-  .object({
-    vodAnalysisId: vodAnalysisIdInputSchema,
-    eventType: z.enum(VOD_ANALYSIS_EVENT_TYPES, {
-      error: "VOD analysis event type is not supported.",
-    }),
-    timestampSeconds: z
-      .number()
-      .int("Event timestamp must be a whole number of seconds.")
-      .nonnegative("Event timestamp must be zero or greater."),
-    actorLabel: z.string().trim().optional().nullable(),
-    targetLabel: z.string().trim().optional().nullable(),
-    teamLabel: z.string().trim().optional().nullable(),
-    metadata: z.unknown().optional(),
-  })
-  .superRefine((input, ctx) => {
-    const requiredFields = VOD_ANALYSIS_EVENT_REQUIRED_FIELDS[input.eventType];
+const vodAnalysisEventPayloadBaseSchema = z.object({
+  vodAnalysisId: vodAnalysisIdInputSchema,
+  eventType: z.enum(VOD_ANALYSIS_EVENT_TYPES, {
+    error: "VOD analysis event type is not supported.",
+  }),
+  timestampSeconds: z
+    .number()
+    .int("Event timestamp must be a whole number of seconds.")
+    .nonnegative("Event timestamp must be zero or greater."),
+  actorLabel: z.string().trim().optional().nullable(),
+  targetLabel: z.string().trim().optional().nullable(),
+  teamLabel: z.string().trim().optional().nullable(),
+  metadata: z.unknown().optional(),
+});
 
-    for (const field of requiredFields) {
-      if (!input[field]?.trim()) {
-        ctx.addIssue({
-          code: "custom",
-          path: [field],
-          message: `${field} is required for ${input.eventType} events.`,
-        });
-      }
+type VodAnalysisEventPayloadForValidation = z.infer<
+  typeof vodAnalysisEventPayloadBaseSchema
+>;
+
+function validateVodAnalysisEventRequiredFields(
+  input: Pick<
+    VodAnalysisEventPayloadForValidation,
+    "eventType" | "actorLabel" | "targetLabel" | "teamLabel"
+  >,
+  ctx: z.RefinementCtx
+) {
+  const requiredFields = VOD_ANALYSIS_EVENT_REQUIRED_FIELDS[input.eventType];
+
+  for (const field of requiredFields) {
+    if (!input[field]?.trim()) {
+      ctx.addIssue({
+        code: "custom",
+        path: [field],
+        message: `${field} is required for ${input.eventType} events.`,
+      });
     }
-  });
+  }
+}
+
+const vodAnalysisEventPayloadSchema =
+  vodAnalysisEventPayloadBaseSchema.superRefine(
+    validateVodAnalysisEventRequiredFields
+  );
 
 export const createVodAnalysisEventInputSchema = vodAnalysisEventPayloadSchema;
 
@@ -423,6 +461,21 @@ export const createVodSuggestedEventInputSchema =
       .optional()
       .default("pending"),
   });
+
+export const updateVodSuggestedEventInputSchema =
+  vodAnalysisEventPayloadBaseSchema
+    .omit({ vodAnalysisId: true })
+    .safeExtend({
+      id: z.number().int().positive(),
+      confidence: z
+        .number()
+        .int("Suggested event confidence must be a whole number.")
+        .min(0, "Suggested event confidence must be between 0 and 100.")
+        .max(100, "Suggested event confidence must be between 0 and 100.")
+        .optional()
+        .nullable(),
+    })
+    .superRefine(validateVodAnalysisEventRequiredFields);
 
 export const suggestedEventIdInputSchema = z.number().int().positive();
 
@@ -1051,15 +1104,32 @@ export function buildVodSuggestedEventInsert(
     actorLabel: normalizeEventLabel(parsedInput.actorLabel),
     targetLabel: normalizeEventLabel(parsedInput.targetLabel),
     teamLabel: normalizeEventLabel(parsedInput.teamLabel),
-    metadata:
-      parsedInput.metadata === undefined || parsedInput.metadata === null
-        ? null
-        : JSON.stringify(parsedInput.metadata),
+    metadata: serializeEventMetadata(parsedInput.metadata),
     source: parsedInput.source,
     confidence: parsedInput.confidence ?? null,
     status: parsedInput.status,
     confirmedVodEventId: null,
   };
+}
+
+export function buildVodSuggestedEventUpdate(
+  input: UpdateVodSuggestedEventInput
+): Partial<InsertVodSuggestedEvent> {
+  const parsedInput = updateVodSuggestedEventInputSchema.parse(input);
+  const values: Partial<InsertVodSuggestedEvent> = {
+    eventType: parsedInput.eventType,
+    timestampSeconds: parsedInput.timestampSeconds,
+    actorLabel: normalizeEventLabel(parsedInput.actorLabel),
+    targetLabel: normalizeEventLabel(parsedInput.targetLabel),
+    teamLabel: normalizeEventLabel(parsedInput.teamLabel),
+    confidence: parsedInput.confidence ?? null,
+  };
+
+  if (Object.hasOwn(parsedInput, "metadata")) {
+    values.metadata = serializeEventMetadata(parsedInput.metadata);
+  }
+
+  return values;
 }
 
 export async function createVodSuggestedEvent(
@@ -1078,6 +1148,52 @@ export async function createVodSuggestedEvent(
   await db.insert(vodSuggestedEvents).values(values);
 
   return values;
+}
+
+export async function updateVodSuggestedEvent(
+  input: UpdateVodSuggestedEventInput,
+  dbClient?: SuggestedEventUpdateableDb | null
+): Promise<VodSuggestedEventRecord> {
+  const parsedInput = updateVodSuggestedEventInputSchema.parse(input);
+  const values = buildVodSuggestedEventUpdate(parsedInput);
+  const db = dbClient ?? (await getDb());
+
+  if (!db) {
+    throw new Error(
+      "Database is not available for VOD suggested event updates."
+    );
+  }
+
+  const updateDb = db as unknown as SuggestedEventUpdateableDb;
+  const suggestion = await getVodSuggestedEventByIdForWorkflow(
+    parsedInput.id,
+    updateDb
+  );
+
+  if (!suggestion) {
+    throw new Error("Suggested event was not found.");
+  }
+
+  if (suggestion.status !== "pending") {
+    throw new Error("Only pending suggested events can be edited.");
+  }
+
+  await updateDb
+    .update(vodSuggestedEvents)
+    .set(values)
+    .where(
+      and(
+        eq(vodSuggestedEvents.id, parsedInput.id),
+        eq(vodSuggestedEvents.status, "pending")
+      )
+    );
+
+  const updatedSuggestion = await getVodSuggestedEventByIdForWorkflow(
+    parsedInput.id,
+    updateDb
+  );
+
+  return updatedSuggestion ?? { ...suggestion, ...values };
 }
 
 export async function listVodSuggestedEvents(
@@ -1117,7 +1233,7 @@ export async function listVodSuggestedEvents(
 
 async function getVodSuggestedEventByIdForWorkflow(
   id: number,
-  db: SuggestedEventWorkflowDb
+  db: SuggestedEventUpdateableDb
 ): Promise<VodSuggestedEventRecord | null> {
   const [suggestion] = await db
     .select(vodSuggestedEventFields)

@@ -61,6 +61,16 @@ type SuggestedEventFilter = (typeof SUGGESTED_EVENT_FILTERS)[number];
 
 type SuggestedEventStatus = Exclude<SuggestedEventFilter, "all">;
 
+type SuggestedEventEditState = {
+  id: number;
+  eventType: VodAnalysisEventType;
+  timestampInput: string;
+  actorLabel: string;
+  targetLabel: string;
+  teamLabel: string;
+  confidence: number | null;
+};
+
 const suggestedEventFilterLabels: Record<SuggestedEventFilter, string> = {
   all: "All",
   pending: "Pending",
@@ -772,6 +782,12 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
     id: number;
     message: string;
   } | null>(null);
+  const [editingSuggestedEvent, setEditingSuggestedEvent] =
+    useState<SuggestedEventEditState | null>(null);
+  const [suggestedEventEditError, setSuggestedEventEditError] = useState<{
+    id: number;
+    message: string;
+  } | null>(null);
   const [suggestedEventFilter, setSuggestedEventFilter] =
     useState<SuggestedEventFilter | null>(null);
   const [metadataRefreshMessage, setMetadataRefreshMessage] = useState<{
@@ -935,6 +951,27 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
       },
       onError: (error, id) => {
         setSuggestedEventActionError({ id, message: error.message });
+      },
+      onSettled: () => {
+        setActiveSuggestedEventId(null);
+      },
+    });
+
+  const updateSuggestedEventMutation =
+    trpc.vodAnalysis.updateSuggestedEvent.useMutation({
+      onMutate: input => {
+        setActiveSuggestedEventId(input.id);
+        setSuggestedEventError(null);
+        setSuggestedEventActionError(null);
+        setSuggestedEventEditError(null);
+      },
+      onSuccess: async () => {
+        setEditingSuggestedEvent(null);
+        setSuggestedEventEditError(null);
+        await utils.vodAnalysis.listSuggestedEvents.invalidate(vodAnalysisId);
+      },
+      onError: (error, input) => {
+        setSuggestedEventEditError({ id: input.id, message: error.message });
       },
       onSettled: () => {
         setActiveSuggestedEventId(null);
@@ -1166,6 +1203,104 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
     });
   };
 
+  const startSuggestedEventEdit = (suggestion: {
+    id: number;
+    eventType: VodAnalysisEventType;
+    timestampSeconds: number;
+    actorLabel: string | null;
+    targetLabel: string | null;
+    teamLabel: string | null;
+    confidence: number | null;
+  }) => {
+    setEditingSuggestedEvent({
+      id: suggestion.id,
+      eventType: suggestion.eventType,
+      timestampInput: formatVodEventTimestamp(suggestion.timestampSeconds),
+      actorLabel: suggestion.actorLabel ?? "",
+      targetLabel: suggestion.targetLabel ?? "",
+      teamLabel: suggestion.teamLabel ?? "",
+      confidence: suggestion.confidence,
+    });
+    setSuggestedEventEditError(null);
+    setSuggestedEventActionError(null);
+  };
+
+  const updateSuggestedEventEdit = (
+    updates: Partial<Omit<SuggestedEventEditState, "id">>
+  ) => {
+    setEditingSuggestedEvent(current =>
+      current ? { ...current, ...updates } : current
+    );
+  };
+
+  const getSuggestedEventEditErrors = (edit: SuggestedEventEditState) => {
+    const nextErrors: EventFormErrors = {};
+    const editRequiredFields =
+      VOD_ANALYSIS_EVENT_REQUIRED_FIELDS[edit.eventType];
+    const editTimestamp = parseVodEventTimestamp(edit.timestampInput);
+
+    if (!edit.timestampInput.trim()) {
+      nextErrors.timestamp = "Timestamp is required.";
+    } else if (editTimestamp === null) {
+      nextErrors.timestamp = "Use whole seconds or m:ss format.";
+    }
+
+    if (editRequiredFields.includes("actorLabel") && !edit.actorLabel.trim()) {
+      nextErrors.actorLabel = "Actor is required for this event type.";
+    }
+
+    if (
+      editRequiredFields.includes("targetLabel") &&
+      !edit.targetLabel.trim()
+    ) {
+      nextErrors.targetLabel = "Target is required for this event type.";
+    }
+
+    if (editRequiredFields.includes("teamLabel") && !edit.teamLabel.trim()) {
+      nextErrors.teamLabel = "Team is required for this event type.";
+    }
+
+    return { errors: nextErrors, timestampSeconds: editTimestamp };
+  };
+
+  const handleSuggestedEventEditSubmit = (
+    event: FormEvent<HTMLFormElement>
+  ) => {
+    event.preventDefault();
+    if (!editingSuggestedEvent) return;
+
+    const { errors, timestampSeconds } = getSuggestedEventEditErrors(
+      editingSuggestedEvent
+    );
+
+    if (Object.keys(errors).length > 0 || timestampSeconds === null) {
+      setSuggestedEventEditError({
+        id: editingSuggestedEvent.id,
+        message: Object.values(errors)[0] ?? "Correct the highlighted fields.",
+      });
+      return;
+    }
+
+    const editRequiredFields =
+      VOD_ANALYSIS_EVENT_REQUIRED_FIELDS[editingSuggestedEvent.eventType];
+
+    updateSuggestedEventMutation.mutate({
+      id: editingSuggestedEvent.id,
+      eventType: editingSuggestedEvent.eventType,
+      timestampSeconds,
+      actorLabel: editRequiredFields.includes("actorLabel")
+        ? editingSuggestedEvent.actorLabel
+        : "",
+      targetLabel: editRequiredFields.includes("targetLabel")
+        ? editingSuggestedEvent.targetLabel
+        : "",
+      teamLabel: editRequiredFields.includes("teamLabel")
+        ? editingSuggestedEvent.teamLabel
+        : "",
+      confidence: editingSuggestedEvent.confidence,
+    });
+  };
+
   const renderEventInput = (
     field: "actorLabel" | "targetLabel" | "teamLabel"
   ) => {
@@ -1277,6 +1412,228 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
           </span>
         ) : null}
       </label>
+    );
+  };
+
+  const renderSuggestedEventEditInput = (
+    edit: SuggestedEventEditState,
+    field: "actorLabel" | "targetLabel" | "teamLabel",
+    errors: EventFormErrors
+  ) => {
+    const editRequiredFields =
+      VOD_ANALYSIS_EVENT_REQUIRED_FIELDS[edit.eventType];
+    const value = edit[field];
+    const helper =
+      eventFieldHelp[edit.eventType][field] ?? eventFieldLabels[field];
+    const isRequired = editRequiredFields.includes(field);
+    const isTeamSelector =
+      field === "teamLabel" ||
+      (field === "actorLabel" && edit.eventType === "team_wipe");
+    const targetKind = getVodEventTargetKind(edit.eventType);
+    const objectiveOptions =
+      field === "targetLabel" && targetKind === "cashout"
+        ? VOD_CASHOUT_LABELS
+        : field === "targetLabel" && targetKind === "vault"
+          ? VOD_VAULT_LABELS
+          : null;
+    const suggestions =
+      field === "actorLabel"
+        ? labelSuggestions.actors
+        : field === "targetLabel"
+          ? labelSuggestions.targets
+          : [];
+    const datalistId = `suggested-${edit.id}-${edit.eventType}-${field}`;
+    const teamOptions = isTeamSelector
+      ? buildVodTeamLabelOptions([value, ...labelSuggestions.teams])
+      : [];
+    const setValue = (nextValue: string) =>
+      updateSuggestedEventEdit({ [field]: nextValue });
+
+    return (
+      <label key={field} className="block">
+        <span className="font-mono text-[10px] uppercase tracking-widest text-white/55">
+          {helper}{" "}
+          {isRequired ? <span className="text-neon-gold">*</span> : null}
+        </span>
+        {objectiveOptions ? (
+          <select
+            value={
+              (objectiveOptions as readonly string[]).includes(value)
+                ? value
+                : ""
+            }
+            onChange={event => setValue(event.target.value)}
+            className="mt-1 w-full rounded border border-white/15 bg-black/45 px-2 py-2 font-mono text-xs text-white outline-none transition focus:border-neon-cyan"
+          >
+            <option value="">
+              Select {targetKind === "cashout" ? "cashout" : "vault"}
+            </option>
+            {objectiveOptions.map(option => (
+              <option key={option} value={option}>
+                {targetKind === "cashout" ? "Cashout" : "Vault"} {option}
+              </option>
+            ))}
+          </select>
+        ) : isTeamSelector ? (
+          <select
+            value={teamOptions.includes(value) ? value : ""}
+            onChange={event => setValue(event.target.value)}
+            className="mt-1 w-full rounded border border-white/15 bg-black/45 px-2 py-2 font-mono text-xs text-white outline-none transition focus:border-neon-cyan"
+          >
+            <option value="">Select team</option>
+            {teamOptions.map(option => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <>
+            <input
+              value={value}
+              onChange={event => setValue(event.target.value)}
+              placeholder={eventFieldLabels[field]}
+              list={datalistId}
+              className="mt-1 w-full rounded border border-white/15 bg-black/45 px-2 py-2 font-mono text-xs text-white outline-none transition focus:border-neon-cyan"
+            />
+            <datalist id={datalistId}>
+              {suggestions.map(suggestion => (
+                <option key={suggestion} value={suggestion} />
+              ))}
+            </datalist>
+          </>
+        )}
+        {errors[field] ? (
+          <span className="mt-1 block font-mono text-[10px] text-red-300">
+            {errors[field]}
+          </span>
+        ) : null}
+      </label>
+    );
+  };
+
+  const renderSuggestedEventEditor = (edit: SuggestedEventEditState) => {
+    const editRequiredFields =
+      VOD_ANALYSIS_EVENT_REQUIRED_FIELDS[edit.eventType];
+    const { errors } = getSuggestedEventEditErrors(edit);
+    const isSavingEdit =
+      activeSuggestedEventId === edit.id &&
+      updateSuggestedEventMutation.isPending;
+
+    return (
+      <form
+        onSubmit={handleSuggestedEventEditSubmit}
+        className="mt-4 space-y-3 rounded border border-neon-cyan/25 bg-black/30 p-3"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="font-mono text-xs font-bold uppercase tracking-widest text-neon-cyan">
+            Correct suggestion
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setEditingSuggestedEvent(null);
+              setSuggestedEventEditError(null);
+            }}
+            className="font-mono text-[10px] font-bold uppercase tracking-widest text-white/55 transition hover:text-neon-cyan"
+          >
+            Cancel
+          </button>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]">
+          <label className="block">
+            <span className="font-mono text-[10px] uppercase tracking-widest text-white/55">
+              Event Type *
+            </span>
+            <select
+              value={edit.eventType}
+              onChange={event => {
+                const nextEventType = event.target
+                  .value as VodAnalysisEventType;
+                const nextRequiredFields =
+                  VOD_ANALYSIS_EVENT_REQUIRED_FIELDS[nextEventType];
+                updateSuggestedEventEdit({
+                  eventType: nextEventType,
+                  actorLabel: nextRequiredFields.includes("actorLabel")
+                    ? edit.actorLabel
+                    : "",
+                  targetLabel: nextRequiredFields.includes("targetLabel")
+                    ? edit.targetLabel
+                    : "",
+                  teamLabel: nextRequiredFields.includes("teamLabel")
+                    ? edit.teamLabel
+                    : "",
+                });
+              }}
+              className="mt-1 w-full rounded border border-white/15 bg-black/45 px-2 py-2 font-mono text-xs text-white outline-none transition focus:border-neon-cyan"
+            >
+              {VOD_ANALYSIS_EVENT_TYPES.map(eventType => (
+                <option key={eventType} value={eventType}>
+                  {VOD_ANALYSIS_EVENT_LABELS[eventType]}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="font-mono text-[10px] uppercase tracking-widest text-white/55">
+              Timestamp *
+            </span>
+            <input
+              value={edit.timestampInput}
+              onChange={event =>
+                updateSuggestedEventEdit({ timestampInput: event.target.value })
+              }
+              placeholder="90 or 1:30"
+              className="mt-1 w-full rounded border border-white/15 bg-black/45 px-2 py-2 font-mono text-xs text-white outline-none transition focus:border-neon-cyan"
+            />
+            {errors.timestamp ? (
+              <span className="mt-1 block font-mono text-[10px] text-red-300">
+                {errors.timestamp}
+              </span>
+            ) : null}
+          </label>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-3">
+          {editRequiredFields.includes("actorLabel")
+            ? renderSuggestedEventEditInput(edit, "actorLabel", errors)
+            : null}
+          {editRequiredFields.includes("targetLabel")
+            ? renderSuggestedEventEditInput(edit, "targetLabel", errors)
+            : null}
+          {editRequiredFields.includes("teamLabel")
+            ? renderSuggestedEventEditInput(edit, "teamLabel", errors)
+            : null}
+        </div>
+
+        {suggestedEventEditError?.id === edit.id ? (
+          <div className="rounded border border-red-500/40 bg-red-950/30 p-2 font-mono text-xs text-red-100">
+            {suggestedEventEditError.message}
+          </div>
+        ) : null}
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="submit"
+            disabled={isSavingEdit || Object.keys(errors).length > 0}
+            className="rounded-sm border border-neon-gold/70 px-3 py-2 font-mono text-xs font-bold uppercase tracking-widest text-neon-gold transition hover:bg-neon-gold/10 disabled:cursor-not-allowed disabled:opacity-35"
+          >
+            {isSavingEdit ? "Saving…" : "Save correction"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setEditingSuggestedEvent(null);
+              setSuggestedEventEditError(null);
+            }}
+            className="rounded-sm border border-white/20 px-3 py-2 font-mono text-xs font-bold uppercase tracking-widest text-white/65 transition hover:border-neon-cyan hover:text-neon-cyan"
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
     );
   };
 
@@ -1666,8 +2023,13 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
                             const isPendingAction =
                               activeSuggestedEventId === suggestion.id &&
                               (approveSuggestedEventMutation.isPending ||
-                                rejectSuggestedEventMutation.isPending);
+                                rejectSuggestedEventMutation.isPending ||
+                                updateSuggestedEventMutation.isPending);
                             const canReview = suggestion.status === "pending";
+                            const editState =
+                              editingSuggestedEvent?.id === suggestion.id
+                                ? editingSuggestedEvent
+                                : null;
                             const timestampUrl = getEventTimestampUrl(
                               suggestion.timestampSeconds
                             );
@@ -1743,6 +2105,10 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
                                   </div>
                                 ) : null}
 
+                                {editState
+                                  ? renderSuggestedEventEditor(editState)
+                                  : null}
+
                                 {suggestedEventActionError?.id ===
                                 suggestion.id ? (
                                   <div className="mt-3 rounded border border-red-500/40 bg-red-950/30 p-2 font-mono text-xs text-red-100">
@@ -1752,6 +2118,16 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
 
                                 {canReview ? (
                                   <div className="mt-4 flex flex-wrap gap-2">
+                                    <button
+                                      type="button"
+                                      disabled={isPendingAction}
+                                      onClick={() =>
+                                        startSuggestedEventEdit(suggestion)
+                                      }
+                                      className="rounded-sm border border-neon-cyan/60 px-3 py-2 font-mono text-xs font-bold uppercase tracking-widest text-neon-cyan transition hover:bg-neon-cyan/10 disabled:cursor-not-allowed disabled:opacity-35"
+                                    >
+                                      {editState ? "Editing" : "Edit"}
+                                    </button>
                                     <button
                                       type="button"
                                       disabled={isPendingAction}
