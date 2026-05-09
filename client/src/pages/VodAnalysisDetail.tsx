@@ -610,8 +610,8 @@ function CaptureReadinessPanel({
             Automation Status
           </h3>
           <p className="mt-2 font-mono text-sm text-white/50">
-            Frame scanning is not active yet. This panel shows the automation
-            pipeline state that future scanning will use.
+            Frame scanning is not active yet. Future scanner output will enter
+            this review queue as pending suggestions.
           </p>
         </div>
         <span className="rounded border border-white/10 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-white/50">
@@ -2013,9 +2013,8 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
 
                   <div className="mt-3 space-y-2 font-mono text-sm text-white/65">
                     <p>
-                      Future automation will populate this queue from frame
-                      scanning. For now, suggested events can be reviewed here
-                      before becoming confirmed manual events.
+                      Frame scanning is not active yet. Future scanner output
+                      will enter this review queue as pending suggestions.
                     </p>
                     <p className="rounded border border-neon-magenta/25 bg-neon-magenta/10 p-3 text-xs text-white/60">
                       Capture jobs plan frame-sampling work; suggested events

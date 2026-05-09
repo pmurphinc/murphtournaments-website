@@ -12,6 +12,7 @@ import {
   buildVodAnalysisEventUpdate,
   buildVodAnalysisInsert,
   buildVodAnalysisMetadataUpdate,
+  buildAutomationDetectionSuggestedEventInserts,
   buildVodSuggestedEventInsert,
   buildVodSuggestedEventUpdate,
   createVodAnalysis,
@@ -27,6 +28,8 @@ import {
   getVodAutomationStatus,
   getPendingSuggestedEventCountsByVodAnalysisIds,
   getVodAnalysisById,
+  ingestAutomationDetections,
+  ingestAutomationDetectionsInputSchema,
   listVodAnalysisEvents,
   listVodAnalyses,
   listVodCaptureJobs,
@@ -213,6 +216,40 @@ function createSuggestedEventInsertDb() {
   const insert = vi.fn(() => ({ values }));
 
   return { db: { insert }, insert, values };
+}
+
+function createAutomationDetectionIngestDb({
+  vodRows,
+  captureRows,
+}: {
+  vodRows: VodAnalysisRecord[];
+  captureRows: VodCaptureJobRecord[];
+}) {
+  const insertedSuggestedEvents: unknown[] = [];
+  const values = vi.fn(async (event: unknown) => {
+    insertedSuggestedEvents.push(event);
+  });
+  const insert = vi.fn(() => ({ values }));
+  const vodLimit = vi.fn().mockResolvedValue(vodRows);
+  const vodWhere = vi.fn(() => ({ limit: vodLimit }));
+  const captureLimit = vi.fn().mockResolvedValue(captureRows);
+  const captureWhere = vi.fn(() => ({ limit: captureLimit }));
+  const from = vi.fn(table => {
+    if (table === vodAnalyses) return { where: vodWhere };
+    return { where: captureWhere };
+  });
+  const select = vi.fn(() => ({ from }));
+
+  return {
+    db: { select, insert },
+    select,
+    from,
+    insert,
+    values,
+    vodLimit,
+    captureLimit,
+    insertedSuggestedEvents,
+  };
 }
 
 function createSuggestedEventListDb(rows: VodSuggestedEventRecord[]) {
@@ -1793,6 +1830,271 @@ describe("createVodCaptureJob", () => {
     expect(insert).toHaveBeenCalledWith(vodCaptureJobs);
     expect(insert).not.toHaveBeenCalledWith(vodAnalysisEvents);
     expect(insert).not.toHaveBeenCalledWith(vodSuggestedEvents);
+  });
+});
+
+describe("ingestAutomationDetections", () => {
+  const baseDetection = {
+    eventType: "cashout",
+    timestampSeconds: 30,
+    targetLabel: "A",
+    teamLabel: " The Live Wires ",
+    confidence: 82,
+    metadata: { detector: "scoreboard-v1", frameNumber: 120 },
+  } as const;
+
+  it("creates pending automation suggested events", async () => {
+    const { db, insert, values, insertedSuggestedEvents } =
+      createAutomationDetectionIngestDb({
+        vodRows: [captureReadyVod()],
+        captureRows: [captureJob({ id: 99, vodAnalysisId: 44 })],
+      });
+
+    await expect(
+      ingestAutomationDetections(
+        {
+          vodAnalysisId: 44,
+          captureJobId: 99,
+          detections: [baseDetection],
+        },
+        db
+      )
+    ).resolves.toMatchObject({
+      status: "created",
+      vodAnalysisId: 44,
+      captureJobId: 99,
+      createdCount: 1,
+      suggestedEvents: [
+        {
+          eventType: "cashout",
+          source: "automation",
+          status: "pending",
+          confirmedVodEventId: null,
+          targetLabel: "A",
+          teamLabel: "The Live Wires",
+          confidence: 82,
+        },
+      ],
+    });
+
+    expect(insert).toHaveBeenCalledTimes(1);
+    expect(insert).toHaveBeenCalledWith(vodSuggestedEvents);
+    expect(insert).not.toHaveBeenCalledWith(vodAnalysisEvents);
+    expect(values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        vodAnalysisId: 44,
+        source: "automation",
+        status: "pending",
+      })
+    );
+    expect(insertedSuggestedEvents).toHaveLength(1);
+  });
+
+  it("validates detections with the same required-field rules as suggested events", () => {
+    const result = ingestAutomationDetectionsInputSchema.safeParse({
+      vodAnalysisId: 44,
+      captureJobId: 99,
+      detections: [
+        {
+          eventType: "team_wipe",
+          timestampSeconds: 45,
+          teamLabel: "The High Notes",
+        },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    expect(
+      result.error?.issues.some(issue => issue.path.includes("actorLabel"))
+    ).toBe(true);
+  });
+
+  it.each([
+    ["cashout", { teamLabel: "The Live Wires" }],
+    ["steal_flip", { teamLabel: "The High Notes" }],
+    ["tap", { actorLabel: "Player A", teamLabel: "The Live Wires" }],
+    ["plug", { actorLabel: "Player A", teamLabel: "The Live Wires" }],
+  ] as const)(
+    "rejects %s detections without targetLabel",
+    (eventType, fields) => {
+      expect(
+        ingestAutomationDetectionsInputSchema.safeParse({
+          vodAnalysisId: 44,
+          captureJobId: 99,
+          detections: [
+            {
+              eventType,
+              timestampSeconds: 60,
+              ...fields,
+            },
+          ],
+        }).success
+      ).toBe(false);
+    }
+  );
+
+  it("does not write when the capture job belongs to a different VOD", async () => {
+    const { db, insert } = createAutomationDetectionIngestDb({
+      vodRows: [captureReadyVod()],
+      captureRows: [captureJob({ id: 99, vodAnalysisId: 45 })],
+    });
+
+    await expect(
+      ingestAutomationDetections(
+        {
+          vodAnalysisId: 44,
+          captureJobId: 99,
+          detections: [baseDetection],
+        },
+        db
+      )
+    ).resolves.toMatchObject({
+      status: "invalid_capture_job",
+      createdCount: 0,
+      suggestedEvents: [],
+    });
+
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("rejects cancelled capture jobs", async () => {
+    const { db, insert } = createAutomationDetectionIngestDb({
+      vodRows: [captureReadyVod()],
+      captureRows: [
+        captureJob({ id: 99, vodAnalysisId: 44, status: "cancelled" }),
+      ],
+    });
+
+    await expect(
+      ingestAutomationDetections(
+        {
+          vodAnalysisId: 44,
+          captureJobId: 99,
+          detections: [baseDetection],
+        },
+        db
+      )
+    ).resolves.toMatchObject({ status: "invalid_capture_job" });
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("allows completed capture jobs so workers can finish after writing", async () => {
+    const { db, insert } = createAutomationDetectionIngestDb({
+      vodRows: [captureReadyVod()],
+      captureRows: [
+        captureJob({ id: 99, vodAnalysisId: 44, status: "complete" }),
+      ],
+    });
+
+    await expect(
+      ingestAutomationDetections(
+        {
+          vodAnalysisId: 44,
+          captureJobId: 99,
+          detections: [baseDetection],
+        },
+        db
+      )
+    ).resolves.toMatchObject({ status: "created", createdCount: 1 });
+    expect(insert).toHaveBeenCalledWith(vodSuggestedEvents);
+  });
+
+  it("does not create manual events", async () => {
+    const { db, insert } = createAutomationDetectionIngestDb({
+      vodRows: [captureReadyVod()],
+      captureRows: [captureJob({ id: 99, vodAnalysisId: 44 })],
+    });
+
+    await ingestAutomationDetections(
+      {
+        vodAnalysisId: 44,
+        captureJobId: 99,
+        detections: [baseDetection],
+      },
+      db
+    );
+
+    expect(insert).not.toHaveBeenCalledWith(vodAnalysisEvents);
+  });
+
+  it("preserves captureJobId and detector metadata", () => {
+    expect(
+      buildAutomationDetectionSuggestedEventInserts({
+        vodAnalysisId: 44,
+        captureJobId: 99,
+        detections: [baseDetection],
+      })[0]
+    ).toMatchObject({
+      metadata: JSON.stringify({
+        captureJobId: 99,
+        detectorMetadata: { detector: "scoreboard-v1", frameNumber: 120 },
+      }),
+    });
+  });
+
+  it("returns not_found for missing VODs before writes", async () => {
+    const { db, insert, captureLimit } = createAutomationDetectionIngestDb({
+      vodRows: [],
+      captureRows: [captureJob({ id: 99, vodAnalysisId: 44 })],
+    });
+
+    await expect(
+      ingestAutomationDetections(
+        {
+          vodAnalysisId: 44,
+          captureJobId: 99,
+          detections: [baseDetection],
+        },
+        db
+      )
+    ).resolves.toMatchObject({ status: "not_found", createdCount: 0 });
+
+    expect(captureLimit).not.toHaveBeenCalled();
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("returns invalid_capture_job for missing capture jobs before writes", async () => {
+    const { db, insert } = createAutomationDetectionIngestDb({
+      vodRows: [captureReadyVod()],
+      captureRows: [],
+    });
+
+    await expect(
+      ingestAutomationDetections(
+        {
+          vodAnalysisId: 44,
+          captureJobId: 99,
+          detections: [baseDetection],
+        },
+        db
+      )
+    ).resolves.toMatchObject({
+      status: "invalid_capture_job",
+      createdCount: 0,
+    });
+
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid VOD and capture ids before database access", async () => {
+    const { db, select } = createAutomationDetectionIngestDb({
+      vodRows: [captureReadyVod()],
+      captureRows: [captureJob({ id: 99, vodAnalysisId: 44 })],
+    });
+
+    await expect(
+      ingestAutomationDetections(
+        { vodAnalysisId: 0, captureJobId: 99, detections: [baseDetection] },
+        db
+      )
+    ).rejects.toThrow();
+    await expect(
+      ingestAutomationDetections(
+        { vodAnalysisId: 44, captureJobId: 0, detections: [baseDetection] },
+        db
+      )
+    ).rejects.toThrow();
+    expect(select).not.toHaveBeenCalled();
   });
 });
 

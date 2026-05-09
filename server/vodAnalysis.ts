@@ -203,6 +203,42 @@ export type CreateVodSuggestedEventInput = CreateVodAnalysisEventInput & {
   status?: VodSuggestedEventStatus;
 };
 
+export type DetectedAutomationEventInput = Omit<
+  CreateVodAnalysisEventInput,
+  "vodAnalysisId"
+> & {
+  confidence?: number | null;
+};
+
+export type IngestAutomationDetectionsInput = {
+  vodAnalysisId: number;
+  captureJobId: number;
+  detections: DetectedAutomationEventInput[];
+};
+
+export type IngestAutomationDetectionsResult =
+  | {
+      status: "created";
+      vodAnalysisId: number;
+      captureJobId: number;
+      createdCount: number;
+      suggestedEvents: InsertVodSuggestedEvent[];
+    }
+  | {
+      status: "not_found";
+      vodAnalysisId: number;
+      captureJobId: number;
+      createdCount: 0;
+      suggestedEvents: [];
+    }
+  | {
+      status: "invalid_capture_job";
+      vodAnalysisId: number;
+      captureJobId: number;
+      createdCount: 0;
+      suggestedEvents: [];
+    };
+
 export type UpdateVodSuggestedEventInput = Omit<
   CreateVodAnalysisEventInput,
   "vodAnalysisId"
@@ -339,6 +375,21 @@ type CaptureJobLatestDb = {
 };
 
 type SuggestedEventInsertableDb = {
+  insert: (table: typeof vodSuggestedEvents) => {
+    values: (values: InsertVodSuggestedEvent) => Promise<unknown>;
+  };
+};
+
+type AutomationDetectionIngestDb = {
+  select: (fields: Record<string, unknown>) => {
+    from: (table: typeof vodAnalyses | typeof vodCaptureJobs) => {
+      where: (condition: unknown) => {
+        limit: (
+          limit: number
+        ) => Promise<VodAnalysisRecord[] | VodCaptureJobRecord[]>;
+      };
+    };
+  };
   insert: (table: typeof vodSuggestedEvents) => {
     values: (values: InsertVodSuggestedEvent) => Promise<unknown>;
   };
@@ -505,6 +556,27 @@ export const createVodSuggestedEventInputSchema =
       .optional()
       .default("pending"),
   });
+
+const detectedAutomationEventInputSchema = vodAnalysisEventPayloadBaseSchema
+  .omit({ vodAnalysisId: true })
+  .safeExtend({
+    confidence: z
+      .number()
+      .int("Detected event confidence must be a whole number.")
+      .min(0, "Detected event confidence must be between 0 and 100.")
+      .max(100, "Detected event confidence must be between 0 and 100.")
+      .optional()
+      .nullable(),
+  })
+  .superRefine(validateVodAnalysisEventRequiredFields);
+
+export const ingestAutomationDetectionsInputSchema = z.object({
+  vodAnalysisId: vodAnalysisIdInputSchema,
+  captureJobId: z.number().int().positive(),
+  detections: z
+    .array(detectedAutomationEventInputSchema)
+    .nonempty("At least one detected event is required."),
+});
 
 export const updateVodSuggestedEventInputSchema =
   vodAnalysisEventPayloadBaseSchema
@@ -1258,6 +1330,121 @@ export async function createVodSuggestedEvent(
   await db.insert(vodSuggestedEvents).values(values);
 
   return values;
+}
+
+function buildAutomationDetectionMetadata(
+  captureJobId: number,
+  detection: DetectedAutomationEventInput
+) {
+  if (Object.hasOwn(detection, "metadata")) {
+    return {
+      captureJobId,
+      detectorMetadata: detection.metadata ?? null,
+    };
+  }
+
+  return { captureJobId };
+}
+
+export function buildAutomationDetectionSuggestedEventInserts(
+  input: IngestAutomationDetectionsInput
+): InsertVodSuggestedEvent[] {
+  const parsedInput = ingestAutomationDetectionsInputSchema.parse(input);
+
+  return parsedInput.detections.map(detection =>
+    buildVodSuggestedEventInsert({
+      vodAnalysisId: parsedInput.vodAnalysisId,
+      eventType: detection.eventType,
+      timestampSeconds: detection.timestampSeconds,
+      actorLabel: detection.actorLabel,
+      targetLabel: detection.targetLabel,
+      teamLabel: detection.teamLabel,
+      confidence: detection.confidence,
+      metadata: buildAutomationDetectionMetadata(
+        parsedInput.captureJobId,
+        detection
+      ),
+      source: "automation",
+      status: "pending",
+    })
+  );
+}
+
+async function getVodCaptureJobByIdForIngestion(
+  id: number,
+  db: AutomationDetectionIngestDb
+): Promise<VodCaptureJobRecord | null> {
+  const [captureJob] = (await db
+    .select(vodCaptureJobFields)
+    .from(vodCaptureJobs)
+    .where(eq(vodCaptureJobs.id, id))
+    .limit(1)) as VodCaptureJobRecord[];
+
+  return captureJob ?? null;
+}
+
+export async function ingestAutomationDetections(
+  input: IngestAutomationDetectionsInput,
+  dbClient?: AutomationDetectionIngestDb | null
+): Promise<IngestAutomationDetectionsResult> {
+  const parsedInput = ingestAutomationDetectionsInputSchema.parse(input);
+  const suggestedEvents =
+    buildAutomationDetectionSuggestedEventInserts(parsedInput);
+  const db =
+    dbClient ?? ((await getDb()) as AutomationDetectionIngestDb | null);
+
+  if (!db) {
+    throw new Error(
+      "Database is not available for VOD automation detection ingestion."
+    );
+  }
+
+  const [vodAnalysis] = (await db
+    .select(vodAnalysisFields)
+    .from(vodAnalyses)
+    .where(eq(vodAnalyses.id, parsedInput.vodAnalysisId))
+    .limit(1)) as VodAnalysisRecord[];
+
+  if (!vodAnalysis) {
+    return {
+      status: "not_found",
+      vodAnalysisId: parsedInput.vodAnalysisId,
+      captureJobId: parsedInput.captureJobId,
+      createdCount: 0,
+      suggestedEvents: [],
+    };
+  }
+
+  const captureJob = await getVodCaptureJobByIdForIngestion(
+    parsedInput.captureJobId,
+    db
+  );
+
+  if (
+    !captureJob ||
+    captureJob.vodAnalysisId !== parsedInput.vodAnalysisId ||
+    captureJob.status === "cancelled"
+  ) {
+    return {
+      status: "invalid_capture_job",
+      vodAnalysisId: parsedInput.vodAnalysisId,
+      captureJobId: parsedInput.captureJobId,
+      createdCount: 0,
+      suggestedEvents: [],
+    };
+  }
+
+  for (const suggestedEvent of suggestedEvents) {
+    await db.insert(vodSuggestedEvents).values(suggestedEvent);
+  }
+
+  return {
+    status: "created",
+    vodAnalysisId: parsedInput.vodAnalysisId,
+    captureJobId: parsedInput.captureJobId,
+    createdCount: suggestedEvents.length,
+    suggestedEvents,
+  };
 }
 
 export async function updateVodSuggestedEvent(
