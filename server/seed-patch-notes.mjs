@@ -23,6 +23,75 @@ const patchNotes = mysqlTable("patch_notes", {
 
 const SEED_DATA = [
   {
+    title: "Midseason Update 10.6.0",
+    date: "2026.05.07",
+    version: "10.6.0",
+    url: "https://www.reachthefinals.com/patchnotes/10-60",
+    sourceUrl: "https://www.reachthefinals.com/patchnotes/10-60",
+    isGameUpdate: 1,
+    content: `THE FINALS — Midseason Update 10.6.0
+
+The Season 10 Midseason Update adds Dragon’s Claim, Scales of Fortune, new Twitch Drops, balance tuning, and a broad bug-fix pass.
+
+LIMITED-TIME MODE | DRAGON’S CLAIM
+
+• New 5v5 mode focused on taking, planting, and holding a banner.
+• The planted banner creates a scoring zone where Contestants earn cash by surviving inside it.
+• The team that plants the banner receives a bonus, but the banner also attracts a fire-breathing dragon.
+• Available from May 7 through May 28, 2026.
+
+EVENT | SCALES OF FORTUNE
+
+• Complete daily contracts to earn up to 3 tickets per day.
+• Spin the reward wheel for more than 20 free rewards, including a Legendary outfit for completion.
+• Duplicate rewards convert tiles into Golden Tickets for guaranteed new-item spins.
+• Available through May 28, 2026.
+
+TWITCH DROPS | UP THE SCALE
+
+• Watch 1 hour for the Wyrmmarked Sticker.
+• Watch 2 hours for the Scale Crest Charm.
+• Watch 4 hours for the Scaelium Edge Chimera-XB Skin.
+• Drops available through May 21, 2026.
+
+GAME UPDATE | BALANCE CHANGES
+
+Gadgets
+• Vanishing Bomb: invisibility duration decreased from 6s to 5s; cooldown increased from 18s to 22s.
+
+Game Modes
+• Coin respawns in Cashout, Ranked Cashout, and Quick Cash now require roughly 20% more enemy distance.
+• Ranked Tournament league rank distribution recalibrated to spread players more evenly across ranks.
+
+Gameplay
+• Goo now breaks when overlapping a player in 0.35s instead of 0.8s.
+
+Specializations
+• Shockwave: reverted the 10.3 launch-height constraint when combined with Jump Pad.
+• Guardian Turret: vertical vision angle increased from ±45 degrees to ±60 degrees.
+
+Weapons
+• .50 Akimbo: hip-fire dispersion tightened across max, standing, and moving states.
+• Chimera-XB: shorter falloff ranges and lower ranged damage multiplier.
+• KS-23: pump-action trigger-hold delay disabled for smoother firing consistency.
+• M11: falloff max range increased, but ranged damage multiplier decreased.
+• M26 Matter: pump-action trigger-hold delay disabled.
+• Model 1887: pump-action trigger-hold delay disabled.
+• Spear: spin attack target caps increased for player and non-player targets.
+• V9S: magazine size decreased from 20 to 18.
+
+GAME UPDATE | BUG FIXES
+
+• Animation fixes for ARN-220, Riot Shield, Spear, hand gestures, and interaction visuals.
+• Audio fixes for Monaco cannon audio, audience cutouts, sliding fades, weapon firing sounds, Vault/Cashout sounds, squad intro music, replay audio, and reconnect audio.
+• Cosmetic compatibility and cloth simulation improvements.
+• Gadget fixes for Glitch Trap pings, Proximity Sensor pings, and object pickup cancellation.
+• Gameplay fixes for scissor lifts, Revive Statues, Cashout Station movement exploits, Charge ‘n’ Slam interactions, Guardian Turret bots, Hover Pad elimination credit, default AKM display, cloaked pings, and controller weapon-switch animations.
+• Map fixes for Fangwai City, Las Vegas, Las Vegas Stadium, Monaco, and Seoul.
+• Dragon’s Claim added to Private Matches.
+• Social, spectator, stability, UI, Point Break, Sponsorship, World Tour, and weapon-reload fixes included.`,
+  },
+  {
     title: "UPDATE 10.3.0",
     date: "2026.04.17",
     version: "10.3.0",

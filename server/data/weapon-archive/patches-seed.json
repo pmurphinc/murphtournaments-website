@@ -1,5 +1,14 @@
 [
   {
+    "id": "patch_10_6_0",
+    "versionLabel": "10.6.0",
+    "title": "Midseason Update 10.6.0",
+    "patchDate": "2026-05-07",
+    "seasonLabel": "Season 10",
+    "sourceUrl": "https://www.reachthefinals.com/patchnotes/10-60",
+    "sourceType": "official"
+  },
+  {
     "id": "patch_10_3_0",
     "versionLabel": "10.3.0",
     "title": "Season 10 \u2014 Patch 10.3.0",
