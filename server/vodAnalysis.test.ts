@@ -24,6 +24,7 @@ import {
   createVodSuggestedEvent,
   createVodSuggestedEventInputSchema,
   getLatestVodCaptureJob,
+  getVodAutomationStatus,
   getPendingSuggestedEventCountsByVodAnalysisIds,
   getVodAnalysisById,
   listVodAnalysisEvents,
@@ -43,6 +44,8 @@ import {
   type PendingSuggestedEventCountRow,
   type VodAnalysisRecord,
   type VodSuggestedEventRecord,
+  type ManualEventCountRow,
+  type SuggestedEventStatusCountRow,
 } from "./vodAnalysis";
 
 function createInsertDb() {
@@ -161,6 +164,48 @@ function createLatestCaptureJobDb(rows: VodCaptureJobRecord[]) {
   const select = vi.fn(() => ({ from }));
 
   return { db: { select }, select, from, where, orderBy, limit };
+}
+
+function createAutomationStatusDb({
+  vodRows,
+  captureRows = [],
+  suggestedCountRows = [],
+  manualCountRows = [{ confirmedManualEventCount: 0 }],
+}: {
+  vodRows: VodAnalysisRecord[];
+  captureRows?: VodCaptureJobRecord[];
+  suggestedCountRows?: SuggestedEventStatusCountRow[];
+  manualCountRows?: ManualEventCountRow[];
+}) {
+  const vodLimit = vi.fn().mockResolvedValue(vodRows);
+  const vodWhere = vi.fn(() => ({ limit: vodLimit }));
+  const captureLimit = vi.fn().mockResolvedValue(captureRows);
+  const captureOrderBy = vi.fn(() => ({ limit: captureLimit }));
+  const captureWhere = vi.fn(() => ({ orderBy: captureOrderBy }));
+  const suggestedGroupBy = vi.fn().mockResolvedValue(suggestedCountRows);
+  const suggestedWhere = vi.fn(() => ({ groupBy: suggestedGroupBy }));
+  const manualWhere = vi.fn().mockResolvedValue(manualCountRows);
+  const from = vi.fn(table => {
+    if (table === vodAnalyses) return { where: vodWhere };
+    if (table === vodCaptureJobs) return { where: captureWhere };
+    if (table === vodSuggestedEvents) return { where: suggestedWhere };
+    return { where: manualWhere };
+  });
+  const select = vi.fn(() => ({ from }));
+
+  return {
+    db: { select },
+    select,
+    from,
+    vodWhere,
+    vodLimit,
+    captureWhere,
+    captureOrderBy,
+    captureLimit,
+    suggestedWhere,
+    suggestedGroupBy,
+    manualWhere,
+  };
 }
 
 function createSuggestedEventInsertDb() {
@@ -1774,5 +1819,90 @@ describe("getLatestVodCaptureJob", () => {
     expect(from).toHaveBeenCalledWith(vodCaptureJobs);
     expect(orderBy).toHaveBeenCalledTimes(1);
     expect(limit).toHaveBeenCalledWith(1);
+  });
+});
+
+describe("getVodAutomationStatus", () => {
+  it("returns the latest capture job and counts by suggestion status", async () => {
+    const latestCaptureJob = captureJob({
+      id: 9,
+      status: "processing",
+      processedSamples: 2,
+      failedSamples: 1,
+    });
+    const { db, captureOrderBy, captureLimit, suggestedGroupBy } =
+      createAutomationStatusDb({
+        vodRows: [captureReadyVod()],
+        captureRows: [latestCaptureJob],
+        suggestedCountRows: [
+          { status: "pending", suggestedCount: 3 },
+          { status: "approved", suggestedCount: "2" },
+          { status: "rejected", suggestedCount: BigInt(1) },
+        ],
+        manualCountRows: [{ confirmedManualEventCount: 6 }],
+      });
+
+    await expect(getVodAutomationStatus(44, db)).resolves.toMatchObject({
+      vodAnalysisId: 44,
+      readiness: { status: "ready", isReady: true },
+      latestCaptureJob,
+      pendingSuggestedCount: 3,
+      approvedSuggestedCount: 2,
+      rejectedSuggestedCount: 1,
+      confirmedManualEventCount: 6,
+    });
+
+    expect(captureOrderBy).toHaveBeenCalledTimes(1);
+    expect(captureLimit).toHaveBeenCalledWith(1);
+    expect(suggestedGroupBy).toHaveBeenCalledTimes(1);
+  });
+
+  it("handles no capture job", async () => {
+    const { db } = createAutomationStatusDb({
+      vodRows: [captureReadyVod()],
+      captureRows: [],
+    });
+
+    await expect(getVodAutomationStatus(44, db)).resolves.toMatchObject({
+      latestCaptureJob: null,
+      pendingSuggestedCount: 0,
+      approvedSuggestedCount: 0,
+      rejectedSuggestedCount: 0,
+    });
+  });
+
+  it("handles no suggestions", async () => {
+    const { db } = createAutomationStatusDb({
+      vodRows: [captureReadyVod()],
+      captureRows: [captureJob()],
+      suggestedCountRows: [],
+      manualCountRows: [],
+    });
+
+    await expect(getVodAutomationStatus(44, db)).resolves.toMatchObject({
+      pendingSuggestedCount: 0,
+      approvedSuggestedCount: 0,
+      rejectedSuggestedCount: 0,
+      confirmedManualEventCount: 0,
+    });
+  });
+
+  it("returns null when the VOD does not exist", async () => {
+    const { db, captureOrderBy, suggestedGroupBy, manualWhere } =
+      createAutomationStatusDb({ vodRows: [] });
+
+    await expect(getVodAutomationStatus(44, db)).resolves.toBeNull();
+    expect(captureOrderBy).not.toHaveBeenCalled();
+    expect(suggestedGroupBy).not.toHaveBeenCalled();
+    expect(manualWhere).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid ids before DB query", async () => {
+    const { db, select } = createAutomationStatusDb({
+      vodRows: [captureReadyVod()],
+    });
+
+    await expect(getVodAutomationStatus(0, db)).rejects.toThrow();
+    expect(select).not.toHaveBeenCalled();
   });
 });

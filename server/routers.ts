@@ -35,6 +35,7 @@ import {
   deleteVodAnalysisEvent,
   deleteVodAnalysisEventInputSchema,
   getLatestVodCaptureJob,
+  getVodAutomationStatus,
   getVodAnalysisById,
   listVodAnalysisEvents,
   listVodCaptureJobs,
@@ -779,6 +780,12 @@ export const appRouter = router({
       .input(vodAnalysisIdInputSchema)
       .query(async ({ input }) => {
         return getLatestVodCaptureJob(input);
+      }),
+
+    getAutomationStatus: publicProcedure
+      .input(vodAnalysisIdInputSchema)
+      .query(async ({ input }) => {
+        return getVodAutomationStatus(input);
       }),
 
     listEvents: publicProcedure

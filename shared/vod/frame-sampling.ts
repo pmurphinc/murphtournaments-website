@@ -14,6 +14,32 @@ export type VodCaptureReadinessVod = {
   durationSeconds?: number | null;
 };
 
+export type VodCaptureJobStatus =
+  | "queued"
+  | "processing"
+  | "complete"
+  | "failed"
+  | "cancelled";
+
+export type VodCaptureJobStatusTone =
+  | "neutral"
+  | "active"
+  | "success"
+  | "danger"
+  | "muted";
+
+export type VodCaptureJobProgressSource = {
+  plannedSamples: number;
+  processedSamples: number;
+  failedSamples: number;
+};
+
+export type VodCaptureJobProgress = VodCaptureJobProgressSource & {
+  completedSamples: number;
+  percentComplete: number;
+  remainingSamples: number;
+};
+
 export type FrameSamplingPlan = {
   durationSeconds: number;
   intervalSeconds: number;
@@ -30,6 +56,25 @@ export type VodCaptureReadiness = {
 
 const DEFAULT_FRAME_SAMPLING_INTERVAL_SECONDS = 30;
 const DEFAULT_FRAME_SAMPLING_MAX_SAMPLES = 200;
+
+const VOD_CAPTURE_JOB_STATUS_LABELS: Record<VodCaptureJobStatus, string> = {
+  queued: "Queued",
+  processing: "Processing",
+  complete: "Complete",
+  failed: "Failed",
+  cancelled: "Cancelled",
+};
+
+const VOD_CAPTURE_JOB_STATUS_TONES: Record<
+  VodCaptureJobStatus,
+  VodCaptureJobStatusTone
+> = {
+  queued: "neutral",
+  processing: "active",
+  complete: "success",
+  failed: "danger",
+  cancelled: "muted",
+};
 
 const CAPTURE_READINESS_LABELS: Record<VodCaptureReadinessStatus, string> = {
   ready: "Ready",
@@ -152,4 +197,46 @@ export function formatCaptureReadinessLabel(
   status: VodCaptureReadinessStatus
 ): string {
   return CAPTURE_READINESS_LABELS[status];
+}
+
+export function getVodCaptureJobProgress(
+  job: VodCaptureJobProgressSource
+): VodCaptureJobProgress {
+  const plannedSamples = Math.max(
+    0,
+    normalizePositiveInteger(job.plannedSamples)
+  );
+  const processedSamples = Math.max(
+    0,
+    normalizePositiveInteger(job.processedSamples)
+  );
+  const failedSamples = Math.max(
+    0,
+    normalizePositiveInteger(job.failedSamples)
+  );
+  const completedSamples = processedSamples + failedSamples;
+  const percentComplete =
+    plannedSamples === 0
+      ? 0
+      : Math.min(100, Math.floor((completedSamples / plannedSamples) * 100));
+  const remainingSamples = Math.max(0, plannedSamples - completedSamples);
+
+  return {
+    plannedSamples,
+    processedSamples,
+    failedSamples,
+    completedSamples,
+    percentComplete,
+    remainingSamples,
+  };
+}
+
+export function formatVodCaptureJobStatus(status: VodCaptureJobStatus): string {
+  return VOD_CAPTURE_JOB_STATUS_LABELS[status];
+}
+
+export function getVodCaptureJobStatusTone(
+  status: VodCaptureJobStatus
+): VodCaptureJobStatusTone {
+  return VOD_CAPTURE_JOB_STATUS_TONES[status];
 }
