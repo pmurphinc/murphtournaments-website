@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildVodEmbedConfig,
   formatVodSourceType,
   getVodSourceLabel,
   parseVodSource,
@@ -130,5 +131,93 @@ describe("VOD source labels", () => {
     expect(
       getVodSourceLabel(parseVodSource("https://example.com/video/123"))
     ).toBe("VIDEO LINK");
+  });
+});
+
+describe("VOD embed config", () => {
+  it("builds YouTube embed URLs from parsed watch sources", () => {
+    const parsedSource = parseVodSource(
+      "https://www.youtube.com/watch?v=VIDEO_ID"
+    );
+
+    expect(
+      buildVodEmbedConfig({
+        sourceType: parsedSource.valid ? parsedSource.sourceType : "unknown",
+        sourceId: parsedSource.valid ? parsedSource.sourceId : null,
+        sourceRef: parsedSource.valid ? parsedSource.sourceRef : null,
+        normalizedSourceUrl: parsedSource.valid
+          ? parsedSource.normalizedUrl
+          : null,
+        sourceUrl: "https://www.youtube.com/watch?v=VIDEO_ID",
+      })
+    ).toEqual({
+      embeddable: true,
+      provider: "youtube",
+      embedUrl: "https://www.youtube.com/embed/VIDEO_ID",
+      label: "YOUTUBE VIDEO • VIDEO_ID",
+    });
+  });
+
+  it("builds Twitch player URLs with a parent hostname when provided", () => {
+    expect(
+      buildVodEmbedConfig(
+        {
+          sourceType: "twitch",
+          sourceId: "1234567890",
+          sourceRef: "v1234567890",
+          normalizedSourceUrl: "https://www.twitch.tv/videos/1234567890",
+          sourceUrl: "https://www.twitch.tv/videos/1234567890",
+        },
+        { parentHostname: "murphtournaments.com" }
+      )
+    ).toEqual({
+      embeddable: true,
+      provider: "twitch",
+      embedUrl:
+        "https://player.twitch.tv/?video=v1234567890&parent=murphtournaments.com",
+      label: "TWITCH VOD • v1234567890",
+    });
+  });
+
+  it("builds Google Drive preview URLs from file ids", () => {
+    expect(
+      buildVodEmbedConfig({
+        sourceType: "google_drive",
+        sourceId: "FILE_ID",
+        sourceRef: "FILE_ID",
+        normalizedSourceUrl: "https://drive.google.com/file/d/FILE_ID/view",
+        sourceUrl: "https://drive.google.com/file/d/FILE_ID/view",
+      })
+    ).toEqual({
+      embeddable: true,
+      provider: "google_drive",
+      embedUrl: "https://drive.google.com/file/d/FILE_ID/preview",
+      label: "GOOGLE DRIVE • FILE_ID",
+    });
+  });
+
+  it("marks generic URLs as not embeddable", () => {
+    const config = buildVodEmbedConfig({
+      sourceType: "generic",
+      normalizedSourceUrl: "https://example.com/video/123",
+      sourceUrl: "https://example.com/video/123",
+    });
+
+    expect(config.embeddable).toBe(false);
+    expect(config.provider).toBe("generic");
+    expect(config.reason).toContain("generic link");
+  });
+
+  it("marks known providers without source ids as not embeddable", () => {
+    const config = buildVodEmbedConfig({
+      sourceType: "youtube",
+      sourceId: null,
+      normalizedSourceUrl: "https://www.youtube.com/watch?v=VIDEO_ID",
+      sourceUrl: "https://www.youtube.com/watch?v=VIDEO_ID",
+    });
+
+    expect(config.embeddable).toBe(false);
+    expect(config.provider).toBe("unknown");
+    expect(config.reason).toContain("parsed source id");
   });
 });

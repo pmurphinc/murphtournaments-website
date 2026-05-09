@@ -14,7 +14,12 @@ import {
   formatCaptureReadinessLabel,
   getVodCaptureReadiness,
 } from "@shared/vod/frame-sampling";
-import { formatVodSourceType, getVodSourceLabel } from "@shared/vod/source";
+import {
+  buildVodEmbedConfig,
+  formatVodSourceType,
+  getVodSourceLabel,
+  type VodEmbedConfig,
+} from "@shared/vod/source";
 import {
   buildVodTeamSummaries,
   type VodTeamSummary,
@@ -124,6 +129,83 @@ function DetailPill({ label, value }: { label: string; value: string }) {
       </div>
       <div className="mt-1 font-mono text-sm text-white/85">{value}</div>
     </div>
+  );
+}
+
+function ReviewPlayerSection({
+  embedConfig,
+  sourceHref,
+  durationLabel,
+}: {
+  embedConfig: VodEmbedConfig;
+  sourceHref: string | null | undefined;
+  durationLabel: string | null;
+}) {
+  const providerLabel = embedConfig.embeddable
+    ? embedConfig.label
+    : embedConfig.provider === "generic"
+      ? "VIDEO LINK"
+      : "UNKNOWN SOURCE";
+
+  return (
+    <NeonCard variant="cyan" className="h-full">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="font-mono text-xl font-bold uppercase text-neon-cyan">
+            Review Player
+          </h2>
+          <p className="mt-1 font-mono text-xs uppercase tracking-widest text-white/45">
+            {providerLabel}
+          </p>
+        </div>
+        {durationLabel ? (
+          <span className="rounded border border-neon-gold/50 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-neon-gold">
+            Duration {durationLabel}
+          </span>
+        ) : null}
+      </div>
+
+      {embedConfig.embeddable ? (
+        <div className="overflow-hidden rounded-lg border border-neon-cyan/30 bg-black shadow-[0_0_24px_rgba(0,243,255,0.12)]">
+          <iframe
+            src={embedConfig.embedUrl}
+            title="Review Player"
+            className="aspect-video w-full"
+            allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+            sandbox="allow-same-origin allow-scripts allow-presentation allow-popups"
+            allowFullScreen
+          />
+        </div>
+      ) : (
+        <div className="flex aspect-video w-full items-center justify-center rounded-lg border border-white/10 bg-black/50 p-6 text-center">
+          <div>
+            <div className="font-mono text-sm font-bold uppercase tracking-widest text-white/70">
+              Embed unavailable
+            </div>
+            <p className="mt-3 max-w-xl font-mono text-sm text-white/50">
+              {embedConfig.reason}
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="font-mono text-xs uppercase tracking-widest text-white/40">
+          Log manual events beside the playback station. Playback time is not
+          auto-synced yet.
+        </p>
+        {sourceHref ? (
+          <a
+            href={sourceHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block rounded-sm border border-neon-cyan/70 px-3 py-2 font-mono text-xs font-bold uppercase tracking-widest text-neon-cyan transition-all hover:bg-neon-cyan/10"
+          >
+            Open source
+          </a>
+        ) : null}
+      </div>
+    </NeonCard>
   );
 }
 
@@ -636,6 +718,20 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
         sourceRef: vod.sourceRef ?? undefined,
       })
     : null;
+  const parentHostname =
+    typeof window === "undefined" ? null : window.location.hostname;
+  const embedConfig = vod
+    ? buildVodEmbedConfig(
+        {
+          sourceType: vod.sourceType,
+          sourceId: vod.sourceId,
+          sourceRef: vod.sourceRef,
+          normalizedSourceUrl: vod.normalizedSourceUrl,
+          sourceUrl: vod.sourceUrl,
+        },
+        { parentHostname }
+      )
+    : null;
   const events = eventsQuery.data ?? [];
   const suggestedEvents = suggestedEventsQuery.data ?? [];
   const pendingSuggestedEventCount = suggestedEvents.filter(
@@ -763,6 +859,117 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
     );
   };
 
+  const renderManualEventCard = () => (
+    <NeonCard variant="cyan" className="h-full">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="font-mono text-xl font-bold uppercase text-neon-cyan">
+            {isEditingEvent ? "Edit Manual Event" : "Manual Event"}
+          </h2>
+          <p className="mt-1 font-mono text-xs uppercase tracking-widest text-white/45">
+            Review station logger. No event-level POV required.
+          </p>
+          {isEditingEvent ? (
+            <p className="mt-1 font-mono text-xs uppercase tracking-widest text-neon-gold">
+              Editing event #{editingEventId}. Submit to save changes.
+            </p>
+          ) : null}
+        </div>
+        {isEditingEvent ? (
+          <button
+            type="button"
+            onClick={resetEventForm}
+            className="rounded-sm border border-white/20 px-3 py-2 font-mono text-xs font-bold uppercase tracking-widest text-white/65 transition hover:border-neon-cyan hover:text-neon-cyan"
+          >
+            Cancel edit
+          </button>
+        ) : null}
+      </div>
+      <form className="mt-5 space-y-5" onSubmit={handleEventSubmit}>
+        <div>
+          <div className="font-mono text-xs uppercase tracking-widest text-white/60">
+            Event type
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {VOD_ANALYSIS_EVENT_TYPES.map(eventType => (
+              <button
+                key={eventType}
+                type="button"
+                onClick={() => {
+                  setSelectedEventType(eventType);
+                  setEventErrors({});
+                }}
+                className={`rounded-full border px-3 py-1 font-mono text-xs font-bold uppercase tracking-widest transition ${
+                  selectedEventType === eventType
+                    ? "border-neon-cyan bg-neon-cyan/15 text-neon-cyan"
+                    : "border-white/15 text-white/60 hover:border-white/35 hover:text-white"
+                }`}
+              >
+                {VOD_ANALYSIS_EVENT_LABELS[eventType]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <label className="block">
+          <span className="font-mono text-xs uppercase tracking-widest text-white/60">
+            Timestamp *
+          </span>
+          <input
+            value={timestampInput}
+            onChange={event => setTimestampInput(event.target.value)}
+            placeholder="90 or 1:30"
+            className="mt-2 w-full rounded border border-white/15 bg-black/40 px-3 py-2 font-mono text-sm text-white outline-none transition focus:border-neon-cyan"
+          />
+          {eventErrors.timestamp ? (
+            <span className="mt-1 block font-mono text-xs text-red-300">
+              {eventErrors.timestamp}
+            </span>
+          ) : (
+            <span className="mt-1 block font-mono text-xs text-white/35">
+              Use whole seconds or m:ss.
+            </span>
+          )}
+        </label>
+
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+          {renderEventInput("actorLabel")}
+          {renderEventInput("targetLabel")}
+          {renderEventInput("teamLabel")}
+        </div>
+
+        {eventErrors.form ? (
+          <div className="rounded border border-red-500/40 bg-red-950/30 p-3 font-mono text-sm text-red-100">
+            {eventErrors.form}
+          </div>
+        ) : null}
+
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="submit"
+            disabled={isSubmitDisabled}
+            className="rounded-sm border-2 border-neon-gold px-5 py-2 font-mono text-sm font-bold uppercase tracking-widest text-neon-gold transition-all hover:bg-neon-gold/10 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {isEventSubmitPending
+              ? "Saving…"
+              : isEditingEvent
+                ? "Save Event"
+                : "Add Event"}
+          </button>
+          {isEditingEvent ? (
+            <button
+              type="button"
+              onClick={resetEventForm}
+              className="rounded-sm border border-white/20 px-4 py-2 font-mono text-xs font-bold uppercase tracking-widest text-white/65 transition hover:border-neon-cyan hover:text-neon-cyan"
+            >
+              Clear edit
+            </button>
+          ) : null}
+        </div>
+      </form>
+    </NeonCard>
+  );
+
   return (
     <div className="min-h-screen bg-dark-charcoal py-20">
       <div className="container space-y-8">
@@ -888,117 +1095,19 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
               </p>
             </NeonCard>
 
+            {embedConfig ? (
+              <section className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)] lg:items-stretch">
+                <ReviewPlayerSection
+                  embedConfig={embedConfig}
+                  sourceHref={sourceHref}
+                  durationLabel={durationLabel}
+                />
+                {renderManualEventCard()}
+              </section>
+            ) : null}
+
             <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
               <div className="space-y-4 lg:col-span-2">
-                <NeonCard variant="cyan">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <h2 className="font-mono text-xl font-bold uppercase text-neon-cyan">
-                        {isEditingEvent ? "Edit Manual Event" : "Manual Event"}
-                      </h2>
-                      {isEditingEvent ? (
-                        <p className="mt-1 font-mono text-xs uppercase tracking-widest text-neon-gold">
-                          Editing event #{editingEventId}. Submit to save
-                          changes.
-                        </p>
-                      ) : null}
-                    </div>
-                    {isEditingEvent ? (
-                      <button
-                        type="button"
-                        onClick={resetEventForm}
-                        className="rounded-sm border border-white/20 px-3 py-2 font-mono text-xs font-bold uppercase tracking-widest text-white/65 transition hover:border-neon-cyan hover:text-neon-cyan"
-                      >
-                        Cancel edit
-                      </button>
-                    ) : null}
-                  </div>
-                  <form className="mt-5 space-y-5" onSubmit={handleEventSubmit}>
-                    <div>
-                      <div className="font-mono text-xs uppercase tracking-widest text-white/60">
-                        Event type
-                      </div>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {VOD_ANALYSIS_EVENT_TYPES.map(eventType => (
-                          <button
-                            key={eventType}
-                            type="button"
-                            onClick={() => {
-                              setSelectedEventType(eventType);
-                              setEventErrors({});
-                            }}
-                            className={`rounded-full border px-3 py-1 font-mono text-xs font-bold uppercase tracking-widest transition ${
-                              selectedEventType === eventType
-                                ? "border-neon-cyan bg-neon-cyan/15 text-neon-cyan"
-                                : "border-white/15 text-white/60 hover:border-white/35 hover:text-white"
-                            }`}
-                          >
-                            {VOD_ANALYSIS_EVENT_LABELS[eventType]}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <label className="block">
-                      <span className="font-mono text-xs uppercase tracking-widest text-white/60">
-                        Timestamp *
-                      </span>
-                      <input
-                        value={timestampInput}
-                        onChange={event =>
-                          setTimestampInput(event.target.value)
-                        }
-                        placeholder="90 or 1:30"
-                        className="mt-2 w-full rounded border border-white/15 bg-black/40 px-3 py-2 font-mono text-sm text-white outline-none transition focus:border-neon-cyan"
-                      />
-                      {eventErrors.timestamp ? (
-                        <span className="mt-1 block font-mono text-xs text-red-300">
-                          {eventErrors.timestamp}
-                        </span>
-                      ) : (
-                        <span className="mt-1 block font-mono text-xs text-white/35">
-                          Enter whole seconds or m:ss / mm:ss.
-                        </span>
-                      )}
-                    </label>
-
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                      {renderEventInput("actorLabel")}
-                      {renderEventInput("targetLabel")}
-                      {renderEventInput("teamLabel")}
-                    </div>
-
-                    {eventErrors.form ? (
-                      <div className="rounded border border-red-500/40 bg-red-950/30 p-3 font-mono text-sm text-red-100">
-                        {eventErrors.form}
-                      </div>
-                    ) : null}
-
-                    <div className="flex flex-wrap items-center gap-3">
-                      <button
-                        type="submit"
-                        disabled={isSubmitDisabled}
-                        className="rounded-sm border-2 border-neon-gold px-5 py-2 font-mono text-sm font-bold uppercase tracking-widest text-neon-gold transition-all hover:bg-neon-gold/10 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        {isEventSubmitPending
-                          ? "Saving…"
-                          : isEditingEvent
-                            ? "Save Event"
-                            : "Add Event"}
-                      </button>
-                      {isEditingEvent ? (
-                        <button
-                          type="button"
-                          onClick={resetEventForm}
-                          className="rounded-sm border border-white/20 px-4 py-2 font-mono text-xs font-bold uppercase tracking-widest text-white/65 transition hover:border-neon-cyan hover:text-neon-cyan"
-                        >
-                          Clear edit
-                        </button>
-                      ) : null}
-                    </div>
-                  </form>
-                </NeonCard>
-
                 <NeonCard variant="cyan">
                   <button
                     type="button"
