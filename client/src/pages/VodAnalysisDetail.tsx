@@ -407,6 +407,8 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
   const [targetLabel, setTargetLabel] = useState("");
   const [teamLabel, setTeamLabel] = useState("");
   const [eventErrors, setEventErrors] = useState<EventFormErrors>({});
+  const [editingEventId, setEditingEventId] = useState<number | null>(null);
+  const [deletingEventId, setDeletingEventId] = useState<number | null>(null);
   const [timelineOpen, setTimelineOpen] = useState(false);
   const [suggestedEventsOpen, setSuggestedEventsOpen] = useState(() => {
     if (typeof window === "undefined") {
@@ -453,17 +455,52 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
     ]);
   };
 
+  const resetEventForm = () => {
+    setSelectedEventType("death");
+    setTimestampInput("");
+    setActorLabel("");
+    setTargetLabel("");
+    setTeamLabel("");
+    setEventErrors({});
+    setEditingEventId(null);
+  };
+
   const createEventMutation = trpc.vodAnalysis.createEvent.useMutation({
     onSuccess: async () => {
-      setTimestampInput("");
-      setActorLabel("");
-      setTargetLabel("");
-      setTeamLabel("");
-      setEventErrors({});
+      resetEventForm();
       await utils.vodAnalysis.listEvents.invalidate(vodAnalysisId);
     },
     onError: error => {
       setEventErrors({ form: error.message });
+    },
+  });
+
+  const updateEventMutation = trpc.vodAnalysis.updateEvent.useMutation({
+    onSuccess: async () => {
+      resetEventForm();
+      await utils.vodAnalysis.listEvents.invalidate(vodAnalysisId);
+    },
+    onError: error => {
+      setEventErrors({ form: error.message });
+    },
+  });
+
+  const deleteEventMutation = trpc.vodAnalysis.deleteEvent.useMutation({
+    onMutate: input => {
+      setDeletingEventId(input.id);
+      setEventErrors({});
+    },
+    onSuccess: async deletedEvent => {
+      if (editingEventId === deletedEvent.id) {
+        resetEventForm();
+      }
+      await utils.vodAnalysis.listEvents.invalidate(vodAnalysisId);
+    },
+    onError: error => {
+      setEventErrors({ form: error.message });
+    },
+    onSettled: () => {
+      setDeletingEventId(null);
     },
   });
 
@@ -580,8 +617,11 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
     timestampInput,
   ]);
 
+  const isEditingEvent = editingEventId !== null;
+  const isEventSubmitPending =
+    createEventMutation.isPending || updateEventMutation.isPending;
   const isSubmitDisabled =
-    createEventMutation.isPending || Object.keys(currentFormErrors).length > 0;
+    isEventSubmitPending || Object.keys(currentFormErrors).length > 0;
 
   const vod = query.data;
   const durationLabel = vod ? formatDuration(vod.durationSeconds) : null;
@@ -616,13 +656,53 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
     event.preventDefault();
     if (!validateEventForm() || parsedTimestamp === null) return;
 
-    createEventMutation.mutate({
+    const eventPayload = {
       vodAnalysisId,
       eventType: selectedEventType,
       timestampSeconds: parsedTimestamp,
-      actorLabel: actorLabel || undefined,
-      targetLabel: targetLabel || undefined,
-      teamLabel: teamLabel || undefined,
+      actorLabel,
+      targetLabel,
+      teamLabel,
+    };
+
+    if (editingEventId !== null) {
+      updateEventMutation.mutate({
+        id: editingEventId,
+        ...eventPayload,
+      });
+      return;
+    }
+
+    createEventMutation.mutate(eventPayload);
+  };
+
+  const handleEditEvent = (event: {
+    id: number;
+    eventType: VodAnalysisEventType;
+    timestampSeconds: number;
+    actorLabel: string | null;
+    targetLabel: string | null;
+    teamLabel: string | null;
+  }) => {
+    setEditingEventId(event.id);
+    setSelectedEventType(event.eventType);
+    setTimestampInput(formatVodEventTimestamp(event.timestampSeconds));
+    setActorLabel(event.actorLabel ?? "");
+    setTargetLabel(event.targetLabel ?? "");
+    setTeamLabel(event.teamLabel ?? "");
+    setEventErrors({});
+  };
+
+  const handleDeleteEvent = (event: { id: number }) => {
+    const confirmed = window.confirm(
+      "Delete this manual VOD event? Team Summary and Team Insights will update after it is removed."
+    );
+
+    if (!confirmed) return;
+
+    deleteEventMutation.mutate({
+      id: event.id,
+      vodAnalysisId,
     });
   };
 
@@ -811,9 +891,28 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
             <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
               <div className="space-y-4 lg:col-span-2">
                 <NeonCard variant="cyan">
-                  <h2 className="font-mono text-xl font-bold uppercase text-neon-cyan">
-                    Manual Event
-                  </h2>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h2 className="font-mono text-xl font-bold uppercase text-neon-cyan">
+                        {isEditingEvent ? "Edit Manual Event" : "Manual Event"}
+                      </h2>
+                      {isEditingEvent ? (
+                        <p className="mt-1 font-mono text-xs uppercase tracking-widest text-neon-gold">
+                          Editing event #{editingEventId}. Submit to save
+                          changes.
+                        </p>
+                      ) : null}
+                    </div>
+                    {isEditingEvent ? (
+                      <button
+                        type="button"
+                        onClick={resetEventForm}
+                        className="rounded-sm border border-white/20 px-3 py-2 font-mono text-xs font-bold uppercase tracking-widest text-white/65 transition hover:border-neon-cyan hover:text-neon-cyan"
+                      >
+                        Cancel edit
+                      </button>
+                    ) : null}
+                  </div>
                   <form className="mt-5 space-y-5" onSubmit={handleEventSubmit}>
                     <div>
                       <div className="font-mono text-xs uppercase tracking-widest text-white/60">
@@ -875,13 +974,28 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
                       </div>
                     ) : null}
 
-                    <button
-                      type="submit"
-                      disabled={isSubmitDisabled}
-                      className="rounded-sm border-2 border-neon-gold px-5 py-2 font-mono text-sm font-bold uppercase tracking-widest text-neon-gold transition-all hover:bg-neon-gold/10 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      {createEventMutation.isPending ? "Saving…" : "Add Event"}
-                    </button>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        type="submit"
+                        disabled={isSubmitDisabled}
+                        className="rounded-sm border-2 border-neon-gold px-5 py-2 font-mono text-sm font-bold uppercase tracking-widest text-neon-gold transition-all hover:bg-neon-gold/10 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {isEventSubmitPending
+                          ? "Saving…"
+                          : isEditingEvent
+                            ? "Save Event"
+                            : "Add Event"}
+                      </button>
+                      {isEditingEvent ? (
+                        <button
+                          type="button"
+                          onClick={resetEventForm}
+                          className="rounded-sm border border-white/20 px-4 py-2 font-mono text-xs font-bold uppercase tracking-widest text-white/65 transition hover:border-neon-cyan hover:text-neon-cyan"
+                        >
+                          Clear edit
+                        </button>
+                      ) : null}
+                    </div>
                   </form>
                 </NeonCard>
 
@@ -1086,15 +1200,42 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
                               key={event.id}
                               className="rounded border border-white/10 bg-black/30 p-4"
                             >
-                              <div className="flex flex-wrap items-center gap-3">
-                                <span className="rounded border border-neon-cyan/50 px-2 py-1 font-mono text-xs font-bold text-neon-cyan">
-                                  {formatVodEventTimestamp(
-                                    event.timestampSeconds
-                                  )}
-                                </span>
-                                <span className="font-mono text-sm font-bold uppercase tracking-widest text-white">
-                                  {VOD_ANALYSIS_EVENT_LABELS[event.eventType]}
-                                </span>
+                              <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div className="flex flex-wrap items-center gap-3">
+                                  <span className="rounded border border-neon-cyan/50 px-2 py-1 font-mono text-xs font-bold text-neon-cyan">
+                                    {formatVodEventTimestamp(
+                                      event.timestampSeconds
+                                    )}
+                                  </span>
+                                  <span className="font-mono text-sm font-bold uppercase tracking-widest text-white">
+                                    {VOD_ANALYSIS_EVENT_LABELS[event.eventType]}
+                                  </span>
+                                  {editingEventId === event.id ? (
+                                    <span className="rounded border border-neon-gold/50 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-neon-gold">
+                                      Editing
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleEditEvent(event)}
+                                    disabled={isEventSubmitPending}
+                                    className="rounded-sm border border-neon-cyan/60 px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-neon-cyan transition hover:bg-neon-cyan/10 disabled:cursor-not-allowed disabled:opacity-40"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteEvent(event)}
+                                    disabled={deletingEventId === event.id}
+                                    className="rounded-sm border border-red-400/60 px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-red-200 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-40"
+                                  >
+                                    {deletingEventId === event.id
+                                      ? "Deleting…"
+                                      : "Delete"}
+                                  </button>
+                                </div>
                               </div>
                               <div className="mt-3 flex flex-wrap gap-2 font-mono text-xs text-white/65">
                                 {event.actorLabel ? (

@@ -9,6 +9,7 @@ import {
   addPendingSuggestedCountsToVodAnalyses,
   approveVodSuggestedEvent,
   buildVodAnalysisEventInsert,
+  buildVodAnalysisEventUpdate,
   buildVodAnalysisInsert,
   buildVodAnalysisMetadataUpdate,
   buildVodSuggestedEventInsert,
@@ -17,6 +18,8 @@ import {
   createVodAnalysisEventInputSchema,
   createVodAnalysisInputSchema,
   createVodCaptureJob,
+  deleteVodAnalysisEvent,
+  deleteVodAnalysisEventInputSchema,
   createVodSuggestedEvent,
   createVodSuggestedEventInputSchema,
   getLatestVodCaptureJob,
@@ -28,6 +31,8 @@ import {
   listVodSuggestedEvents,
   rejectVodSuggestedEvent,
   refreshTwitchMetadataForVodAnalysis,
+  updateVodAnalysisEvent,
+  updateVodAnalysisEventInputSchema,
   sortVodSuggestedEventRecords,
   vodAnalysisIdInputSchema,
   type VodAnalysisEventRecord,
@@ -93,6 +98,21 @@ function createEventListDb(rows: VodAnalysisEventRecord[]) {
   const select = vi.fn(() => ({ from }));
 
   return { db: { select }, select, from, where, orderBy };
+}
+
+function createEventUpdateDb() {
+  const where = vi.fn().mockResolvedValue(undefined);
+  const set = vi.fn(() => ({ where }));
+  const update = vi.fn(() => ({ set }));
+
+  return { db: { update }, update, set, where };
+}
+
+function createEventDeleteDb() {
+  const where = vi.fn().mockResolvedValue(undefined);
+  const deleteFn = vi.fn(() => ({ where }));
+
+  return { db: { delete: deleteFn }, deleteFn, where };
 }
 
 function createCaptureJobDb(vodRows: VodAnalysisRecord[]) {
@@ -649,6 +669,69 @@ describe("createVodAnalysisEventInputSchema", () => {
   });
 });
 
+describe("updateVodAnalysisEventInputSchema", () => {
+  const baseInput = {
+    id: 9,
+    vodAnalysisId: 1,
+    eventType: "death",
+    timestampSeconds: 10,
+    actorLabel: "Player A",
+    targetLabel: "Player B",
+  } as const;
+
+  it("validates required fields for changed event types", () => {
+    expect(
+      updateVodAnalysisEventInputSchema.safeParse({
+        ...baseInput,
+        eventType: "cashout",
+        actorLabel: undefined,
+        targetLabel: undefined,
+        teamLabel: "Orange",
+      }).success
+    ).toBe(true);
+
+    expect(
+      updateVodAnalysisEventInputSchema.safeParse({
+        ...baseInput,
+        eventType: "cashout",
+        actorLabel: undefined,
+        targetLabel: undefined,
+        teamLabel: "   ",
+      }).success
+    ).toBe(false);
+  });
+
+  it("rejects invalid ids, timestamps, and event types before database access", async () => {
+    const { db, update } = createEventUpdateDb();
+
+    await expect(
+      updateVodAnalysisEvent(
+        {
+          ...baseInput,
+          id: 0,
+        },
+        db
+      )
+    ).rejects.toThrow();
+    await expect(
+      updateVodAnalysisEvent(
+        {
+          ...baseInput,
+          timestampSeconds: -1,
+        },
+        db
+      )
+    ).rejects.toThrow();
+    expect(
+      updateVodAnalysisEventInputSchema.safeParse({
+        ...baseInput,
+        eventType: "unsupported_event",
+      }).success
+    ).toBe(false);
+    expect(update).not.toHaveBeenCalled();
+  });
+});
+
 describe("createVodAnalysisEvent", () => {
   it("inserts normalized manual event values", async () => {
     const { db, insert, values } = createEventInsertDb();
@@ -706,6 +789,59 @@ describe("createVodAnalysisEvent", () => {
   });
 });
 
+describe("updateVodAnalysisEvent", () => {
+  it("updates normalized manual event values scoped to the VOD", async () => {
+    const { db, update, set, where } = createEventUpdateDb();
+
+    await expect(
+      updateVodAnalysisEvent(
+        {
+          id: 33,
+          vodAnalysisId: 12,
+          eventType: "team_wipe",
+          timestampSeconds: 77,
+          actorLabel: " Orange ",
+          targetLabel: "   ",
+          teamLabel: " Purple ",
+          metadata: { note: "edited" },
+        },
+        db
+      )
+    ).resolves.toMatchObject({
+      eventType: "team_wipe",
+      timestampSeconds: 77,
+      actorLabel: "Orange",
+      targetLabel: null,
+      teamLabel: "Purple",
+      metadata: JSON.stringify({ note: "edited" }),
+    });
+
+    expect(update).toHaveBeenCalledWith(vodAnalysisEvents);
+    expect(set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: "team_wipe",
+        timestampSeconds: 77,
+        actorLabel: "Orange",
+        targetLabel: null,
+        teamLabel: "Purple",
+      })
+    );
+    expect(where).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not overwrite metadata when metadata is omitted", () => {
+    expect(
+      buildVodAnalysisEventUpdate({
+        id: 33,
+        vodAnalysisId: 12,
+        eventType: "cashout",
+        timestampSeconds: 77,
+        teamLabel: "Orange",
+      })
+    ).not.toHaveProperty("metadata");
+  });
+});
+
 describe("listVodAnalysisEvents", () => {
   it("sorts VOD events by timestamp then id", async () => {
     const createdAt = new Date("2026-01-02T00:00:00Z");
@@ -750,6 +886,36 @@ describe("listVodAnalysisEvents", () => {
     expect(from).toHaveBeenCalledWith(vodAnalysisEvents);
     expect(where).toHaveBeenCalledTimes(1);
     expect(orderBy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("deleteVodAnalysisEventInputSchema", () => {
+  it("rejects invalid ids before database access", async () => {
+    const { db, deleteFn } = createEventDeleteDb();
+
+    expect(
+      deleteVodAnalysisEventInputSchema.safeParse({
+        id: 0,
+        vodAnalysisId: 12,
+      }).success
+    ).toBe(false);
+    await expect(
+      deleteVodAnalysisEvent({ id: 9, vodAnalysisId: 0 }, db)
+    ).rejects.toThrow();
+    expect(deleteFn).not.toHaveBeenCalled();
+  });
+});
+
+describe("deleteVodAnalysisEvent", () => {
+  it("deletes the expected event scoped to the VOD", async () => {
+    const { db, deleteFn, where } = createEventDeleteDb();
+
+    await expect(
+      deleteVodAnalysisEvent({ id: 33, vodAnalysisId: 12 }, db)
+    ).resolves.toEqual({ id: 33, vodAnalysisId: 12 });
+
+    expect(deleteFn).toHaveBeenCalledWith(vodAnalysisEvents);
+    expect(where).toHaveBeenCalledTimes(1);
   });
 });
 

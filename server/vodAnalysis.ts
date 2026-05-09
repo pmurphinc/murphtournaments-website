@@ -139,6 +139,15 @@ export type CreateVodAnalysisEventInput = {
   metadata?: unknown;
 };
 
+export type UpdateVodAnalysisEventInput = CreateVodAnalysisEventInput & {
+  id: number;
+};
+
+export type DeleteVodAnalysisEventInput = {
+  id: number;
+  vodAnalysisId: number;
+};
+
 export type VodAnalysisEventRecord = Pick<
   VodAnalysisEvent,
   | "id"
@@ -207,6 +216,20 @@ type InsertableDb = {
 type EventInsertableDb = {
   insert: (table: typeof vodAnalysisEvents) => {
     values: (values: InsertVodAnalysisEvent) => Promise<unknown>;
+  };
+};
+
+type EventUpdateableDb = {
+  update: (table: typeof vodAnalysisEvents) => {
+    set: (values: Partial<InsertVodAnalysisEvent>) => {
+      where: (condition: unknown) => Promise<unknown>;
+    };
+  };
+};
+
+type EventDeleteableDb = {
+  delete: (table: typeof vodAnalysisEvents) => {
+    where: (condition: unknown) => Promise<unknown>;
   };
 };
 
@@ -338,7 +361,7 @@ export const createVodCaptureJobInputSchema = z.object({
     .optional(),
 });
 
-export const createVodAnalysisEventInputSchema = z
+const vodAnalysisEventPayloadSchema = z
   .object({
     vodAnalysisId: vodAnalysisIdInputSchema,
     eventType: z.enum(VOD_ANALYSIS_EVENT_TYPES, {
@@ -366,6 +389,20 @@ export const createVodAnalysisEventInputSchema = z
       }
     }
   });
+
+export const createVodAnalysisEventInputSchema = vodAnalysisEventPayloadSchema;
+
+export const vodAnalysisEventIdInputSchema = z.number().int().positive();
+
+export const updateVodAnalysisEventInputSchema =
+  vodAnalysisEventPayloadSchema.safeExtend({
+    id: vodAnalysisEventIdInputSchema,
+  });
+
+export const deleteVodAnalysisEventInputSchema = z.object({
+  id: vodAnalysisEventIdInputSchema,
+  vodAnalysisId: vodAnalysisIdInputSchema,
+});
 
 export const createVodSuggestedEventInputSchema =
   createVodAnalysisEventInputSchema.safeExtend({
@@ -822,6 +859,12 @@ export async function refreshTwitchMetadataForVodAnalysis(
   };
 }
 
+function serializeEventMetadata(metadata: unknown) {
+  return metadata === undefined || metadata === null
+    ? null
+    : JSON.stringify(metadata);
+}
+
 export function buildVodAnalysisEventInsert(
   input: CreateVodAnalysisEventInput
 ): InsertVodAnalysisEvent {
@@ -834,11 +877,27 @@ export function buildVodAnalysisEventInsert(
     actorLabel: normalizeEventLabel(parsedInput.actorLabel),
     targetLabel: normalizeEventLabel(parsedInput.targetLabel),
     teamLabel: normalizeEventLabel(parsedInput.teamLabel),
-    metadata:
-      parsedInput.metadata === undefined || parsedInput.metadata === null
-        ? null
-        : JSON.stringify(parsedInput.metadata),
+    metadata: serializeEventMetadata(parsedInput.metadata),
   };
+}
+
+export function buildVodAnalysisEventUpdate(
+  input: UpdateVodAnalysisEventInput
+): Partial<InsertVodAnalysisEvent> {
+  const parsedInput = updateVodAnalysisEventInputSchema.parse(input);
+  const values: Partial<InsertVodAnalysisEvent> = {
+    eventType: parsedInput.eventType,
+    timestampSeconds: parsedInput.timestampSeconds,
+    actorLabel: normalizeEventLabel(parsedInput.actorLabel),
+    targetLabel: normalizeEventLabel(parsedInput.targetLabel),
+    teamLabel: normalizeEventLabel(parsedInput.teamLabel),
+  };
+
+  if (Object.hasOwn(parsedInput, "metadata")) {
+    values.metadata = serializeEventMetadata(parsedInput.metadata);
+  }
+
+  return values;
 }
 
 export async function createVodAnalysisEvent(
@@ -857,6 +916,58 @@ export async function createVodAnalysisEvent(
   await db.insert(vodAnalysisEvents).values(values);
 
   return values;
+}
+
+export async function updateVodAnalysisEvent(
+  input: UpdateVodAnalysisEventInput,
+  dbClient?: EventUpdateableDb | null
+): Promise<Partial<InsertVodAnalysisEvent>> {
+  const parsedInput = updateVodAnalysisEventInputSchema.parse(input);
+  const values = buildVodAnalysisEventUpdate(parsedInput);
+  const db = dbClient ?? ((await getDb()) as EventUpdateableDb | null);
+
+  if (!db) {
+    throw new Error(
+      "Database is not available for VOD analysis event updates."
+    );
+  }
+
+  await db
+    .update(vodAnalysisEvents)
+    .set(values)
+    .where(
+      and(
+        eq(vodAnalysisEvents.id, parsedInput.id),
+        eq(vodAnalysisEvents.vodAnalysisId, parsedInput.vodAnalysisId)
+      )
+    );
+
+  return values;
+}
+
+export async function deleteVodAnalysisEvent(
+  input: DeleteVodAnalysisEventInput,
+  dbClient?: EventDeleteableDb | null
+): Promise<DeleteVodAnalysisEventInput> {
+  const parsedInput = deleteVodAnalysisEventInputSchema.parse(input);
+  const db = dbClient ?? ((await getDb()) as EventDeleteableDb | null);
+
+  if (!db) {
+    throw new Error(
+      "Database is not available for VOD analysis event deletion."
+    );
+  }
+
+  await db
+    .delete(vodAnalysisEvents)
+    .where(
+      and(
+        eq(vodAnalysisEvents.id, parsedInput.id),
+        eq(vodAnalysisEvents.vodAnalysisId, parsedInput.vodAnalysisId)
+      )
+    );
+
+  return parsedInput;
 }
 
 export async function listVodAnalysisEvents(
