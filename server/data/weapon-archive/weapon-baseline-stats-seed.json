@@ -218,10 +218,10 @@
     "ttkVsHeavyHeadSeconds": 0.84,
     "stkHeavyHead": 15,
     "damageDropoffMinRange": 10.0,
-    "damageDropoffMaxRange": 17.5,
-    "damageDropoffModifierAtMaxRange": 52.0,
+    "damageDropoffMaxRange": 20.0,
+    "damageDropoffModifierAtMaxRange": 45.0,
     "sourceNotes": null,
-    "rawValues": "{\"damageDropoffMinRange\": \"10m\", \"damageDropoffMaxRange\": \"17.5m\", \"damageDropoffModifierAtMaxRange\": \"~52%\", \"magazineRaw\": \"40\", \"emptyReloadRaw\": \"1.85s\"}"
+    "rawValues": "{\"damageDropoffMinRange\": \"10m\", \"damageDropoffMaxRange\": \"20m\", \"damageDropoffModifierAtMaxRange\": \"~45%\", \"magazineRaw\": \"40\", \"emptyReloadRaw\": \"1.85s\"}"
   },
   {
     "batchId": "baseline_kromes_spreadsheet_10_3_0",
@@ -519,8 +519,8 @@
     "bodyDamage": 38.0,
     "headDamage": 57.0,
     "rateOfFireRpm": 360.0,
-    "magazineSize": 20,
-    "damagePerMagazine": 760.0,
+    "magazineSize": 18,
+    "damagePerMagazine": 684.0,
     "tacticalReloadTimeSeconds": 1.25,
     "emptyReloadTimeSeconds": 1.5,
     "shotsPerBurst": null,
@@ -541,7 +541,7 @@
     "damageDropoffMaxRange": 20.0,
     "damageDropoffModifierAtMaxRange": 65.0,
     "sourceNotes": null,
-    "rawValues": "{\"damageDropoffMinRange\": \"15m\", \"damageDropoffMaxRange\": \"20m\", \"damageDropoffModifierAtMaxRange\": \"~65%\", \"magazineRaw\": \"20\", \"emptyReloadRaw\": \"1.50s\"}"
+    "rawValues": "{\"damageDropoffMinRange\": \"15m\", \"damageDropoffMaxRange\": \"20m\", \"damageDropoffModifierAtMaxRange\": \"~65%\", \"magazineRaw\": \"18\", \"emptyReloadRaw\": \"1.50s\"}"
   },
   {
     "batchId": "baseline_kromes_spreadsheet_10_3_0",
@@ -697,11 +697,11 @@
     "stkHeavyBody": 8,
     "ttkVsHeavyHeadSeconds": 1.15,
     "stkHeavyHead": 6,
-    "damageDropoffMinRange": 20.0,
-    "damageDropoffMaxRange": 30.0,
-    "damageDropoffModifierAtMaxRange": 60.0,
+    "damageDropoffMinRange": 17.5,
+    "damageDropoffMaxRange": 27.5,
+    "damageDropoffModifierAtMaxRange": 53.0,
     "sourceNotes": null,
-    "rawValues": "{\"damageDropoffMinRange\": \"20m\", \"damageDropoffMaxRange\": \"30m\", \"damageDropoffModifierAtMaxRange\": \"~60%\", \"magazineRaw\": \"15\", \"emptyReloadRaw\": \"2.15s\"}"
+    "rawValues": "{\"damageDropoffMinRange\": \"17.5m\", \"damageDropoffMaxRange\": \"27.5m\", \"damageDropoffModifierAtMaxRange\": \"~53%\", \"magazineRaw\": \"15\", \"emptyReloadRaw\": \"2.15s\"}"
   },
   {
     "batchId": "baseline_kromes_spreadsheet_10_3_0",
