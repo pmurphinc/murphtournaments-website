@@ -15,6 +15,7 @@ import {
   getAllPatchNotes,
 } from "./db";
 import { scrapeAndStorePatchNotes } from "./patchNoteScraper";
+import { mergeWebsitePatchNotes } from "./patchNoteContent";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
@@ -530,21 +531,24 @@ export const appRouter = router({
     getAll: publicProcedure.query(async () => {
       try {
         const dbNotes = await getAllPatchNotes();
-        if (dbNotes.length > 0) {
-          return dbNotes.map(note => ({
-            id: note.id,
-            title: note.title,
-            date: note.date,
-            content: note.content,
-            url: note.url,
-            version: note.version,
-          }));
-        }
-        // Fallback: return empty array if DB is empty (seed should populate it)
-        return [];
+        return mergeWebsitePatchNotes(dbNotes).map(note => ({
+          id: note.id ?? 0,
+          title: note.title,
+          date: note.date,
+          content: note.content,
+          url: note.url,
+          version: note.version,
+        }));
       } catch (err) {
         console.error("[patchNotes.getAll] Error:", err);
-        return [];
+        return mergeWebsitePatchNotes([]).map(note => ({
+          id: note.id ?? 0,
+          title: note.title,
+          date: note.date,
+          content: note.content,
+          url: note.url,
+          version: note.version,
+        }));
       }
     }),
 
