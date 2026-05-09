@@ -29,6 +29,8 @@ import {
   createVodAnalysisEventInputSchema,
   createVodCaptureJob,
   createVodCaptureJobInputSchema,
+  updateVodCaptureJobStatus,
+  updateVodCaptureJobStatusInputSchema,
   createVodSuggestedEvent,
   createVodSuggestedEventInputSchema,
   createVodAnalysisInputSchema,
@@ -772,6 +774,18 @@ export const appRouter = router({
       .input(createVodCaptureJobInputSchema)
       .mutation(async ({ input }) => {
         return createVodCaptureJob(input.vodAnalysisId, input.source);
+      }),
+
+    updateCaptureJobStatus: publicProcedure
+      .input(updateVodCaptureJobStatusInputSchema)
+      .mutation(async ({ input }) => {
+        if (process.env.NODE_ENV === "production") {
+          throw new Error(
+            "Capture job status controls are only available in development."
+          );
+        }
+
+        return updateVodCaptureJobStatus(input);
       }),
 
     listCaptureJobs: publicProcedure
