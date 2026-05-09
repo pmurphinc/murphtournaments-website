@@ -216,6 +216,16 @@ export type IngestAutomationDetectionsInput = {
   detections: DetectedAutomationEventInput[];
 };
 
+export type RunMockVodAutomationDetectionsInput = {
+  vodAnalysisId: number;
+  captureJobId: number;
+};
+
+export type RunMockVodAutomationDetectionsResult = Pick<
+  IngestAutomationDetectionsResult,
+  "status" | "vodAnalysisId" | "captureJobId" | "createdCount"
+>;
+
 export type IngestAutomationDetectionsResult =
   | {
       status: "created";
@@ -576,6 +586,11 @@ export const ingestAutomationDetectionsInputSchema = z.object({
   detections: z
     .array(detectedAutomationEventInputSchema)
     .nonempty("At least one detected event is required."),
+});
+
+export const runMockVodAutomationDetectionsInputSchema = z.object({
+  vodAnalysisId: vodAnalysisIdInputSchema,
+  captureJobId: z.number().int().positive(),
 });
 
 export const updateVodSuggestedEventInputSchema =
@@ -1444,6 +1459,84 @@ export async function ingestAutomationDetections(
     captureJobId: parsedInput.captureJobId,
     createdCount: suggestedEvents.length,
     suggestedEvents,
+  };
+}
+
+const MOCK_VOD_AUTOMATION_DETECTIONS: DetectedAutomationEventInput[] = [
+  {
+    eventType: "tap",
+    timestampSeconds: 30,
+    actorLabel: "Mock Player 1",
+    targetLabel: "1",
+    teamLabel: "The Live Wires",
+    confidence: 72,
+    metadata: {
+      mockAutomation: true,
+      devOnly: true,
+      generator: "runMockVodAutomationDetections",
+      sampleIndex: 0,
+    },
+  },
+  {
+    eventType: "plug",
+    timestampSeconds: 45,
+    actorLabel: "Mock Player 1",
+    targetLabel: "A",
+    teamLabel: "The Live Wires",
+    confidence: 76,
+    metadata: {
+      mockAutomation: true,
+      devOnly: true,
+      generator: "runMockVodAutomationDetections",
+      sampleIndex: 1,
+    },
+  },
+  {
+    eventType: "steal_flip",
+    timestampSeconds: 75,
+    targetLabel: "A",
+    teamLabel: "The High Notes",
+    confidence: 81,
+    metadata: {
+      mockAutomation: true,
+      devOnly: true,
+      generator: "runMockVodAutomationDetections",
+      sampleIndex: 2,
+    },
+  },
+  {
+    eventType: "cashout",
+    timestampSeconds: 120,
+    targetLabel: "A",
+    teamLabel: "The High Notes",
+    confidence: 88,
+    metadata: {
+      mockAutomation: true,
+      devOnly: true,
+      generator: "runMockVodAutomationDetections",
+      sampleIndex: 3,
+    },
+  },
+];
+
+export async function runMockVodAutomationDetections(
+  input: RunMockVodAutomationDetectionsInput,
+  dbClient?: AutomationDetectionIngestDb | null
+): Promise<RunMockVodAutomationDetectionsResult> {
+  const parsedInput = runMockVodAutomationDetectionsInputSchema.parse(input);
+  const result = await ingestAutomationDetections(
+    {
+      ...parsedInput,
+      detections: MOCK_VOD_AUTOMATION_DETECTIONS,
+    },
+    dbClient
+  );
+
+  return {
+    status: result.status,
+    vodAnalysisId: result.vodAnalysisId,
+    captureJobId: result.captureJobId,
+    createdCount: result.createdCount,
   };
 }
 
