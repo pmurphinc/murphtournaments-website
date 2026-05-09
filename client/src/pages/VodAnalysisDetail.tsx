@@ -4,10 +4,13 @@ import NeonCard from "@/components/NeonCard";
 import { trpc } from "@/lib/trpc";
 import {
   formatVodEventTimestamp,
+  getVodEventTargetKind,
   parseVodEventTimestamp,
   VOD_ANALYSIS_EVENT_LABELS,
   VOD_ANALYSIS_EVENT_REQUIRED_FIELDS,
   VOD_ANALYSIS_EVENT_TYPES,
+  VOD_CASHOUT_LABELS,
+  VOD_VAULT_LABELS,
   type VodAnalysisEventType,
 } from "@shared/vod/events";
 import {
@@ -47,6 +50,129 @@ type EventFormErrors = Partial<
 const EVENT_FILTERS = ["all", ...VOD_ANALYSIS_EVENT_TYPES] as const;
 type EventFilter = (typeof EVENT_FILTERS)[number];
 
+const SUGGESTED_EVENT_FILTERS = [
+  "all",
+  "pending",
+  "approved",
+  "rejected",
+] as const;
+type SuggestedEventFilter = (typeof SUGGESTED_EVENT_FILTERS)[number];
+
+type SuggestedEventStatus = Exclude<SuggestedEventFilter, "all">;
+
+const suggestedEventFilterLabels: Record<SuggestedEventFilter, string> = {
+  all: "All",
+  pending: "Pending",
+  approved: "Approved",
+  rejected: "Rejected",
+};
+
+const suggestedEventFieldLabels: Record<
+  VodAnalysisEventType,
+  Partial<Record<"actorLabel" | "targetLabel" | "teamLabel", string>>
+> = {
+  death: {
+    actorLabel: "Actor",
+    targetLabel: "Target",
+    teamLabel: "Team",
+  },
+  tap: {
+    actorLabel: "Actor",
+    targetLabel: "Vault",
+    teamLabel: "Team",
+  },
+  plug: {
+    actorLabel: "Actor",
+    targetLabel: "Cashout",
+    teamLabel: "Team",
+  },
+  cashout: {
+    targetLabel: "Cashout",
+    teamLabel: "Cashing team",
+  },
+  steal_flip: {
+    targetLabel: "Cashout",
+    teamLabel: "Stealing team / new cashout owner",
+  },
+  team_wipe: {
+    actorLabel: "Attacking team",
+    teamLabel: "Wiped team",
+  },
+  team_spawn: {
+    teamLabel: "Spawning team",
+  },
+  revive: {
+    actorLabel: "Actor",
+    targetLabel: "Target",
+    teamLabel: "Team",
+  },
+  defib: {
+    actorLabel: "Actor",
+    targetLabel: "Target",
+    teamLabel: "Team",
+  },
+};
+
+const metadataPreviewLimit = 120;
+
+function truncateMetadataPreview(value: string) {
+  return value.length > metadataPreviewLimit
+    ? `${value.slice(0, metadataPreviewLimit - 1)}…`
+    : value;
+}
+
+function formatUnknownMetadataValue(value: unknown): string {
+  if (value === null) return "null";
+  if (["string", "number", "boolean"].includes(typeof value)) {
+    return String(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.length} items]`;
+  }
+  if (typeof value === "object") {
+    return "{…}";
+  }
+
+  return String(value);
+}
+
+function formatSuggestedEventMetadataPreview(metadata: string | null) {
+  if (!metadata) return null;
+
+  try {
+    const parsed: unknown = JSON.parse(metadata);
+
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const entries = Object.entries(parsed as Record<string, unknown>);
+      if (entries.length === 0) return "{}";
+
+      const preview = entries
+        .slice(0, 3)
+        .map(([key, value]) => `${key}: ${formatUnknownMetadataValue(value)}`)
+        .join(" • ");
+      const suffix = entries.length > 3 ? " • …" : "";
+
+      return truncateMetadataPreview(`${preview}${suffix}`);
+    }
+
+    return truncateMetadataPreview(formatUnknownMetadataValue(parsed));
+  } catch {
+    return truncateMetadataPreview(metadata);
+  }
+}
+
+function formatVodTargetDisplayLabel(
+  eventType: VodAnalysisEventType,
+  targetLabel: string
+) {
+  const targetKind = getVodEventTargetKind(eventType);
+
+  if (targetKind === "cashout") return `Cashout ${targetLabel}`;
+  if (targetKind === "vault") return `Vault ${targetLabel}`;
+
+  return targetLabel;
+}
+
 const povLabel = (value: "player" | "spectator") =>
   value === "player" ? "Player POV" : "Spectator POV";
 
@@ -67,15 +193,16 @@ const eventFieldHelp: Record<
   },
   tap: {
     actorLabel: "Player tapping",
-    targetLabel: "Objective/cashout",
+    targetLabel: "Vault",
     teamLabel: "Team tapping",
   },
   plug: {
     actorLabel: "Player plugging",
-    targetLabel: "Objective/cashout",
+    targetLabel: "Cashout",
     teamLabel: "Team plugging",
   },
   cashout: {
+    targetLabel: "Cashout",
     teamLabel: "Cashing team",
   },
   team_wipe: {
@@ -86,6 +213,7 @@ const eventFieldHelp: Record<
     teamLabel: "Spawning team",
   },
   steal_flip: {
+    targetLabel: "Cashout",
     teamLabel: "Stealing team / new owner",
   },
   revive: {
@@ -354,7 +482,10 @@ function TeamSummarySection({
                 <DetailPill label="Wipes" value={String(summary.teamWipes)} />
                 <DetailPill label="Spawns" value={String(summary.teamSpawns)} />
                 <DetailPill label="Cashouts" value={String(summary.cashouts)} />
-                <DetailPill label="Steal / Flip" value={String(summary.stealFlips)} />
+                <DetailPill
+                  label="Steal / Flip"
+                  value={String(summary.stealFlips)}
+                />
                 <DetailPill label="Revives" value={String(summary.revives)} />
                 <DetailPill label="Defibs" value={String(summary.defibs)} />
               </div>
@@ -591,6 +722,12 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
   const [suggestedEventError, setSuggestedEventError] = useState<string | null>(
     null
   );
+  const [suggestedEventActionError, setSuggestedEventActionError] = useState<{
+    id: number;
+    message: string;
+  } | null>(null);
+  const [suggestedEventFilter, setSuggestedEventFilter] =
+    useState<SuggestedEventFilter | null>(null);
   const [metadataRefreshMessage, setMetadataRefreshMessage] = useState<{
     type: "success" | "error";
     text: string;
@@ -674,6 +811,7 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
     trpc.vodAnalysis.createSuggestedEvent.useMutation({
       onSuccess: async () => {
         setSuggestedEventError(null);
+        setSuggestedEventActionError(null);
         setSuggestedEventsOpen(true);
         await utils.vodAnalysis.listSuggestedEvents.invalidate(vodAnalysisId);
       },
@@ -724,10 +862,14 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
       onMutate: id => {
         setActiveSuggestedEventId(id);
         setSuggestedEventError(null);
+        setSuggestedEventActionError(null);
       },
-      onSuccess: refreshSuggestedEventReview,
-      onError: error => {
-        setSuggestedEventError(error.message);
+      onSuccess: async () => {
+        setSuggestedEventActionError(null);
+        await refreshSuggestedEventReview();
+      },
+      onError: (error, id) => {
+        setSuggestedEventActionError({ id, message: error.message });
       },
       onSettled: () => {
         setActiveSuggestedEventId(null);
@@ -739,10 +881,14 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
       onMutate: id => {
         setActiveSuggestedEventId(id);
         setSuggestedEventError(null);
+        setSuggestedEventActionError(null);
       },
-      onSuccess: refreshSuggestedEventReview,
-      onError: error => {
-        setSuggestedEventError(error.message);
+      onSuccess: async () => {
+        setSuggestedEventActionError(null);
+        await refreshSuggestedEventReview();
+      },
+      onError: (error, id) => {
+        setSuggestedEventActionError({ id, message: error.message });
       },
       onSettled: () => {
         setActiveSuggestedEventId(null);
@@ -818,9 +964,25 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
     : null;
   const events = eventsQuery.data ?? [];
   const suggestedEvents = suggestedEventsQuery.data ?? [];
-  const pendingSuggestedEventCount = suggestedEvents.filter(
-    suggestion => suggestion.status === "pending"
-  ).length;
+  const suggestedEventCounts: Record<SuggestedEventStatus, number> = {
+    pending: 0,
+    approved: 0,
+    rejected: 0,
+  };
+
+  for (const suggestion of suggestedEvents) {
+    suggestedEventCounts[suggestion.status] += 1;
+  }
+
+  const pendingSuggestedEventCount = suggestedEventCounts.pending;
+  const activeSuggestedEventFilter =
+    suggestedEventFilter ??
+    (pendingSuggestedEventCount > 0 ? "pending" : "all");
+  const visibleSuggestedEvents = suggestedEvents.filter(
+    suggestion =>
+      activeSuggestedEventFilter === "all" ||
+      suggestion.status === activeSuggestedEventFilter
+  );
   const teamSummaries = useMemo(() => buildVodTeamSummaries(events), [events]);
   const labelSuggestions = useMemo(
     () => getVodEventLabelSuggestions(events),
@@ -985,6 +1147,13 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
           ? labelSuggestions.targets
           : labelSuggestions.teams;
     const datalistId = `vod-${selectedEventType}-${field}-suggestions`;
+    const targetKind = getVodEventTargetKind(selectedEventType);
+    const objectiveOptions =
+      field === "targetLabel" && targetKind === "cashout"
+        ? VOD_CASHOUT_LABELS
+        : field === "targetLabel" && targetKind === "vault"
+          ? VOD_VAULT_LABELS
+          : null;
 
     return (
       <label className="block" key={field}>
@@ -992,19 +1161,42 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
           {helper}{" "}
           {isRequired ? <span className="text-neon-gold">*</span> : null}
         </span>
-        <input
-          value={value}
-          onChange={event => setValue(event.target.value)}
-          placeholder={eventFieldLabels[field]}
-          list={datalistId}
-          className="mt-2 w-full rounded border border-white/15 bg-black/40 px-3 py-2 font-mono text-sm text-white outline-none transition focus:border-neon-cyan"
-        />
-        <datalist id={datalistId}>
-          {suggestions.map(suggestion => (
-            <option key={suggestion} value={suggestion} />
-          ))}
-        </datalist>
-        {suggestions.length > 0 ? (
+        {objectiveOptions ? (
+          <select
+            value={
+              (objectiveOptions as readonly string[]).includes(value)
+                ? value
+                : ""
+            }
+            onChange={event => setValue(event.target.value)}
+            className="mt-2 w-full rounded border border-white/15 bg-black/40 px-3 py-2 font-mono text-sm text-white outline-none transition focus:border-neon-cyan"
+          >
+            <option value="">
+              Select {targetKind === "cashout" ? "cashout" : "vault"}
+            </option>
+            {objectiveOptions.map(option => (
+              <option key={option} value={option}>
+                {targetKind === "cashout" ? "Cashout" : "Vault"} {option}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <>
+            <input
+              value={value}
+              onChange={event => setValue(event.target.value)}
+              placeholder={eventFieldLabels[field]}
+              list={datalistId}
+              className="mt-2 w-full rounded border border-white/15 bg-black/40 px-3 py-2 font-mono text-sm text-white outline-none transition focus:border-neon-cyan"
+            />
+            <datalist id={datalistId}>
+              {suggestions.map(suggestion => (
+                <option key={suggestion} value={suggestion} />
+              ))}
+            </datalist>
+          </>
+        )}
+        {!objectiveOptions && suggestions.length > 0 ? (
           <div className="mt-2 flex max-h-16 flex-wrap gap-1 overflow-hidden">
             {suggestions.slice(0, 4).map(suggestion => (
               <button
@@ -1065,6 +1257,14 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
                 type="button"
                 onClick={() => {
                   setSelectedEventType(eventType);
+                  setTargetLabel("");
+                  setActorLabel(currentActorLabel =>
+                    VOD_ANALYSIS_EVENT_REQUIRED_FIELDS[eventType].includes(
+                      "actorLabel"
+                    )
+                      ? currentActorLabel
+                      : ""
+                  );
                   setEventErrors({});
                 }}
                 className={`rounded-full border px-3 py-1 font-mono text-xs font-bold uppercase tracking-widest transition ${
@@ -1300,10 +1500,13 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
                   >
                     <span>
                       <span className="block font-mono text-xl font-bold uppercase text-neon-cyan">
-                        Suggested Events
+                        Automation Suggestions
                       </span>
                       <span className="mt-1 block font-mono text-xs uppercase tracking-widest text-white/45">
-                        {pendingSuggestedEventCount} pending
+                        {suggestedEvents.length} total •{" "}
+                        {pendingSuggestedEventCount} pending •{" "}
+                        {suggestedEventCounts.approved} approved •{" "}
+                        {suggestedEventCounts.rejected} rejected
                       </span>
                     </span>
                     <span className="font-mono text-sm uppercase tracking-widest text-neon-cyan">
@@ -1311,22 +1514,39 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
                     </span>
                   </button>
 
-                  <p className="mt-3 font-mono text-sm text-white/65">
-                    Suggested events are review-only. Approved suggestions
-                    become manual timeline events.
-                  </p>
+                  <div className="mt-3 space-y-2 font-mono text-sm text-white/65">
+                    <p>
+                      Future automation will populate this queue from frame
+                      scanning. For now, suggested events can be reviewed here
+                      before becoming confirmed manual events.
+                    </p>
+                    <p className="rounded border border-neon-magenta/25 bg-neon-magenta/10 p-3 text-xs text-white/60">
+                      Capture jobs currently record planned frame-sampling work.
+                      Future automation will convert detected frame events into
+                      suggestions for this queue.
+                    </p>
+                  </div>
 
                   {import.meta.env.DEV ? (
-                    <button
-                      type="button"
-                      onClick={handleCreateTestSuggestion}
-                      disabled={createSuggestedEventMutation.isPending}
-                      className="mt-4 rounded-sm border border-neon-gold/70 px-3 py-2 font-mono text-xs font-bold uppercase tracking-widest text-neon-gold transition hover:bg-neon-gold/10 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      {createSuggestedEventMutation.isPending
-                        ? "Creating…"
-                        : "Create test suggestion"}
-                    </button>
+                    <div className="mt-4 rounded border border-neon-gold/30 bg-neon-gold/10 p-3">
+                      <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-neon-gold">
+                        Dev only suggestion seed
+                      </div>
+                      <p className="mt-1 font-mono text-xs text-white/55">
+                        Hidden outside local development so the public review
+                        queue does not expose test tooling.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleCreateTestSuggestion}
+                        disabled={createSuggestedEventMutation.isPending}
+                        className="mt-3 rounded-sm border border-neon-gold/70 px-3 py-2 font-mono text-xs font-bold uppercase tracking-widest text-neon-gold transition hover:bg-neon-gold/10 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {createSuggestedEventMutation.isPending
+                          ? "Creating…"
+                          : "Create dev test suggestion"}
+                      </button>
+                    </div>
                   ) : null}
 
                   {suggestedEventError ? (
@@ -1336,97 +1556,193 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
                   ) : null}
 
                   {suggestedEventsOpen ? (
-                    <div className="mt-5 space-y-3">
+                    <div className="mt-5 space-y-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {SUGGESTED_EVENT_FILTERS.map(filter => {
+                          const count =
+                            filter === "all"
+                              ? suggestedEvents.length
+                              : suggestedEventCounts[filter];
+                          const isActive =
+                            filter === activeSuggestedEventFilter;
+
+                          return (
+                            <button
+                              key={filter}
+                              type="button"
+                              onClick={() => setSuggestedEventFilter(filter)}
+                              className={`rounded-full border px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-widest transition ${
+                                isActive
+                                  ? "border-neon-cyan bg-neon-cyan/10 text-neon-cyan"
+                                  : "border-white/15 text-white/50 hover:border-neon-cyan/60 hover:text-neon-cyan"
+                              }`}
+                            >
+                              {suggestedEventFilterLabels[filter]} ({count})
+                            </button>
+                          );
+                        })}
+                      </div>
+
                       {suggestedEventsQuery.isLoading ? (
                         <div className="rounded border border-white/10 bg-black/30 p-4 font-mono text-sm text-white/50">
                           Loading suggested events…
                         </div>
                       ) : suggestedEvents.length === 0 ? (
                         <div className="rounded border border-white/10 bg-black/30 p-4 font-mono text-sm text-white/50">
-                          No suggested events are waiting for review.
+                          No automation suggestions have been recorded yet.
+                        </div>
+                      ) : visibleSuggestedEvents.length === 0 ? (
+                        <div className="rounded border border-white/10 bg-black/30 p-4 font-mono text-sm text-white/50">
+                          No{" "}
+                          {suggestedEventFilterLabels[
+                            activeSuggestedEventFilter
+                          ].toLowerCase()}{" "}
+                          suggestions match this filter.
                         </div>
                       ) : (
-                        suggestedEvents.map(suggestion => {
-                          const isPendingAction =
-                            activeSuggestedEventId === suggestion.id &&
-                            (approveSuggestedEventMutation.isPending ||
-                              rejectSuggestedEventMutation.isPending);
-                          const canReview = suggestion.status === "pending";
+                        <div className="space-y-3">
+                          {visibleSuggestedEvents.map(suggestion => {
+                            const isPendingAction =
+                              activeSuggestedEventId === suggestion.id &&
+                              (approveSuggestedEventMutation.isPending ||
+                                rejectSuggestedEventMutation.isPending);
+                            const canReview = suggestion.status === "pending";
+                            const timestampUrl = getEventTimestampUrl(
+                              suggestion.timestampSeconds
+                            );
+                            const metadataPreview =
+                              formatSuggestedEventMetadataPreview(
+                                suggestion.metadata
+                              );
+                            const fieldLabels =
+                              suggestedEventFieldLabels[suggestion.eventType];
+                            const isDeemphasized =
+                              suggestion.status !== "pending";
 
-                          return (
-                            <div
-                              key={suggestion.id}
-                              className="rounded border border-white/10 bg-black/30 p-4"
-                            >
-                              <div className="flex flex-wrap items-center gap-3">
-                                <span className="rounded border border-neon-cyan/50 px-2 py-1 font-mono text-xs font-bold text-neon-cyan">
-                                  {formatVodEventTimestamp(
-                                    suggestion.timestampSeconds
-                                  )}
-                                </span>
-                                <span className="font-mono text-sm font-bold uppercase tracking-widest text-white">
-                                  {
-                                    VOD_ANALYSIS_EVENT_LABELS[
-                                      suggestion.eventType
-                                    ]
-                                  }
-                                </span>
-                                <span className="rounded border border-white/10 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-white/55">
-                                  {suggestion.status}
-                                </span>
-                              </div>
-                              <div className="mt-3 flex flex-wrap gap-2 font-mono text-xs text-white/65">
-                                <span>Source: {suggestion.source}</span>
-                                {suggestion.confidence !== null ? (
-                                  <span>
-                                    Confidence: {suggestion.confidence}%
+                            return (
+                              <div
+                                key={suggestion.id}
+                                className={`rounded border p-4 transition ${
+                                  isDeemphasized
+                                    ? "border-white/10 bg-black/20 opacity-65"
+                                    : "border-neon-cyan/25 bg-black/35"
+                                }`}
+                              >
+                                <div className="flex flex-wrap items-center gap-3">
+                                  <span className="rounded border border-neon-cyan/50 px-2 py-1 font-mono text-xs font-bold text-neon-cyan">
+                                    {formatVodEventTimestamp(
+                                      suggestion.timestampSeconds
+                                    )}
                                   </span>
+                                  <span className="font-mono text-sm font-bold uppercase tracking-widest text-white">
+                                    {
+                                      VOD_ANALYSIS_EVENT_LABELS[
+                                        suggestion.eventType
+                                      ]
+                                    }
+                                  </span>
+                                  <span className="rounded border border-white/10 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-white/55">
+                                    {suggestion.status}
+                                  </span>
+                                  {timestampUrl ? (
+                                    <a
+                                      href={timestampUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="font-mono text-[10px] font-bold uppercase tracking-widest text-neon-cyan underline-offset-4 hover:underline"
+                                    >
+                                      Open at timestamp
+                                    </a>
+                                  ) : null}
+                                </div>
+
+                                <div className="mt-3 grid gap-2 font-mono text-xs text-white/65 sm:grid-cols-2">
+                                  {suggestion.teamLabel ? (
+                                    <span>
+                                      {fieldLabels.teamLabel ?? "Team"}:{" "}
+                                      {suggestion.teamLabel}
+                                    </span>
+                                  ) : null}
+                                  {suggestion.actorLabel ? (
+                                    <span>
+                                      {fieldLabels.actorLabel ?? "Actor"}:{" "}
+                                      {suggestion.actorLabel}
+                                    </span>
+                                  ) : null}
+                                  {suggestion.targetLabel ? (
+                                    <span>
+                                      {fieldLabels.targetLabel ?? "Target"}:{" "}
+                                      {formatVodTargetDisplayLabel(
+                                        suggestion.eventType,
+                                        suggestion.targetLabel
+                                      )}
+                                    </span>
+                                  ) : null}
+                                  {suggestion.confidence !== null ? (
+                                    <span>
+                                      Confidence: {suggestion.confidence}%
+                                    </span>
+                                  ) : null}
+                                  <span>Source: {suggestion.source}</span>
+                                  {suggestion.confirmedVodEventId ? (
+                                    <span>
+                                      Confirmed manual event id:{" "}
+                                      {suggestion.confirmedVodEventId}
+                                    </span>
+                                  ) : null}
+                                </div>
+
+                                {metadataPreview ? (
+                                  <div className="mt-3 rounded border border-white/10 bg-black/30 p-2 font-mono text-xs text-white/50">
+                                    Metadata: {metadataPreview}
+                                  </div>
                                 ) : null}
-                                {suggestion.actorLabel ? (
-                                  <span>Actor: {suggestion.actorLabel}</span>
+
+                                {suggestedEventActionError?.id ===
+                                suggestion.id ? (
+                                  <div className="mt-3 rounded border border-red-500/40 bg-red-950/30 p-2 font-mono text-xs text-red-100">
+                                    {suggestedEventActionError.message}
+                                  </div>
                                 ) : null}
-                                {suggestion.targetLabel ? (
-                                  <span>Target: {suggestion.targetLabel}</span>
-                                ) : null}
-                                {suggestion.teamLabel ? (
-                                  <span>Team: {suggestion.teamLabel}</span>
+
+                                {canReview ? (
+                                  <div className="mt-4 flex flex-wrap gap-2">
+                                    <button
+                                      type="button"
+                                      disabled={isPendingAction}
+                                      onClick={() =>
+                                        approveSuggestedEventMutation.mutate(
+                                          suggestion.id
+                                        )
+                                      }
+                                      className="rounded-sm border border-neon-gold/70 px-3 py-2 font-mono text-xs font-bold uppercase tracking-widest text-neon-gold transition hover:bg-neon-gold/10 disabled:cursor-not-allowed disabled:opacity-35"
+                                    >
+                                      {isPendingAction &&
+                                      approveSuggestedEventMutation.isPending
+                                        ? "Approving…"
+                                        : "Approve"}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={isPendingAction}
+                                      onClick={() =>
+                                        rejectSuggestedEventMutation.mutate(
+                                          suggestion.id
+                                        )
+                                      }
+                                      className="rounded-sm border border-white/20 px-3 py-2 font-mono text-xs font-bold uppercase tracking-widest text-white/65 transition hover:border-red-300/70 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-35"
+                                    >
+                                      {isPendingAction &&
+                                      rejectSuggestedEventMutation.isPending
+                                        ? "Rejecting…"
+                                        : "Reject"}
+                                    </button>
+                                  </div>
                                 ) : null}
                               </div>
-                              <div className="mt-4 flex flex-wrap gap-2">
-                                <button
-                                  type="button"
-                                  disabled={!canReview || isPendingAction}
-                                  onClick={() =>
-                                    approveSuggestedEventMutation.mutate(
-                                      suggestion.id
-                                    )
-                                  }
-                                  className="rounded-sm border border-neon-gold/70 px-3 py-2 font-mono text-xs font-bold uppercase tracking-widest text-neon-gold transition hover:bg-neon-gold/10 disabled:cursor-not-allowed disabled:opacity-35"
-                                >
-                                  {isPendingAction &&
-                                  approveSuggestedEventMutation.isPending
-                                    ? "Approving…"
-                                    : "Approve"}
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={!canReview || isPendingAction}
-                                  onClick={() =>
-                                    rejectSuggestedEventMutation.mutate(
-                                      suggestion.id
-                                    )
-                                  }
-                                  className="rounded-sm border border-white/20 px-3 py-2 font-mono text-xs font-bold uppercase tracking-widest text-white/65 transition hover:border-red-300/70 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-35"
-                                >
-                                  {isPendingAction &&
-                                  rejectSuggestedEventMutation.isPending
-                                    ? "Rejecting…"
-                                    : "Reject"}
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })
+                            );
+                          })}
+                        </div>
                       )}
                     </div>
                   ) : null}
@@ -1594,7 +1910,16 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
                                     <span>Actor: {event.actorLabel}</span>
                                   ) : null}
                                   {event.targetLabel ? (
-                                    <span>Target: {event.targetLabel}</span>
+                                    <span>
+                                      {suggestedEventFieldLabels[
+                                        event.eventType
+                                      ].targetLabel ?? "Target"}
+                                      :{" "}
+                                      {formatVodTargetDisplayLabel(
+                                        event.eventType,
+                                        event.targetLabel
+                                      )}
+                                    </span>
                                   ) : null}
                                   {event.teamLabel ? (
                                     <span>Team: {event.teamLabel}</span>

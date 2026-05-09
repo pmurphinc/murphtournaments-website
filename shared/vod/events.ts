@@ -12,6 +12,13 @@ export const VOD_ANALYSIS_EVENT_TYPES = [
 
 export type VodAnalysisEventType = (typeof VOD_ANALYSIS_EVENT_TYPES)[number];
 
+export const VOD_CASHOUT_LABELS = ["A", "B", "C", "D", "E"] as const;
+export const VOD_VAULT_LABELS = ["1", "2", "3", "4", "5", "6"] as const;
+
+export type VodCashoutLabel = (typeof VOD_CASHOUT_LABELS)[number];
+export type VodVaultLabel = (typeof VOD_VAULT_LABELS)[number];
+export type VodEventTargetKind = "player" | "cashout" | "vault" | "none";
+
 export const VOD_ANALYSIS_EVENT_LABELS: Record<VodAnalysisEventType, string> = {
   death: "Death",
   tap: "Tap",
@@ -31,13 +38,35 @@ export const VOD_ANALYSIS_EVENT_REQUIRED_FIELDS: Record<
   death: ["actorLabel", "targetLabel"],
   tap: ["actorLabel", "targetLabel", "teamLabel"],
   plug: ["actorLabel", "targetLabel", "teamLabel"],
-  cashout: ["teamLabel"],
+  cashout: ["targetLabel", "teamLabel"],
   team_wipe: ["actorLabel", "teamLabel"],
   team_spawn: ["teamLabel"],
-  steal_flip: ["teamLabel"],
+  steal_flip: ["targetLabel", "teamLabel"],
   revive: ["actorLabel", "targetLabel", "teamLabel"],
   defib: ["actorLabel", "targetLabel", "teamLabel"],
 };
+
+export function getVodEventTargetKind(
+  eventType: VodAnalysisEventType
+): VodEventTargetKind {
+  if (eventType === "tap") return "vault";
+  if (
+    eventType === "cashout" ||
+    eventType === "steal_flip" ||
+    eventType === "plug"
+  ) {
+    return "cashout";
+  }
+  if (
+    eventType === "death" ||
+    eventType === "revive" ||
+    eventType === "defib"
+  ) {
+    return "player";
+  }
+
+  return "none";
+}
 
 export function isVodAnalysisEventType(
   value: unknown

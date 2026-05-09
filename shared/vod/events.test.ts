@@ -1,30 +1,25 @@
 import { describe, expect, it } from "vitest";
-import { formatVodEventTimestamp, parseVodEventTimestamp } from "./events";
+import {
+  getVodEventTargetKind,
+  VOD_CASHOUT_LABELS,
+  VOD_VAULT_LABELS,
+} from "./events";
 
-describe("parseVodEventTimestamp", () => {
-  it("parses whole seconds", () => {
-    expect(parseVodEventTimestamp("0")).toBe(0);
-    expect(parseVodEventTimestamp("90")).toBe(90);
-    expect(parseVodEventTimestamp(" 120 ")).toBe(120);
+describe("VOD event objective helpers", () => {
+  it("exposes typed cashout and vault selector constants", () => {
+    expect(VOD_CASHOUT_LABELS).toEqual(["A", "B", "C", "D", "E"]);
+    expect(VOD_VAULT_LABELS).toEqual(["1", "2", "3", "4", "5", "6"]);
   });
 
-  it("parses m:ss and mm:ss values", () => {
-    expect(parseVodEventTimestamp("1:30")).toBe(90);
-    expect(parseVodEventTimestamp("12:05")).toBe(725);
-  });
-
-  it("rejects invalid timestamp values", () => {
-    expect(parseVodEventTimestamp("")).toBeNull();
-    expect(parseVodEventTimestamp("-1")).toBeNull();
-    expect(parseVodEventTimestamp("1:60")).toBeNull();
-    expect(parseVodEventTimestamp("1:2")).toBeNull();
-    expect(parseVodEventTimestamp("1:02:03")).toBeNull();
-  });
-});
-
-describe("formatVodEventTimestamp", () => {
-  it("formats timestamps as m:ss", () => {
-    expect(formatVodEventTimestamp(0)).toBe("0:00");
-    expect(formatVodEventTimestamp(90)).toBe("1:30");
+  it("classifies target fields by event type", () => {
+    expect(getVodEventTargetKind("cashout")).toBe("cashout");
+    expect(getVodEventTargetKind("steal_flip")).toBe("cashout");
+    expect(getVodEventTargetKind("plug")).toBe("cashout");
+    expect(getVodEventTargetKind("tap")).toBe("vault");
+    expect(getVodEventTargetKind("death")).toBe("player");
+    expect(getVodEventTargetKind("revive")).toBe("player");
+    expect(getVodEventTargetKind("defib")).toBe("player");
+    expect(getVodEventTargetKind("team_wipe")).toBe("none");
+    expect(getVodEventTargetKind("team_spawn")).toBe("none");
   });
 });

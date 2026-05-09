@@ -1,4 +1,4 @@
-import type { VodAnalysisEventType } from "./events";
+import { getVodEventTargetKind, type VodAnalysisEventType } from "./events";
 
 export const DEFAULT_THE_FINALS_TEAM_LABELS = [
   "The High Notes",
@@ -143,6 +143,13 @@ export function getVodEventLabelSuggestions(
       return label ? isNotTeamLabel(label) : false;
     }),
     targets: getPreferredLabels(events, "targetLabel", event => {
+      if (
+        event.eventType &&
+        getVodEventTargetKind(event.eventType) !== "player"
+      ) {
+        return false;
+      }
+
       const label = event.targetLabel?.trim();
       return label ? isNotTeamLabel(label) : false;
     }),
