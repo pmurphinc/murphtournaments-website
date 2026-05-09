@@ -37,6 +37,8 @@ import {
   getLatestVodCaptureJob,
   getVodAutomationStatus,
   getVodAnalysisById,
+  ingestAutomationDetections,
+  ingestAutomationDetectionsInputSchema,
   listVodAnalysisEvents,
   listVodCaptureJobs,
   listVodAnalyses,
@@ -804,6 +806,12 @@ export const appRouter = router({
       .input(createVodSuggestedEventInputSchema)
       .mutation(async ({ input }) => {
         return createVodSuggestedEvent(input);
+      }),
+
+    ingestAutomationDetections: publicProcedure
+      .input(ingestAutomationDetectionsInputSchema)
+      .mutation(async ({ input }) => {
+        return ingestAutomationDetections(input);
       }),
 
     updateSuggestedEvent: publicProcedure
