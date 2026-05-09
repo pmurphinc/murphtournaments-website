@@ -12,6 +12,11 @@ import {
 } from "../drizzle/schema";
 import { parseVodSource, type VodSourceType } from "../shared/vod/source";
 import {
+  fetchTwitchVodMetadata,
+  type TwitchMetadata,
+  type TwitchMetadataResult,
+} from "./twitchMetadata";
+import {
   VOD_ANALYSIS_EVENT_REQUIRED_FIELDS,
   VOD_ANALYSIS_EVENT_TYPES,
   type VodAnalysisEventType,
@@ -57,6 +62,21 @@ export type PendingSuggestedEventCountsByVodAnalysisId = Record<number, number>;
 export type VodAnalysisListItem = VodAnalysisRecord & {
   pendingSuggestedCount: number;
 };
+
+export type RefreshTwitchMetadataStatus =
+  | "updated"
+  | "credentials_missing"
+  | "not_twitch"
+  | "not_found"
+  | "fetch_failed";
+
+export type RefreshTwitchMetadataResult = {
+  status: RefreshTwitchMetadataStatus;
+  vodAnalysis?: VodAnalysisRecord | null;
+  metadata?: TwitchMetadata;
+};
+
+type TwitchMetadataFetcher = (vodId: string) => Promise<TwitchMetadataResult>;
 
 export type CreateVodAnalysisEventInput = {
   vodAnalysisId: number;
@@ -167,6 +187,14 @@ type GetByIdDb = {
       where: (condition: unknown) => {
         limit: (limit: number) => Promise<VodAnalysisRecord[]>;
       };
+    };
+  };
+};
+
+type UpdateVodAnalysisMetadataDb = GetByIdDb & {
+  update: (table: typeof vodAnalyses) => {
+    set: (values: Partial<InsertVodAnalysis>) => {
+      where: (condition: unknown) => Promise<unknown>;
     };
   };
 };
@@ -498,6 +526,104 @@ const vodAnalysisEventFields = {
 function normalizeEventLabel(value: string | null | undefined) {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
+}
+
+function getTwitchVodId(vod: VodAnalysisRecord): string | null {
+  if (vod.sourceId?.trim() && /^\d+$/.test(vod.sourceId.trim())) {
+    return vod.sourceId.trim();
+  }
+
+  const parsedSource = parseVodSource(vod.normalizedSourceUrl || vod.sourceUrl);
+
+  if (
+    parsedSource.valid &&
+    parsedSource.sourceType === "twitch" &&
+    parsedSource.sourceId &&
+    /^\d+$/.test(parsedSource.sourceId)
+  ) {
+    return parsedSource.sourceId;
+  }
+
+  return null;
+}
+
+export function buildVodAnalysisMetadataUpdate(
+  metadata: TwitchMetadata
+): Partial<InsertVodAnalysis> {
+  const update: Partial<InsertVodAnalysis> = {};
+  const title = metadata.title?.trim();
+
+  if (title) {
+    update.title = title;
+  }
+
+  if (metadata.thumbnailUrl) {
+    update.thumbnailUrl = metadata.thumbnailUrl;
+  }
+
+  if (metadata.durationSeconds && metadata.durationSeconds > 0) {
+    update.durationSeconds = metadata.durationSeconds;
+  }
+
+  return update;
+}
+
+export async function refreshTwitchMetadataForVodAnalysis(
+  vodAnalysisId: number,
+  dbClient?: UpdateVodAnalysisMetadataDb | null,
+  metadataFetcher: TwitchMetadataFetcher = fetchTwitchVodMetadata
+): Promise<RefreshTwitchMetadataResult> {
+  const parsedVodAnalysisId = vodAnalysisIdInputSchema.parse(vodAnalysisId);
+  const db =
+    dbClient ?? ((await getDb()) as UpdateVodAnalysisMetadataDb | null);
+
+  if (!db) {
+    throw new Error(
+      "Database is not available for VOD analysis metadata refresh."
+    );
+  }
+
+  const vod = await getVodAnalysisById(parsedVodAnalysisId, db);
+
+  if (!vod) {
+    return { status: "not_found", vodAnalysis: null };
+  }
+
+  if (vod.sourceType !== "twitch") {
+    return { status: "not_twitch", vodAnalysis: vod };
+  }
+
+  const twitchVodId = getTwitchVodId(vod);
+
+  if (!twitchVodId) {
+    return { status: "not_found", vodAnalysis: vod };
+  }
+
+  const metadataResult = await metadataFetcher(twitchVodId);
+
+  if (metadataResult.status !== "success") {
+    return { status: metadataResult.status, vodAnalysis: vod };
+  }
+
+  const updateValues = buildVodAnalysisMetadataUpdate(metadataResult.metadata);
+
+  if (Object.keys(updateValues).length > 0) {
+    await db
+      .update(vodAnalyses)
+      .set(updateValues)
+      .where(eq(vodAnalyses.id, parsedVodAnalysisId));
+  }
+
+  const updatedVod = {
+    ...vod,
+    ...updateValues,
+  };
+
+  return {
+    status: "updated",
+    vodAnalysis: updatedVod,
+    metadata: metadataResult.metadata,
+  };
 }
 
 export function buildVodAnalysisEventInsert(
