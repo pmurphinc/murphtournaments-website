@@ -1,4 +1,4 @@
-import { asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   vodAnalyses,
   vodAnalysisEvents,
@@ -47,7 +47,16 @@ export type VodAnalysisRecord = Pick<
   | "updatedAt"
 >;
 
-export type VodAnalysisListItem = VodAnalysisRecord;
+export type PendingSuggestedEventCountRow = {
+  vodAnalysisId: number;
+  pendingSuggestedCount: number | string | bigint;
+};
+
+export type PendingSuggestedEventCountsByVodAnalysisId = Record<number, number>;
+
+export type VodAnalysisListItem = VodAnalysisRecord & {
+  pendingSuggestedCount: number;
+};
 
 export type CreateVodAnalysisEventInput = {
   vodAnalysisId: number;
@@ -133,10 +142,24 @@ type EventInsertableDb = {
 type ListableDb = {
   select: (fields: Record<string, unknown>) => {
     from: (table: typeof vodAnalyses) => {
-      orderBy: (...columns: unknown[]) => Promise<VodAnalysisListItem[]>;
+      orderBy: (...columns: unknown[]) => Promise<VodAnalysisRecord[]>;
     };
   };
 };
+
+type PendingSuggestedEventCountDb = {
+  select: (fields: Record<string, unknown>) => {
+    from: (table: typeof vodSuggestedEvents) => {
+      where: (condition: unknown) => {
+        groupBy: (
+          column: typeof vodSuggestedEvents.vodAnalysisId
+        ) => Promise<PendingSuggestedEventCountRow[]>;
+      };
+    };
+  };
+};
+
+type VodAnalysisListDb = ListableDb & PendingSuggestedEventCountDb;
 
 type GetByIdDb = {
   select: (fields: Record<string, unknown>) => {
@@ -341,14 +364,77 @@ const vodAnalysisFields = {
   updatedAt: vodAnalyses.updatedAt,
 };
 
+export function addPendingSuggestedCountsToVodAnalyses(
+  rows: VodAnalysisRecord[],
+  countsByVodAnalysisId: PendingSuggestedEventCountsByVodAnalysisId
+): VodAnalysisListItem[] {
+  return rows.map(row => ({
+    ...row,
+    pendingSuggestedCount: countsByVodAnalysisId[row.id] ?? 0,
+  }));
+}
+
+export async function getPendingSuggestedEventCountsByVodAnalysisIds(
+  ids: number[],
+  dbClient?: PendingSuggestedEventCountDb | null
+): Promise<PendingSuggestedEventCountsByVodAnalysisId> {
+  const uniqueIds = Array.from(
+    new Set(ids.map(id => vodAnalysisIdInputSchema.parse(id)))
+  );
+
+  if (uniqueIds.length === 0) {
+    return {};
+  }
+
+  const runQuery = (db: PendingSuggestedEventCountDb) =>
+    db
+      .select({
+        vodAnalysisId: vodSuggestedEvents.vodAnalysisId,
+        pendingSuggestedCount: count(),
+      })
+      .from(vodSuggestedEvents)
+      .where(
+        and(
+          inArray(vodSuggestedEvents.vodAnalysisId, uniqueIds),
+          eq(vodSuggestedEvents.status, "pending")
+        )
+      )
+      .groupBy(vodSuggestedEvents.vodAnalysisId);
+
+  const db =
+    dbClient ?? ((await getDb()) as PendingSuggestedEventCountDb | null);
+
+  if (!db) {
+    throw new Error(
+      "Database is not available for VOD suggested event count listing."
+    );
+  }
+
+  const countRows = await runQuery(db);
+
+  return Object.fromEntries(
+    countRows.map(row => [row.vodAnalysisId, Number(row.pendingSuggestedCount)])
+  );
+}
+
 export async function listVodAnalyses(
-  dbClient?: ListableDb | null
+  dbClient?: VodAnalysisListDb | null
 ): Promise<VodAnalysisListItem[]> {
-  if (dbClient) {
-    return dbClient
+  const runListQuery = (db: ListableDb) =>
+    db
       .select(vodAnalysisFields)
       .from(vodAnalyses)
       .orderBy(desc(vodAnalyses.createdAt), desc(vodAnalyses.id));
+
+  if (dbClient) {
+    const rows = await runListQuery(dbClient);
+    const countsByVodAnalysisId =
+      await getPendingSuggestedEventCountsByVodAnalysisIds(
+        rows.map(row => row.id),
+        dbClient
+      );
+
+    return addPendingSuggestedCountsToVodAnalyses(rows, countsByVodAnalysisId);
   }
 
   const db = await getDb();
@@ -357,10 +443,15 @@ export async function listVodAnalyses(
     throw new Error("Database is not available for VOD analysis listing.");
   }
 
-  return db
-    .select(vodAnalysisFields)
-    .from(vodAnalyses)
-    .orderBy(desc(vodAnalyses.createdAt), desc(vodAnalyses.id));
+  const listDb = db as unknown as VodAnalysisListDb;
+  const rows = await runListQuery(listDb);
+  const countsByVodAnalysisId =
+    await getPendingSuggestedEventCountsByVodAnalysisIds(
+      rows.map(row => row.id),
+      listDb
+    );
+
+  return addPendingSuggestedCountsToVodAnalyses(rows, countsByVodAnalysisId);
 }
 
 export async function getVodAnalysisById(

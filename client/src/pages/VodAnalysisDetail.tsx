@@ -222,7 +222,16 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
   const [teamLabel, setTeamLabel] = useState("");
   const [eventErrors, setEventErrors] = useState<EventFormErrors>({});
   const [timelineOpen, setTimelineOpen] = useState(false);
-  const [suggestedEventsOpen, setSuggestedEventsOpen] = useState(false);
+  const [suggestedEventsOpen, setSuggestedEventsOpen] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+
+    return (
+      new URLSearchParams(window.location.search).get("review") ===
+      "suggestions"
+    );
+  });
   const [activeSuggestedEventId, setActiveSuggestedEventId] = useState<
     number | null
   >(null);

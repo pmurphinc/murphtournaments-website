@@ -7,7 +7,9 @@ import { Link } from "wouter";
 
 type VideoPov = "player" | "spectator";
 
-type FormErrors = Partial<Record<"title" | "sourceUrl" | "videoPov" | "form", string>>;
+type FormErrors = Partial<
+  Record<"title" | "sourceUrl" | "videoPov" | "form", string>
+>;
 
 const povLabel = (value: VideoPov) =>
   value === "player" ? "Player POV" : "Spectator POV";
@@ -114,13 +116,17 @@ export default function VodAnalysis() {
                 Create VOD
               </h2>
               <p className="mt-2 font-mono text-sm text-white/60">
-                Add a Twitch, YouTube, Google Drive, or direct video link for later review.
+                Add a Twitch, YouTube, Google Drive, or direct video link for
+                later review.
               </p>
             </div>
 
             <form className="space-y-5" onSubmit={handleSubmit}>
               <div>
-                <label htmlFor="vod-title" className="mb-2 block font-mono text-sm uppercase tracking-widest text-white/80">
+                <label
+                  htmlFor="vod-title"
+                  className="mb-2 block font-mono text-sm uppercase tracking-widest text-white/80"
+                >
                   Title
                 </label>
                 <input
@@ -131,11 +137,18 @@ export default function VodAnalysis() {
                   placeholder="Ranked finals review"
                   disabled={createMutation.isPending}
                 />
-                {errors.title ? <p className="mt-2 font-mono text-xs text-red-300">{errors.title}</p> : null}
+                {errors.title ? (
+                  <p className="mt-2 font-mono text-xs text-red-300">
+                    {errors.title}
+                  </p>
+                ) : null}
               </div>
 
               <div>
-                <label htmlFor="vod-source-url" className="mb-2 block font-mono text-sm uppercase tracking-widest text-white/80">
+                <label
+                  htmlFor="vod-source-url"
+                  className="mb-2 block font-mono text-sm uppercase tracking-widest text-white/80"
+                >
                   Video link
                 </label>
                 <input
@@ -147,11 +160,19 @@ export default function VodAnalysis() {
                   disabled={createMutation.isPending}
                 />
                 {sourcePreview ? (
-                  <p className={`mt-2 font-mono text-xs ${sourcePreview.valid ? "text-neon-cyan" : "text-red-300"}`}>
-                    {sourcePreview.valid ? `Source: ${sourcePreview.label}` : sourcePreview.label}
+                  <p
+                    className={`mt-2 font-mono text-xs ${sourcePreview.valid ? "text-neon-cyan" : "text-red-300"}`}
+                  >
+                    {sourcePreview.valid
+                      ? `Source: ${sourcePreview.label}`
+                      : sourcePreview.label}
                   </p>
                 ) : null}
-                {errors.sourceUrl ? <p className="mt-2 font-mono text-xs text-red-300">{errors.sourceUrl}</p> : null}
+                {errors.sourceUrl ? (
+                  <p className="mt-2 font-mono text-xs text-red-300">
+                    {errors.sourceUrl}
+                  </p>
+                ) : null}
               </div>
 
               <fieldset>
@@ -181,7 +202,11 @@ export default function VodAnalysis() {
                     </label>
                   ))}
                 </div>
-                {errors.videoPov ? <p className="mt-2 font-mono text-xs text-red-300">{errors.videoPov}</p> : null}
+                {errors.videoPov ? (
+                  <p className="mt-2 font-mono text-xs text-red-300">
+                    {errors.videoPov}
+                  </p>
+                ) : null}
               </fieldset>
 
               {errors.form ? (
@@ -222,7 +247,10 @@ export default function VodAnalysis() {
             ) : listQuery.isLoading ? (
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
                 {Array.from({ length: 4 }).map((_, index) => (
-                  <div key={index} className="h-52 animate-pulse rounded-lg border border-white/10 bg-black/40" />
+                  <div
+                    key={index}
+                    className="h-52 animate-pulse rounded-lg border border-white/10 bg-black/40"
+                  />
                 ))}
               </div>
             ) : vodAnalyses.length === 0 ? (
@@ -261,9 +289,16 @@ export default function VodAnalysis() {
                             {sourceLabel}
                           </p>
                         </div>
-                        <span className="shrink-0 rounded border border-neon-gold/60 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-neon-gold">
-                          {vod.status}
-                        </span>
+                        <div className="flex shrink-0 flex-col items-end gap-2">
+                          <span className="rounded border border-neon-gold/60 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-neon-gold">
+                            {vod.status}
+                          </span>
+                          {vod.pendingSuggestedCount > 0 ? (
+                            <span className="rounded border border-neon-cyan/60 bg-neon-cyan/10 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-neon-cyan">
+                              {vod.pendingSuggestedCount} Pending
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
 
                       <div className="mb-5 flex flex-wrap gap-2 font-mono text-xs uppercase tracking-widest text-white/60">
@@ -282,6 +317,14 @@ export default function VodAnalysis() {
                         >
                           View details
                         </Link>
+                        {vod.pendingSuggestedCount > 0 ? (
+                          <Link
+                            href={`/vod/${vod.id}?review=suggestions`}
+                            className="inline-block rounded-sm border-2 border-neon-gold px-4 py-2 font-mono text-sm font-bold uppercase tracking-widest text-neon-gold transition-all hover:bg-neon-gold/10"
+                          >
+                            Review suggestions
+                          </Link>
+                        ) : null}
                         <a
                           href={sourceHref}
                           target="_blank"
