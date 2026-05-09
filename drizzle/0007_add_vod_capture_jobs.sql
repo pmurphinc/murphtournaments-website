@@ -8,8 +8,8 @@ CREATE TABLE `vod_capture_jobs` (
 	`processedSamples` int NOT NULL DEFAULT 0,
 	`failedSamples` int NOT NULL DEFAULT 0,
 	`errorMessage` text,
-	`startedAt` timestamp,
-	`completedAt` timestamp,
+	`startedAt` datetime,
+	`completedAt` datetime,
 	`createdAt` timestamp NOT NULL DEFAULT (now()),
 	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
 	CONSTRAINT `vod_capture_jobs_id` PRIMARY KEY(`id`)

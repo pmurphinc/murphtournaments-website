@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   check,
+  datetime,
   index,
   int,
   mysqlEnum,
@@ -160,8 +161,8 @@ export const vodCaptureJobs = mysqlTable(
     processedSamples: int("processedSamples").default(0).notNull(),
     failedSamples: int("failedSamples").default(0).notNull(),
     errorMessage: text("errorMessage"),
-    startedAt: timestamp("startedAt"),
-    completedAt: timestamp("completedAt"),
+    startedAt: datetime("startedAt"),
+    completedAt: datetime("completedAt"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
