@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildVodEmbedConfig,
+  buildVodTimestampUrl,
   formatVodSourceType,
   getVodSourceLabel,
   parseVodSource,
@@ -219,5 +220,109 @@ describe("VOD embed config", () => {
     expect(config.embeddable).toBe(false);
     expect(config.provider).toBe("unknown");
     expect(config.reason).toContain("parsed source id");
+  });
+});
+
+describe("VOD timestamp URLs", () => {
+  it("builds YouTube timestamp URLs", () => {
+    expect(
+      buildVodTimestampUrl(
+        {
+          sourceType: "youtube",
+          sourceId: "VIDEO_ID",
+          sourceRef: "VIDEO_ID",
+          normalizedSourceUrl: "https://www.youtube.com/watch?v=VIDEO_ID",
+          sourceUrl: "https://youtu.be/VIDEO_ID",
+        },
+        75
+      )
+    ).toBe("https://www.youtube.com/watch?v=VIDEO_ID&t=75s");
+  });
+
+  it("builds Twitch timestamp URLs with minute and second offsets", () => {
+    expect(
+      buildVodTimestampUrl(
+        {
+          sourceType: "twitch",
+          sourceId: "1234567890",
+          sourceRef: "v1234567890",
+          normalizedSourceUrl: "https://www.twitch.tv/videos/1234567890",
+          sourceUrl: "https://www.twitch.tv/videos/1234567890",
+        },
+        75
+      )
+    ).toBe("https://www.twitch.tv/videos/1234567890?t=1m15s");
+  });
+
+  it("builds Twitch timestamp URLs with hour offsets", () => {
+    expect(
+      buildVodTimestampUrl(
+        {
+          sourceType: "twitch",
+          sourceId: "1234567890",
+          sourceRef: "v1234567890",
+          normalizedSourceUrl: "https://www.twitch.tv/videos/1234567890",
+          sourceUrl: "https://www.twitch.tv/videos/1234567890",
+        },
+        3723
+      )
+    ).toBe("https://www.twitch.tv/videos/1234567890?t=1h02m03s");
+  });
+
+  it("does not build Google Drive timestamp URLs", () => {
+    expect(
+      buildVodTimestampUrl(
+        {
+          sourceType: "google_drive",
+          sourceId: "FILE_ID",
+          sourceRef: "FILE_ID",
+          normalizedSourceUrl: "https://drive.google.com/file/d/FILE_ID/view",
+          sourceUrl: "https://drive.google.com/file/d/FILE_ID/view",
+        },
+        75
+      )
+    ).toBeNull();
+  });
+
+  it("does not build generic timestamp URLs", () => {
+    expect(
+      buildVodTimestampUrl(
+        {
+          sourceType: "generic",
+          normalizedSourceUrl: "https://example.com/video/123",
+          sourceUrl: "https://example.com/video/123",
+        },
+        75
+      )
+    ).toBeNull();
+  });
+
+  it("does not build timestamp URLs when provider source ids are missing", () => {
+    expect(
+      buildVodTimestampUrl(
+        {
+          sourceType: "youtube",
+          sourceId: null,
+          normalizedSourceUrl: "https://www.youtube.com/watch?v=VIDEO_ID",
+          sourceUrl: "https://www.youtube.com/watch?v=VIDEO_ID",
+        },
+        75
+      )
+    ).toBeNull();
+  });
+
+  it("clamps negative timestamps to zero", () => {
+    expect(
+      buildVodTimestampUrl(
+        {
+          sourceType: "youtube",
+          sourceId: "VIDEO_ID",
+          sourceRef: "VIDEO_ID",
+          normalizedSourceUrl: "https://www.youtube.com/watch?v=VIDEO_ID",
+          sourceUrl: "https://www.youtube.com/watch?v=VIDEO_ID",
+        },
+        -12
+      )
+    ).toBe("https://www.youtube.com/watch?v=VIDEO_ID&t=0s");
   });
 });

@@ -6,7 +6,7 @@ import {
   formatVodEventTimestamp,
   VOD_ANALYSIS_EVENT_LABELS,
 } from "@shared/vod/events";
-import { getVodSourceLabel } from "@shared/vod/source";
+import { buildVodTimestampUrl, getVodSourceLabel } from "@shared/vod/source";
 import {
   buildVodTeamSummaries,
   getVodTeamAttributedEvents,
@@ -199,6 +199,20 @@ export default function VodTeamInsights({ params }: { params: RouteParams }) {
     : [];
 
   const vod = query.data;
+  const getEventTimestampUrl = (timestampSeconds: number) =>
+    vod
+      ? buildVodTimestampUrl(
+          {
+            sourceType: vod.sourceType,
+            sourceId: vod.sourceId,
+            sourceRef: vod.sourceRef,
+            normalizedSourceUrl: vod.normalizedSourceUrl,
+            sourceUrl: vod.sourceUrl,
+          },
+          timestampSeconds
+        )
+      : null;
+
   const sourceLabel = vod
     ? getVodSourceLabel({
         valid: true,
@@ -372,32 +386,52 @@ export default function VodTeamInsights({ params }: { params: RouteParams }) {
                     </p>
                   ) : (
                     <ol className="mt-5 space-y-3">
-                      {selectedEvents.map(event => (
-                        <li
-                          key={event.id}
-                          className="rounded border border-white/10 bg-black/30 p-4"
-                        >
-                          <div className="flex flex-wrap items-center gap-3">
-                            <span className="rounded border border-neon-gold/50 px-2 py-1 font-mono text-xs font-bold text-neon-gold">
-                              {formatVodEventTimestamp(event.timestampSeconds)}
-                            </span>
-                            <span className="font-mono text-sm font-bold uppercase tracking-widest text-white">
-                              {VOD_ANALYSIS_EVENT_LABELS[event.eventType]}
-                            </span>
-                          </div>
-                          <div className="mt-3 flex flex-wrap gap-2 font-mono text-xs text-white/65">
-                            {event.actorLabel ? (
-                              <span>Actor: {event.actorLabel}</span>
-                            ) : null}
-                            {event.targetLabel ? (
-                              <span>Target: {event.targetLabel}</span>
-                            ) : null}
-                            {event.teamLabel ? (
-                              <span>Team: {event.teamLabel}</span>
-                            ) : null}
-                          </div>
-                        </li>
-                      ))}
+                      {selectedEvents.map(event => {
+                        const timestampUrl = getEventTimestampUrl(
+                          event.timestampSeconds
+                        );
+
+                        return (
+                          <li
+                            key={event.id}
+                            className="rounded border border-white/10 bg-black/30 p-4"
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <div className="flex flex-wrap items-center gap-3">
+                                <span className="rounded border border-neon-gold/50 px-2 py-1 font-mono text-xs font-bold text-neon-gold">
+                                  {formatVodEventTimestamp(
+                                    event.timestampSeconds
+                                  )}
+                                </span>
+                                <span className="font-mono text-sm font-bold uppercase tracking-widest text-white">
+                                  {VOD_ANALYSIS_EVENT_LABELS[event.eventType]}
+                                </span>
+                              </div>
+                              {timestampUrl ? (
+                                <a
+                                  href={timestampUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="rounded-sm border border-neon-gold/60 px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-neon-gold transition hover:bg-neon-gold/10"
+                                >
+                                  Open at timestamp
+                                </a>
+                              ) : null}
+                            </div>
+                            <div className="mt-3 flex flex-wrap gap-2 font-mono text-xs text-white/65">
+                              {event.actorLabel ? (
+                                <span>Actor: {event.actorLabel}</span>
+                              ) : null}
+                              {event.targetLabel ? (
+                                <span>Target: {event.targetLabel}</span>
+                              ) : null}
+                              {event.teamLabel ? (
+                                <span>Team: {event.teamLabel}</span>
+                              ) : null}
+                            </div>
+                          </li>
+                        );
+                      })}
                     </ol>
                   )}
                 </NeonCard>
