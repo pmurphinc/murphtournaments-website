@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_THE_FINALS_TEAM_LABELS,
   getVodEventLabelSuggestions,
   getVodTeamLabelWarnings,
   normalizeVodLabelKey,
@@ -11,50 +12,146 @@ describe("VOD label helpers", () => {
     expect(normalizeVodLabelKey("  Orange   Team  ")).toBe("orange team");
   });
 
-  it("returns unique team, actor, and target suggestions while ignoring blank labels", () => {
+  it("keeps team, player actor, and target suggestions in separate pools", () => {
     const events: VodEventLabelSource[] = [
       {
+        eventType: "death",
         actorLabel: "Alice",
         targetLabel: "Cashout A",
-        teamLabel: "Orange",
+        teamLabel: "The Live Wires",
       },
       {
+        eventType: "revive",
         actorLabel: " alice ",
         targetLabel: "",
         teamLabel: null,
       },
       {
+        eventType: "tap",
         actorLabel: "Bob",
         targetLabel: "Vault",
-        teamLabel: "Blue",
+        teamLabel: "The High Notes",
       },
       {
+        eventType: "cashout",
         actorLabel: null,
         targetLabel: "Cashout A",
         teamLabel: " ",
       },
+      {
+        eventType: "plug",
+        actorLabel: "The High Notes",
+        targetLabel: "The Live Wires",
+        teamLabel: null,
+      },
     ];
 
-    expect(getVodEventLabelSuggestions(events)).toEqual({
-      teams: ["Blue", "Orange"],
-      actors: ["Alice", "Bob"],
-      targets: ["Cashout A", "Vault"],
-    });
+    const suggestions = getVodEventLabelSuggestions(events);
+
+    expect(suggestions.teams).toEqual(
+      expect.arrayContaining([
+        "The High Notes",
+        "The Live Wires",
+        ...DEFAULT_THE_FINALS_TEAM_LABELS,
+      ])
+    );
+    expect(suggestions.actors).toEqual(["Alice", "Bob"]);
+    expect(suggestions.targets).toEqual(["Cashout A", "Vault"]);
+    expect(suggestions.actors).not.toContain("The High Notes");
+    expect(suggestions.actors).not.toContain("The Live Wires");
+    expect(suggestions.targets).not.toContain("The Live Wires");
   });
 
   it("uses the most common display casing for suggestions and a first-seen tie break", () => {
     const events: VodEventLabelSource[] = [
-      { teamLabel: "Orange", actorLabel: "June", targetLabel: "Vault" },
-      { teamLabel: "orange", actorLabel: "june", targetLabel: "vault" },
-      { teamLabel: "orange", actorLabel: "June", targetLabel: "Vault" },
-      { teamLabel: "Blue", actorLabel: "Ada", targetLabel: "Cashout" },
+      {
+        eventType: "death",
+        teamLabel: "Orange",
+        actorLabel: "June",
+        targetLabel: "Vault",
+      },
+      {
+        eventType: "revive",
+        teamLabel: "orange",
+        actorLabel: "june",
+        targetLabel: "vault",
+      },
+      {
+        eventType: "defib",
+        teamLabel: "orange",
+        actorLabel: "June",
+        targetLabel: "Vault",
+      },
+      {
+        eventType: "plug",
+        teamLabel: "Blue",
+        actorLabel: "Ada",
+        targetLabel: "Cashout",
+      },
     ];
 
     expect(getVodEventLabelSuggestions(events)).toEqual({
-      teams: ["Blue", "orange"],
+      teams: expect.arrayContaining(["Blue", "orange"]),
       actors: ["Ada", "June"],
       targets: ["Cashout", "Vault"],
     });
+  });
+
+  it("uses THE FINALS default team labels only for team suggestions", () => {
+    const suggestions = getVodEventLabelSuggestions([
+      {
+        eventType: "death",
+        actorLabel: "Eliminator",
+        targetLabel: "Target",
+        teamLabel: "Custom Team",
+      },
+    ]);
+
+    for (const teamLabel of DEFAULT_THE_FINALS_TEAM_LABELS) {
+      expect(suggestions.teams).toContain(teamLabel);
+      expect(suggestions.actors).not.toContain(teamLabel);
+      expect(suggestions.targets).not.toContain(teamLabel);
+    }
+  });
+
+  it("excludes team_wipe and steal_flip actor labels from player actor suggestions", () => {
+    const suggestions = getVodEventLabelSuggestions([
+      { eventType: "team_wipe", actorLabel: "The Live Wires" },
+      { eventType: "steal_flip", actorLabel: "Should Not Suggest" },
+      { eventType: "death", actorLabel: "Death Player" },
+      { eventType: "revive", actorLabel: "Revive Player" },
+      { eventType: "defib", actorLabel: "Defib Player" },
+      { eventType: "tap", actorLabel: "Tap Player" },
+      { eventType: "plug", actorLabel: "Plug Player" },
+    ]);
+
+    expect(suggestions.actors).toEqual([
+      "Death Player",
+      "Defib Player",
+      "Plug Player",
+      "Revive Player",
+      "Tap Player",
+    ]);
+    expect(suggestions.actors).not.toContain("The Live Wires");
+    expect(suggestions.actors).not.toContain("Should Not Suggest");
+  });
+
+  it("does not promote actor or target labels into team suggestions unless saved as teamLabel", () => {
+    const suggestions = getVodEventLabelSuggestions([
+      {
+        eventType: "death",
+        actorLabel: "Player One",
+        targetLabel: "Cashout A",
+        teamLabel: "The Vogues",
+      },
+      {
+        eventType: "cashout",
+        teamLabel: "Player One",
+      },
+    ]);
+
+    expect(suggestions.teams).toContain("Player One");
+    expect(suggestions.teams).not.toContain("Cashout A");
   });
 
   it("detects casing and spacing variants as team label warnings", () => {
@@ -91,13 +188,28 @@ describe("VOD label helpers", () => {
 
   it("sorts suggestions and warnings deterministically", () => {
     const events: VodEventLabelSource[] = [
-      { teamLabel: "Zeta", actorLabel: "Zed", targetLabel: "Vault B" },
-      { teamLabel: "Alpha", actorLabel: "Ann", targetLabel: "Cashout A" },
-      { teamLabel: "alpha", actorLabel: "ann", targetLabel: "cashout a" },
+      {
+        eventType: "death",
+        teamLabel: "Zeta",
+        actorLabel: "Zed",
+        targetLabel: "Vault B",
+      },
+      {
+        eventType: "defib",
+        teamLabel: "Alpha",
+        actorLabel: "Ann",
+        targetLabel: "Cashout A",
+      },
+      {
+        eventType: "revive",
+        teamLabel: "alpha",
+        actorLabel: "ann",
+        targetLabel: "cashout a",
+      },
     ];
 
-    expect(getVodEventLabelSuggestions(events)).toEqual({
-      teams: ["Alpha", "Zeta"],
+    expect(getVodEventLabelSuggestions(events)).toMatchObject({
+      teams: expect.arrayContaining(["Alpha", "Zeta"]),
       actors: ["Ann", "Zed"],
       targets: ["Cashout A", "Vault B"],
     });

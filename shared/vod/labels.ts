@@ -1,4 +1,18 @@
+import type { VodAnalysisEventType } from "./events";
+
+export const DEFAULT_THE_FINALS_TEAM_LABELS = [
+  "The High Notes",
+  "The Live Wires",
+  "The Kingfish",
+  "The Ultra-Rares",
+  "The Socialites",
+  "The Tough Shells",
+  "The Vogues",
+  "The Powerhouses",
+] as const;
+
 export type VodEventLabelSource = {
+  eventType?: VodAnalysisEventType | null;
   actorLabel?: string | null;
   targetLabel?: string | null;
   teamLabel?: string | null;
@@ -27,19 +41,30 @@ type LabelCandidate = {
   firstSeenIndex: number;
 };
 
+const playerActorEventTypes = new Set<VodAnalysisEventType>([
+  "death",
+  "revive",
+  "defib",
+  "tap",
+  "plug",
+]);
+
 export function normalizeVodLabelKey(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 function getPreferredLabels(
   events: VodEventLabelSource[],
-  field: keyof VodEventLabelSource
+  field: keyof VodEventLabelSource,
+  shouldIncludeEvent: (event: VodEventLabelSource) => boolean = () => true
 ): string[] {
   const labelsByNormalizedKey = new Map<string, Map<string, LabelCandidate>>();
 
   events.forEach((event, eventIndex) => {
+    if (!shouldIncludeEvent(event)) return;
+
     const rawLabel = event[field];
-    if (rawLabel == null) return;
+    if (rawLabel == null || typeof rawLabel !== "string") return;
 
     const displayLabel = rawLabel.trim();
     if (!displayLabel) return;
@@ -80,13 +105,47 @@ function getPreferredLabels(
     .map(({ label }) => label);
 }
 
+function mergeTeamSuggestions(savedTeamLabels: string[]): string[] {
+  const byNormalizedKey = new Map<string, string>();
+
+  for (const label of [...savedTeamLabels, ...DEFAULT_THE_FINALS_TEAM_LABELS]) {
+    const normalizedKey = normalizeVodLabelKey(label);
+    if (!byNormalizedKey.has(normalizedKey)) {
+      byNormalizedKey.set(normalizedKey, label);
+    }
+  }
+
+  return Array.from(byNormalizedKey.entries())
+    .sort((left, right) => left[0].localeCompare(right[0]))
+    .map(([, label]) => label);
+}
+
 export function getVodEventLabelSuggestions(
   events: VodEventLabelSource[]
 ): VodEventLabelSuggestions {
+  const savedTeamLabels = getPreferredLabels(events, "teamLabel");
+  const teamLabelKeys = new Set(
+    [...savedTeamLabels, ...DEFAULT_THE_FINALS_TEAM_LABELS].map(label =>
+      normalizeVodLabelKey(label)
+    )
+  );
+  const isNotTeamLabel = (label: string) =>
+    !teamLabelKeys.has(normalizeVodLabelKey(label));
+
   return {
-    teams: getPreferredLabels(events, "teamLabel"),
-    actors: getPreferredLabels(events, "actorLabel"),
-    targets: getPreferredLabels(events, "targetLabel"),
+    teams: mergeTeamSuggestions(savedTeamLabels),
+    actors: getPreferredLabels(events, "actorLabel", event => {
+      if (event.eventType && !playerActorEventTypes.has(event.eventType)) {
+        return false;
+      }
+
+      const label = event.actorLabel?.trim();
+      return label ? isNotTeamLabel(label) : false;
+    }),
+    targets: getPreferredLabels(events, "targetLabel", event => {
+      const label = event.targetLabel?.trim();
+      return label ? isNotTeamLabel(label) : false;
+    }),
   };
 }
 

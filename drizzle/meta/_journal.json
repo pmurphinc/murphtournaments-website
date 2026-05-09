@@ -57,6 +57,13 @@
       "when": 1778288722176,
       "tag": "0007_add_vod_capture_jobs",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1778323200000,
+      "tag": "0008_add_vod_steal_flip_event_type",
+      "breakpoints": true
     }
   ]
 }

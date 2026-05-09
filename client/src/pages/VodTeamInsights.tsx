@@ -86,6 +86,11 @@ const comparisonMetrics: ComparisonMetric[] = [
   },
   { key: "cashouts", label: "Cashouts", value: summary => summary.cashouts },
   {
+    key: "stealFlips",
+    label: "Steal / Flip",
+    value: summary => summary.stealFlips,
+  },
+  {
     key: "recovery",
     label: "Revives + defibs",
     value: summary => summary.revives + summary.defibs,
@@ -331,7 +336,7 @@ export default function VodTeamInsights({ params }: { params: RouteParams }) {
               </div>
             </NeonCard>
 
-            <section className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
+            <section className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
               <StatCard label="Deaths" value={String(selectedSummary.deaths)} />
               <StatCard
                 label="Team wipes"
@@ -344,6 +349,10 @@ export default function VodTeamInsights({ params }: { params: RouteParams }) {
               <StatCard
                 label="Cashouts"
                 value={String(selectedSummary.cashouts)}
+              />
+              <StatCard
+                label="Steal / Flip"
+                value={String(selectedSummary.stealFlips)}
               />
               <StatCard
                 label="Revives"
@@ -458,6 +467,10 @@ export default function VodTeamInsights({ params }: { params: RouteParams }) {
                     <DetailPill
                       label="Cashouts"
                       value={String(selectedSummary.cashouts)}
+                    />
+                    <DetailPill
+                      label="Steal / Flip"
+                      value={String(selectedSummary.stealFlips)}
                     />
                     <DetailPill
                       label="Revives"

@@ -635,6 +635,7 @@ describe("createVodAnalysisEventInputSchema", () => {
     ["cashout", { teamLabel: "Orange" }],
     ["team_wipe", { actorLabel: "Orange", teamLabel: "Purple" }],
     ["team_spawn", { teamLabel: "Orange" }],
+    ["steal_flip", { teamLabel: "The Live Wires" }],
     ["revive", { actorLabel: "A", targetLabel: "B", teamLabel: "Orange" }],
     ["defib", { actorLabel: "A", targetLabel: "B", teamLabel: "Orange" }],
   ] as const)("accepts required fields for %s", (eventType, fields) => {
@@ -655,6 +656,7 @@ describe("createVodAnalysisEventInputSchema", () => {
     ["cashout", {}],
     ["team_wipe", { teamLabel: "Purple" }],
     ["team_spawn", {}],
+    ["steal_flip", {}],
     ["revive", { actorLabel: "A", targetLabel: "B" }],
     ["defib", { targetLabel: "B", teamLabel: "Orange" }],
   ] as const)("rejects missing required fields for %s", (eventType, fields) => {
@@ -687,6 +689,16 @@ describe("updateVodAnalysisEventInputSchema", () => {
         actorLabel: undefined,
         targetLabel: undefined,
         teamLabel: "Orange",
+      }).success
+    ).toBe(true);
+
+    expect(
+      updateVodAnalysisEventInputSchema.safeParse({
+        ...baseInput,
+        eventType: "steal_flip",
+        actorLabel: undefined,
+        targetLabel: undefined,
+        teamLabel: "The Live Wires",
       }).success
     ).toBe(true);
 
@@ -956,6 +968,18 @@ describe("createVodSuggestedEventInputSchema", () => {
     expect(result.success).toBe(false);
     expect(
       result.error?.issues.some(issue => issue.path[0] === "targetLabel")
+    ).toBe(true);
+  });
+
+  it("accepts steal_flip suggestions with the required teamLabel", () => {
+    expect(
+      createVodSuggestedEventInputSchema.safeParse({
+        vodAnalysisId: 7,
+        eventType: "steal_flip",
+        timestampSeconds: 30,
+        teamLabel: "The Live Wires",
+        source: "automation",
+      }).success
     ).toBe(true);
   });
 
