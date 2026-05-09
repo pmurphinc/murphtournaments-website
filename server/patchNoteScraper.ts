@@ -3,10 +3,20 @@
  * Fetches game updates from thefinals.wiki and stores new ones in the database.
  * Called by the weekly scheduler and also available as a tRPC mutation.
  */
-import { getAllPatchNotes, addPatchNote, getPatchNoteByVersion } from "./db";
+import { addPatchNote, getPatchNoteByVersion } from "./db";
+import { cleanPatchNoteContent } from "./patchNoteContent";
 
 const PATCHNOTES_PAGE_API =
   "https://www.thefinals.wiki/w/api.php?action=parse&page=Patchnotes&prop=text&formatversion=2&format=json";
+
+const getOfficialPatchNotesUrl = (version: string) => {
+  const [major, minor = "0", patch = "0"] = version.split(".");
+  const path =
+    Number(major) >= 10
+      ? `${major}-${minor}${patch}`
+      : `${major}${minor}${patch}`;
+  return `https://www.reachthefinals.com/patchnotes/${path}`;
+};
 
 const stripHtmlTags = (value: string) =>
   value
@@ -19,7 +29,11 @@ const stripHtmlTags = (value: string) =>
     .trim();
 
 const extractPatchLinks = (html: string) => {
-  const links: Array<{ pageTitle: string; patchVersion: string; patchDate: string }> = [];
+  const links: Array<{
+    pageTitle: string;
+    patchVersion: string;
+    patchDate: string;
+  }> = [];
   const seen = new Set<string>();
   const rowRegex =
     /<tr[^>]*>[\s\S]*?<a[^>]*href="\/wiki\/([^"]+)"[^>]*>([^<]+)<\/a>[\s\S]*?(\d{4}-\d{2}-\d{2})[\s\S]*?<\/tr>/gi;
@@ -62,10 +76,12 @@ export async function scrapeAndStorePatchNotes(): Promise<ScrapeResult> {
     }
 
     const patchLinks = extractPatchLinks(indexHtml);
-    console.log(`[patchNoteScraper] Found ${patchLinks.length} patch entries on wiki`);
+    console.log(
+      `[patchNoteScraper] Found ${patchLinks.length} patch entries on wiki`
+    );
 
     // Filter to only game updates (not store updates, hotfixes unless they are game updates)
-    const gameUpdateLinks = patchLinks.filter((link) => {
+    const gameUpdateLinks = patchLinks.filter(link => {
       const title = link.patchVersion.toLowerCase();
       return (
         title.startsWith("update") ||
@@ -74,7 +90,9 @@ export async function scrapeAndStorePatchNotes(): Promise<ScrapeResult> {
       );
     });
 
-    console.log(`[patchNoteScraper] ${gameUpdateLinks.length} game update entries to check`);
+    console.log(
+      `[patchNoteScraper] ${gameUpdateLinks.length} game update entries to check`
+    );
 
     for (const link of gameUpdateLinks) {
       try {
@@ -106,25 +124,17 @@ export async function scrapeAndStorePatchNotes(): Promise<ScrapeResult> {
           continue;
         }
 
-        const cleanedContent = wikitext
-          .replace(/\{\{[^}]*\}\}/g, "")
-          .replace(/\[\[File:[^\]]*\]\]/gi, "")
-          .replace(/\[\[Category:[^\]]*\]\]/gi, "")
-          .replace(/\[\[([^|\]]+)\|([^\]]+)\]\]/g, "$2")
-          .replace(/\[\[([^\]]+)\]\]/g, "$1")
-          .replace(/'{2,3}/g, "")
-          .replace(/^={1,6}\s*(.+?)\s*={1,6}$/gm, "$1")
-          .replace(/^[*#:;]+\s*/gm, "• ")
-          .replace(/\n{3,}/g, "\n\n")
-          .trim();
+        const cleanedContent = cleanPatchNoteContent(wikitext);
 
-        const isSeasonPatch = link.patchVersion.toLowerCase().includes("season");
+        const isSeasonPatch = link.patchVersion
+          .toLowerCase()
+          .includes("season");
         const title = isSeasonPatch
           ? link.patchVersion.toUpperCase()
           : `UPDATE ${version}`;
 
         const formattedDate = link.patchDate.replace(/-/g, ".");
-        const officialUrl = `https://www.reachthefinals.com/patchnotes/${version.replace(/\./g, "")}`;
+        const officialUrl = getOfficialPatchNotesUrl(version);
         const wikiUrl = `https://www.thefinals.wiki/wiki/${encodeURIComponent(link.pageTitle)}`;
 
         await addPatchNote({
