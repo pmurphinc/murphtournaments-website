@@ -15,6 +15,12 @@ import {
   getVodCaptureReadiness,
 } from "@shared/vod/frame-sampling";
 import {
+  getVodEventLabelSuggestions,
+  getVodTeamLabelWarnings,
+  normalizeVodLabelKey,
+  type VodTeamLabelWarning,
+} from "@shared/vod/labels";
+import {
   buildVodEmbedConfig,
   buildVodTimestampUrl,
   formatVodSourceType,
@@ -214,6 +220,78 @@ const formatAverageSeconds = (value: number | null) => {
   if (value === null) return null;
   return `${Math.round(value)}s`;
 };
+
+function LabelQualityPanel({
+  totalEvents,
+  teamLabeledEventCount,
+  uniqueTeamLabelCount,
+  warnings,
+}: {
+  totalEvents: number;
+  teamLabeledEventCount: number;
+  uniqueTeamLabelCount: number;
+  warnings: VodTeamLabelWarning[];
+}) {
+  return (
+    <div className="rounded-lg border border-neon-gold/20 bg-black/30 p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="font-mono text-lg font-bold uppercase tracking-widest text-neon-gold">
+            Label Quality
+          </h3>
+          <p className="mt-1 font-mono text-xs uppercase tracking-widest text-white/45">
+            Manual label consistency checks.
+          </p>
+        </div>
+        <span className="rounded border border-white/10 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-white/40">
+          No auto-merge
+        </span>
+      </div>
+
+      <div className="mt-4 grid grid-cols-3 gap-2">
+        <DetailPill label="Manual" value={String(totalEvents)} />
+        <DetailPill label="Team tagged" value={String(teamLabeledEventCount)} />
+        <DetailPill label="Teams" value={String(uniqueTeamLabelCount)} />
+      </div>
+
+      {warnings.length === 0 ? (
+        <p className="mt-4 rounded border border-emerald-400/20 bg-emerald-950/20 p-3 font-mono text-xs text-emerald-100/80">
+          Team labels look consistent. Keep reusing the same casing and spacing
+          so Team Summary and Team Insights stay grouped correctly.
+        </p>
+      ) : (
+        <div className="mt-4 space-y-3">
+          <p className="rounded border border-neon-gold/30 bg-neon-gold/10 p-3 font-mono text-xs text-neon-gold">
+            Suspicious team label variants can split Team Summary and Team
+            Insights. Review these manually; this panel does not merge or mutate
+            existing events.
+          </p>
+          {warnings.map(warning => (
+            <div
+              key={warning.normalizedKey}
+              className="rounded border border-white/10 bg-black/30 p-3"
+            >
+              <div className="font-mono text-[10px] uppercase tracking-widest text-white/40">
+                Normalized as “{warning.normalizedKey}” • {warning.totalCount}
+                events
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {warning.variants.map(variant => (
+                  <span
+                    key={variant.label}
+                    className="rounded-full border border-neon-gold/40 px-2 py-1 font-mono text-[10px] text-neon-gold"
+                  >
+                    “{variant.label}” × {variant.count}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function TeamSummarySection({
   summaries,
@@ -514,6 +592,7 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
     text: string;
   } | null>(null);
   const [eventFilter, setEventFilter] = useState<EventFilter>("all");
+  const [teamFilter, setTeamFilter] = useState<string | null>(null);
 
   const query = trpc.vodAnalysis.getById.useQuery(vodAnalysisId, {
     enabled: isValidId,
@@ -739,10 +818,28 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
     suggestion => suggestion.status === "pending"
   ).length;
   const teamSummaries = useMemo(() => buildVodTeamSummaries(events), [events]);
-  const filteredEvents =
-    eventFilter === "all"
-      ? events
-      : events.filter(event => event.eventType === eventFilter);
+  const labelSuggestions = useMemo(
+    () => getVodEventLabelSuggestions(events),
+    [events]
+  );
+  const teamLabelWarnings = useMemo(
+    () => getVodTeamLabelWarnings(events),
+    [events]
+  );
+  const teamLabeledEventCount = useMemo(
+    () => events.filter(event => event.teamLabel?.trim()).length,
+    [events]
+  );
+  const filteredEvents = events.filter(event => {
+    const matchesEventType =
+      eventFilter === "all" || event.eventType === eventFilter;
+    const matchesTeam =
+      teamFilter === null ||
+      normalizeVodLabelKey(event.teamLabel ?? "") ===
+        normalizeVodLabelKey(teamFilter);
+
+    return matchesEventType && matchesTeam;
+  });
 
   const handleTimestampNudge = (deltaSeconds: number) => {
     const currentTimestamp = parseVodEventTimestamp(timestampInput) ?? 0;
@@ -858,6 +955,13 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
     const isRequired = requiredFields.includes(field);
     const helper =
       eventFieldHelp[selectedEventType][field] ?? eventFieldLabels[field];
+    const suggestions =
+      field === "actorLabel"
+        ? labelSuggestions.actors
+        : field === "targetLabel"
+          ? labelSuggestions.targets
+          : labelSuggestions.teams;
+    const datalistId = `vod-${field}-suggestions`;
 
     return (
       <label className="block" key={field}>
@@ -869,8 +973,28 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
           value={value}
           onChange={event => setValue(event.target.value)}
           placeholder={eventFieldLabels[field]}
+          list={datalistId}
           className="mt-2 w-full rounded border border-white/15 bg-black/40 px-3 py-2 font-mono text-sm text-white outline-none transition focus:border-neon-cyan"
         />
+        <datalist id={datalistId}>
+          {suggestions.map(suggestion => (
+            <option key={suggestion} value={suggestion} />
+          ))}
+        </datalist>
+        {suggestions.length > 0 ? (
+          <div className="mt-2 flex max-h-16 flex-wrap gap-1 overflow-hidden">
+            {suggestions.slice(0, 4).map(suggestion => (
+              <button
+                key={suggestion}
+                type="button"
+                onClick={() => setValue(suggestion)}
+                className="rounded-full border border-white/15 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-white/55 transition hover:border-neon-cyan hover:text-neon-cyan"
+              >
+                {suggestion}
+              </button>
+            ))}
+          </div>
+        ) : null}
         {eventErrors[field] ? (
           <span className="mt-1 block font-mono text-xs text-red-300">
             {eventErrors[field]}
@@ -1303,23 +1427,58 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
 
                   {timelineOpen ? (
                     <div className="mt-5 space-y-4">
-                      <div className="flex flex-wrap gap-2">
-                        {EVENT_FILTERS.map(filter => (
-                          <button
-                            key={filter}
-                            type="button"
-                            onClick={() => setEventFilter(filter)}
-                            className={`rounded-full border px-3 py-1 font-mono text-xs font-bold uppercase tracking-widest transition ${
-                              eventFilter === filter
-                                ? "border-neon-pink bg-neon-pink/15 text-neon-pink"
-                                : "border-white/15 text-white/60 hover:border-white/35 hover:text-white"
-                            }`}
-                          >
-                            {filter === "all"
-                              ? "All"
-                              : VOD_ANALYSIS_EVENT_LABELS[filter]}
-                          </button>
-                        ))}
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap gap-2">
+                          {EVENT_FILTERS.map(filter => (
+                            <button
+                              key={filter}
+                              type="button"
+                              onClick={() => setEventFilter(filter)}
+                              className={`rounded-full border px-3 py-1 font-mono text-xs font-bold uppercase tracking-widest transition ${
+                                eventFilter === filter
+                                  ? "border-neon-pink bg-neon-pink/15 text-neon-pink"
+                                  : "border-white/15 text-white/60 hover:border-white/35 hover:text-white"
+                              }`}
+                            >
+                              {filter === "all"
+                                ? "All"
+                                : VOD_ANALYSIS_EVENT_LABELS[filter]}
+                            </button>
+                          ))}
+                        </div>
+
+                        {labelSuggestions.teams.length > 0 ? (
+                          <div>
+                            <div className="mb-2 font-mono text-[10px] uppercase tracking-widest text-white/40">
+                              Team filter
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {labelSuggestions.teams.map(team => (
+                                <button
+                                  key={team}
+                                  type="button"
+                                  onClick={() => setTeamFilter(team)}
+                                  className={`rounded-full border px-3 py-1 font-mono text-xs font-bold uppercase tracking-widest transition ${
+                                    teamFilter === team
+                                      ? "border-neon-cyan bg-neon-cyan/15 text-neon-cyan"
+                                      : "border-white/15 text-white/60 hover:border-white/35 hover:text-white"
+                                  }`}
+                                >
+                                  {team}
+                                </button>
+                              ))}
+                              {teamFilter ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setTeamFilter(null)}
+                                  className="rounded-full border border-white/15 px-3 py-1 font-mono text-xs font-bold uppercase tracking-widest text-white/60 transition hover:border-neon-gold hover:text-neon-gold"
+                                >
+                                  Clear team
+                                </button>
+                              ) : null}
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
 
                       <p className="rounded border border-white/10 bg-black/30 p-3 font-mono text-xs text-white/45">
@@ -1338,7 +1497,7 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
                         </div>
                       ) : filteredEvents.length === 0 ? (
                         <div className="rounded border border-white/10 bg-black/30 p-4 font-mono text-sm text-white/50">
-                          No events for this filter.
+                          No events match the selected event type/team filters.
                         </div>
                       ) : (
                         <ol className="space-y-3">
@@ -1425,6 +1584,12 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
               </div>
 
               <div className="space-y-4">
+                <LabelQualityPanel
+                  totalEvents={events.length}
+                  teamLabeledEventCount={teamLabeledEventCount}
+                  uniqueTeamLabelCount={labelSuggestions.teams.length}
+                  warnings={teamLabelWarnings}
+                />
                 <TeamSummarySection
                   summaries={teamSummaries}
                   vodAnalysisId={vodAnalysisId}
