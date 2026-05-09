@@ -18,6 +18,7 @@ import {
   getVodCaptureReadiness,
 } from "@shared/vod/frame-sampling";
 import {
+  buildVodTeamLabelOptions,
   getVodEventLabelSuggestions,
   getVodTeamLabelWarnings,
   normalizeVodLabelKey,
@@ -74,32 +75,32 @@ const suggestedEventFieldLabels: Record<
   death: {
     actorLabel: "Actor",
     targetLabel: "Target",
-    teamLabel: "Team",
+    teamLabel: "Victim Team",
   },
   tap: {
     actorLabel: "Actor",
     targetLabel: "Vault",
-    teamLabel: "Team",
+    teamLabel: "Team Tapping",
   },
   plug: {
     actorLabel: "Actor",
     targetLabel: "Cashout",
-    teamLabel: "Team",
+    teamLabel: "Team Plugging",
   },
   cashout: {
     targetLabel: "Cashout",
-    teamLabel: "Cashing team",
+    teamLabel: "Cashing Team",
   },
   steal_flip: {
     targetLabel: "Cashout",
-    teamLabel: "Stealing team / new cashout owner",
+    teamLabel: "Stealing Team / New Owner",
   },
   team_wipe: {
-    actorLabel: "Attacking team",
-    teamLabel: "Wiped team",
+    actorLabel: "Attacking Team",
+    teamLabel: "Wiped Team",
   },
   team_spawn: {
-    teamLabel: "Spawning team",
+    teamLabel: "Spawning Team",
   },
   revive: {
     actorLabel: "Actor",
@@ -189,32 +190,32 @@ const eventFieldHelp: Record<
   death: {
     actorLabel: "Eliminating player",
     targetLabel: "Eliminated player",
-    teamLabel: "Victim team (optional)",
+    teamLabel: "Victim Team",
   },
   tap: {
     actorLabel: "Player tapping",
     targetLabel: "Vault",
-    teamLabel: "Team tapping",
+    teamLabel: "Team Tapping",
   },
   plug: {
     actorLabel: "Player plugging",
     targetLabel: "Cashout",
-    teamLabel: "Team plugging",
+    teamLabel: "Team Plugging",
   },
   cashout: {
     targetLabel: "Cashout",
-    teamLabel: "Cashing team",
+    teamLabel: "Cashing Team",
   },
   team_wipe: {
-    actorLabel: "Attacking team",
-    teamLabel: "Wiped team",
+    actorLabel: "Attacking Team",
+    teamLabel: "Wiped Team",
   },
   team_spawn: {
-    teamLabel: "Spawning team",
+    teamLabel: "Spawning Team",
   },
   steal_flip: {
     targetLabel: "Cashout",
-    teamLabel: "Stealing team / new owner",
+    teamLabel: "Stealing Team / New Owner",
   },
   revive: {
     actorLabel: "Reviving player",
@@ -1138,14 +1139,15 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
     const isRequired = requiredFields.includes(field);
     const helper =
       eventFieldHelp[selectedEventType][field] ?? eventFieldLabels[field];
+    const isTeamSelector =
+      field === "teamLabel" ||
+      (field === "actorLabel" && selectedEventType === "team_wipe");
     const suggestions =
       field === "actorLabel"
-        ? selectedEventType === "team_wipe"
-          ? labelSuggestions.teams
-          : labelSuggestions.actors
+        ? labelSuggestions.actors
         : field === "targetLabel"
           ? labelSuggestions.targets
-          : labelSuggestions.teams;
+          : [];
     const datalistId = `vod-${selectedEventType}-${field}-suggestions`;
     const targetKind = getVodEventTargetKind(selectedEventType);
     const objectiveOptions =
@@ -1154,6 +1156,7 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
         : field === "targetLabel" && targetKind === "vault"
           ? VOD_VAULT_LABELS
           : null;
+    const teamOptions = isTeamSelector ? buildVodTeamLabelOptions([value]) : [];
 
     return (
       <label className="block" key={field}>
@@ -1180,6 +1183,19 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
               </option>
             ))}
           </select>
+        ) : isTeamSelector ? (
+          <select
+            value={teamOptions.includes(value) ? value : ""}
+            onChange={event => setValue(event.target.value)}
+            className="mt-2 w-full rounded border border-white/15 bg-black/40 px-3 py-2 font-mono text-sm text-white outline-none transition focus:border-neon-cyan"
+          >
+            <option value="">Select team</option>
+            {teamOptions.map(option => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
         ) : (
           <>
             <input
@@ -1196,7 +1212,7 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
             </datalist>
           </>
         )}
-        {!objectiveOptions && suggestions.length > 0 ? (
+        {!objectiveOptions && !isTeamSelector && suggestions.length > 0 ? (
           <div className="mt-2 flex max-h-16 flex-wrap gap-1 overflow-hidden">
             {suggestions.slice(0, 4).map(suggestion => (
               <button
