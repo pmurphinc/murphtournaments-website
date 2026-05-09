@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   vodAnalyses,
   vodAnalysisEvents,
+  vodCaptureJobs,
   vodSuggestedEvents,
 } from "../drizzle/schema";
 import {
@@ -15,18 +16,22 @@ import {
   createVodAnalysisEvent,
   createVodAnalysisEventInputSchema,
   createVodAnalysisInputSchema,
+  createVodCaptureJob,
   createVodSuggestedEvent,
   createVodSuggestedEventInputSchema,
+  getLatestVodCaptureJob,
   getPendingSuggestedEventCountsByVodAnalysisIds,
   getVodAnalysisById,
   listVodAnalysisEvents,
   listVodAnalyses,
+  listVodCaptureJobs,
   listVodSuggestedEvents,
   rejectVodSuggestedEvent,
   refreshTwitchMetadataForVodAnalysis,
   sortVodSuggestedEventRecords,
   vodAnalysisIdInputSchema,
   type VodAnalysisEventRecord,
+  type VodCaptureJobRecord,
   type PendingSuggestedEventCountRow,
   type VodAnalysisRecord,
   type VodSuggestedEventRecord,
@@ -88,6 +93,51 @@ function createEventListDb(rows: VodAnalysisEventRecord[]) {
   const select = vi.fn(() => ({ from }));
 
   return { db: { select }, select, from, where, orderBy };
+}
+
+function createCaptureJobDb(vodRows: VodAnalysisRecord[]) {
+  const insertedCaptureJobs: unknown[] = [];
+  const values = vi.fn(async (job: unknown) => {
+    insertedCaptureJobs.push(job);
+  });
+  const insert = vi.fn(() => ({ values }));
+  const vodLimit = vi.fn().mockResolvedValue(vodRows);
+  const vodWhere = vi.fn(() => ({ limit: vodLimit }));
+  const captureOrderBy = vi.fn();
+  const captureWhere = vi.fn(() => ({ orderBy: captureOrderBy }));
+  const from = vi.fn(table => {
+    if (table === vodAnalyses) return { where: vodWhere };
+    return { where: captureWhere };
+  });
+  const select = vi.fn(() => ({ from }));
+
+  return {
+    db: { select, insert },
+    select,
+    from,
+    insert,
+    values,
+    insertedCaptureJobs,
+  };
+}
+
+function createCaptureJobListDb(rows: VodCaptureJobRecord[]) {
+  const orderBy = vi.fn().mockResolvedValue(rows);
+  const where = vi.fn(() => ({ orderBy }));
+  const from = vi.fn(() => ({ where }));
+  const select = vi.fn(() => ({ from }));
+
+  return { db: { select }, select, from, where, orderBy };
+}
+
+function createLatestCaptureJobDb(rows: VodCaptureJobRecord[]) {
+  const limit = vi.fn().mockResolvedValue(rows);
+  const orderBy = vi.fn(() => ({ limit }));
+  const where = vi.fn(() => ({ orderBy }));
+  const from = vi.fn(() => ({ where }));
+  const select = vi.fn(() => ({ from }));
+
+  return { db: { select }, select, from, where, orderBy, limit };
 }
 
 function createSuggestedEventInsertDb() {
@@ -1082,5 +1132,141 @@ describe("refreshTwitchMetadataForVodAnalysis", () => {
       vodAnalysis: twitchVod,
     });
     expect(update).not.toHaveBeenCalled();
+  });
+});
+
+const captureJobCreatedAt = new Date("2026-02-01T00:00:00Z");
+
+function captureReadyVod(
+  overrides: Partial<VodAnalysisRecord> = {}
+): VodAnalysisRecord {
+  return {
+    id: 44,
+    title: "Ready Twitch VOD",
+    sourceType: "twitch",
+    sourceUrl: "https://www.twitch.tv/videos/1234567890",
+    normalizedSourceUrl: "https://www.twitch.tv/videos/1234567890",
+    sourceId: "1234567890",
+    sourceRef: "v1234567890",
+    thumbnailUrl: null,
+    durationSeconds: 95,
+    videoPov: "spectator",
+    status: "created",
+    createdAt: captureJobCreatedAt,
+    updatedAt: captureJobCreatedAt,
+    ...overrides,
+  };
+}
+
+function captureJob(
+  overrides: Partial<VodCaptureJobRecord> = {}
+): VodCaptureJobRecord {
+  return {
+    id: 1,
+    vodAnalysisId: 44,
+    status: "queued",
+    source: "manual_debug",
+    sampleIntervalSeconds: 30,
+    plannedSamples: 4,
+    processedSamples: 0,
+    failedSamples: 0,
+    errorMessage: null,
+    startedAt: null,
+    completedAt: null,
+    createdAt: captureJobCreatedAt,
+    updatedAt: captureJobCreatedAt,
+    ...overrides,
+  };
+}
+
+describe("createVodCaptureJob", () => {
+  it("rejects not-ready VODs", async () => {
+    const { db, insert } = createCaptureJobDb([
+      captureReadyVod({ durationSeconds: null }),
+    ]);
+
+    await expect(
+      createVodCaptureJob(44, "manual_debug", db)
+    ).resolves.toMatchObject({
+      status: "not_ready",
+      readiness: { status: "missing_duration", isReady: false },
+    });
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("rejects missing VODs", async () => {
+    const { db, insert } = createCaptureJobDb([]);
+
+    await expect(createVodCaptureJob(44, "manual_debug", db)).resolves.toEqual({
+      status: "not_found",
+      vodAnalysis: null,
+    });
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("uses the sampling plan count and defaults status to queued", async () => {
+    const { db, insert, values } = createCaptureJobDb([captureReadyVod()]);
+
+    await expect(createVodCaptureJob(44, undefined, db)).resolves.toMatchObject(
+      {
+        status: "created",
+        captureJob: {
+          status: "queued",
+          source: "manual_debug",
+          sampleIntervalSeconds: 30,
+          plannedSamples: 4,
+          processedSamples: 0,
+          failedSamples: 0,
+        },
+      }
+    );
+
+    expect(insert).toHaveBeenCalledTimes(1);
+    expect(insert).toHaveBeenCalledWith(vodCaptureJobs);
+    expect(insert).not.toHaveBeenCalledWith(vodAnalysisEvents);
+    expect(insert).not.toHaveBeenCalledWith(vodSuggestedEvents);
+    expect(values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        vodAnalysisId: 44,
+        status: "queued",
+        plannedSamples: 4,
+      })
+    );
+  });
+
+  it("does not create events or suggested events", async () => {
+    const { db, insert } = createCaptureJobDb([captureReadyVod()]);
+
+    await createVodCaptureJob(44, "automation", db);
+
+    expect(insert).toHaveBeenCalledWith(vodCaptureJobs);
+    expect(insert).not.toHaveBeenCalledWith(vodAnalysisEvents);
+    expect(insert).not.toHaveBeenCalledWith(vodSuggestedEvents);
+  });
+});
+
+describe("listVodCaptureJobs", () => {
+  it("lists capture jobs newest-first", async () => {
+    const rows = [
+      captureJob({ id: 3, createdAt: new Date("2026-02-03T00:00:00Z") }),
+      captureJob({ id: 2, createdAt: new Date("2026-02-02T00:00:00Z") }),
+    ];
+    const { db, from, orderBy } = createCaptureJobListDb(rows);
+
+    await expect(listVodCaptureJobs(44, db)).resolves.toEqual(rows);
+    expect(from).toHaveBeenCalledWith(vodCaptureJobs);
+    expect(orderBy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("getLatestVodCaptureJob", () => {
+  it("returns the newest job", async () => {
+    const newest = captureJob({ id: 5 });
+    const { db, from, orderBy, limit } = createLatestCaptureJobDb([newest]);
+
+    await expect(getLatestVodCaptureJob(44, db)).resolves.toEqual(newest);
+    expect(from).toHaveBeenCalledWith(vodCaptureJobs);
+    expect(orderBy).toHaveBeenCalledTimes(1);
+    expect(limit).toHaveBeenCalledWith(1);
   });
 });

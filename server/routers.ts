@@ -26,11 +26,15 @@ import {
   approveVodSuggestedEvent,
   createVodAnalysisEvent,
   createVodAnalysisEventInputSchema,
+  createVodCaptureJob,
+  createVodCaptureJobInputSchema,
   createVodSuggestedEvent,
   createVodSuggestedEventInputSchema,
   createVodAnalysisInputSchema,
+  getLatestVodCaptureJob,
   getVodAnalysisById,
   listVodAnalysisEvents,
+  listVodCaptureJobs,
   listVodAnalyses,
   listVodSuggestedEvents,
   rejectVodSuggestedEvent,
@@ -735,6 +739,24 @@ export const appRouter = router({
       .input(vodAnalysisIdInputSchema)
       .mutation(async ({ input }) => {
         return refreshTwitchMetadataForVodAnalysis(input);
+      }),
+
+    createCaptureJob: publicProcedure
+      .input(createVodCaptureJobInputSchema)
+      .mutation(async ({ input }) => {
+        return createVodCaptureJob(input.vodAnalysisId, input.source);
+      }),
+
+    listCaptureJobs: publicProcedure
+      .input(vodAnalysisIdInputSchema)
+      .query(async ({ input }) => {
+        return listVodCaptureJobs(input);
+      }),
+
+    getLatestCaptureJob: publicProcedure
+      .input(vodAnalysisIdInputSchema)
+      .query(async ({ input }) => {
+        return getLatestVodCaptureJob(input);
       }),
 
     listEvents: publicProcedure
