@@ -190,6 +190,50 @@ function getMissingSourceIdReason(sourceType: VodSourceType): string {
   )} embeds require a parsed source id. Re-save or refresh the source link before embedding.`;
 }
 
+export function buildVodTimestampUrl(
+  input: VodEmbedSourceInput,
+  timestampSeconds: number
+): string | null {
+  if (!Number.isFinite(timestampSeconds)) {
+    return null;
+  }
+
+  const sourceId = input.sourceId?.trim();
+  if (!sourceId) {
+    return null;
+  }
+
+  const safeTimestampSeconds = Math.max(0, Math.floor(timestampSeconds));
+
+  switch (input.sourceType) {
+    case "youtube":
+      return `https://www.youtube.com/watch?v=${encodeURIComponent(
+        sourceId
+      )}&t=${safeTimestampSeconds}s`;
+
+    case "twitch": {
+      const hours = Math.floor(safeTimestampSeconds / 3600);
+      const minutes = Math.floor((safeTimestampSeconds % 3600) / 60);
+      const seconds = safeTimestampSeconds % 60;
+      const twitchTimestamp =
+        hours > 0
+          ? `${hours}h${minutes.toString().padStart(2, "0")}m${seconds
+              .toString()
+              .padStart(2, "0")}s`
+          : `${minutes}m${seconds.toString().padStart(2, "0")}s`;
+
+      return `https://www.twitch.tv/videos/${encodeURIComponent(
+        sourceId
+      )}?t=${twitchTimestamp}`;
+    }
+
+    case "google_drive":
+    case "generic":
+    default:
+      return null;
+  }
+}
+
 export function buildVodEmbedConfig(
   input: VodEmbedSourceInput,
   options: VodEmbedOptions = {}

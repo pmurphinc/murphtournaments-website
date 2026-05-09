@@ -16,6 +16,7 @@ import {
 } from "@shared/vod/frame-sampling";
 import {
   buildVodEmbedConfig,
+  buildVodTimestampUrl,
   formatVodSourceType,
   getVodSourceLabel,
   type VodEmbedConfig,
@@ -743,6 +744,26 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
       ? events
       : events.filter(event => event.eventType === eventFilter);
 
+  const handleTimestampNudge = (deltaSeconds: number) => {
+    const currentTimestamp = parseVodEventTimestamp(timestampInput) ?? 0;
+    const nextTimestamp = Math.max(0, currentTimestamp + deltaSeconds);
+    setTimestampInput(formatVodEventTimestamp(nextTimestamp));
+  };
+
+  const getEventTimestampUrl = (timestampSeconds: number) =>
+    vod
+      ? buildVodTimestampUrl(
+          {
+            sourceType: vod.sourceType,
+            sourceId: vod.sourceId,
+            sourceRef: vod.sourceRef,
+            normalizedSourceUrl: vod.normalizedSourceUrl,
+            sourceUrl: vod.sourceUrl,
+          },
+          timestampSeconds
+        )
+      : null;
+
   const validateEventForm = () => {
     setEventErrors(currentFormErrors);
     return Object.keys(currentFormErrors).length === 0;
@@ -921,13 +942,25 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
             placeholder="90 or 1:30"
             className="mt-2 w-full rounded border border-white/15 bg-black/40 px-3 py-2 font-mono text-sm text-white outline-none transition focus:border-neon-cyan"
           />
+          <div className="mt-2 flex flex-wrap gap-2">
+            {[-10, -5, 5, 10].map(deltaSeconds => (
+              <button
+                key={deltaSeconds}
+                type="button"
+                onClick={() => handleTimestampNudge(deltaSeconds)}
+                className="rounded-sm border border-white/15 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-white/60 transition hover:border-neon-cyan hover:text-neon-cyan"
+              >
+                {deltaSeconds > 0 ? `+${deltaSeconds}s` : `${deltaSeconds}s`}
+              </button>
+            ))}
+          </div>
           {eventErrors.timestamp ? (
             <span className="mt-1 block font-mono text-xs text-red-300">
               {eventErrors.timestamp}
             </span>
           ) : (
             <span className="mt-1 block font-mono text-xs text-white/35">
-              Use whole seconds or m:ss.
+              Use whole seconds or m:ss. Nudge controls snap to m:ss.
             </span>
           )}
         </label>
@@ -1289,6 +1322,11 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
                         ))}
                       </div>
 
+                      <p className="rounded border border-white/10 bg-black/30 p-3 font-mono text-xs text-white/45">
+                        Review links open the source video at the selected event
+                        time when supported by the provider.
+                      </p>
+
                       {eventsQuery.isLoading ? (
                         <div className="rounded border border-white/10 bg-black/30 p-4 font-mono text-sm text-white/50">
                           Loading events…
@@ -1304,61 +1342,81 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
                         </div>
                       ) : (
                         <ol className="space-y-3">
-                          {filteredEvents.map(event => (
-                            <li
-                              key={event.id}
-                              className="rounded border border-white/10 bg-black/30 p-4"
-                            >
-                              <div className="flex flex-wrap items-center justify-between gap-3">
-                                <div className="flex flex-wrap items-center gap-3">
-                                  <span className="rounded border border-neon-cyan/50 px-2 py-1 font-mono text-xs font-bold text-neon-cyan">
-                                    {formatVodEventTimestamp(
-                                      event.timestampSeconds
-                                    )}
-                                  </span>
-                                  <span className="font-mono text-sm font-bold uppercase tracking-widest text-white">
-                                    {VOD_ANALYSIS_EVENT_LABELS[event.eventType]}
-                                  </span>
-                                  {editingEventId === event.id ? (
-                                    <span className="rounded border border-neon-gold/50 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-neon-gold">
-                                      Editing
+                          {filteredEvents.map(event => {
+                            const timestampUrl = getEventTimestampUrl(
+                              event.timestampSeconds
+                            );
+
+                            return (
+                              <li
+                                key={event.id}
+                                className="rounded border border-white/10 bg-black/30 p-4"
+                              >
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                  <div className="flex flex-wrap items-center gap-3">
+                                    <span className="rounded border border-neon-cyan/50 px-2 py-1 font-mono text-xs font-bold text-neon-cyan">
+                                      {formatVodEventTimestamp(
+                                        event.timestampSeconds
+                                      )}
                                     </span>
+                                    <span className="font-mono text-sm font-bold uppercase tracking-widest text-white">
+                                      {
+                                        VOD_ANALYSIS_EVENT_LABELS[
+                                          event.eventType
+                                        ]
+                                      }
+                                    </span>
+                                    {editingEventId === event.id ? (
+                                      <span className="rounded border border-neon-gold/50 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-neon-gold">
+                                        Editing
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                  <div className="flex flex-wrap gap-2">
+                                    {timestampUrl ? (
+                                      <a
+                                        href={timestampUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="rounded-sm border border-neon-gold/60 px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-neon-gold transition hover:bg-neon-gold/10"
+                                      >
+                                        Open at timestamp
+                                      </a>
+                                    ) : null}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleEditEvent(event)}
+                                      disabled={isEventSubmitPending}
+                                      className="rounded-sm border border-neon-cyan/60 px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-neon-cyan transition hover:bg-neon-cyan/10 disabled:cursor-not-allowed disabled:opacity-40"
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteEvent(event)}
+                                      disabled={deletingEventId === event.id}
+                                      className="rounded-sm border border-red-400/60 px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-red-200 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-40"
+                                    >
+                                      {deletingEventId === event.id
+                                        ? "Deleting…"
+                                        : "Delete"}
+                                    </button>
+                                  </div>
+                                </div>
+                                <div className="mt-3 flex flex-wrap gap-2 font-mono text-xs text-white/65">
+                                  {event.actorLabel ? (
+                                    <span>Actor: {event.actorLabel}</span>
+                                  ) : null}
+                                  {event.targetLabel ? (
+                                    <span>Target: {event.targetLabel}</span>
+                                  ) : null}
+                                  {event.teamLabel ? (
+                                    <span>Team: {event.teamLabel}</span>
                                   ) : null}
                                 </div>
-                                <div className="flex flex-wrap gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleEditEvent(event)}
-                                    disabled={isEventSubmitPending}
-                                    className="rounded-sm border border-neon-cyan/60 px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-neon-cyan transition hover:bg-neon-cyan/10 disabled:cursor-not-allowed disabled:opacity-40"
-                                  >
-                                    Edit
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteEvent(event)}
-                                    disabled={deletingEventId === event.id}
-                                    className="rounded-sm border border-red-400/60 px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-red-200 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-40"
-                                  >
-                                    {deletingEventId === event.id
-                                      ? "Deleting…"
-                                      : "Delete"}
-                                  </button>
-                                </div>
-                              </div>
-                              <div className="mt-3 flex flex-wrap gap-2 font-mono text-xs text-white/65">
-                                {event.actorLabel ? (
-                                  <span>Actor: {event.actorLabel}</span>
-                                ) : null}
-                                {event.targetLabel ? (
-                                  <span>Target: {event.targetLabel}</span>
-                                ) : null}
-                                {event.teamLabel ? (
-                                  <span>Team: {event.teamLabel}</span>
-                                ) : null}
-                              </div>
-                            </li>
-                          ))}
+                              </li>
+                            );
+                          })}
                         </ol>
                       )}
                     </div>
