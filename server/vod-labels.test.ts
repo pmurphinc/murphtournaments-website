@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_THE_FINALS_TEAM_LABELS,
+  buildVodTeamLabelOptions,
   getVodEventLabelSuggestions,
   getVodTeamLabelWarnings,
   normalizeVodLabelKey,
@@ -155,6 +156,27 @@ describe("VOD label helpers", () => {
 
     expect(suggestions.teams).toContain("Player One");
     expect(suggestions.teams).not.toContain("A");
+  });
+
+  it("builds team selector options from default teams and preserves current legacy values", () => {
+    expect(buildVodTeamLabelOptions()).toEqual([
+      ...DEFAULT_THE_FINALS_TEAM_LABELS,
+    ]);
+
+    expect(
+      buildVodTeamLabelOptions([
+        "Legacy Orange",
+        "The Live Wires",
+        " Player One ",
+        "",
+        null,
+        undefined,
+      ])
+    ).toEqual([
+      ...DEFAULT_THE_FINALS_TEAM_LABELS,
+      "Legacy Orange",
+      " Player One ",
+    ]);
   });
 
   it("detects casing and spacing variants as team label warnings", () => {

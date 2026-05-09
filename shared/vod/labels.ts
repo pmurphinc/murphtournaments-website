@@ -120,6 +120,23 @@ function mergeTeamSuggestions(savedTeamLabels: string[]): string[] {
     .map(([, label]) => label);
 }
 
+export function buildVodTeamLabelOptions(
+  currentValues: Array<string | null | undefined> = []
+): string[] {
+  const options: string[] = [...DEFAULT_THE_FINALS_TEAM_LABELS];
+  const seenOptions = new Set<string>(options);
+
+  for (const label of currentValues) {
+    if (typeof label !== "string" || !label.trim()) continue;
+    if (seenOptions.has(label)) continue;
+
+    options.push(label);
+    seenOptions.add(label);
+  }
+
+  return options;
+}
+
 export function getVodEventLabelSuggestions(
   events: VodEventLabelSource[]
 ): VodEventLabelSuggestions {
