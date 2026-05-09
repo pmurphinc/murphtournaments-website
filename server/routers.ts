@@ -49,6 +49,8 @@ import {
   updateVodSuggestedEvent,
   updateVodSuggestedEventInputSchema,
   refreshTwitchMetadataForVodAnalysis,
+  runMockVodAutomationDetections,
+  runMockVodAutomationDetectionsInputSchema,
   suggestedEventIdInputSchema,
   vodAnalysisIdInputSchema,
 } from "./vodAnalysis";
@@ -812,6 +814,18 @@ export const appRouter = router({
       .input(ingestAutomationDetectionsInputSchema)
       .mutation(async ({ input }) => {
         return ingestAutomationDetections(input);
+      }),
+
+    runMockAutomationDetections: publicProcedure
+      .input(runMockVodAutomationDetectionsInputSchema)
+      .mutation(async ({ input }) => {
+        if (process.env.NODE_ENV === "production") {
+          throw new Error(
+            "Mock automation detections are only available in development."
+          );
+        }
+
+        return runMockVodAutomationDetections(input);
       }),
 
     updateSuggestedEvent: publicProcedure

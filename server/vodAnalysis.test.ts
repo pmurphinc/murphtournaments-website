@@ -36,6 +36,7 @@ import {
   listVodSuggestedEvents,
   rejectVodSuggestedEvent,
   refreshTwitchMetadataForVodAnalysis,
+  runMockVodAutomationDetections,
   updateVodAnalysisEvent,
   updateVodAnalysisEventInputSchema,
   updateVodSuggestedEvent,
@@ -2091,6 +2092,177 @@ describe("ingestAutomationDetections", () => {
     await expect(
       ingestAutomationDetections(
         { vodAnalysisId: 44, captureJobId: 0, detections: [baseDetection] },
+        db
+      )
+    ).rejects.toThrow();
+    expect(select).not.toHaveBeenCalled();
+  });
+});
+
+describe("runMockVodAutomationDetections", () => {
+  it("creates four pending automation suggestions without manual events", async () => {
+    const { db, insert, insertedSuggestedEvents } =
+      createAutomationDetectionIngestDb({
+        vodRows: [captureReadyVod()],
+        captureRows: [captureJob({ id: 99, vodAnalysisId: 44 })],
+      });
+
+    await expect(
+      runMockVodAutomationDetections(
+        { vodAnalysisId: 44, captureJobId: 99 },
+        db
+      )
+    ).resolves.toEqual({
+      status: "created",
+      vodAnalysisId: 44,
+      captureJobId: 99,
+      createdCount: 4,
+    });
+
+    expect(insert).toHaveBeenCalledTimes(4);
+    expect(insert).toHaveBeenCalledWith(vodSuggestedEvents);
+    expect(insert).not.toHaveBeenCalledWith(vodAnalysisEvents);
+    expect(insertedSuggestedEvents).toHaveLength(4);
+    expect(insertedSuggestedEvents).toEqual([
+      expect.objectContaining({
+        eventType: "tap",
+        timestampSeconds: 30,
+        actorLabel: "Mock Player 1",
+        targetLabel: "1",
+        teamLabel: "The Live Wires",
+        confidence: 72,
+        source: "automation",
+        status: "pending",
+        confirmedVodEventId: null,
+      }),
+      expect.objectContaining({
+        eventType: "plug",
+        timestampSeconds: 45,
+        actorLabel: "Mock Player 1",
+        targetLabel: "A",
+        teamLabel: "The Live Wires",
+        confidence: 76,
+        source: "automation",
+        status: "pending",
+        confirmedVodEventId: null,
+      }),
+      expect.objectContaining({
+        eventType: "steal_flip",
+        timestampSeconds: 75,
+        actorLabel: null,
+        targetLabel: "A",
+        teamLabel: "The High Notes",
+        confidence: 81,
+        source: "automation",
+        status: "pending",
+        confirmedVodEventId: null,
+      }),
+      expect.objectContaining({
+        eventType: "cashout",
+        timestampSeconds: 120,
+        actorLabel: null,
+        targetLabel: "A",
+        teamLabel: "The High Notes",
+        confidence: 88,
+        source: "automation",
+        status: "pending",
+        confirmedVodEventId: null,
+      }),
+    ]);
+  });
+
+  it("uses valid target selectors for Vault 1 and Cashout A", async () => {
+    const { db, insertedSuggestedEvents } = createAutomationDetectionIngestDb({
+      vodRows: [captureReadyVod()],
+      captureRows: [captureJob({ id: 99, vodAnalysisId: 44 })],
+    });
+
+    await runMockVodAutomationDetections(
+      { vodAnalysisId: 44, captureJobId: 99 },
+      db
+    );
+
+    expect(insertedSuggestedEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ eventType: "tap", targetLabel: "1" }),
+        expect.objectContaining({ eventType: "plug", targetLabel: "A" }),
+        expect.objectContaining({ eventType: "steal_flip", targetLabel: "A" }),
+        expect.objectContaining({ eventType: "cashout", targetLabel: "A" }),
+      ])
+    );
+  });
+
+  it("marks detector metadata as mock/dev generated", async () => {
+    const { db, insertedSuggestedEvents } = createAutomationDetectionIngestDb({
+      vodRows: [captureReadyVod()],
+      captureRows: [captureJob({ id: 99, vodAnalysisId: 44 })],
+    });
+
+    await runMockVodAutomationDetections(
+      { vodAnalysisId: 44, captureJobId: 99 },
+      db
+    );
+
+    for (const event of insertedSuggestedEvents) {
+      expect(event).toEqual(
+        expect.objectContaining({ metadata: expect.any(String) })
+      );
+      const metadata = JSON.parse(
+        (event as { metadata: string }).metadata
+      ) as {
+        captureJobId: number;
+        detectorMetadata: {
+          mockAutomation: boolean;
+          devOnly: boolean;
+          generator: string;
+        };
+      };
+
+      expect(metadata.captureJobId).toBe(99);
+      expect(metadata.detectorMetadata).toMatchObject({
+        mockAutomation: true,
+        devOnly: true,
+        generator: "runMockVodAutomationDetections",
+      });
+    }
+  });
+
+  it("returns invalid_capture_job for invalid capture jobs before writes", async () => {
+    const { db, insert } = createAutomationDetectionIngestDb({
+      vodRows: [captureReadyVod()],
+      captureRows: [],
+    });
+
+    await expect(
+      runMockVodAutomationDetections(
+        { vodAnalysisId: 44, captureJobId: 99 },
+        db
+      )
+    ).resolves.toEqual({
+      status: "invalid_capture_job",
+      vodAnalysisId: 44,
+      captureJobId: 99,
+      createdCount: 0,
+    });
+
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid VOD and capture ids before database access", async () => {
+    const { db, select } = createAutomationDetectionIngestDb({
+      vodRows: [captureReadyVod()],
+      captureRows: [captureJob({ id: 99, vodAnalysisId: 44 })],
+    });
+
+    await expect(
+      runMockVodAutomationDetections(
+        { vodAnalysisId: 0, captureJobId: 99 },
+        db
+      )
+    ).rejects.toThrow();
+    await expect(
+      runMockVodAutomationDetections(
+        { vodAnalysisId: 44, captureJobId: 0 },
         db
       )
     ).rejects.toThrow();

@@ -569,6 +569,10 @@ function CaptureReadinessPanel({
   };
 }) {
   const utils = trpc.useUtils();
+  const [mockAutomationMessage, setMockAutomationMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
   const readiness = getVodCaptureReadiness(vod);
   const samplePlan = readiness.samplePlan;
   const firstTimestamps = samplePlan.timestamps.slice(0, 5);
@@ -583,6 +587,26 @@ function CaptureReadinessPanel({
     trpc.vodAnalysis.createCaptureJob.useMutation({
       onSuccess: async () => {
         await utils.vodAnalysis.getAutomationStatus.invalidate(vodAnalysisId);
+      },
+    });
+  const mockAutomationMutation =
+    trpc.vodAnalysis.runMockAutomationDetections.useMutation({
+      onMutate: () => {
+        setMockAutomationMessage(null);
+      },
+      onSuccess: async result => {
+        await Promise.all([
+          utils.vodAnalysis.listSuggestedEvents.invalidate(vodAnalysisId),
+          utils.vodAnalysis.getAutomationStatus.invalidate(vodAnalysisId),
+          utils.vodAnalysis.list.invalidate(),
+        ]);
+        setMockAutomationMessage({
+          type: "success",
+          text: `Created ${result.createdCount} pending mock suggestions.`,
+        });
+      },
+      onError: error => {
+        setMockAutomationMessage({ type: "error", text: error.message });
       },
     });
   const automationStatus = automationStatusQuery.data;
@@ -778,6 +802,50 @@ function CaptureReadinessPanel({
           <p className="font-mono text-xs text-white/45">
             Capture job creation is disabled: {captureJobDisabledReason}
           </p>
+        ) : null}
+
+        {import.meta.env.DEV ? (
+          <div className="rounded border border-neon-gold/30 bg-neon-gold/10 p-3">
+            <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-neon-gold">
+              Dev mock automation
+            </div>
+            <p className="mt-1 font-mono text-xs text-white/60">
+              Dev only. Creates deterministic pending suggestions. No video
+              frames are scanned.
+            </p>
+            {!latestCaptureJob ? (
+              <p className="mt-2 font-mono text-xs text-white/45">
+                Queue a capture job first.
+              </p>
+            ) : null}
+            {mockAutomationMessage ? (
+              <p
+                className={`mt-2 rounded border p-2 font-mono text-xs ${
+                  mockAutomationMessage.type === "success"
+                    ? "border-neon-cyan/30 bg-neon-cyan/10 text-neon-cyan"
+                    : "border-red-500/40 bg-red-950/30 text-red-100"
+                }`}
+              >
+                {mockAutomationMessage.text}
+              </p>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => {
+                if (!latestCaptureJob) return;
+                mockAutomationMutation.mutate({
+                  vodAnalysisId,
+                  captureJobId: latestCaptureJob.id,
+                });
+              }}
+              disabled={!latestCaptureJob || mockAutomationMutation.isPending}
+              className="mt-3 rounded-sm border border-neon-gold/70 px-3 py-2 font-mono text-xs font-bold uppercase tracking-widest text-neon-gold transition hover:bg-neon-gold/10 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {mockAutomationMutation.isPending
+                ? "Running mock automation…"
+                : "Run mock automation detections"}
+            </button>
+          </div>
         ) : null}
       </div>
     </details>
