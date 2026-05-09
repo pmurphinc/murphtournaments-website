@@ -73,19 +73,19 @@ const suggestedEventFieldLabels: Record<
   Partial<Record<"actorLabel" | "targetLabel" | "teamLabel", string>>
 > = {
   death: {
-    actorLabel: "Actor",
-    targetLabel: "Target",
+    actorLabel: "Eliminating Player",
+    targetLabel: "Eliminated Player",
     teamLabel: "Victim Team",
   },
   tap: {
-    actorLabel: "Actor",
+    actorLabel: "Tapping Player",
     targetLabel: "Vault",
-    teamLabel: "Team Tapping",
+    teamLabel: "Tapping Team",
   },
   plug: {
-    actorLabel: "Actor",
+    actorLabel: "Plugging Player",
     targetLabel: "Cashout",
-    teamLabel: "Team Plugging",
+    teamLabel: "Plugging Team",
   },
   cashout: {
     targetLabel: "Cashout",
@@ -103,13 +103,13 @@ const suggestedEventFieldLabels: Record<
     teamLabel: "Spawning Team",
   },
   revive: {
-    actorLabel: "Actor",
-    targetLabel: "Target",
+    actorLabel: "Reviving Player",
+    targetLabel: "Revived Player",
     teamLabel: "Team",
   },
   defib: {
-    actorLabel: "Actor",
-    targetLabel: "Target",
+    actorLabel: "Defib Player",
+    targetLabel: "Revived Player",
     teamLabel: "Team",
   },
 };
@@ -160,6 +160,51 @@ function formatSuggestedEventMetadataPreview(metadata: string | null) {
   } catch {
     return truncateMetadataPreview(metadata);
   }
+}
+
+type SuggestedEventDisplayField = {
+  key: "actorLabel" | "targetLabel" | "teamLabel";
+  label: string;
+  value: string;
+};
+
+function getSuggestedEventDisplayFields(suggestion: {
+  eventType: VodAnalysisEventType;
+  actorLabel: string | null;
+  targetLabel: string | null;
+  teamLabel: string | null;
+}): SuggestedEventDisplayField[] {
+  const labels = suggestedEventFieldLabels[suggestion.eventType];
+  const fields: SuggestedEventDisplayField[] = [];
+
+  if (labels.actorLabel && suggestion.actorLabel) {
+    fields.push({
+      key: "actorLabel",
+      label: labels.actorLabel,
+      value: suggestion.actorLabel,
+    });
+  }
+
+  if (labels.teamLabel && suggestion.teamLabel) {
+    fields.push({
+      key: "teamLabel",
+      label: labels.teamLabel,
+      value: suggestion.teamLabel,
+    });
+  }
+
+  if (labels.targetLabel && suggestion.targetLabel) {
+    fields.push({
+      key: "targetLabel",
+      label: labels.targetLabel,
+      value: formatVodTargetDisplayLabel(
+        suggestion.eventType,
+        suggestion.targetLabel
+      ),
+    });
+  }
+
+  return fields;
 }
 
 function formatVodTargetDisplayLabel(
@@ -1630,8 +1675,8 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
                               formatSuggestedEventMetadataPreview(
                                 suggestion.metadata
                               );
-                            const fieldLabels =
-                              suggestedEventFieldLabels[suggestion.eventType];
+                            const displayFields =
+                              getSuggestedEventDisplayFields(suggestion);
                             const isDeemphasized =
                               suggestion.status !== "pending";
 
@@ -1673,27 +1718,11 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
                                 </div>
 
                                 <div className="mt-3 grid gap-2 font-mono text-xs text-white/65 sm:grid-cols-2">
-                                  {suggestion.teamLabel ? (
-                                    <span>
-                                      {fieldLabels.teamLabel ?? "Team"}:{" "}
-                                      {suggestion.teamLabel}
+                                  {displayFields.map(field => (
+                                    <span key={field.key}>
+                                      {field.label}: {field.value}
                                     </span>
-                                  ) : null}
-                                  {suggestion.actorLabel ? (
-                                    <span>
-                                      {fieldLabels.actorLabel ?? "Actor"}:{" "}
-                                      {suggestion.actorLabel}
-                                    </span>
-                                  ) : null}
-                                  {suggestion.targetLabel ? (
-                                    <span>
-                                      {fieldLabels.targetLabel ?? "Target"}:{" "}
-                                      {formatVodTargetDisplayLabel(
-                                        suggestion.eventType,
-                                        suggestion.targetLabel
-                                      )}
-                                    </span>
-                                  ) : null}
+                                  ))}
                                   {suggestion.confidence !== null ? (
                                     <span>
                                       Confidence: {suggestion.confidence}%
