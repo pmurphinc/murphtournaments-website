@@ -17,7 +17,7 @@ describe("VOD label helpers", () => {
       {
         eventType: "death",
         actorLabel: "Alice",
-        targetLabel: "Cashout A",
+        targetLabel: "Charlie",
         teamLabel: "The Live Wires",
       },
       {
@@ -29,19 +29,19 @@ describe("VOD label helpers", () => {
       {
         eventType: "tap",
         actorLabel: "Bob",
-        targetLabel: "Vault",
+        targetLabel: "1",
         teamLabel: "The High Notes",
       },
       {
         eventType: "cashout",
         actorLabel: null,
-        targetLabel: "Cashout A",
+        targetLabel: "A",
         teamLabel: " ",
       },
       {
         eventType: "plug",
         actorLabel: "The High Notes",
-        targetLabel: "The Live Wires",
+        targetLabel: "B",
         teamLabel: null,
       },
     ];
@@ -56,10 +56,13 @@ describe("VOD label helpers", () => {
       ])
     );
     expect(suggestions.actors).toEqual(["Alice", "Bob"]);
-    expect(suggestions.targets).toEqual(["Cashout A", "Vault"]);
+    expect(suggestions.targets).toEqual(["Charlie"]);
     expect(suggestions.actors).not.toContain("The High Notes");
     expect(suggestions.actors).not.toContain("The Live Wires");
     expect(suggestions.targets).not.toContain("The Live Wires");
+    expect(suggestions.targets).not.toContain("A");
+    expect(suggestions.targets).not.toContain("B");
+    expect(suggestions.targets).not.toContain("1");
   });
 
   it("uses the most common display casing for suggestions and a first-seen tie break", () => {
@@ -86,14 +89,14 @@ describe("VOD label helpers", () => {
         eventType: "plug",
         teamLabel: "Blue",
         actorLabel: "Ada",
-        targetLabel: "Cashout",
+        targetLabel: "A",
       },
     ];
 
     expect(getVodEventLabelSuggestions(events)).toEqual({
       teams: expect.arrayContaining(["Blue", "orange"]),
       actors: ["Ada", "June"],
-      targets: ["Cashout", "Vault"],
+      targets: ["Vault"],
     });
   });
 
@@ -141,7 +144,7 @@ describe("VOD label helpers", () => {
       {
         eventType: "death",
         actorLabel: "Player One",
-        targetLabel: "Cashout A",
+        targetLabel: "A",
         teamLabel: "The Vogues",
       },
       {
@@ -151,7 +154,7 @@ describe("VOD label helpers", () => {
     ]);
 
     expect(suggestions.teams).toContain("Player One");
-    expect(suggestions.teams).not.toContain("Cashout A");
+    expect(suggestions.teams).not.toContain("A");
   });
 
   it("detects casing and spacing variants as team label warnings", () => {
@@ -192,26 +195,26 @@ describe("VOD label helpers", () => {
         eventType: "death",
         teamLabel: "Zeta",
         actorLabel: "Zed",
-        targetLabel: "Vault B",
+        targetLabel: "Zed Target",
       },
       {
         eventType: "defib",
         teamLabel: "Alpha",
         actorLabel: "Ann",
-        targetLabel: "Cashout A",
+        targetLabel: "Ann Target",
       },
       {
         eventType: "revive",
         teamLabel: "alpha",
         actorLabel: "ann",
-        targetLabel: "cashout a",
+        targetLabel: "ann target",
       },
     ];
 
     expect(getVodEventLabelSuggestions(events)).toMatchObject({
       teams: expect.arrayContaining(["Alpha", "Zeta"]),
       actors: ["Ann", "Zed"],
-      targets: ["Cashout A", "Vault B"],
+      targets: ["Ann Target", "Zed Target"],
     });
     expect(
       getVodTeamLabelWarnings(events).map(warning => warning.normalizedKey)

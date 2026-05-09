@@ -630,12 +630,12 @@ describe("createVodAnalysisEventInputSchema", () => {
 
   it.each([
     ["death", { actorLabel: "A", targetLabel: "B" }],
-    ["tap", { actorLabel: "A", targetLabel: "Vault", teamLabel: "Orange" }],
-    ["plug", { actorLabel: "A", targetLabel: "Cashout", teamLabel: "Orange" }],
-    ["cashout", { teamLabel: "Orange" }],
+    ["tap", { actorLabel: "A", targetLabel: "1", teamLabel: "Orange" }],
+    ["plug", { actorLabel: "A", targetLabel: "A", teamLabel: "Orange" }],
+    ["cashout", { targetLabel: "A", teamLabel: "Orange" }],
     ["team_wipe", { actorLabel: "Orange", teamLabel: "Purple" }],
     ["team_spawn", { teamLabel: "Orange" }],
-    ["steal_flip", { teamLabel: "The Live Wires" }],
+    ["steal_flip", { targetLabel: "B", teamLabel: "The Live Wires" }],
     ["revive", { actorLabel: "A", targetLabel: "B", teamLabel: "Orange" }],
     ["defib", { actorLabel: "A", targetLabel: "B", teamLabel: "Orange" }],
   ] as const)("accepts required fields for %s", (eventType, fields) => {
@@ -651,12 +651,12 @@ describe("createVodAnalysisEventInputSchema", () => {
 
   it.each([
     ["death", { targetLabel: "B" }],
-    ["tap", { actorLabel: "A", targetLabel: "Vault" }],
+    ["tap", { actorLabel: "A", targetLabel: "1" }],
     ["plug", { actorLabel: "A", teamLabel: "Orange" }],
-    ["cashout", {}],
+    ["cashout", { teamLabel: "Orange" }],
     ["team_wipe", { teamLabel: "Purple" }],
     ["team_spawn", {}],
-    ["steal_flip", {}],
+    ["steal_flip", { teamLabel: "The Live Wires" }],
     ["revive", { actorLabel: "A", targetLabel: "B" }],
     ["defib", { targetLabel: "B", teamLabel: "Orange" }],
   ] as const)("rejects missing required fields for %s", (eventType, fields) => {
@@ -687,7 +687,7 @@ describe("updateVodAnalysisEventInputSchema", () => {
         ...baseInput,
         eventType: "cashout",
         actorLabel: undefined,
-        targetLabel: undefined,
+        targetLabel: "A",
         teamLabel: "Orange",
       }).success
     ).toBe(true);
@@ -697,7 +697,7 @@ describe("updateVodAnalysisEventInputSchema", () => {
         ...baseInput,
         eventType: "steal_flip",
         actorLabel: undefined,
-        targetLabel: undefined,
+        targetLabel: "B",
         teamLabel: "The Live Wires",
       }).success
     ).toBe(true);
@@ -786,6 +786,7 @@ describe("createVodAnalysisEvent", () => {
           vodAnalysisId: 1,
           eventType: "cashout",
           timestampSeconds: 30,
+          targetLabel: "A",
           teamLabel: "Orange",
         })
       )
@@ -848,6 +849,7 @@ describe("updateVodAnalysisEvent", () => {
         vodAnalysisId: 12,
         eventType: "cashout",
         timestampSeconds: 77,
+        targetLabel: "A",
         teamLabel: "Orange",
       })
     ).not.toHaveProperty("metadata");
@@ -971,13 +973,97 @@ describe("createVodSuggestedEventInputSchema", () => {
     ).toBe(true);
   });
 
-  it("accepts steal_flip suggestions with the required teamLabel", () => {
+  it("accepts steal_flip suggestions with the required teamLabel and cashout selector", () => {
     expect(
       createVodSuggestedEventInputSchema.safeParse({
         vodAnalysisId: 7,
         eventType: "steal_flip",
         timestampSeconds: 30,
+        targetLabel: "A",
         teamLabel: "The Live Wires",
+        source: "automation",
+      }).success
+    ).toBe(true);
+  });
+
+  it("rejects steal_flip suggestions without the required teamLabel", () => {
+    const result = createVodSuggestedEventInputSchema.safeParse({
+      vodAnalysisId: 7,
+      eventType: "steal_flip",
+      timestampSeconds: 30,
+      targetLabel: "A",
+      source: "automation",
+    });
+
+    expect(result.success).toBe(false);
+    expect(
+      result.error?.issues.some(issue => issue.path[0] === "teamLabel")
+    ).toBe(true);
+  });
+
+  it("rejects steal_flip suggestions without the required cashout selector", () => {
+    const result = createVodSuggestedEventInputSchema.safeParse({
+      vodAnalysisId: 7,
+      eventType: "steal_flip",
+      timestampSeconds: 30,
+      teamLabel: "The Live Wires",
+      source: "automation",
+    });
+
+    expect(result.success).toBe(false);
+    expect(
+      result.error?.issues.some(issue => issue.path[0] === "targetLabel")
+    ).toBe(true);
+  });
+
+  it("accepts cashout suggestions with teamLabel and cashout selector", () => {
+    expect(
+      createVodSuggestedEventInputSchema.safeParse({
+        vodAnalysisId: 7,
+        eventType: "cashout",
+        timestampSeconds: 30,
+        targetLabel: "A",
+        teamLabel: "Orange",
+        source: "automation",
+      }).success
+    ).toBe(true);
+  });
+
+  it("rejects cashout suggestions without the required cashout selector", () => {
+    const result = createVodSuggestedEventInputSchema.safeParse({
+      vodAnalysisId: 7,
+      eventType: "cashout",
+      timestampSeconds: 30,
+      teamLabel: "Orange",
+      source: "automation",
+    });
+
+    expect(result.success).toBe(false);
+    expect(
+      result.error?.issues.some(issue => issue.path[0] === "targetLabel")
+    ).toBe(true);
+  });
+
+  it("accepts plug cashout selectors and tap vault selectors", () => {
+    expect(
+      createVodSuggestedEventInputSchema.safeParse({
+        vodAnalysisId: 7,
+        eventType: "plug",
+        timestampSeconds: 30,
+        actorLabel: "Plug Player",
+        targetLabel: "B",
+        teamLabel: "Orange",
+        source: "automation",
+      }).success
+    ).toBe(true);
+    expect(
+      createVodSuggestedEventInputSchema.safeParse({
+        vodAnalysisId: 7,
+        eventType: "tap",
+        timestampSeconds: 30,
+        actorLabel: "Tap Player",
+        targetLabel: "2",
+        teamLabel: "Orange",
         source: "automation",
       }).success
     ).toBe(true);
@@ -989,6 +1075,7 @@ describe("createVodSuggestedEventInputSchema", () => {
         vodAnalysisId: 7,
         eventType: "cashout",
         timestampSeconds: 30,
+        targetLabel: "A",
         teamLabel: "Orange",
         source: "debug",
         confidence: -1,
@@ -999,6 +1086,7 @@ describe("createVodSuggestedEventInputSchema", () => {
         vodAnalysisId: 7,
         eventType: "cashout",
         timestampSeconds: 30,
+        targetLabel: "A",
         teamLabel: "Orange",
         source: "debug",
         confidence: 101,
@@ -1012,6 +1100,7 @@ describe("createVodSuggestedEventInputSchema", () => {
         vodAnalysisId: 7,
         eventType: "cashout",
         timestampSeconds: 30,
+        targetLabel: "A",
         teamLabel: "Orange",
         source: "automation",
       }).status
@@ -1029,6 +1118,7 @@ describe("createVodSuggestedEvent", () => {
           vodAnalysisId: 7,
           eventType: "cashout",
           timestampSeconds: 45,
+          targetLabel: "A",
           teamLabel: "Orange",
           source: "manual_test",
           confidence: 88,
@@ -1125,8 +1215,8 @@ describe("approveVodSuggestedEvent", () => {
 });
 
 describe("rejectVodSuggestedEvent", () => {
-  it("marks pending suggestions rejected without deleting them", async () => {
-    const { db, set, storedRows } = createSuggestedEventWorkflowDb([
+  it("marks pending suggestions rejected without creating manual events or deleting them", async () => {
+    const { db, insert, set, storedRows } = createSuggestedEventWorkflowDb([
       suggestedEvent({ id: 22 }),
     ]);
 
@@ -1135,6 +1225,7 @@ describe("rejectVodSuggestedEvent", () => {
     });
 
     expect(set).toHaveBeenCalledWith({ status: "rejected" });
+    expect(insert).not.toHaveBeenCalled();
     expect(storedRows).toHaveLength(1);
   });
 
