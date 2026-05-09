@@ -1,5 +1,33 @@
 export type VodSourceType = "twitch" | "youtube" | "google_drive" | "generic";
 
+export type VodEmbeddableProvider = "youtube" | "twitch" | "google_drive";
+export type VodEmbedFallbackProvider = "generic" | "unknown";
+
+export type VodEmbedConfig =
+  | {
+      embeddable: true;
+      provider: VodEmbeddableProvider;
+      embedUrl: string;
+      label: string;
+    }
+  | {
+      embeddable: false;
+      provider: VodEmbedFallbackProvider;
+      reason: string;
+    };
+
+export type VodEmbedSourceInput = {
+  sourceType: VodSourceType | string | null;
+  sourceId?: string | null;
+  sourceRef?: string | null;
+  normalizedSourceUrl?: string | null;
+  sourceUrl?: string | null;
+};
+
+export type VodEmbedOptions = {
+  parentHostname?: string | null;
+};
+
 export type ParsedVodSource =
   | {
       valid: true;
@@ -154,4 +182,120 @@ export function getVodSourceLabel(parsedSource: ParsedVodSource): string {
   return sourceReference
     ? `${sourceTypeLabel} • ${sourceReference}`
     : sourceTypeLabel;
+}
+
+function getMissingSourceIdReason(sourceType: VodSourceType): string {
+  return `${formatVodSourceType(
+    sourceType
+  )} embeds require a parsed source id. Re-save or refresh the source link before embedding.`;
+}
+
+export function buildVodEmbedConfig(
+  input: VodEmbedSourceInput,
+  options: VodEmbedOptions = {}
+): VodEmbedConfig {
+  const sourceId = input.sourceId?.trim();
+
+  switch (input.sourceType) {
+    case "youtube": {
+      if (!sourceId) {
+        return {
+          embeddable: false,
+          provider: "unknown",
+          reason: getMissingSourceIdReason("youtube"),
+        };
+      }
+
+      return {
+        embeddable: true,
+        provider: "youtube",
+        embedUrl: `https://www.youtube.com/embed/${encodeURIComponent(sourceId)}`,
+        label: getVodSourceLabel({
+          valid: true,
+          sourceType: "youtube",
+          sourceId,
+          sourceRef: input.sourceRef ?? sourceId,
+          normalizedUrl:
+            input.normalizedSourceUrl ??
+            `https://www.youtube.com/watch?v=${sourceId}`,
+        }),
+      };
+    }
+
+    case "twitch": {
+      if (!sourceId) {
+        return {
+          embeddable: false,
+          provider: "unknown",
+          reason: getMissingSourceIdReason("twitch"),
+        };
+      }
+
+      const embedUrl = new URL("https://player.twitch.tv/");
+      embedUrl.searchParams.set("video", `v${sourceId}`);
+      const parentHostname = options.parentHostname?.trim();
+
+      if (parentHostname) {
+        embedUrl.searchParams.set("parent", parentHostname);
+      }
+
+      return {
+        embeddable: true,
+        provider: "twitch",
+        embedUrl: embedUrl.toString(),
+        label: getVodSourceLabel({
+          valid: true,
+          sourceType: "twitch",
+          sourceId,
+          sourceRef: input.sourceRef ?? `v${sourceId}`,
+          normalizedUrl:
+            input.normalizedSourceUrl ??
+            `https://www.twitch.tv/videos/${sourceId}`,
+        }),
+      };
+    }
+
+    case "google_drive": {
+      if (!sourceId) {
+        return {
+          embeddable: false,
+          provider: "unknown",
+          reason: getMissingSourceIdReason("google_drive"),
+        };
+      }
+
+      return {
+        embeddable: true,
+        provider: "google_drive",
+        embedUrl: `https://drive.google.com/file/d/${encodeURIComponent(
+          sourceId
+        )}/preview`,
+        label: getVodSourceLabel({
+          valid: true,
+          sourceType: "google_drive",
+          sourceId,
+          sourceRef: input.sourceRef ?? sourceId,
+          normalizedUrl:
+            input.normalizedSourceUrl ??
+            `https://drive.google.com/file/d/${sourceId}/view`,
+        }),
+      };
+    }
+
+    case "generic":
+      return {
+        embeddable: false,
+        provider: "generic",
+        reason:
+          "This video source is a generic link and cannot be safely embedded here. Open the source in a new tab to review it.",
+      };
+
+    default:
+      return {
+        embeddable: false,
+        provider: "unknown",
+        reason:
+          "This video source type is not recognized and cannot be safely embedded here.",
+      };
+  }
 }
