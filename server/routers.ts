@@ -43,6 +43,8 @@ import {
   rejectVodSuggestedEvent,
   updateVodAnalysisEvent,
   updateVodAnalysisEventInputSchema,
+  updateVodSuggestedEvent,
+  updateVodSuggestedEventInputSchema,
   refreshTwitchMetadataForVodAnalysis,
   suggestedEventIdInputSchema,
   vodAnalysisIdInputSchema,
@@ -795,6 +797,12 @@ export const appRouter = router({
       .input(createVodSuggestedEventInputSchema)
       .mutation(async ({ input }) => {
         return createVodSuggestedEvent(input);
+      }),
+
+    updateSuggestedEvent: publicProcedure
+      .input(updateVodSuggestedEventInputSchema)
+      .mutation(async ({ input }) => {
+        return updateVodSuggestedEvent(input);
       }),
 
     approveSuggestedEvent: publicProcedure

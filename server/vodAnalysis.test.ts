@@ -13,6 +13,7 @@ import {
   buildVodAnalysisInsert,
   buildVodAnalysisMetadataUpdate,
   buildVodSuggestedEventInsert,
+  buildVodSuggestedEventUpdate,
   createVodAnalysis,
   createVodAnalysisEvent,
   createVodAnalysisEventInputSchema,
@@ -33,6 +34,8 @@ import {
   refreshTwitchMetadataForVodAnalysis,
   updateVodAnalysisEvent,
   updateVodAnalysisEventInputSchema,
+  updateVodSuggestedEvent,
+  updateVodSuggestedEventInputSchema,
   sortVodSuggestedEventRecords,
   vodAnalysisIdInputSchema,
   type VodAnalysisEventRecord,
@@ -1166,6 +1169,197 @@ describe("createVodSuggestedEvent", () => {
   });
 });
 
+describe("updateVodSuggestedEvent", () => {
+  it("accepts valid pending corrections and returns the updated suggestion", async () => {
+    const { db, set, insertedEvents } = createSuggestedEventWorkflowDb([
+      suggestedEvent({ id: 22, eventType: "death" }),
+    ]);
+
+    await expect(
+      updateVodSuggestedEvent(
+        {
+          id: 22,
+          eventType: "cashout",
+          timestampSeconds: 75,
+          targetLabel: " B ",
+          teamLabel: " The Live Wires ",
+          confidence: 62,
+          metadata: { corrected: true },
+        },
+        db
+      )
+    ).resolves.toMatchObject({
+      id: 22,
+      eventType: "cashout",
+      timestampSeconds: 75,
+      actorLabel: null,
+      targetLabel: "B",
+      teamLabel: "The Live Wires",
+      confidence: 62,
+      status: "pending",
+    });
+
+    expect(set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: "cashout",
+        timestampSeconds: 75,
+        actorLabel: null,
+        targetLabel: "B",
+        teamLabel: "The Live Wires",
+        confidence: 62,
+        metadata: JSON.stringify({ corrected: true }),
+      })
+    );
+    expect(insertedEvents).toHaveLength(0);
+  });
+
+  it("rejects missing required targetLabel for cashout", async () => {
+    const { db, update } = createSuggestedEventWorkflowDb([suggestedEvent()]);
+
+    await expect(
+      updateVodSuggestedEvent(
+        {
+          id: 1,
+          eventType: "cashout",
+          timestampSeconds: 30,
+          teamLabel: "Orange",
+        },
+        db
+      )
+    ).rejects.toThrow();
+
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("rejects missing targetLabel for steal_flip", async () => {
+    const { db, update } = createSuggestedEventWorkflowDb([suggestedEvent()]);
+
+    await expect(
+      updateVodSuggestedEvent(
+        {
+          id: 1,
+          eventType: "steal_flip",
+          timestampSeconds: 30,
+          teamLabel: "Orange",
+        },
+        db
+      )
+    ).rejects.toThrow();
+
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("rejects missing teamLabel for steal_flip", async () => {
+    const { db, update } = createSuggestedEventWorkflowDb([suggestedEvent()]);
+
+    await expect(
+      updateVodSuggestedEvent(
+        {
+          id: 1,
+          eventType: "steal_flip",
+          timestampSeconds: 30,
+          targetLabel: "A",
+        },
+        db
+      )
+    ).rejects.toThrow();
+
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid timestamp before DB write", async () => {
+    const { db, select, update } = createSuggestedEventWorkflowDb([
+      suggestedEvent(),
+    ]);
+
+    expect(
+      updateVodSuggestedEventInputSchema.safeParse({
+        id: 1,
+        eventType: "death",
+        timestampSeconds: -1,
+        actorLabel: "A",
+        targetLabel: "B",
+      }).success
+    ).toBe(false);
+
+    await expect(
+      updateVodSuggestedEvent(
+        {
+          id: 1,
+          eventType: "death",
+          timestampSeconds: -1,
+          actorLabel: "A",
+          targetLabel: "B",
+        },
+        db
+      )
+    ).rejects.toThrow();
+
+    expect(select).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("does not create a manual event during correction", async () => {
+    const { db, insert, insertedEvents } = createSuggestedEventWorkflowDb([
+      suggestedEvent({ id: 22 }),
+    ]);
+
+    await updateVodSuggestedEvent(
+      {
+        id: 22,
+        eventType: "death",
+        timestampSeconds: 45,
+        actorLabel: "Correct Actor",
+        targetLabel: "Correct Target",
+      },
+      db
+    );
+
+    expect(insert).not.toHaveBeenCalled();
+    expect(insertedEvents).toHaveLength(0);
+  });
+
+  it("does not update approved or rejected suggestions", async () => {
+    for (const status of ["approved", "rejected"] as const) {
+      const { db, update } = createSuggestedEventWorkflowDb([
+        suggestedEvent({ id: 22, status }),
+      ]);
+
+      await expect(
+        updateVodSuggestedEvent(
+          {
+            id: 22,
+            eventType: "death",
+            timestampSeconds: 45,
+            actorLabel: "Correct Actor",
+            targetLabel: "Correct Target",
+          },
+          db
+        )
+      ).rejects.toThrow("Only pending suggested events can be edited.");
+
+      expect(update).not.toHaveBeenCalled();
+    }
+  });
+
+  it("builds updates with normalized labels and optional metadata", () => {
+    expect(
+      buildVodSuggestedEventUpdate({
+        id: 9,
+        eventType: "death",
+        timestampSeconds: 10,
+        actorLabel: " Actor ",
+        targetLabel: " Target ",
+        teamLabel: " ",
+      })
+    ).toMatchObject({
+      actorLabel: "Actor",
+      targetLabel: "Target",
+      teamLabel: null,
+    });
+  });
+});
+
 describe("approveVodSuggestedEvent", () => {
   it("creates exactly one confirmed manual event and marks suggestion approved", async () => {
     const { db, insert, values, set, insertedEvents } =
@@ -1184,6 +1378,37 @@ describe("approveVodSuggestedEvent", () => {
       status: "approved",
       confirmedVodEventId: 101,
     });
+  });
+
+  it("approves using corrected saved values after correction", async () => {
+    const { db, insertedEvents } = createSuggestedEventWorkflowDb([
+      suggestedEvent({ id: 22, eventType: "death" }),
+    ]);
+
+    await updateVodSuggestedEvent(
+      {
+        id: 22,
+        eventType: "steal_flip",
+        timestampSeconds: 92,
+        targetLabel: "C",
+        teamLabel: "The Socialites",
+      },
+      db
+    );
+
+    await expect(approveVodSuggestedEvent(22, db)).resolves.toMatchObject({
+      confirmedEventId: 101,
+      suggestion: { status: "approved", confirmedVodEventId: 101 },
+    });
+
+    expect(insertedEvents).toEqual([
+      expect.objectContaining({
+        eventType: "steal_flip",
+        timestampSeconds: 92,
+        targetLabel: "C",
+        teamLabel: "The Socialites",
+      }),
+    ]);
   });
 
   it("is idempotent when already approved with a confirmed event id", async () => {
