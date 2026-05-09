@@ -32,6 +32,8 @@ import {
   createVodSuggestedEvent,
   createVodSuggestedEventInputSchema,
   createVodAnalysisInputSchema,
+  deleteVodAnalysisEvent,
+  deleteVodAnalysisEventInputSchema,
   getLatestVodCaptureJob,
   getVodAnalysisById,
   listVodAnalysisEvents,
@@ -39,6 +41,8 @@ import {
   listVodAnalyses,
   listVodSuggestedEvents,
   rejectVodSuggestedEvent,
+  updateVodAnalysisEvent,
+  updateVodAnalysisEventInputSchema,
   refreshTwitchMetadataForVodAnalysis,
   suggestedEventIdInputSchema,
   vodAnalysisIdInputSchema,
@@ -737,6 +741,18 @@ export const appRouter = router({
       .input(createVodAnalysisEventInputSchema)
       .mutation(async ({ input }) => {
         return createVodAnalysisEvent(input);
+      }),
+
+    updateEvent: publicProcedure
+      .input(updateVodAnalysisEventInputSchema)
+      .mutation(async ({ input }) => {
+        return updateVodAnalysisEvent(input);
+      }),
+
+    deleteEvent: publicProcedure
+      .input(deleteVodAnalysisEventInputSchema)
+      .mutation(async ({ input }) => {
+        return deleteVodAnalysisEvent(input);
       }),
 
     refreshTwitchMetadata: publicProcedure
