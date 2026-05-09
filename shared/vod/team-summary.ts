@@ -18,6 +18,7 @@ export type VodTeamSummary = {
   teamWipes: number;
   teamSpawns: number;
   cashouts: number;
+  stealFlips: number;
   revives: number;
   defibs: number;
   firstDeathToWipeAvgSeconds: number | null;
@@ -33,6 +34,7 @@ const createEmptySummary = (teamName: string): MutableVodTeamSummary => ({
   teamWipes: 0,
   teamSpawns: 0,
   cashouts: 0,
+  stealFlips: 0,
   revives: 0,
   defibs: 0,
   firstDeathToWipeAvgSeconds: null,
@@ -44,6 +46,7 @@ const countedEventTypes = new Set<VodAnalysisEventType>([
   "cashout",
   "team_wipe",
   "team_spawn",
+  "steal_flip",
   "revive",
   "defib",
 ]);
@@ -110,6 +113,9 @@ export function buildVodTeamSummaries(
       case "cashout":
         summary.cashouts += 1;
         break;
+      case "steal_flip":
+        summary.stealFlips += 1;
+        break;
       case "revive":
         summary.revives += 1;
         break;
@@ -158,6 +164,7 @@ export function getVodTeamInsightCallouts(
     summary.teamWipes +
     summary.teamSpawns +
     summary.cashouts +
+    summary.stealFlips +
     recoveryEvents;
 
   if (labeledEventCount < 2) {

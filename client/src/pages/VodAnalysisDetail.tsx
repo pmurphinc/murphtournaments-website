@@ -85,6 +85,9 @@ const eventFieldHelp: Record<
   team_spawn: {
     teamLabel: "Spawning team",
   },
+  steal_flip: {
+    teamLabel: "Stealing team / new owner",
+  },
   revive: {
     actorLabel: "Reviving player",
     targetLabel: "Revived player",
@@ -351,6 +354,7 @@ function TeamSummarySection({
                 <DetailPill label="Wipes" value={String(summary.teamWipes)} />
                 <DetailPill label="Spawns" value={String(summary.teamSpawns)} />
                 <DetailPill label="Cashouts" value={String(summary.cashouts)} />
+                <DetailPill label="Steal / Flip" value={String(summary.stealFlips)} />
                 <DetailPill label="Revives" value={String(summary.revives)} />
                 <DetailPill label="Defibs" value={String(summary.defibs)} />
               </div>
@@ -826,6 +830,23 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
     () => getVodTeamLabelWarnings(events),
     [events]
   );
+  const savedTeamLabels = useMemo(() => {
+    const labelsByNormalizedKey = new Map<string, string>();
+
+    for (const event of events) {
+      const label = event.teamLabel?.trim();
+      if (!label) continue;
+
+      const normalizedKey = normalizeVodLabelKey(label);
+      if (!labelsByNormalizedKey.has(normalizedKey)) {
+        labelsByNormalizedKey.set(normalizedKey, label);
+      }
+    }
+
+    return Array.from(labelsByNormalizedKey.entries())
+      .sort((left, right) => left[0].localeCompare(right[0]))
+      .map(([, label]) => label);
+  }, [events]);
   const teamLabeledEventCount = useMemo(
     () => events.filter(event => event.teamLabel?.trim()).length,
     [events]
@@ -874,8 +895,8 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
       vodAnalysisId,
       eventType: selectedEventType,
       timestampSeconds: parsedTimestamp,
-      actorLabel,
-      targetLabel,
+      actorLabel: requiredFields.includes("actorLabel") ? actorLabel : "",
+      targetLabel: requiredFields.includes("targetLabel") ? targetLabel : "",
       teamLabel,
     };
 
@@ -957,11 +978,13 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
       eventFieldHelp[selectedEventType][field] ?? eventFieldLabels[field];
     const suggestions =
       field === "actorLabel"
-        ? labelSuggestions.actors
+        ? selectedEventType === "team_wipe"
+          ? labelSuggestions.teams
+          : labelSuggestions.actors
         : field === "targetLabel"
           ? labelSuggestions.targets
           : labelSuggestions.teams;
-    const datalistId = `vod-${field}-suggestions`;
+    const datalistId = `vod-${selectedEventType}-${field}-suggestions`;
 
     return (
       <label className="block" key={field}>
@@ -1090,8 +1113,12 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
         </label>
 
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-          {renderEventInput("actorLabel")}
-          {renderEventInput("targetLabel")}
+          {requiredFields.includes("actorLabel")
+            ? renderEventInput("actorLabel")
+            : null}
+          {requiredFields.includes("targetLabel")
+            ? renderEventInput("targetLabel")
+            : null}
           {renderEventInput("teamLabel")}
         </div>
 
@@ -1447,13 +1474,13 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
                           ))}
                         </div>
 
-                        {labelSuggestions.teams.length > 0 ? (
+                        {savedTeamLabels.length > 0 ? (
                           <div>
                             <div className="mb-2 font-mono text-[10px] uppercase tracking-widest text-white/40">
                               Team filter
                             </div>
                             <div className="flex flex-wrap gap-2">
-                              {labelSuggestions.teams.map(team => (
+                              {savedTeamLabels.map(team => (
                                 <button
                                   key={team}
                                   type="button"
@@ -1587,7 +1614,7 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
                 <LabelQualityPanel
                   totalEvents={events.length}
                   teamLabeledEventCount={teamLabeledEventCount}
-                  uniqueTeamLabelCount={labelSuggestions.teams.length}
+                  uniqueTeamLabelCount={savedTeamLabels.length}
                   warnings={teamLabelWarnings}
                 />
                 <TeamSummarySection

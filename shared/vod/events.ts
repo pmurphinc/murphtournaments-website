@@ -5,6 +5,7 @@ export const VOD_ANALYSIS_EVENT_TYPES = [
   "cashout",
   "team_wipe",
   "team_spawn",
+  "steal_flip",
   "revive",
   "defib",
 ] as const;
@@ -18,6 +19,7 @@ export const VOD_ANALYSIS_EVENT_LABELS: Record<VodAnalysisEventType, string> = {
   cashout: "Cashout",
   team_wipe: "Team Wipe",
   team_spawn: "Team Spawn",
+  steal_flip: "Steal / Flip",
   revive: "Revive",
   defib: "Defib",
 };
@@ -32,6 +34,7 @@ export const VOD_ANALYSIS_EVENT_REQUIRED_FIELDS: Record<
   cashout: ["teamLabel"],
   team_wipe: ["actorLabel", "teamLabel"],
   team_spawn: ["teamLabel"],
+  steal_flip: ["teamLabel"],
   revive: ["actorLabel", "targetLabel", "teamLabel"],
   defib: ["actorLabel", "targetLabel", "teamLabel"],
 };

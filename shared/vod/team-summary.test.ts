@@ -54,10 +54,33 @@ describe("buildVodTeamSummaries", () => {
         teamWipes: 0,
         teamSpawns: 1,
         cashouts: 1,
+        stealFlips: 0,
         revives: 1,
         defibs: 2,
         firstDeathToWipeAvgSeconds: null,
       },
+    ]);
+  });
+
+
+  it("counts steal flips for the stealing team without incrementing cashouts", () => {
+    expect(
+      buildVodTeamSummaries([
+        event("steal_flip", 10, "The Live Wires"),
+        event("cashout", 20, "The Live Wires"),
+        event("steal_flip", 30, "The High Notes"),
+      ])
+    ).toEqual([
+      expect.objectContaining({
+        teamName: "The High Notes",
+        stealFlips: 1,
+        cashouts: 0,
+      }),
+      expect.objectContaining({
+        teamName: "The Live Wires",
+        stealFlips: 1,
+        cashouts: 1,
+      }),
     ]);
   });
 
@@ -148,6 +171,12 @@ describe("getVodTeamAttributedEvents", () => {
         timestampSeconds: 30,
         teamLabel: "Orange",
       },
+      {
+        id: 6,
+        eventType: "steal_flip",
+        timestampSeconds: 35,
+        teamLabel: "Orange",
+      },
       { id: 4, eventType: "tap", timestampSeconds: 40, teamLabel: "Orange" },
       {
         id: 5,
@@ -159,7 +188,7 @@ describe("getVodTeamAttributedEvents", () => {
 
     expect(
       getVodTeamAttributedEvents("Orange", [...events]).map(event => event.id)
-    ).toEqual([1, 3, 5]);
+    ).toEqual([1, 3, 6, 5]);
   });
 
   it("sorts selected-team timeline events by timestamp and then id", async () => {
@@ -189,6 +218,7 @@ describe("getVodTeamInsightCallouts", () => {
     teamWipes: 0,
     teamSpawns: 0,
     cashouts: 0,
+    stealFlips: 0,
     revives: 0,
     defibs: 0,
     firstDeathToWipeAvgSeconds: null,
