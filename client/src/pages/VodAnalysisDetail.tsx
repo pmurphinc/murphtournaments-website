@@ -14,30 +14,32 @@ import {
   type VodAnalysisEventType,
 } from "@shared/vod/events";
 import {
-  formatCaptureReadinessLabel,
-  formatVodCaptureJobStatus,
-  getVodCaptureJobProgress,
-  getVodCaptureJobStatusTone,
-  getVodCaptureReadiness,
-} from "@shared/vod/frame-sampling";
-import {
   buildVodTeamLabelOptions,
   getVodEventLabelSuggestions,
   getVodTeamLabelWarnings,
   normalizeVodLabelKey,
-  type VodTeamLabelWarning,
 } from "@shared/vod/labels";
 import {
   buildVodEmbedConfig,
   buildVodTimestampUrl,
-  formatVodSourceType,
   getVodSourceLabel,
-  type VodEmbedConfig,
 } from "@shared/vod/source";
+import { buildVodTeamSummaries } from "@shared/vod/team-summary";
+import { VodAutomationStatusPanel } from "@/components/vod/VodAutomationStatusPanel";
+import { VodDetailPill } from "@/components/vod/VodDetailPill";
+import { VodLabelQualityPanel } from "@/components/vod/VodLabelQualityPanel";
+import { VodReviewPlayer } from "@/components/vod/VodReviewPlayer";
+import { VodTeamSummaryPanel } from "@/components/vod/VodTeamSummaryPanel";
+import { VodThumbnail } from "@/components/vod/VodThumbnail";
 import {
-  buildVodTeamSummaries,
-  type VodTeamSummary,
-} from "@shared/vod/team-summary";
+  formatDateTime,
+  formatDuration,
+  formatSuggestedEventMetadataPreview,
+  formatVodTargetDisplayLabel,
+  getSuggestedEventDisplayFields,
+  suggestedEventFieldLabels,
+  povLabel,
+} from "@/components/vod/vod-detail-helpers";
 import { Link } from "wouter";
 
 type RouteParams = {
@@ -80,160 +82,6 @@ const suggestedEventFilterLabels: Record<SuggestedEventFilter, string> = {
   approved: "Approved",
   rejected: "Rejected",
 };
-
-const suggestedEventFieldLabels: Record<
-  VodAnalysisEventType,
-  Partial<Record<"actorLabel" | "targetLabel" | "teamLabel", string>>
-> = {
-  death: {
-    actorLabel: "Eliminating Player",
-    targetLabel: "Eliminated Player",
-    teamLabel: "Victim Team",
-  },
-  tap: {
-    actorLabel: "Tapping Player",
-    targetLabel: "Vault",
-    teamLabel: "Tapping Team",
-  },
-  plug: {
-    actorLabel: "Plugging Player",
-    targetLabel: "Cashout",
-    teamLabel: "Plugging Team",
-  },
-  cashout: {
-    targetLabel: "Cashout",
-    teamLabel: "Cashing Team",
-  },
-  steal_flip: {
-    targetLabel: "Cashout",
-    teamLabel: "Stealing Team / New Owner",
-  },
-  team_wipe: {
-    actorLabel: "Attacking Team",
-    teamLabel: "Wiped Team",
-  },
-  team_spawn: {
-    teamLabel: "Spawning Team",
-  },
-  revive: {
-    actorLabel: "Reviving Player",
-    targetLabel: "Revived Player",
-    teamLabel: "Team",
-  },
-  defib: {
-    actorLabel: "Defib Player",
-    targetLabel: "Revived Player",
-    teamLabel: "Team",
-  },
-};
-
-const metadataPreviewLimit = 120;
-
-function truncateMetadataPreview(value: string) {
-  return value.length > metadataPreviewLimit
-    ? `${value.slice(0, metadataPreviewLimit - 1)}…`
-    : value;
-}
-
-function formatUnknownMetadataValue(value: unknown): string {
-  if (value === null) return "null";
-  if (["string", "number", "boolean"].includes(typeof value)) {
-    return String(value);
-  }
-  if (Array.isArray(value)) {
-    return `[${value.length} items]`;
-  }
-  if (typeof value === "object") {
-    return "{…}";
-  }
-
-  return String(value);
-}
-
-function formatSuggestedEventMetadataPreview(metadata: string | null) {
-  if (!metadata) return null;
-
-  try {
-    const parsed: unknown = JSON.parse(metadata);
-
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      const entries = Object.entries(parsed as Record<string, unknown>);
-      if (entries.length === 0) return "{}";
-
-      const preview = entries
-        .slice(0, 3)
-        .map(([key, value]) => `${key}: ${formatUnknownMetadataValue(value)}`)
-        .join(" • ");
-      const suffix = entries.length > 3 ? " • …" : "";
-
-      return truncateMetadataPreview(`${preview}${suffix}`);
-    }
-
-    return truncateMetadataPreview(formatUnknownMetadataValue(parsed));
-  } catch {
-    return truncateMetadataPreview(metadata);
-  }
-}
-
-type SuggestedEventDisplayField = {
-  key: "actorLabel" | "targetLabel" | "teamLabel";
-  label: string;
-  value: string;
-};
-
-function getSuggestedEventDisplayFields(suggestion: {
-  eventType: VodAnalysisEventType;
-  actorLabel: string | null;
-  targetLabel: string | null;
-  teamLabel: string | null;
-}): SuggestedEventDisplayField[] {
-  const labels = suggestedEventFieldLabels[suggestion.eventType];
-  const fields: SuggestedEventDisplayField[] = [];
-
-  if (labels.actorLabel && suggestion.actorLabel) {
-    fields.push({
-      key: "actorLabel",
-      label: labels.actorLabel,
-      value: suggestion.actorLabel,
-    });
-  }
-
-  if (labels.teamLabel && suggestion.teamLabel) {
-    fields.push({
-      key: "teamLabel",
-      label: labels.teamLabel,
-      value: suggestion.teamLabel,
-    });
-  }
-
-  if (labels.targetLabel && suggestion.targetLabel) {
-    fields.push({
-      key: "targetLabel",
-      label: labels.targetLabel,
-      value: formatVodTargetDisplayLabel(
-        suggestion.eventType,
-        suggestion.targetLabel
-      ),
-    });
-  }
-
-  return fields;
-}
-
-function formatVodTargetDisplayLabel(
-  eventType: VodAnalysisEventType,
-  targetLabel: string
-) {
-  const targetKind = getVodEventTargetKind(eventType);
-
-  if (targetKind === "cashout") return `Cashout ${targetLabel}`;
-  if (targetKind === "vault") return `Vault ${targetLabel}`;
-
-  return targetLabel;
-}
-
-const povLabel = (value: "player" | "spectator") =>
-  value === "player" ? "Player POV" : "Spectator POV";
 
 const eventFieldLabels = {
   actorLabel: "Actor",
@@ -286,658 +134,6 @@ const eventFieldHelp: Record<
     teamLabel: "Team",
   },
 };
-
-const formatDateTime = (value: Date | string) => {
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return "Unknown date";
-
-  return date.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-};
-
-const formatDuration = (durationSeconds: number | null) => {
-  if (!durationSeconds || durationSeconds <= 0) return null;
-
-  const hours = Math.floor(durationSeconds / 3600);
-  const minutes = Math.floor((durationSeconds % 3600) / 60);
-  const seconds = durationSeconds % 60;
-
-  if (hours > 0) {
-    return `${hours}h ${minutes}m ${seconds}s`;
-  }
-
-  if (minutes > 0) {
-    return `${minutes}m ${seconds}s`;
-  }
-
-  return `${seconds}s`;
-};
-
-function DetailPill({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded border border-white/10 bg-black/30 px-3 py-2">
-      <div className="font-mono text-[10px] uppercase tracking-widest text-white/45">
-        {label}
-      </div>
-      <div className="mt-1 font-mono text-sm text-white/85">{value}</div>
-    </div>
-  );
-}
-
-function ReviewPlayerSection({
-  embedConfig,
-  sourceHref,
-  durationLabel,
-}: {
-  embedConfig: VodEmbedConfig;
-  sourceHref: string | null | undefined;
-  durationLabel: string | null;
-}) {
-  const providerLabel = embedConfig.embeddable
-    ? embedConfig.label
-    : embedConfig.provider === "generic"
-      ? "VIDEO LINK"
-      : "UNKNOWN SOURCE";
-
-  return (
-    <NeonCard variant="cyan" className="h-full">
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="font-mono text-xl font-bold uppercase text-neon-cyan">
-            Review Player
-          </h2>
-          <p className="mt-1 font-mono text-xs uppercase tracking-widest text-white/45">
-            {providerLabel}
-          </p>
-        </div>
-        {durationLabel ? (
-          <span className="rounded border border-neon-gold/50 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-neon-gold">
-            Duration {durationLabel}
-          </span>
-        ) : null}
-      </div>
-
-      {embedConfig.embeddable ? (
-        <div className="overflow-hidden rounded-lg border border-neon-cyan/30 bg-black shadow-[0_0_24px_rgba(0,243,255,0.12)]">
-          <iframe
-            src={embedConfig.embedUrl}
-            title="Review Player"
-            className="aspect-video w-full"
-            allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-            sandbox="allow-same-origin allow-scripts allow-presentation allow-popups"
-            allowFullScreen
-          />
-        </div>
-      ) : (
-        <div className="flex aspect-video w-full items-center justify-center rounded-lg border border-white/10 bg-black/50 p-6 text-center">
-          <div>
-            <div className="font-mono text-sm font-bold uppercase tracking-widest text-white/70">
-              Embed unavailable
-            </div>
-            <p className="mt-3 max-w-xl font-mono text-sm text-white/50">
-              {embedConfig.reason}
-            </p>
-          </div>
-        </div>
-      )}
-
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <p className="font-mono text-xs uppercase tracking-widest text-white/40">
-          Log manual events beside the playback station. Playback time is not
-          auto-synced yet.
-        </p>
-        {sourceHref ? (
-          <a
-            href={sourceHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-block rounded-sm border border-neon-cyan/70 px-3 py-2 font-mono text-xs font-bold uppercase tracking-widest text-neon-cyan transition-all hover:bg-neon-cyan/10"
-          >
-            Open source
-          </a>
-        ) : null}
-      </div>
-    </NeonCard>
-  );
-}
-
-const formatAverageSeconds = (value: number | null) => {
-  if (value === null) return null;
-  return `${Math.round(value)}s`;
-};
-
-function LabelQualityPanel({
-  totalEvents,
-  teamLabeledEventCount,
-  uniqueTeamLabelCount,
-  warnings,
-}: {
-  totalEvents: number;
-  teamLabeledEventCount: number;
-  uniqueTeamLabelCount: number;
-  warnings: VodTeamLabelWarning[];
-}) {
-  return (
-    <div className="rounded-lg border border-neon-gold/20 bg-black/30 p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="font-mono text-lg font-bold uppercase tracking-widest text-neon-gold">
-            Label Quality
-          </h3>
-          <p className="mt-1 font-mono text-xs uppercase tracking-widest text-white/45">
-            Manual label consistency checks.
-          </p>
-        </div>
-        <span className="rounded border border-white/10 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-white/40">
-          No auto-merge
-        </span>
-      </div>
-
-      <div className="mt-4 grid grid-cols-3 gap-2">
-        <DetailPill label="Manual" value={String(totalEvents)} />
-        <DetailPill label="Team tagged" value={String(teamLabeledEventCount)} />
-        <DetailPill label="Teams" value={String(uniqueTeamLabelCount)} />
-      </div>
-
-      {warnings.length === 0 ? (
-        <p className="mt-4 rounded border border-emerald-400/20 bg-emerald-950/20 p-3 font-mono text-xs text-emerald-100/80">
-          Team labels look consistent. Keep reusing the same casing and spacing
-          so Team Summary and Team Insights stay grouped correctly.
-        </p>
-      ) : (
-        <div className="mt-4 space-y-3">
-          <p className="rounded border border-neon-gold/30 bg-neon-gold/10 p-3 font-mono text-xs text-neon-gold">
-            Suspicious team label variants can split Team Summary and Team
-            Insights. Review these manually; this panel does not merge or mutate
-            existing events.
-          </p>
-          {warnings.map(warning => (
-            <div
-              key={warning.normalizedKey}
-              className="rounded border border-white/10 bg-black/30 p-3"
-            >
-              <div className="font-mono text-[10px] uppercase tracking-widest text-white/40">
-                Normalized as “{warning.normalizedKey}” • {warning.totalCount}
-                events
-              </div>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {warning.variants.map(variant => (
-                  <span
-                    key={variant.label}
-                    className="rounded-full border border-neon-gold/40 px-2 py-1 font-mono text-[10px] text-neon-gold"
-                  >
-                    “{variant.label}” × {variant.count}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function TeamSummarySection({
-  summaries,
-  vodAnalysisId,
-}: {
-  summaries: VodTeamSummary[];
-  vodAnalysisId: number;
-}) {
-  return (
-    <div className="rounded-lg border border-white/10 bg-black/30 p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="font-mono text-lg font-bold uppercase tracking-widest text-neon-cyan">
-            Team Summary
-          </h3>
-          <p className="mt-1 font-mono text-xs uppercase tracking-widest text-white/45">
-            Manual-event breakdown by team.
-          </p>
-        </div>
-        <span className="rounded border border-white/10 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-white/40">
-          Derived
-        </span>
-      </div>
-
-      {summaries.length === 0 ? (
-        <p className="mt-4 rounded border border-white/10 bg-black/30 p-3 font-mono text-sm text-white/50">
-          Add team-labeled events to unlock Team Summary.
-        </p>
-      ) : (
-        <div className="mt-4 space-y-3">
-          {summaries.map(summary => (
-            <div
-              key={summary.teamName}
-              className="rounded border border-white/10 bg-black/30 p-3"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h4 className="font-mono text-sm font-bold uppercase tracking-widest text-white">
-                  {summary.teamName}
-                </h4>
-                <Link
-                  href={`/vod/${vodAnalysisId}/team-summary/${encodeURIComponent(
-                    summary.teamName
-                  )}`}
-                  className="rounded border border-neon-cyan/50 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-neon-cyan transition-all hover:bg-neon-cyan/10"
-                >
-                  View insights
-                </Link>
-                {summary.firstDeathToWipeAvgSeconds !== null ? (
-                  <span className="rounded border border-neon-gold/40 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-neon-gold">
-                    FD→Wipe avg{" "}
-                    {formatAverageSeconds(summary.firstDeathToWipeAvgSeconds)}
-                  </span>
-                ) : null}
-              </div>
-              <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-6 lg:grid-cols-3 xl:grid-cols-6">
-                <DetailPill label="Deaths" value={String(summary.deaths)} />
-                <DetailPill label="Wipes" value={String(summary.teamWipes)} />
-                <DetailPill label="Spawns" value={String(summary.teamSpawns)} />
-                <DetailPill label="Cashouts" value={String(summary.cashouts)} />
-                <DetailPill
-                  label="Steal / Flip"
-                  value={String(summary.stealFlips)}
-                />
-                <DetailPill label="Revives" value={String(summary.revives)} />
-                <DetailPill label="Defibs" value={String(summary.defibs)} />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function CaptureReadinessPanel({
-  vodAnalysisId,
-  vod,
-}: {
-  vodAnalysisId: number;
-  vod: {
-    sourceType: string;
-    sourceUrl: string | null;
-    normalizedSourceUrl: string | null;
-    durationSeconds: number | null;
-  };
-}) {
-  const utils = trpc.useUtils();
-  const [mockAutomationMessage, setMockAutomationMessage] = useState<{
-    type: "success" | "error";
-    text: string;
-  } | null>(null);
-  const [captureJobStatusMessage, setCaptureJobStatusMessage] = useState<{
-    type: "success" | "error";
-    text: string;
-  } | null>(null);
-  const readiness = getVodCaptureReadiness(vod);
-  const samplePlan = readiness.samplePlan;
-  const firstTimestamps = samplePlan.timestamps.slice(0, 5);
-  const durationLabel = formatDuration(vod.durationSeconds) ?? "Unavailable";
-  const automationStatusQuery = trpc.vodAnalysis.getAutomationStatus.useQuery(
-    vodAnalysisId,
-    {
-      staleTime: 1000 * 10,
-    }
-  );
-  const createCaptureJobMutation =
-    trpc.vodAnalysis.createCaptureJob.useMutation({
-      onSuccess: async () => {
-        await utils.vodAnalysis.getAutomationStatus.invalidate(vodAnalysisId);
-      },
-    });
-  const updateCaptureJobStatusMutation =
-    trpc.vodAnalysis.updateCaptureJobStatus.useMutation({
-      onMutate: () => {
-        setCaptureJobStatusMessage(null);
-      },
-      onSuccess: async result => {
-        await Promise.all([
-          utils.vodAnalysis.getAutomationStatus.invalidate(vodAnalysisId),
-          utils.vodAnalysis.getLatestCaptureJob.invalidate(vodAnalysisId),
-          utils.vodAnalysis.listCaptureJobs.invalidate(vodAnalysisId),
-        ]);
-        setCaptureJobStatusMessage({
-          type: "success",
-          text: `Marked capture job ${result.id} ${result.update.status}.`,
-        });
-      },
-      onError: error => {
-        setCaptureJobStatusMessage({ type: "error", text: error.message });
-      },
-    });
-  const mockAutomationMutation =
-    trpc.vodAnalysis.runMockAutomationDetections.useMutation({
-      onMutate: () => {
-        setMockAutomationMessage(null);
-      },
-      onSuccess: async result => {
-        await Promise.all([
-          utils.vodAnalysis.listSuggestedEvents.invalidate(vodAnalysisId),
-          utils.vodAnalysis.getAutomationStatus.invalidate(vodAnalysisId),
-          utils.vodAnalysis.list.invalidate(),
-        ]);
-        setMockAutomationMessage({
-          type: "success",
-          text: `Created ${result.createdCount} pending mock suggestions.`,
-        });
-      },
-      onError: error => {
-        setMockAutomationMessage({ type: "error", text: error.message });
-      },
-    });
-  const automationStatus = automationStatusQuery.data;
-  const latestCaptureJob = automationStatus?.latestCaptureJob ?? null;
-  const captureJobProgress = latestCaptureJob
-    ? getVodCaptureJobProgress(latestCaptureJob)
-    : null;
-  const latestCaptureJobTone = latestCaptureJob
-    ? getVodCaptureJobStatusTone(latestCaptureJob.status)
-    : null;
-  const captureJobDisabledReason = readiness.isReady ? null : readiness.reason;
-  const sourceTypeLabel =
-    vod.sourceType === "twitch" ||
-    vod.sourceType === "youtube" ||
-    vod.sourceType === "google_drive" ||
-    vod.sourceType === "generic"
-      ? formatVodSourceType(vod.sourceType)
-      : "Unknown";
-
-  return (
-    <details className="group rounded-lg border border-neon-cyan/20 bg-black/30 p-5">
-      <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
-        <div>
-          <h3 className="font-mono text-lg font-bold uppercase tracking-widest text-neon-cyan">
-            Automation Status
-          </h3>
-          <p className="mt-2 font-mono text-sm text-white/50">
-            Frame scanning is not active yet. Future scanner output will enter
-            this review queue as pending suggestions.
-          </p>
-        </div>
-        <span className="rounded border border-white/10 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-white/50">
-          {formatCaptureReadinessLabel(readiness.status)}
-        </span>
-      </summary>
-
-      <div className="mt-4 space-y-4 border-t border-white/10 pt-4">
-        <div className="grid gap-2 sm:grid-cols-2">
-          <DetailPill
-            label="Status"
-            value={formatCaptureReadinessLabel(readiness.status)}
-          />
-          <DetailPill label="Source type" value={sourceTypeLabel} />
-          <DetailPill label="Duration" value={durationLabel} />
-          <DetailPill
-            label="Sample interval"
-            value={`${samplePlan.intervalSeconds}s`}
-          />
-          <DetailPill
-            label="Planned samples"
-            value={String(samplePlan.timestamps.length)}
-          />
-        </div>
-
-        <div className="rounded border border-white/10 bg-black/30 p-3">
-          <div className="font-mono text-[10px] uppercase tracking-widest text-white/45">
-            First 5 timestamps
-          </div>
-          {firstTimestamps.length > 0 ? (
-            <div className="mt-2 flex flex-wrap gap-2">
-              {firstTimestamps.map(timestamp => (
-                <span
-                  key={timestamp}
-                  className="rounded border border-neon-cyan/30 px-2 py-1 font-mono text-xs text-neon-cyan"
-                >
-                  {formatVodEventTimestamp(timestamp)}
-                </span>
-              ))}
-            </div>
-          ) : (
-            <p className="mt-2 font-mono text-sm text-white/50">
-              No timestamps planned until duration metadata is available.
-            </p>
-          )}
-        </div>
-
-        <div className="rounded border border-neon-magenta/30 bg-neon-magenta/10 p-3 font-mono text-sm text-white/70">
-          Capture jobs plan frame-sampling work. Suggested events are the review
-          queue output. Confirmed manual events are the approved output used by
-          Team Summary and Team Insights.
-        </div>
-
-        {automationStatus ? (
-          <div className="grid gap-2 sm:grid-cols-4">
-            <DetailPill
-              label="Pending suggestions"
-              value={String(automationStatus.pendingSuggestedCount)}
-            />
-            <DetailPill
-              label="Approved suggestions"
-              value={String(automationStatus.approvedSuggestedCount)}
-            />
-            <DetailPill
-              label="Rejected suggestions"
-              value={String(automationStatus.rejectedSuggestedCount)}
-            />
-            <DetailPill
-              label="Confirmed events"
-              value={String(automationStatus.confirmedManualEventCount)}
-            />
-          </div>
-        ) : null}
-
-        {automationStatusQuery.isLoading ? (
-          <div className="rounded border border-white/10 bg-black/30 p-3 font-mono text-sm text-white/50">
-            Loading automation status…
-          </div>
-        ) : latestCaptureJob && captureJobProgress ? (
-          <div className="rounded border border-white/10 bg-black/30 p-3">
-            <div className="font-mono text-[10px] uppercase tracking-widest text-white/45">
-              Latest capture job
-            </div>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              <DetailPill
-                label="Status"
-                value={formatVodCaptureJobStatus(latestCaptureJob.status)}
-              />
-              <DetailPill
-                label="Status tone"
-                value={latestCaptureJobTone ?? "neutral"}
-              />
-              <DetailPill label="Source" value={latestCaptureJob.source} />
-              <DetailPill
-                label="Planned samples"
-                value={String(captureJobProgress.plannedSamples)}
-              />
-              <DetailPill
-                label="Processed samples"
-                value={String(captureJobProgress.processedSamples)}
-              />
-              <DetailPill
-                label="Failed samples"
-                value={String(captureJobProgress.failedSamples)}
-              />
-              <DetailPill
-                label="Percent complete"
-                value={`${captureJobProgress.percentComplete}%`}
-              />
-              <DetailPill
-                label="Remaining samples"
-                value={String(captureJobProgress.remainingSamples)}
-              />
-              <DetailPill
-                label="Created"
-                value={formatDateTime(latestCaptureJob.createdAt)}
-              />
-            </div>
-            {latestCaptureJob.errorMessage ? (
-              <p className="mt-3 rounded border border-red-500/40 bg-red-950/30 p-3 font-mono text-sm text-red-100">
-                {latestCaptureJob.errorMessage}
-              </p>
-            ) : null}
-            {import.meta.env.DEV ? (
-              <div className="mt-3 rounded border border-neon-cyan/25 bg-neon-cyan/10 p-3">
-                <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-neon-cyan">
-                  Dev capture lifecycle
-                </div>
-                <p className="mt-1 font-mono text-xs text-white/60">
-                  Dev only. Simulates capture job lifecycle. No frames are
-                  processed.
-                </p>
-                {captureJobStatusMessage ? (
-                  <p
-                    className={`mt-2 rounded border p-2 font-mono text-xs ${
-                      captureJobStatusMessage.type === "success"
-                        ? "border-neon-cyan/30 bg-neon-cyan/10 text-neon-cyan"
-                        : "border-red-500/40 bg-red-950/30 text-red-100"
-                    }`}
-                  >
-                    {captureJobStatusMessage.text}
-                  </p>
-                ) : null}
-                <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                  {[
-                    {
-                      label: "Mark processing",
-                      status: "processing" as const,
-                      errorMessage: undefined,
-                    },
-                    {
-                      label: "Mark complete",
-                      status: "complete" as const,
-                      errorMessage: undefined,
-                    },
-                    {
-                      label: "Mark failed",
-                      status: "failed" as const,
-                      errorMessage: "Mock capture failure.",
-                    },
-                    {
-                      label: "Cancel job",
-                      status: "cancelled" as const,
-                      errorMessage: undefined,
-                    },
-                  ].map(action => (
-                    <button
-                      key={action.status}
-                      type="button"
-                      onClick={() =>
-                        updateCaptureJobStatusMutation.mutate({
-                          id: latestCaptureJob.id,
-                          vodAnalysisId,
-                          status: action.status,
-                          errorMessage: action.errorMessage,
-                        })
-                      }
-                      disabled={updateCaptureJobStatusMutation.isPending}
-                      className="rounded-sm border border-neon-cyan/60 px-3 py-2 font-mono text-xs font-bold uppercase tracking-widest text-neon-cyan transition hover:bg-neon-cyan/10 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      {action.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-          </div>
-        ) : (
-          <div className="rounded border border-white/10 bg-black/30 p-3 font-mono text-sm text-white/50">
-            No capture jobs have been recorded for this VOD yet.
-          </div>
-        )}
-
-        {!readiness.isReady ? (
-          <p className="rounded border border-neon-gold/30 bg-neon-gold/10 p-3 font-mono text-sm text-neon-gold">
-            {readiness.reason}
-          </p>
-        ) : null}
-
-        {createCaptureJobMutation.isError ? (
-          <p className="rounded border border-red-500/40 bg-red-950/30 p-3 font-mono text-sm text-red-100">
-            {createCaptureJobMutation.error.message}
-          </p>
-        ) : null}
-
-        <button
-          type="button"
-          onClick={() =>
-            createCaptureJobMutation.mutate({
-              vodAnalysisId,
-              source: "manual_debug",
-            })
-          }
-          disabled={!readiness.isReady || createCaptureJobMutation.isPending}
-          title={captureJobDisabledReason ?? undefined}
-          className="w-full rounded-sm border-2 border-neon-cyan px-4 py-2 font-mono text-xs font-bold uppercase tracking-widest text-neon-cyan transition hover:bg-neon-cyan/10 hover-glow-cyan disabled:cursor-not-allowed disabled:border-white/15 disabled:text-white/35 disabled:hover:bg-transparent"
-        >
-          {createCaptureJobMutation.isPending
-            ? "Queueing capture job…"
-            : "Queue capture job"}
-        </button>
-        <p className="font-mono text-xs text-white/45">
-          This records planned sampling work. Actual frame processing will be
-          added later.
-        </p>
-        {captureJobDisabledReason ? (
-          <p className="font-mono text-xs text-white/45">
-            Capture job creation is disabled: {captureJobDisabledReason}
-          </p>
-        ) : null}
-
-        {import.meta.env.DEV ? (
-          <div className="rounded border border-neon-gold/30 bg-neon-gold/10 p-3">
-            <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-neon-gold">
-              Dev mock automation
-            </div>
-            <p className="mt-1 font-mono text-xs text-white/60">
-              Dev only. Creates deterministic pending suggestions. No video
-              frames are scanned.
-            </p>
-            {!latestCaptureJob ? (
-              <p className="mt-2 font-mono text-xs text-white/45">
-                Queue a capture job first.
-              </p>
-            ) : null}
-            {mockAutomationMessage ? (
-              <p
-                className={`mt-2 rounded border p-2 font-mono text-xs ${
-                  mockAutomationMessage.type === "success"
-                    ? "border-neon-cyan/30 bg-neon-cyan/10 text-neon-cyan"
-                    : "border-red-500/40 bg-red-950/30 text-red-100"
-                }`}
-              >
-                {mockAutomationMessage.text}
-              </p>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => {
-                if (!latestCaptureJob) return;
-                mockAutomationMutation.mutate({
-                  vodAnalysisId,
-                  captureJobId: latestCaptureJob.id,
-                });
-              }}
-              disabled={!latestCaptureJob || mockAutomationMutation.isPending}
-              className="mt-3 rounded-sm border border-neon-gold/70 px-3 py-2 font-mono text-xs font-bold uppercase tracking-widest text-neon-gold transition hover:bg-neon-gold/10 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {mockAutomationMutation.isPending
-                ? "Running mock automation…"
-                : "Run mock automation detections"}
-            </button>
-          </div>
-        ) : null}
-      </div>
-    </details>
-  );
-}
 
 function WorkflowPlaceholder({ title }: { title: string }) {
   return (
@@ -2043,20 +1239,20 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
                   </GlitchText>
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                    <DetailPill
+                    <VodDetailPill
                       label="Video POV"
                       value={povLabel(vod.videoPov)}
                     />
-                    <DetailPill
+                    <VodDetailPill
                       label="Created"
                       value={formatDateTime(vod.createdAt)}
                     />
-                    <DetailPill
+                    <VodDetailPill
                       label="Updated"
                       value={formatDateTime(vod.updatedAt)}
                     />
                     {durationLabel ? (
-                      <DetailPill label="Duration" value={durationLabel} />
+                      <VodDetailPill label="Duration" value={durationLabel} />
                     ) : null}
                   </div>
 
@@ -2100,18 +1296,14 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
                   ) : null}
                 </div>
 
-                {vod.thumbnailUrl ? (
-                  <img
-                    src={vod.thumbnailUrl}
-                    alt={`${vod.title} thumbnail`}
-                    className="aspect-video w-full rounded-lg border border-white/10 bg-black/40 object-cover"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="flex aspect-video w-full items-center justify-center rounded-lg border border-white/10 bg-black/40 font-mono text-sm uppercase tracking-widest text-white/35">
-                    No thumbnail
-                  </div>
-                )}
+                <VodThumbnail
+                  vodId={vod.id}
+                  title={vod.title}
+                  thumbnailUrl={vod.thumbnailUrl}
+                  className="aspect-video w-full rounded-lg border border-white/10 bg-black/40 object-cover"
+                  fallbackClassName="flex aspect-video w-full items-center justify-center rounded-lg border border-white/10 bg-black/40 text-center font-mono text-sm uppercase tracking-widest text-white/35"
+                  showUnavailableText
+                />
               </div>
             </NeonCard>
 
@@ -2127,7 +1319,7 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
 
             {embedConfig ? (
               <section className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)] lg:items-stretch">
-                <ReviewPlayerSection
+                <VodReviewPlayer
                   embedConfig={embedConfig}
                   sourceHref={sourceHref}
                   durationLabel={durationLabel}
@@ -2591,18 +1783,18 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
               </div>
 
               <div className="space-y-4">
-                <LabelQualityPanel
+                <VodLabelQualityPanel
                   totalEvents={events.length}
                   teamLabeledEventCount={teamLabeledEventCount}
                   uniqueTeamLabelCount={savedTeamLabels.length}
                   warnings={teamLabelWarnings}
                 />
-                <TeamSummarySection
+                <VodTeamSummaryPanel
                   summaries={teamSummaries}
                   vodAnalysisId={vodAnalysisId}
                 />
                 {vod ? (
-                  <CaptureReadinessPanel
+                  <VodAutomationStatusPanel
                     vodAnalysisId={vodAnalysisId}
                     vod={vod}
                   />

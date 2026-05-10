@@ -43,6 +43,30 @@ describe("normalizeTwitchThumbnailUrl", () => {
     ).toBe("https://static-cdn.jtvnw.net/cf_vods/640x360/thumb.jpg");
   });
 
+  it("replaces unescaped Twitch thumbnail dimension placeholders", () => {
+    expect(
+      normalizeTwitchThumbnailUrl(
+        "https://static-cdn.jtvnw.net/cf_vods/{width}x{height}/thumb.jpg"
+      )
+    ).toBe("https://static-cdn.jtvnw.net/cf_vods/640x360/thumb.jpg");
+  });
+
+  it("replaces encoded Twitch thumbnail dimension placeholders", () => {
+    expect(
+      normalizeTwitchThumbnailUrl(
+        "https://static-cdn.jtvnw.net/cf_vods/%7Bwidth%7Dx%7Bheight%7D/thumb.jpg"
+      )
+    ).toBe("https://static-cdn.jtvnw.net/cf_vods/640x360/thumb.jpg");
+  });
+
+  it("replaces doubly encoded Twitch thumbnail dimension placeholders", () => {
+    expect(
+      normalizeTwitchThumbnailUrl(
+        "https://static-cdn.jtvnw.net/cf_vods/%25%7Bwidth%7Dx%25%7Bheight%7D/thumb.jpg"
+      )
+    ).toBe("https://static-cdn.jtvnw.net/cf_vods/640x360/thumb.jpg");
+  });
+
   it("returns undefined for blank thumbnails", () => {
     expect(normalizeTwitchThumbnailUrl("   ")).toBeUndefined();
   });

@@ -47,7 +47,13 @@ export function normalizeTwitchThumbnailUrl(
   const trimmed = thumbnailUrl?.trim();
   if (!trimmed) return undefined;
 
-  return trimmed.replace(/%\{width\}/g, "640").replace(/%\{height\}/g, "360");
+  return trimmed
+    .replace(/(?:%25)?%7Bwidth%7D/gi, "640")
+    .replace(/(?:%25)?%7Bheight%7D/gi, "360")
+    .replace(/%\{width\}/g, "640")
+    .replace(/%\{height\}/g, "360")
+    .replace(/\{width\}/g, "640")
+    .replace(/\{height\}/g, "360");
 }
 
 function hasTwitchCredentials() {

@@ -174,7 +174,6 @@ function createCaptureJobDb(vodRows: VodAnalysisRecord[]) {
   };
 }
 
-
 function createCaptureJobUpdateDb() {
   const where = vi.fn().mockResolvedValue(undefined);
   const set = vi.fn(() => ({ where }));
@@ -1642,6 +1641,24 @@ describe("buildVodAnalysisMetadataUpdate", () => {
     ).toEqual({});
   });
 
+  it("includes thumbnailUrl when Twitch provides a usable thumbnail", () => {
+    expect(
+      buildVodAnalysisMetadataUpdate({
+        thumbnailUrl: "https://example.com/thumb.jpg",
+      })
+    ).toEqual({
+      thumbnailUrl: "https://example.com/thumb.jpg",
+    });
+  });
+
+  it("does not set thumbnailUrl when Twitch omits a usable thumbnail", () => {
+    expect(
+      buildVodAnalysisMetadataUpdate({
+        thumbnailUrl: "   ",
+      })
+    ).not.toHaveProperty("thumbnailUrl");
+  });
+
   it("maps successful Twitch metadata to VOD update fields", () => {
     expect(
       buildVodAnalysisMetadataUpdate({
@@ -1867,7 +1884,6 @@ describe("createVodCaptureJob", () => {
   });
 });
 
-
 describe("updateVodCaptureJobStatus", () => {
   it("scopes updates by id and vodAnalysisId", async () => {
     const { db, update, set, where } = createCaptureJobUpdateDb();
@@ -1971,7 +1987,12 @@ describe("updateVodCaptureJobStatus", () => {
 
     await expect(
       updateVodCaptureJobStatus(
-        { id: 99, vodAnalysisId: 44, status: "processing", processedSamples: -1 },
+        {
+          id: 99,
+          vodAnalysisId: 44,
+          status: "processing",
+          processedSamples: -1,
+        },
         db
       )
     ).rejects.toThrow();
@@ -1993,9 +2014,9 @@ describe("updateVodCaptureJobStatus", () => {
     };
 
     expect(() => buildVodCaptureJobStatusUpdate(input)).toThrow();
-    expect(
-      updateVodCaptureJobStatusInputSchema.safeParse(input).success
-    ).toBe(false);
+    expect(updateVodCaptureJobStatusInputSchema.safeParse(input).success).toBe(
+      false
+    );
     await expect(updateVodCaptureJobStatus(input, db)).rejects.toThrow();
     expect(update).not.toHaveBeenCalled();
   });
@@ -2389,9 +2410,7 @@ describe("runMockVodAutomationDetections", () => {
       expect(event).toEqual(
         expect.objectContaining({ metadata: expect.any(String) })
       );
-      const metadata = JSON.parse(
-        (event as { metadata: string }).metadata
-      ) as {
+      const metadata = JSON.parse((event as { metadata: string }).metadata) as {
         captureJobId: number;
         detectorMetadata: {
           mockAutomation: boolean;
@@ -2437,16 +2456,10 @@ describe("runMockVodAutomationDetections", () => {
     });
 
     await expect(
-      runMockVodAutomationDetections(
-        { vodAnalysisId: 0, captureJobId: 99 },
-        db
-      )
+      runMockVodAutomationDetections({ vodAnalysisId: 0, captureJobId: 99 }, db)
     ).rejects.toThrow();
     await expect(
-      runMockVodAutomationDetections(
-        { vodAnalysisId: 44, captureJobId: 0 },
-        db
-      )
+      runMockVodAutomationDetections({ vodAnalysisId: 44, captureJobId: 0 }, db)
     ).rejects.toThrow();
     expect(select).not.toHaveBeenCalled();
   });
