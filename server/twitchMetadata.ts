@@ -54,15 +54,55 @@ export function normalizeTwitchThumbnailUrl(
   const trimmed = thumbnailUrl?.trim();
   if (!trimmed) return undefined;
 
-  return trimmed
-    .replace(/%257Bwidth%257D/gi, "640")
-    .replace(/%257Bheight%257D/gi, "360")
-    .replace(/(?:%25)?%7Bwidth%7D/gi, "640")
-    .replace(/(?:%25)?%7Bheight%7D/gi, "360")
-    .replace(/%\{width\}/gi, "640")
-    .replace(/%\{height\}/gi, "360")
-    .replace(/\{width\}/gi, "640")
-    .replace(/\{height\}/gi, "360");
+  return replaceTwitchThumbnailTemplateDimensions(trimmed, 640, 360);
+}
+
+function hasTwitchThumbnailTemplateDimensions(thumbnailUrl: string) {
+  return (
+    /%257Bwidth%257D|(?:%25)?%7Bwidth%7D|%\{width\}|\{width\}/i.test(
+      thumbnailUrl
+    ) &&
+    /%257Bheight%257D|(?:%25)?%7Bheight%7D|%\{height\}|\{height\}/i.test(
+      thumbnailUrl
+    )
+  );
+}
+
+function replaceTwitchThumbnailTemplateDimensions(
+  thumbnailUrl: string,
+  width: number,
+  height: number
+) {
+  return thumbnailUrl
+    .replace(/%257Bwidth%257D/gi, String(width))
+    .replace(/%257Bheight%257D/gi, String(height))
+    .replace(/(?:%25)?%7Bwidth%7D/gi, String(width))
+    .replace(/(?:%25)?%7Bheight%7D/gi, String(height))
+    .replace(/%\{width\}/gi, String(width))
+    .replace(/%\{height\}/gi, String(height))
+    .replace(/\{width\}/gi, String(width))
+    .replace(/\{height\}/gi, String(height));
+}
+
+export function buildTwitchThumbnailUrlCandidates(
+  thumbnailUrl: string | null | undefined
+): string[] {
+  const trimmed = thumbnailUrl?.trim();
+  if (!trimmed || !hasTwitchThumbnailTemplateDimensions(trimmed)) return [];
+
+  const sizes = [
+    [640, 360],
+    [320, 180],
+    [1280, 720],
+  ] as const;
+
+  return Array.from(
+    new Set(
+      sizes.map(([width, height]) =>
+        replaceTwitchThumbnailTemplateDimensions(trimmed, width, height)
+      )
+    )
+  );
 }
 
 function normalizeTwitchVideoType(
