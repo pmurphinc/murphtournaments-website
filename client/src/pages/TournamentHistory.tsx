@@ -25,7 +25,7 @@ export default function TournamentHistory() {
       date: 'January 31, 2026',
       teams: 8,
       prizePool: 'Community-funded',
-      winners: 'League Play',
+      winners: 'TBD',
       format: 'Finals Contender League',
       description: 'Day 5 of the Finals Contender League. League play week with no individual day winner.',
       youtubeLink: 'https://youtu.be/x6nEeSLpSY4?si=EYMLlzeiW0fC7YpW'
@@ -35,7 +35,7 @@ export default function TournamentHistory() {
       date: 'January 24, 2026',
       teams: 8,
       prizePool: 'Community-funded',
-      winners: 'League Play',
+      winners: 'TBD',
       format: 'Finals Contender League',
       description: 'Day 4 of the Finals Contender League. League play week with no individual day winner.',
       youtubeLink: 'https://youtu.be/RpKcOJ7h-IU?si=EVsZeBVWGwBoYCDr'
@@ -45,7 +45,7 @@ export default function TournamentHistory() {
       date: 'January 17, 2026',
       teams: 8,
       prizePool: 'Community-funded',
-      winners: 'League Play',
+      winners: 'TBD',
       format: 'Finals Contender League',
       description: 'Day 3 of the Finals Contender League. League play week with no individual day winner.',
       youtubeLink: 'https://youtu.be/FQ1-12OET1I?si=wzicq1DJJFxVLsxr'
@@ -55,7 +55,7 @@ export default function TournamentHistory() {
       date: 'January 10, 2026',
       teams: 8,
       prizePool: 'Community-funded',
-      winners: 'League Play',
+      winners: 'TBD',
       format: 'Finals Contender League',
       description: 'Day 2 of the Finals Contender League. League play week with no individual day winner.',
       youtubeLink: null
@@ -65,7 +65,7 @@ export default function TournamentHistory() {
       date: 'January 3, 2026',
       teams: 8,
       prizePool: 'Community-funded',
-      winners: 'League Play',
+      winners: 'TBD',
       format: 'Finals Contender League',
       description: 'The inaugural day of the Finals Contender League. League play week with no individual day winner.',
       youtubeLink: null
