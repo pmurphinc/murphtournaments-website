@@ -198,7 +198,7 @@ export default function TournamentHistory() {
             Tournament History
           </GlitchText>
           <p className="text-lg text-white/80 font-mono max-w-2xl">
-            Murph Tournaments has hosted the Finals Competitive League (FCL) and 13 Murph Tournaments, establishing a track record of professional production, fair competition, and consistent prize pools.
+            Murph Tournaments has hosted the Finals Contender League (FCL) and 13 Murph Tournaments, establishing a track record of professional production, fair competition, and consistent prize pools.
           </p>
         </div>
 
