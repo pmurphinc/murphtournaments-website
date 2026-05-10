@@ -1319,6 +1319,11 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
                   vodId={vod.id}
                   title={vod.title}
                   thumbnailUrl={vod.thumbnailUrl}
+                  sourceType={vod.sourceType}
+                  sourceRef={vod.sourceRef}
+                  sourceId={vod.sourceId}
+                  videoPov={vod.videoPov}
+                  durationLabel={durationLabel}
                   className="aspect-video w-full rounded-lg border border-white/10 bg-black/40 object-cover"
                   fallbackClassName="flex aspect-video w-full items-center justify-center rounded-lg border border-white/10 bg-black/40 text-center font-mono text-sm uppercase tracking-widest text-white/35"
                   showUnavailableText
