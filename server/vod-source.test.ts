@@ -18,6 +18,16 @@ describe("VOD source parsing", () => {
     });
   });
 
+  it("parses Twitch highlight URLs through the Twitch video path", () => {
+    expect(parseVodSource("https://www.twitch.tv/videos/2768289408")).toEqual({
+      valid: true,
+      sourceType: "twitch",
+      sourceId: "2768289408",
+      sourceRef: "v2768289408",
+      normalizedUrl: "https://www.twitch.tv/videos/2768289408",
+    });
+  });
+
   it("parses Twitch mobile VOD URLs", () => {
     expect(
       parseVodSource("https://m.twitch.tv/videos/1234567890")

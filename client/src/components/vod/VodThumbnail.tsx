@@ -18,15 +18,16 @@ export function VodThumbnail({
   showUnavailableText = false,
 }: VodThumbnailProps) {
   const [hasImageError, setHasImageError] = useState(false);
+  const usableThumbnailUrl = thumbnailUrl?.trim();
 
   useEffect(() => {
     setHasImageError(false);
-  }, [vodId, thumbnailUrl]);
+  }, [vodId, usableThumbnailUrl]);
 
-  if (thumbnailUrl && !hasImageError) {
+  if (usableThumbnailUrl && !hasImageError) {
     return (
       <img
-        src={thumbnailUrl}
+        src={usableThumbnailUrl}
         alt={`${title} thumbnail`}
         className={className}
         loading="lazy"
@@ -38,10 +39,12 @@ export function VodThumbnail({
   return (
     <div className={fallbackClassName}>
       <div>
-        <div>No thumbnail</div>
-        {showUnavailableText && hasImageError ? (
+        <div>
+          {usableThumbnailUrl ? "Thumbnail unavailable" : "No thumbnail"}
+        </div>
+        {showUnavailableText && usableThumbnailUrl && hasImageError ? (
           <div className="mt-2 text-[10px] normal-case tracking-normal text-white/30">
-            Thumbnail unavailable.
+            Image failed to load.
           </div>
         ) : null}
       </div>
