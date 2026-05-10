@@ -1,9 +1,14 @@
 import { ENV } from "./_core/env";
 
+export type TwitchVideoType = "archive" | "highlight" | "upload";
+
 export type TwitchMetadata = {
   title?: string;
   thumbnailUrl?: string;
+  rawThumbnailUrl?: string;
   durationSeconds?: number;
+  videoType?: TwitchVideoType;
+  url?: string;
 };
 
 export type TwitchMetadataResult =
@@ -24,6 +29,8 @@ type TwitchVideo = {
   title?: unknown;
   thumbnail_url?: unknown;
   duration?: unknown;
+  type?: unknown;
+  url?: unknown;
 };
 
 export function parseTwitchDurationToSeconds(duration: string): number | null {
@@ -48,12 +55,28 @@ export function normalizeTwitchThumbnailUrl(
   if (!trimmed) return undefined;
 
   return trimmed
+    .replace(/%257Bwidth%257D/gi, "640")
+    .replace(/%257Bheight%257D/gi, "360")
     .replace(/(?:%25)?%7Bwidth%7D/gi, "640")
     .replace(/(?:%25)?%7Bheight%7D/gi, "360")
-    .replace(/%\{width\}/g, "640")
-    .replace(/%\{height\}/g, "360")
-    .replace(/\{width\}/g, "640")
-    .replace(/\{height\}/g, "360");
+    .replace(/%\{width\}/gi, "640")
+    .replace(/%\{height\}/gi, "360")
+    .replace(/\{width\}/gi, "640")
+    .replace(/\{height\}/gi, "360");
+}
+
+function normalizeTwitchVideoType(
+  videoType: unknown
+): TwitchVideoType | undefined {
+  if (
+    videoType === "archive" ||
+    videoType === "highlight" ||
+    videoType === "upload"
+  ) {
+    return videoType;
+  }
+
+  return undefined;
 }
 
 function hasTwitchCredentials() {
@@ -132,21 +155,25 @@ export async function fetchTwitchVodMetadata(
     }
 
     const title = typeof video.title === "string" ? video.title.trim() : "";
-    const thumbnailUrl =
-      typeof video.thumbnail_url === "string"
-        ? normalizeTwitchThumbnailUrl(video.thumbnail_url)
-        : undefined;
+    const rawThumbnailUrl =
+      typeof video.thumbnail_url === "string" ? video.thumbnail_url.trim() : "";
+    const thumbnailUrl = normalizeTwitchThumbnailUrl(rawThumbnailUrl);
     const durationSeconds =
       typeof video.duration === "string"
         ? parseTwitchDurationToSeconds(video.duration)
         : null;
+    const videoType = normalizeTwitchVideoType(video.type);
+    const url = typeof video.url === "string" ? video.url.trim() : "";
 
     return {
       status: "success",
       metadata: {
         ...(title ? { title } : {}),
         ...(thumbnailUrl ? { thumbnailUrl } : {}),
+        ...(rawThumbnailUrl ? { rawThumbnailUrl } : {}),
         ...(durationSeconds && durationSeconds > 0 ? { durationSeconds } : {}),
+        ...(videoType ? { videoType } : {}),
+        ...(url ? { url } : {}),
       },
     };
   } catch {

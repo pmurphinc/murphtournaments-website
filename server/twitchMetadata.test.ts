@@ -59,12 +59,30 @@ describe("normalizeTwitchThumbnailUrl", () => {
     ).toBe("https://static-cdn.jtvnw.net/cf_vods/640x360/thumb.jpg");
   });
 
-  it("replaces doubly encoded Twitch thumbnail dimension placeholders", () => {
+  it("replaces encoded percent-prefixed Twitch thumbnail dimension placeholders", () => {
     expect(
       normalizeTwitchThumbnailUrl(
         "https://static-cdn.jtvnw.net/cf_vods/%25%7Bwidth%7Dx%25%7Bheight%7D/thumb.jpg"
       )
     ).toBe("https://static-cdn.jtvnw.net/cf_vods/640x360/thumb.jpg");
+  });
+
+  it("replaces doubly encoded Twitch thumbnail dimension placeholders", () => {
+    expect(
+      normalizeTwitchThumbnailUrl(
+        "https://static-cdn.jtvnw.net/cf_vods/%257Bwidth%257Dx%257Bheight%257D/thumb.jpg"
+      )
+    ).toBe("https://static-cdn.jtvnw.net/cf_vods/640x360/thumb.jpg");
+  });
+
+  it("normalizes a realistic Twitch highlight thumbnail template", () => {
+    expect(
+      normalizeTwitchThumbnailUrl(
+        "https://static-cdn.jtvnw.net/s3_vods/example_channel_2768289408_123456789/thumb/thumb0-%{width}x%{height}.jpg"
+      )
+    ).toBe(
+      "https://static-cdn.jtvnw.net/s3_vods/example_channel_2768289408_123456789/thumb/thumb0-640x360.jpg"
+    );
   });
 
   it("returns undefined for blank thumbnails", () => {
@@ -104,6 +122,8 @@ describe("fetchTwitchVodMetadata", () => {
               thumbnail_url:
                 "https://static-cdn.jtvnw.net/thumb/%{width}x%{height}.jpg",
               duration: "1h2m3s",
+              type: "highlight",
+              url: "https://www.twitch.tv/videos/1234567890",
             },
           ],
         }),
@@ -115,7 +135,11 @@ describe("fetchTwitchVodMetadata", () => {
       metadata: {
         title: "Finals scrim",
         thumbnailUrl: "https://static-cdn.jtvnw.net/thumb/640x360.jpg",
+        rawThumbnailUrl:
+          "https://static-cdn.jtvnw.net/thumb/%{width}x%{height}.jpg",
         durationSeconds: 3723,
+        videoType: "highlight",
+        url: "https://www.twitch.tv/videos/1234567890",
       },
     });
   });

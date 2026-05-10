@@ -156,10 +156,20 @@ export type RefreshTwitchMetadataStatus =
   | "not_found"
   | "fetch_failed";
 
+export type RefreshTwitchMetadataSummary = {
+  thumbnailUrlReturned: boolean;
+  thumbnailUrlUpdated: boolean;
+  thumbnailUrl: string | null;
+  existingThumbnailUrl: string | null;
+  videoType?: TwitchMetadata["videoType"];
+  url?: string;
+};
+
 export type RefreshTwitchMetadataResult = {
   status: RefreshTwitchMetadataStatus;
   vodAnalysis?: VodAnalysisRecord | null;
   metadata?: TwitchMetadata;
+  metadataSummary?: RefreshTwitchMetadataSummary;
 };
 
 type TwitchMetadataFetcher = (vodId: string) => Promise<TwitchMetadataResult>;
@@ -1196,6 +1206,18 @@ export async function refreshTwitchMetadataForVodAnalysis(
   }
 
   const updateValues = buildVodAnalysisMetadataUpdate(metadataResult.metadata);
+  const metadataSummary: RefreshTwitchMetadataSummary = {
+    thumbnailUrlReturned: Boolean(metadataResult.metadata.thumbnailUrl?.trim()),
+    thumbnailUrlUpdated: Boolean(updateValues.thumbnailUrl),
+    thumbnailUrl: metadataResult.metadata.thumbnailUrl?.trim() || null,
+    existingThumbnailUrl: vod.thumbnailUrl?.trim() || null,
+    ...(metadataResult.metadata.videoType
+      ? { videoType: metadataResult.metadata.videoType }
+      : {}),
+    ...(metadataResult.metadata.url
+      ? { url: metadataResult.metadata.url }
+      : {}),
+  };
 
   if (Object.keys(updateValues).length > 0) {
     await db
@@ -1213,6 +1235,7 @@ export async function refreshTwitchMetadataForVodAnalysis(
     status: "updated",
     vodAnalysis: updatedVod,
     metadata: metadataResult.metadata,
+    metadataSummary,
   };
 }
 

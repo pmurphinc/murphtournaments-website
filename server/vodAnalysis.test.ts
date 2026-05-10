@@ -1659,6 +1659,18 @@ describe("buildVodAnalysisMetadataUpdate", () => {
     ).not.toHaveProperty("thumbnailUrl");
   });
 
+  it("does not clear an existing thumbnail implicitly", () => {
+    expect(
+      buildVodAnalysisMetadataUpdate({
+        title: "Updated Twitch title",
+        durationSeconds: 120,
+      })
+    ).toEqual({
+      title: "Updated Twitch title",
+      durationSeconds: 120,
+    });
+  });
+
   it("maps successful Twitch metadata to VOD update fields", () => {
     expect(
       buildVodAnalysisMetadataUpdate({
@@ -1724,6 +1736,12 @@ describe("refreshTwitchMetadataForVodAnalysis", () => {
       status: "updated",
       vodAnalysis: twitchVod,
       metadata: {},
+      metadataSummary: {
+        thumbnailUrlReturned: false,
+        thumbnailUrlUpdated: false,
+        thumbnailUrl: null,
+        existingThumbnailUrl: "https://example.com/existing.jpg",
+      },
     });
     expect(update).not.toHaveBeenCalled();
   });
@@ -1736,6 +1754,8 @@ describe("refreshTwitchMetadataForVodAnalysis", () => {
         title: "Updated Twitch title",
         thumbnailUrl: "https://example.com/new.jpg",
         durationSeconds: 3723,
+        videoType: "highlight",
+        url: "https://www.twitch.tv/videos/1234567890",
       },
     });
 
@@ -1747,6 +1767,14 @@ describe("refreshTwitchMetadataForVodAnalysis", () => {
         title: "Updated Twitch title",
         thumbnailUrl: "https://example.com/new.jpg",
         durationSeconds: 3723,
+      },
+      metadataSummary: {
+        thumbnailUrlReturned: true,
+        thumbnailUrlUpdated: true,
+        thumbnailUrl: "https://example.com/new.jpg",
+        existingThumbnailUrl: "https://example.com/existing.jpg",
+        videoType: "highlight",
+        url: "https://www.twitch.tv/videos/1234567890",
       },
     });
     expect(metadataFetcher).toHaveBeenCalledWith("1234567890");

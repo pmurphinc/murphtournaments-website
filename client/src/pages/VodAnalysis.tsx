@@ -272,15 +272,13 @@ export default function VodAnalysis() {
 
                   return (
                     <NeonCard key={vod.id} variant="gold" className="h-full">
-                      {vod.thumbnailUrl ? (
-                        <VodThumbnail
-                          vodId={vod.id}
-                          title={vod.title}
-                          thumbnailUrl={vod.thumbnailUrl}
-                          className="mb-4 aspect-video w-full rounded bg-black/40 object-cover"
-                          fallbackClassName="mb-4 flex aspect-video w-full items-center justify-center rounded bg-black/40 text-center font-mono text-sm uppercase tracking-widest text-white/35"
-                        />
-                      ) : null}
+                      <VodThumbnail
+                        vodId={vod.id}
+                        title={vod.title}
+                        thumbnailUrl={vod.thumbnailUrl}
+                        className="mb-4 aspect-video w-full rounded bg-black/40 object-cover"
+                        fallbackClassName="mb-4 flex aspect-video w-full items-center justify-center rounded bg-black/40 text-center font-mono text-sm uppercase tracking-widest text-white/35"
+                      />
 
                       <div className="mb-4 flex items-start justify-between gap-3">
                         <div>

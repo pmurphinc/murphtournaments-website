@@ -66,6 +66,25 @@ type SuggestedEventFilter = (typeof SUGGESTED_EVENT_FILTERS)[number];
 
 type SuggestedEventStatus = Exclude<SuggestedEventFilter, "all">;
 
+function getTwitchMetadataRefreshSuccessMessage(result: {
+  metadataSummary?: {
+    thumbnailUrlReturned: boolean;
+    thumbnailUrlUpdated: boolean;
+  };
+}) {
+  if (!import.meta.env.DEV) {
+    return "Twitch metadata refreshed.";
+  }
+
+  const thumbnailStatus = result.metadataSummary?.thumbnailUrlUpdated
+    ? "updated"
+    : result.metadataSummary?.thumbnailUrlReturned
+      ? "already available"
+      : "not returned by Twitch";
+
+  return `Twitch metadata refreshed. Thumbnail: ${thumbnailStatus}.`;
+}
+
 type SuggestedEventEditState = {
   id: number;
   eventType: VodAnalysisEventType;
@@ -311,7 +330,7 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
         if (result.status === "updated") {
           setMetadataRefreshMessage({
             type: "success",
-            text: "Twitch metadata refreshed.",
+            text: getTwitchMetadataRefreshSuccessMessage(result),
           });
           await Promise.all([
             utils.vodAnalysis.getById.invalidate(vodAnalysisId),
