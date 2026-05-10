@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  buildTwitchThumbnailUrlCandidates,
   fetchTwitchVodMetadata,
   normalizeTwitchThumbnailUrl,
   parseTwitchDurationToSeconds,
@@ -87,6 +88,46 @@ describe("normalizeTwitchThumbnailUrl", () => {
 
   it("returns undefined for blank thumbnails", () => {
     expect(normalizeTwitchThumbnailUrl("   ")).toBeUndefined();
+  });
+});
+
+describe("buildTwitchThumbnailUrlCandidates", () => {
+  it("builds ordered Twitch thumbnail candidates from template URLs", () => {
+    expect(
+      buildTwitchThumbnailUrlCandidates(
+        "https://static-cdn.jtvnw.net/cf_vods/%{width}x%{height}/thumb.jpg"
+      )
+    ).toEqual([
+      "https://static-cdn.jtvnw.net/cf_vods/640x360/thumb.jpg",
+      "https://static-cdn.jtvnw.net/cf_vods/320x180/thumb.jpg",
+      "https://static-cdn.jtvnw.net/cf_vods/1280x720/thumb.jpg",
+    ]);
+  });
+
+  it("preserves uniqueness for generated candidates", () => {
+    const candidates = buildTwitchThumbnailUrlCandidates(
+      "https://static-cdn.jtvnw.net/cf_vods/thumb-%{width}x%{height}.jpg"
+    );
+
+    expect(candidates).toHaveLength(new Set(candidates).size);
+    expect(candidates).toHaveLength(3);
+  });
+
+  it("keeps existing normalization primary at 640x360", () => {
+    const templateUrl =
+      "https://static-cdn.jtvnw.net/s3_vods/example/thumb/thumb0-%{width}x%{height}.jpg";
+
+    expect(buildTwitchThumbnailUrlCandidates(templateUrl)[0]).toBe(
+      normalizeTwitchThumbnailUrl(templateUrl)
+    );
+    expect(normalizeTwitchThumbnailUrl(templateUrl)).toBe(
+      "https://static-cdn.jtvnw.net/s3_vods/example/thumb/thumb0-640x360.jpg"
+    );
+  });
+
+  it("returns no candidates for blank thumbnails", () => {
+    expect(buildTwitchThumbnailUrlCandidates("   ")).toEqual([]);
+    expect(buildTwitchThumbnailUrlCandidates(undefined)).toEqual([]);
   });
 });
 
