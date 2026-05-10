@@ -276,6 +276,11 @@ export default function VodAnalysis() {
                         vodId={vod.id}
                         title={vod.title}
                         thumbnailUrl={vod.thumbnailUrl}
+                        sourceType={vod.sourceType}
+                        sourceRef={vod.sourceRef}
+                        sourceId={vod.sourceId}
+                        videoPov={vod.videoPov}
+                        durationSeconds={vod.durationSeconds}
                         className="mb-4 aspect-video w-full rounded bg-black/40 object-cover"
                         fallbackClassName="mb-4 flex aspect-video w-full items-center justify-center rounded bg-black/40 text-center font-mono text-sm uppercase tracking-widest text-white/35"
                       />
