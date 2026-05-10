@@ -1145,8 +1145,10 @@ export function buildVodAnalysisMetadataUpdate(
     update.title = title;
   }
 
-  if (metadata.thumbnailUrl) {
-    update.thumbnailUrl = metadata.thumbnailUrl;
+  const thumbnailUrl = metadata.thumbnailUrl?.trim();
+
+  if (thumbnailUrl) {
+    update.thumbnailUrl = thumbnailUrl;
   }
 
   if (metadata.durationSeconds && metadata.durationSeconds > 0) {

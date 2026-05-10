@@ -1,6 +1,7 @@
 import { FormEvent, useMemo, useState } from "react";
 import GlitchText from "@/components/GlitchText";
 import NeonCard from "@/components/NeonCard";
+import { VodThumbnail } from "@/components/vod/VodThumbnail";
 import { trpc } from "@/lib/trpc";
 import { getVodSourceLabel, parseVodSource } from "@shared/vod/source";
 import { Link } from "wouter";
@@ -272,11 +273,12 @@ export default function VodAnalysis() {
                   return (
                     <NeonCard key={vod.id} variant="gold" className="h-full">
                       {vod.thumbnailUrl ? (
-                        <img
-                          src={vod.thumbnailUrl}
-                          alt={`${vod.title} thumbnail`}
+                        <VodThumbnail
+                          vodId={vod.id}
+                          title={vod.title}
+                          thumbnailUrl={vod.thumbnailUrl}
                           className="mb-4 aspect-video w-full rounded bg-black/40 object-cover"
-                          loading="lazy"
+                          fallbackClassName="mb-4 flex aspect-video w-full items-center justify-center rounded bg-black/40 text-center font-mono text-sm uppercase tracking-widest text-white/35"
                         />
                       ) : null}
 
