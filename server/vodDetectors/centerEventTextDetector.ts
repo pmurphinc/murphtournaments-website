@@ -13,6 +13,12 @@ import type {
   VodCaptureSampleDetector,
 } from "../vodAnalysis";
 import type { VodFrameCaptureResult } from "../vodFrameCapture";
+import {
+  getVodAutomationOcrConfidenceThreshold,
+  isVodAutomationOcrEnabled,
+  recognizeCenterEventTextFromFrame,
+  type CenterEventTextOcrResult,
+} from "./centerEventTextOcr";
 
 export const CENTER_EVENT_TEXT_DETECTOR_VERSION = "center-event-text-v1";
 export const CENTER_EVENT_TEXT_HUD_ZONE_ID = "center_event_text";
@@ -29,6 +35,7 @@ export type CenterEventTextDetectionInput = {
 export type CenterEventTextDetectionResult = {
   detections: DetectedAutomationEventInput[];
   debugText: string | null;
+  ocrResult: CenterEventTextOcrResult | null;
   detectorVersion: string;
 };
 
@@ -42,6 +49,16 @@ export type CenterEventTextDetectorOptions = {
   getText?: (
     input: CenterEventTextDetectionInput
   ) => string | null | undefined | Promise<string | null | undefined>;
+  getOcrResult?: (
+    input: CenterEventTextDetectionInput
+  ) =>
+    | CenterEventTextOcrResult
+    | null
+    | undefined
+    | Promise<CenterEventTextOcrResult | null | undefined>;
+  ocrEnabled?: boolean;
+  ocrConfidenceThreshold?: number;
+  dedupeCooldownSeconds?: number;
   parseContext?:
     | CenterEventTextParseContext
     | ((input: CenterEventTextDetectionInput) => CenterEventTextParseContext);
@@ -228,7 +245,42 @@ export async function detectCenterEventText(
   input: CenterEventTextDetectionInput,
   options: CenterEventTextDetectorOptions = {}
 ): Promise<CenterEventTextDetectionResult> {
-  const debugText = (await options.getText?.(input)) ?? null;
+  const explicitText = (await options.getText?.(input)) ?? null;
+  const ocrEnabled = options.ocrEnabled ?? isVodAutomationOcrEnabled();
+  const ocrConfidenceThreshold =
+    options.ocrConfidenceThreshold ?? getVodAutomationOcrConfidenceThreshold();
+  const capturedFrameCapture =
+    input.frameCapture.status === "captured" ? input.frameCapture : null;
+  const shouldRunOcr =
+    !explicitText && ocrEnabled && Boolean(capturedFrameCapture);
+  const mockedOcrResult = shouldRunOcr
+    ? await options.getOcrResult?.(input)
+    : null;
+  const ocrResult = shouldRunOcr
+    ? (mockedOcrResult ??
+      (mockedOcrResult === undefined
+        ? await recognizeCenterEventTextFromFrame({
+            framePath: capturedFrameCapture!.framePath,
+            zone: input.zone,
+            timestampSeconds: input.timestampSeconds,
+            sampleIndex: input.sampleIndex,
+            frameCapture: capturedFrameCapture!,
+          })
+        : null))
+    : null;
+  const debugText = explicitText ?? ocrResult?.normalizedText ?? null;
+
+  if (ocrResult) {
+    const confidence = ocrResult.confidence ?? 0;
+    if (!ocrResult.normalizedText || confidence < ocrConfidenceThreshold) {
+      return {
+        detections: [],
+        debugText,
+        ocrResult,
+        detectorVersion: CENTER_EVENT_TEXT_DETECTOR_VERSION,
+      };
+    }
+  }
   const parseContext =
     typeof options.parseContext === "function"
       ? options.parseContext(input)
@@ -237,18 +289,54 @@ export async function detectCenterEventText(
     debugText,
     input.timestampSeconds,
     parseContext
+  ).map(detection =>
+    ocrResult
+      ? {
+          ...detection,
+          metadata: {
+            ...(typeof detection.metadata === "object" &&
+            detection.metadata !== null &&
+            !Array.isArray(detection.metadata)
+              ? detection.metadata
+              : {}),
+            ocr: {
+              enabled: true,
+              confidence: ocrResult.confidence,
+              rawText: ocrResult.rawText,
+              normalizedText: ocrResult.normalizedText,
+              engine: ocrResult.engine,
+              engineVersion: ocrResult.engineVersion,
+              language: ocrResult.language,
+              crop: ocrResult.crop,
+            },
+          },
+        }
+      : detection
   );
 
   return {
     detections,
     debugText,
+    ocrResult,
     detectorVersion: CENTER_EVENT_TEXT_DETECTOR_VERSION,
   };
+}
+
+function buildDedupeKey(detection: DetectedAutomationEventInput): string {
+  return [
+    detection.eventType,
+    detection.targetLabel?.trim().toUpperCase() ?? "",
+    detection.teamLabel?.trim().toUpperCase() ?? "",
+    detection.actorLabel?.trim().toUpperCase() ?? "",
+  ].join("|");
 }
 
 export function createCenterEventTextSampleDetector(
   options: CenterEventTextDetectorOptions = {}
 ): VodCaptureSampleDetector {
+  const recentDetections = new Map<string, number>();
+  const dedupeCooldownSeconds = options.dedupeCooldownSeconds ?? 4;
+
   return async input => {
     const frameCapture = input.frameCapture;
     if (!frameCapture) return [];
@@ -266,7 +354,23 @@ export function createCenterEventTextSampleDetector(
       options
     );
 
-    return result.detections.map(detection => ({
+    const dedupedDetections = result.detections.filter(detection => {
+      const dedupeKey = buildDedupeKey(detection);
+      const previousTimestampSeconds = recentDetections.get(dedupeKey);
+
+      if (
+        previousTimestampSeconds !== undefined &&
+        Math.abs(input.sampleTimestampSeconds - previousTimestampSeconds) <=
+          dedupeCooldownSeconds
+      ) {
+        return false;
+      }
+
+      recentDetections.set(dedupeKey, input.sampleTimestampSeconds);
+      return true;
+    });
+
+    return dedupedDetections.map(detection => ({
       ...detection,
       metadata: {
         ...(typeof detection.metadata === "object" &&

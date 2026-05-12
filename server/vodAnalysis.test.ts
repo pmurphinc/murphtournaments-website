@@ -68,6 +68,7 @@ import {
   createCenterEventTextSampleDetector,
   parseCenterEventTextToDetections,
 } from "./vodDetectors/centerEventTextDetector";
+import type { CenterEventTextOcrResult } from "./vodDetectors/centerEventTextOcr";
 import {
   getLatestVodCaptureFrameFile,
   resolveVodCaptureFramePath,
@@ -86,6 +87,40 @@ const skippedFrameExtractor: VodFrameExtractor = async input => ({
   sampleIndex: input.sampleIndex,
   errorMessage: "Frame extraction skipped in unit test.",
 });
+
+const capturedFrameExtractor: VodFrameExtractor = async input => ({
+  status: "captured",
+  timestampSeconds: input.timestampSeconds,
+  sampleIndex: input.sampleIndex,
+  framePath: `/workspace/murphtournaments-website/server/.cache/vod-capture/${input.vodAnalysisId}/${input.captureJobId}/sample-${String(input.sampleIndex + 1).padStart(4, "0")}-${String(input.timestampSeconds).padStart(6, "0")}.jpg`,
+  relativeFramePath: `server/.cache/vod-capture/${input.vodAnalysisId}/${input.captureJobId}/sample-${String(input.sampleIndex + 1).padStart(4, "0")}-${String(input.timestampSeconds).padStart(6, "0")}.jpg`,
+  fileName: `sample-${String(input.sampleIndex + 1).padStart(4, "0")}-${String(input.timestampSeconds).padStart(6, "0")}.jpg`,
+});
+
+function mockedCenterEventOcrResult(
+  text: string,
+  confidence: number | null = 92
+): CenterEventTextOcrResult {
+  return {
+    normalizedText: text.trim().toUpperCase(),
+    rawText: text,
+    confidence,
+    engine: "tesseract.js",
+    engineVersion: "test",
+    language: "eng",
+    crop: {
+      hudZoneId: "center_event_text",
+      hudZoneLabel: "Center Event Text",
+      sourceRect: { x: 0.28, y: 0.42, width: 0.44, height: 0.24 },
+      pixelRect: { left: 538, top: 454, width: 845, height: 260 },
+      sourceWidth: 1920,
+      sourceHeight: 1080,
+      scaleFactor: 1,
+    },
+    timestampSeconds: 0,
+    sampleIndex: 0,
+  };
+}
 
 function createPublicContext(): TrpcContext {
   return {
@@ -2495,6 +2530,240 @@ describe("processVodCaptureJob", () => {
       relativeFramePath:
         "server/.cache/vod-capture/44/99/sample-0001-000000.jpg",
       matchedText: "CASHOUT COMPLETE",
+    });
+  });
+
+  it("does not attempt OCR when OCR is disabled and preserves existing empty detector behavior", async () => {
+    const getOcrResult = vi.fn(async () =>
+      mockedCenterEventOcrResult("CASHOUT COMPLETE")
+    );
+    const detector = createCenterEventTextSampleDetector({
+      ocrEnabled: false,
+      getOcrResult,
+      parseContext: { targetLabel: "A", teamLabel: "The Live Wires" },
+    });
+    const { db, insertedSuggestedEvents } = createProcessCaptureJobDb({
+      vodRows: [captureReadyVod()],
+      captureRows: [captureJob({ id: 99 })],
+    });
+
+    await expect(
+      processVodCaptureJob(
+        { vodAnalysisId: 44, captureJobId: 99 },
+        db,
+        detector,
+        capturedFrameExtractor
+      )
+    ).resolves.toMatchObject({
+      status: "complete",
+      createdSuggestionCount: 0,
+    });
+
+    expect(getOcrResult).not.toHaveBeenCalled();
+    expect(insertedSuggestedEvents).toHaveLength(0);
+  });
+
+  it("creates a pending cashout suggestion from confident OCR text", async () => {
+    const detector = createCenterEventTextSampleDetector({
+      ocrEnabled: true,
+      getOcrResult: async ({ sampleIndex }) =>
+        sampleIndex === 0
+          ? mockedCenterEventOcrResult("CASHOUT COMPLETE")
+          : null,
+      parseContext: { targetLabel: "A", teamLabel: "The Live Wires" },
+    });
+    const { db, insertedSuggestedEvents } = createProcessCaptureJobDb({
+      vodRows: [captureReadyVod()],
+      captureRows: [captureJob({ id: 99 })],
+    });
+
+    await expect(
+      processVodCaptureJob(
+        { vodAnalysisId: 44, captureJobId: 99 },
+        db,
+        detector,
+        capturedFrameExtractor
+      )
+    ).resolves.toMatchObject({
+      status: "complete",
+      createdSuggestionCount: 1,
+    });
+
+    expect(insertedSuggestedEvents[0]).toMatchObject({
+      eventType: "cashout",
+      targetLabel: "A",
+      teamLabel: "The Live Wires",
+      source: "automation",
+      status: "pending",
+    });
+    expect(
+      JSON.parse(
+        String((insertedSuggestedEvents[0] as { metadata: string }).metadata)
+      ).detectorMetadata.ocr
+    ).toMatchObject({
+      enabled: true,
+      confidence: 92,
+      normalizedText: "CASHOUT COMPLETE",
+      engine: "tesseract.js",
+    });
+  });
+
+  it.each(["CASHOUT STOLEN", "STOLEN"])(
+    "creates a pending steal suggestion from confident OCR text %s",
+    async ocrText => {
+      const detector = createCenterEventTextSampleDetector({
+        ocrEnabled: true,
+        getOcrResult: async ({ sampleIndex }) =>
+          sampleIndex === 0 ? mockedCenterEventOcrResult(ocrText) : null,
+        parseContext: { targetLabel: "B", teamLabel: "The High Notes" },
+      });
+      const { db, insertedSuggestedEvents } = createProcessCaptureJobDb({
+        vodRows: [captureReadyVod()],
+        captureRows: [captureJob({ id: 99 })],
+      });
+
+      await expect(
+        processVodCaptureJob(
+          { vodAnalysisId: 44, captureJobId: 99 },
+          db,
+          detector,
+          capturedFrameExtractor
+        )
+      ).resolves.toMatchObject({
+        status: "complete",
+        createdSuggestionCount: 1,
+      });
+
+      expect(insertedSuggestedEvents[0]).toMatchObject({
+        eventType: "steal_flip",
+        targetLabel: "B",
+        teamLabel: "The High Notes",
+        source: "automation",
+        status: "pending",
+      });
+    }
+  );
+
+  it("does not create a team wipe suggestion without a safe team label", async () => {
+    const detector = createCenterEventTextSampleDetector({
+      ocrEnabled: true,
+      getOcrResult: async ({ sampleIndex }) =>
+        sampleIndex === 0 ? mockedCenterEventOcrResult("TEAM WIPED") : null,
+    });
+    const { db, insertedSuggestedEvents } = createProcessCaptureJobDb({
+      vodRows: [captureReadyVod()],
+      captureRows: [captureJob({ id: 99 })],
+    });
+
+    await processVodCaptureJob(
+      { vodAnalysisId: 44, captureJobId: 99 },
+      db,
+      detector,
+      capturedFrameExtractor
+    );
+
+    expect(insertedSuggestedEvents).toHaveLength(0);
+  });
+
+  it("does not create suggestions from low-confidence OCR", async () => {
+    const detector = createCenterEventTextSampleDetector({
+      ocrEnabled: true,
+      ocrConfidenceThreshold: 70,
+      getOcrResult: async ({ sampleIndex }) =>
+        sampleIndex === 0
+          ? mockedCenterEventOcrResult("CASHOUT COMPLETE", 69)
+          : null,
+      parseContext: { targetLabel: "A", teamLabel: "The Live Wires" },
+    });
+    const { db, insertedSuggestedEvents } = createProcessCaptureJobDb({
+      vodRows: [captureReadyVod()],
+      captureRows: [captureJob({ id: 99 })],
+    });
+
+    await processVodCaptureJob(
+      { vodAnalysisId: 44, captureJobId: 99 },
+      db,
+      detector,
+      capturedFrameExtractor
+    );
+
+    expect(insertedSuggestedEvents).toHaveLength(0);
+  });
+
+  it("does not create suggestions from unknown OCR text", async () => {
+    const detector = createCenterEventTextSampleDetector({
+      ocrEnabled: true,
+      getOcrResult: async ({ sampleIndex }) =>
+        sampleIndex === 0 ? mockedCenterEventOcrResult("ROUND STARTING") : null,
+      parseContext: { targetLabel: "A", teamLabel: "The Live Wires" },
+    });
+    const { db, insertedSuggestedEvents } = createProcessCaptureJobDb({
+      vodRows: [captureReadyVod()],
+      captureRows: [captureJob({ id: 99 })],
+    });
+
+    await processVodCaptureJob(
+      { vodAnalysisId: 44, captureJobId: 99 },
+      db,
+      detector,
+      capturedFrameExtractor
+    );
+
+    expect(insertedSuggestedEvents).toHaveLength(0);
+  });
+
+  it("dedupes repeated OCR text across adjacent frames", async () => {
+    const detector = createCenterEventTextSampleDetector({
+      ocrEnabled: true,
+      getOcrResult: async () => mockedCenterEventOcrResult("CASHOUT COMPLETE"),
+      parseContext: { targetLabel: "A", teamLabel: "The Live Wires" },
+      dedupeCooldownSeconds: 4,
+    });
+    const { db, insertedSuggestedEvents } = createProcessCaptureJobDb({
+      vodRows: [captureReadyVod({ durationSeconds: 4 })],
+      captureRows: [captureJob({ id: 99, sampleIntervalSeconds: 2 })],
+    });
+
+    await expect(
+      processVodCaptureJob(
+        { vodAnalysisId: 44, captureJobId: 99 },
+        db,
+        detector,
+        capturedFrameExtractor
+      )
+    ).resolves.toMatchObject({
+      status: "complete",
+      createdSuggestionCount: 1,
+    });
+
+    expect(insertedSuggestedEvents).toHaveLength(1);
+  });
+
+  it("keeps OCR capture job ingestion on the pending suggestion path", async () => {
+    const detector = createCenterEventTextSampleDetector({
+      ocrEnabled: true,
+      getOcrResult: async ({ sampleIndex }) =>
+        sampleIndex === 0
+          ? mockedCenterEventOcrResult("CASHOUT COMPLETE")
+          : null,
+      parseContext: { targetLabel: "C", teamLabel: "The Retros" },
+    });
+    const { db, insertedSuggestedEvents } = createProcessCaptureJobDb({
+      vodRows: [captureReadyVod()],
+      captureRows: [captureJob({ id: 99 })],
+    });
+
+    await processVodCaptureJob(
+      { vodAnalysisId: 44, captureJobId: 99 },
+      db,
+      detector,
+      capturedFrameExtractor
+    );
+
+    expect(insertedSuggestedEvents).toHaveLength(1);
+    expect(insertedSuggestedEvents[0]).toMatchObject({
+      source: "automation",
+      status: "pending",
     });
   });
 
