@@ -195,9 +195,10 @@ export function VodAutomationStatusPanel({
             Automation Status
           </h3>
           <p className="mt-2 font-mono text-sm text-white/50">
-            First-pass capture processing now attempts real Twitch frame
-            extraction when server binaries are available, then sends
-            conservative detector output into the pending review queue.
+            First-pass capture processing keeps frame extraction and HUD zones
+            active, then sends conservative center-event-text detector output
+            into the pending review queue only when text is confidently detected
+            or provided by detector input.
           </p>
         </div>
         <span className="rounded border border-white/10 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-white/50">
@@ -248,9 +249,11 @@ export function VodAutomationStatusPanel({
         <div className="rounded border border-neon-magenta/30 bg-neon-magenta/10 p-3 font-mono text-sm text-white/70">
           Capture jobs plan frame-sampling work and can run a conservative
           first-pass processor that saves local Twitch debug frames when yt-dlp
-          and ffmpeg are available. Suggested events are the review queue
-          output. Confirmed manual events are the approved output used by Team
-          Summary and Team Insights.
+          and ffmpeg are available. HUD zones are active for inspection, and the
+          center event text detector only emits suggestions when text is
+          confidently detected or provided by detector input. Suggested events
+          are the review queue output. Confirmed manual events are the approved
+          output used by Team Summary and Team Insights.
         </div>
 
         <div className="rounded border border-neon-cyan/20 bg-black/40 p-3">
@@ -261,8 +264,9 @@ export function VodAutomationStatusPanel({
               </div>
               <p className="mt-1 font-mono text-xs text-white/55">
                 Read-only detector inspection zones over the latest captured
-                Twitch debug frame. These boxes do not create suggestions, OCR,
-                or AI detections.
+                Twitch debug frame. Frame extraction and HUD zones are active;
+                the center event text detector remains conservative and does not
+                add OCR or AI configuration yet.
               </p>
             </div>
             {framePreview?.status === "available" &&
@@ -533,8 +537,9 @@ export function VodAutomationStatusPanel({
         ) : null}
         <p className="font-mono text-xs text-white/45">
           Processing attempts Twitch frame extraction for planned samples when
-          yt-dlp and ffmpeg are installed, then uses a conservative detector;
-          full OCR/AI gameplay detection can replace it later.
+          yt-dlp and ffmpeg are installed, then uses a conservative center event
+          text detector that only emits suggestions when text is confidently
+          detected or provided by detector input.
         </p>
         {captureJobDisabledReason ? (
           <p className="font-mono text-xs text-white/45">
