@@ -33,6 +33,7 @@ import {
   type VodCaptureReadiness,
 } from "../shared/vod/frame-sampling";
 import { getVodHudZonePreset, type VodHudZone } from "../shared/vod/hud-zones";
+import { createCenterEventTextSampleDetector } from "./vodDetectors/centerEventTextDetector";
 import {
   buildVodCaptureFrameUrl,
   extractVodFrame,
@@ -709,18 +710,19 @@ export const createVodSuggestedEventInputSchema =
       .default("pending"),
   });
 
-const detectedAutomationEventInputSchema = vodAnalysisEventPayloadBaseSchema
-  .omit({ vodAnalysisId: true })
-  .safeExtend({
-    confidence: z
-      .number()
-      .int("Detected event confidence must be a whole number.")
-      .min(0, "Detected event confidence must be between 0 and 100.")
-      .max(100, "Detected event confidence must be between 0 and 100.")
-      .optional()
-      .nullable(),
-  })
-  .superRefine(validateVodAnalysisEventRequiredFields);
+export const detectedAutomationEventInputSchema =
+  vodAnalysisEventPayloadBaseSchema
+    .omit({ vodAnalysisId: true })
+    .safeExtend({
+      confidence: z
+        .number()
+        .int("Detected event confidence must be a whole number.")
+        .min(0, "Detected event confidence must be between 0 and 100.")
+        .max(100, "Detected event confidence must be between 0 and 100.")
+        .optional()
+        .nullable(),
+    })
+    .superRefine(validateVodAnalysisEventRequiredFields);
 
 export const ingestAutomationDetectionsInputSchema = z.object({
   vodAnalysisId: vodAnalysisIdInputSchema,
@@ -1109,9 +1111,7 @@ async function getVodCaptureJobByIdForProcessing(
 }
 
 export const conservativeVodCaptureSampleDetector: VodCaptureSampleDetector =
-  async () => {
-    return [];
-  };
+  createCenterEventTextSampleDetector();
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error
@@ -1245,7 +1245,14 @@ export async function processVodCaptureJob(
                 : Object.hasOwn(detection, "metadata")
                   ? { detectorMetadata: detection.metadata }
                   : {}),
-              detectorVersion: "debug-frame-v1",
+              detectorVersion:
+                typeof detection.metadata === "object" &&
+                detection.metadata !== null &&
+                !Array.isArray(detection.metadata) &&
+                "detectorVersion" in detection.metadata &&
+                typeof detection.metadata.detectorVersion === "string"
+                  ? detection.metadata.detectorVersion
+                  : "debug-frame-v1",
               sampleIndex,
               timestampSeconds: sampleTimestampSeconds,
               frameCaptureStatus: frameCapture.status,

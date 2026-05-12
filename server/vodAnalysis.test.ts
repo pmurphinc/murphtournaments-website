@@ -34,6 +34,7 @@ import {
   getVodAnalysisById,
   ingestAutomationDetections,
   ingestAutomationDetectionsInputSchema,
+  detectedAutomationEventInputSchema,
   listVodAnalysisEvents,
   listVodAnalyses,
   listVodCaptureJobs,
@@ -63,6 +64,10 @@ import {
   type VodFrameExtractor,
 } from "./vodAnalysis";
 import { getVodHudZonePreset, VOD_HUD_ZONE_IDS } from "../shared/vod/hud-zones";
+import {
+  createCenterEventTextSampleDetector,
+  parseCenterEventTextToDetections,
+} from "./vodDetectors/centerEventTextDetector";
 import {
   getLatestVodCaptureFrameFile,
   resolveVodCaptureFramePath,
@@ -2129,6 +2134,71 @@ describe("updateVodCaptureJobStatus", () => {
   });
 });
 
+describe("parseCenterEventTextToDetections", () => {
+  it("returns no detections for empty or unknown text", () => {
+    expect(parseCenterEventTextToDetections("", 12)).toEqual([]);
+    expect(parseCenterEventTextToDetections("ROUND STARTING", 12)).toEqual([]);
+  });
+
+  it("maps CASHOUT COMPLETE to a valid cashout detection when required fields can be satisfied", () => {
+    const [detection] = parseCenterEventTextToDetections(
+      "CASHOUT COMPLETE",
+      45,
+      { targetLabel: "A", teamLabel: "The Live Wires" }
+    );
+
+    expect(detection).toMatchObject({
+      eventType: "cashout",
+      timestampSeconds: 45,
+      targetLabel: "A",
+      teamLabel: "The Live Wires",
+    });
+    expect(
+      detectedAutomationEventInputSchema.safeParse(detection).success
+    ).toBe(true);
+  });
+
+  it.each(["CASHOUT STOLEN", "STOLEN"])(
+    "maps %s to a valid steal_flip detection when required fields can be satisfied",
+    text => {
+      const [detection] = parseCenterEventTextToDetections(text, 60, {
+        targetLabel: "B",
+        teamLabel: "The High Notes",
+      });
+
+      expect(detection).toMatchObject({
+        eventType: "steal_flip",
+        timestampSeconds: 60,
+        targetLabel: "B",
+        teamLabel: "The High Notes",
+      });
+      expect(
+        detectedAutomationEventInputSchema.safeParse(detection).success
+      ).toBe(true);
+    }
+  );
+
+  it("does not emit invalid team_wipe detections when no team label is present", () => {
+    expect(parseCenterEventTextToDetections("TEAM WIPED", 75)).toEqual([]);
+  });
+
+  it("emits a valid team_wipe when a team label can be safely provided", () => {
+    const [detection] = parseCenterEventTextToDetections("TEAM WIPED", 75, {
+      teamLabel: "The Big Splash",
+    });
+
+    expect(detection).toMatchObject({
+      eventType: "team_wipe",
+      timestampSeconds: 75,
+      actorLabel: "The Big Splash",
+      teamLabel: "The Big Splash",
+    });
+    expect(
+      detectedAutomationEventInputSchema.safeParse(detection).success
+    ).toBe(true);
+  });
+});
+
 describe("processVodCaptureJob", () => {
   it("returns not_found for missing VODs and missing jobs", async () => {
     const missingVod = createProcessCaptureJobDb({
@@ -2369,6 +2439,62 @@ describe("processVodCaptureJob", () => {
       failedSamples: 4,
       errorMessage:
         "Frame extraction requires missing system binaries: yt-dlp, ffmpeg.",
+    });
+  });
+
+  it("ingests center-event-text detector output into pending suggestions", async () => {
+    const frameExtractor: VodFrameExtractor = async input => ({
+      status: "captured",
+      timestampSeconds: input.timestampSeconds,
+      sampleIndex: input.sampleIndex,
+      framePath:
+        "/workspace/murphtournaments-website/server/.cache/vod-capture/44/99/sample-0001-000000.jpg",
+      relativeFramePath:
+        "server/.cache/vod-capture/44/99/sample-0001-000000.jpg",
+      fileName: "sample-0001-000000.jpg",
+    });
+    const detector = createCenterEventTextSampleDetector({
+      getText: ({ sampleIndex }) =>
+        sampleIndex === 0 ? "CASHOUT COMPLETE" : null,
+      parseContext: { targetLabel: "A", teamLabel: "The Live Wires" },
+    });
+    const { db, insertedSuggestedEvents } = createProcessCaptureJobDb({
+      vodRows: [captureReadyVod()],
+      captureRows: [captureJob({ id: 99 })],
+    });
+
+    await expect(
+      processVodCaptureJob(
+        { vodAnalysisId: 44, captureJobId: 99 },
+        db,
+        detector,
+        frameExtractor
+      )
+    ).resolves.toMatchObject({
+      status: "complete",
+      createdSuggestionCount: 1,
+    });
+
+    expect(insertedSuggestedEvents).toHaveLength(1);
+    expect(insertedSuggestedEvents[0]).toMatchObject({
+      eventType: "cashout",
+      targetLabel: "A",
+      teamLabel: "The Live Wires",
+      source: "automation",
+      status: "pending",
+    });
+    const metadata = JSON.parse(
+      String((insertedSuggestedEvents[0] as { metadata: string }).metadata)
+    );
+    expect(metadata.detectorMetadata).toMatchObject({
+      detectorVersion: "center-event-text-v1",
+      hudZoneId: "center_event_text",
+      sampleIndex: 0,
+      timestampSeconds: 0,
+      frameFileName: "sample-0001-000000.jpg",
+      relativeFramePath:
+        "server/.cache/vod-capture/44/99/sample-0001-000000.jpg",
+      matchedText: "CASHOUT COMPLETE",
     });
   });
 
