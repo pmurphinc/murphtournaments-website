@@ -29,6 +29,7 @@ import { getDb } from "./db";
 import {
   buildFrameSamplingPlan,
   getVodCaptureReadiness,
+  type FrameSamplingPlan,
   type VodCaptureReadiness,
 } from "../shared/vod/frame-sampling";
 
@@ -247,10 +248,42 @@ export type RunMockVodAutomationDetectionsInput = {
   captureJobId: number;
 };
 
+export type ProcessVodCaptureJobInput = {
+  vodAnalysisId: number;
+  captureJobId: number;
+};
+
+export type VodCaptureSampleDetectionInput = {
+  vodAnalysis: VodAnalysisRecord;
+  captureJob: VodCaptureJobRecord;
+  sampleTimestampSeconds: number;
+  sampleIndex: number;
+  samplePlan: FrameSamplingPlan;
+};
+
+export type VodCaptureSampleDetector = (
+  input: VodCaptureSampleDetectionInput
+) => Promise<DetectedAutomationEventInput[]>;
+
 export type RunMockVodAutomationDetectionsResult = Pick<
   IngestAutomationDetectionsResult,
   "status" | "vodAnalysisId" | "captureJobId" | "createdCount"
 >;
+
+export type ProcessVodCaptureJobResult = {
+  status:
+    | "complete"
+    | "failed"
+    | "not_found"
+    | "invalid_capture_job"
+    | "invalid_capture_job_status";
+  vodAnalysisId: number;
+  captureJobId: number;
+  processedSamples: number;
+  failedSamples: number;
+  createdSuggestionCount: number;
+  errorMessage?: string;
+};
 
 export type IngestAutomationDetectionsResult =
   | {
@@ -419,6 +452,26 @@ type CaptureJobLatestDb = {
 };
 
 type SuggestedEventInsertableDb = {
+  insert: (table: typeof vodSuggestedEvents) => {
+    values: (values: InsertVodSuggestedEvent) => Promise<unknown>;
+  };
+};
+
+type ProcessVodCaptureJobDb = {
+  select: (fields: Record<string, unknown>) => {
+    from: (table: typeof vodAnalyses | typeof vodCaptureJobs) => {
+      where: (condition: unknown) => {
+        limit: (
+          limit: number
+        ) => Promise<VodAnalysisRecord[] | VodCaptureJobRecord[]>;
+      };
+    };
+  };
+  update: (table: typeof vodCaptureJobs) => {
+    set: (values: Partial<InsertVodCaptureJob>) => {
+      where: (condition: unknown) => Promise<unknown>;
+    };
+  };
   insert: (table: typeof vodSuggestedEvents) => {
     values: (values: InsertVodSuggestedEvent) => Promise<unknown>;
   };
@@ -642,6 +695,11 @@ export const ingestAutomationDetectionsInputSchema = z.object({
 });
 
 export const runMockVodAutomationDetectionsInputSchema = z.object({
+  vodAnalysisId: vodAnalysisIdInputSchema,
+  captureJobId: z.number().int().positive(),
+});
+
+export const processVodCaptureJobInputSchema = z.object({
   vodAnalysisId: vodAnalysisIdInputSchema,
   captureJobId: z.number().int().positive(),
 });
@@ -994,6 +1052,194 @@ export async function updateVodCaptureJobStatus(
     );
 
   return result;
+}
+
+async function getVodCaptureJobByIdForProcessing(
+  id: number,
+  db: ProcessVodCaptureJobDb
+): Promise<VodCaptureJobRecord | null> {
+  const [captureJob] = (await db
+    .select(vodCaptureJobFields)
+    .from(vodCaptureJobs)
+    .where(eq(vodCaptureJobs.id, id))
+    .limit(1)) as unknown as VodCaptureJobRecord[];
+
+  return captureJob ?? null;
+}
+
+export const conservativeVodCaptureSampleDetector: VodCaptureSampleDetector =
+  async () => {
+    return [];
+  };
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error
+    ? error.message
+    : "Unknown capture processing error.";
+}
+
+export async function processVodCaptureJob(
+  input: ProcessVodCaptureJobInput,
+  dbClient?: ProcessVodCaptureJobDb | null,
+  detector: VodCaptureSampleDetector = conservativeVodCaptureSampleDetector
+): Promise<ProcessVodCaptureJobResult> {
+  const parsedInput = processVodCaptureJobInputSchema.parse(input);
+  const db = dbClient ?? ((await getDb()) as ProcessVodCaptureJobDb | null);
+
+  if (!db) {
+    throw new Error(
+      "Database is not available for VOD capture job processing."
+    );
+  }
+
+  const baseResult = {
+    vodAnalysisId: parsedInput.vodAnalysisId,
+    captureJobId: parsedInput.captureJobId,
+    processedSamples: 0,
+    failedSamples: 0,
+    createdSuggestionCount: 0,
+  } satisfies Omit<ProcessVodCaptureJobResult, "status">;
+
+  const vodAnalysis = await getVodAnalysisById(
+    parsedInput.vodAnalysisId,
+    db as unknown as GetByIdDb
+  );
+
+  if (!vodAnalysis) {
+    return { ...baseResult, status: "not_found" };
+  }
+
+  const captureJob = await getVodCaptureJobByIdForProcessing(
+    parsedInput.captureJobId,
+    db
+  );
+
+  if (!captureJob) {
+    return { ...baseResult, status: "not_found" };
+  }
+
+  if (captureJob.vodAnalysisId !== parsedInput.vodAnalysisId) {
+    return { ...baseResult, status: "invalid_capture_job" };
+  }
+
+  if (captureJob.status !== "queued") {
+    return {
+      ...baseResult,
+      status: "invalid_capture_job_status",
+      errorMessage: `Capture job ${captureJob.id} must be queued before processing.`,
+    };
+  }
+
+  let processedSamples = 0;
+  let failedSamples = 0;
+  let createdSuggestionCount = 0;
+  const samplePlan = buildFrameSamplingPlan(
+    vodAnalysis.durationSeconds,
+    captureJob.sampleIntervalSeconds
+  );
+
+  const updateJob = async (values: Partial<InsertVodCaptureJob>) => {
+    await db
+      .update(vodCaptureJobs)
+      .set(values)
+      .where(
+        and(
+          eq(vodCaptureJobs.id, parsedInput.captureJobId),
+          eq(vodCaptureJobs.vodAnalysisId, parsedInput.vodAnalysisId)
+        )
+      );
+  };
+
+  await updateJob({
+    status: "processing",
+    processedSamples: 0,
+    failedSamples: 0,
+    errorMessage: null,
+    startedAt: new Date(),
+  });
+
+  try {
+    for (
+      let sampleIndex = 0;
+      sampleIndex < samplePlan.timestamps.length;
+      sampleIndex += 1
+    ) {
+      const sampleTimestampSeconds = samplePlan.timestamps[sampleIndex];
+      try {
+        const detections = await detector({
+          vodAnalysis,
+          captureJob,
+          sampleTimestampSeconds,
+          sampleIndex,
+          samplePlan,
+        });
+
+        if (detections.length > 0) {
+          const ingestResult = await ingestAutomationDetections(
+            {
+              vodAnalysisId: parsedInput.vodAnalysisId,
+              captureJobId: parsedInput.captureJobId,
+              detections,
+            },
+            db
+          );
+
+          if (ingestResult.status !== "created") {
+            throw new Error(
+              `Automation detection ingestion returned ${ingestResult.status}.`
+            );
+          }
+
+          createdSuggestionCount += ingestResult.createdCount;
+        }
+
+        processedSamples += 1;
+      } catch {
+        failedSamples += 1;
+        throw new Error(
+          `Capture sample ${sampleIndex + 1} at ${sampleTimestampSeconds}s failed.`
+        );
+      } finally {
+        await updateJob({ processedSamples, failedSamples });
+      }
+    }
+
+    await updateJob({
+      status: "complete",
+      processedSamples,
+      failedSamples,
+      completedAt: new Date(),
+    });
+
+    return {
+      status: "complete",
+      vodAnalysisId: parsedInput.vodAnalysisId,
+      captureJobId: parsedInput.captureJobId,
+      processedSamples,
+      failedSamples,
+      createdSuggestionCount,
+    };
+  } catch (error) {
+    const errorMessage = getErrorMessage(error);
+
+    await updateJob({
+      status: "failed",
+      processedSamples,
+      failedSamples,
+      errorMessage,
+      completedAt: new Date(),
+    });
+
+    return {
+      status: "failed",
+      vodAnalysisId: parsedInput.vodAnalysisId,
+      captureJobId: parsedInput.captureJobId,
+      processedSamples,
+      failedSamples,
+      createdSuggestionCount,
+      errorMessage,
+    };
+  }
 }
 
 export async function listVodCaptureJobs(
@@ -1523,7 +1769,7 @@ async function getVodCaptureJobByIdForIngestion(
     .select(vodCaptureJobFields)
     .from(vodCaptureJobs)
     .where(eq(vodCaptureJobs.id, id))
-    .limit(1)) as VodCaptureJobRecord[];
+    .limit(1)) as unknown as VodCaptureJobRecord[];
 
   return captureJob ?? null;
 }

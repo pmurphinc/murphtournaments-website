@@ -36,6 +36,7 @@ import {
   listVodSuggestedEvents,
   rejectVodSuggestedEvent,
   refreshTwitchMetadataForVodAnalysis,
+  processVodCaptureJob,
   runMockVodAutomationDetections,
   updateVodAnalysisEvent,
   updateVodAnalysisEventInputSchema,
@@ -54,6 +55,7 @@ import {
   updateVodCaptureJobStatus,
   updateVodCaptureJobStatusInputSchema,
   type UpdateVodCaptureJobStatusInput,
+  type VodCaptureSampleDetector,
 } from "./vodAnalysis";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
@@ -282,6 +284,50 @@ function createAutomationDetectionIngestDb({
     vodLimit,
     captureLimit,
     insertedSuggestedEvents,
+  };
+}
+
+function createProcessCaptureJobDb({
+  vodRows,
+  captureRows,
+}: {
+  vodRows: VodAnalysisRecord[];
+  captureRows: VodCaptureJobRecord[];
+}) {
+  const insertedSuggestedEvents: unknown[] = [];
+  const updateSets: Array<Record<string, unknown>> = [];
+  const values = vi.fn(async (event: unknown) => {
+    insertedSuggestedEvents.push(event);
+  });
+  const insert = vi.fn(() => ({ values }));
+  const updateWhere = vi.fn().mockResolvedValue(undefined);
+  const set = vi.fn((update: Record<string, unknown>) => {
+    updateSets.push(update);
+    return { where: updateWhere };
+  });
+  const update = vi.fn(() => ({ set }));
+  const vodLimit = vi.fn().mockResolvedValue(vodRows);
+  const vodWhere = vi.fn(() => ({ limit: vodLimit }));
+  const captureLimit = vi.fn().mockResolvedValue(captureRows);
+  const captureWhere = vi.fn(() => ({ limit: captureLimit }));
+  const from = vi.fn(table => {
+    if (table === vodAnalyses) return { where: vodWhere };
+    return { where: captureWhere };
+  });
+  const select = vi.fn(() => ({ from }));
+
+  return {
+    db: { select, update, insert },
+    select,
+    insert,
+    values,
+    update,
+    set,
+    updateWhere,
+    vodLimit,
+    captureLimit,
+    insertedSuggestedEvents,
+    updateSets,
   };
 }
 
@@ -2062,6 +2108,180 @@ describe("updateVodCaptureJobStatus", () => {
     ).rejects.toThrow(
       "Capture job status controls are only available in development."
     );
+  });
+});
+
+describe("processVodCaptureJob", () => {
+  it("returns not_found for missing VODs and missing jobs", async () => {
+    const missingVod = createProcessCaptureJobDb({
+      vodRows: [],
+      captureRows: [captureJob({ id: 99 })],
+    });
+
+    await expect(
+      processVodCaptureJob(
+        { vodAnalysisId: 44, captureJobId: 99 },
+        missingVod.db
+      )
+    ).resolves.toMatchObject({
+      status: "not_found",
+      vodAnalysisId: 44,
+      captureJobId: 99,
+    });
+    expect(missingVod.captureLimit).not.toHaveBeenCalled();
+    expect(missingVod.update).not.toHaveBeenCalled();
+
+    const missingJob = createProcessCaptureJobDb({
+      vodRows: [captureReadyVod()],
+      captureRows: [],
+    });
+
+    await expect(
+      processVodCaptureJob(
+        { vodAnalysisId: 44, captureJobId: 99 },
+        missingJob.db
+      )
+    ).resolves.toMatchObject({ status: "not_found" });
+    expect(missingJob.update).not.toHaveBeenCalled();
+  });
+
+  it("returns invalid_capture_job when the job belongs to a different VOD", async () => {
+    const { db, update, insert } = createProcessCaptureJobDb({
+      vodRows: [captureReadyVod()],
+      captureRows: [captureJob({ id: 99, vodAnalysisId: 45 })],
+    });
+
+    await expect(
+      processVodCaptureJob({ vodAnalysisId: 44, captureJobId: 99 }, db)
+    ).resolves.toMatchObject({ status: "invalid_capture_job" });
+
+    expect(update).not.toHaveBeenCalled();
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("marks queued jobs processing and then complete", async () => {
+    const { db, updateSets } = createProcessCaptureJobDb({
+      vodRows: [captureReadyVod()],
+      captureRows: [captureJob({ id: 99 })],
+    });
+
+    await expect(
+      processVodCaptureJob({ vodAnalysisId: 44, captureJobId: 99 }, db)
+    ).resolves.toMatchObject({
+      status: "complete",
+      processedSamples: 4,
+      failedSamples: 0,
+      createdSuggestionCount: 0,
+    });
+
+    expect(updateSets[0]).toMatchObject({
+      status: "processing",
+      processedSamples: 0,
+      failedSamples: 0,
+      errorMessage: null,
+      startedAt: expect.any(Date),
+    });
+    expect(updateSets.at(-1)).toMatchObject({
+      status: "complete",
+      processedSamples: 4,
+      failedSamples: 0,
+      completedAt: expect.any(Date),
+    });
+  });
+
+  it("updates processedSamples based on the sampling plan", async () => {
+    const { db, updateSets } = createProcessCaptureJobDb({
+      vodRows: [captureReadyVod({ durationSeconds: 61 })],
+      captureRows: [captureJob({ id: 99, sampleIntervalSeconds: 20 })],
+    });
+
+    await expect(
+      processVodCaptureJob({ vodAnalysisId: 44, captureJobId: 99 }, db)
+    ).resolves.toMatchObject({ processedSamples: 4 });
+
+    expect(updateSets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ processedSamples: 1, failedSamples: 0 }),
+        expect.objectContaining({ processedSamples: 2, failedSamples: 0 }),
+        expect.objectContaining({ processedSamples: 3, failedSamples: 0 }),
+        expect.objectContaining({ processedSamples: 4, failedSamples: 0 }),
+      ])
+    );
+  });
+
+  it("creates pending suggestions through automation ingestion when detections exist", async () => {
+    const detector: VodCaptureSampleDetector = async ({ sampleIndex }) =>
+      sampleIndex === 0
+        ? [
+            {
+              eventType: "cashout",
+              timestampSeconds: 0,
+              targetLabel: "A",
+              teamLabel: "The Live Wires",
+              confidence: 80,
+              metadata: { detector: "unit-test" },
+            },
+          ]
+        : [];
+    const { db, insert, insertedSuggestedEvents } = createProcessCaptureJobDb({
+      vodRows: [captureReadyVod()],
+      captureRows: [captureJob({ id: 99 })],
+    });
+
+    await expect(
+      processVodCaptureJob(
+        { vodAnalysisId: 44, captureJobId: 99 },
+        db,
+        detector
+      )
+    ).resolves.toMatchObject({
+      status: "complete",
+      createdSuggestionCount: 1,
+    });
+
+    expect(insert).toHaveBeenCalledWith(vodSuggestedEvents);
+    expect(insert).not.toHaveBeenCalledWith(vodAnalysisEvents);
+    expect(insertedSuggestedEvents).toHaveLength(1);
+    expect(insertedSuggestedEvents[0]).toMatchObject({
+      vodAnalysisId: 44,
+      source: "automation",
+      status: "pending",
+      metadata: JSON.stringify({
+        captureJobId: 99,
+        detectorMetadata: { detector: "unit-test" },
+      }),
+    });
+  });
+
+  it("marks failed with errorMessage when the detector throws", async () => {
+    const detector: VodCaptureSampleDetector = async () => {
+      throw new Error("OCR engine unavailable");
+    };
+    const { db, updateSets } = createProcessCaptureJobDb({
+      vodRows: [captureReadyVod()],
+      captureRows: [captureJob({ id: 99 })],
+    });
+
+    await expect(
+      processVodCaptureJob(
+        { vodAnalysisId: 44, captureJobId: 99 },
+        db,
+        detector
+      )
+    ).resolves.toMatchObject({
+      status: "failed",
+      processedSamples: 0,
+      failedSamples: 1,
+      errorMessage: "Capture sample 1 at 0s failed.",
+    });
+
+    expect(updateSets.at(-1)).toMatchObject({
+      status: "failed",
+      processedSamples: 0,
+      failedSamples: 1,
+      errorMessage: "Capture sample 1 at 0s failed.",
+      completedAt: expect.any(Date),
+    });
   });
 });
 

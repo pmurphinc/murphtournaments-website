@@ -33,6 +33,10 @@ export function VodAutomationStatusPanel({
     type: "success" | "error";
     text: string;
   } | null>(null);
+  const [processCaptureJobMessage, setProcessCaptureJobMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
   const readiness = getVodCaptureReadiness(vod);
   const samplePlan = readiness.samplePlan;
   const firstTimestamps = samplePlan.timestamps.slice(0, 5);
@@ -69,6 +73,38 @@ export function VodAutomationStatusPanel({
         setCaptureJobStatusMessage({ type: "error", text: error.message });
       },
     });
+  const processCaptureJobMutation =
+    trpc.vodAnalysis.processCaptureJob.useMutation({
+      onMutate: () => {
+        setProcessCaptureJobMessage(null);
+      },
+      onSuccess: async result => {
+        await Promise.all([
+          utils.vodAnalysis.getAutomationStatus.invalidate(vodAnalysisId),
+          utils.vodAnalysis.getLatestCaptureJob.invalidate(vodAnalysisId),
+          utils.vodAnalysis.listCaptureJobs.invalidate(vodAnalysisId),
+          utils.vodAnalysis.listSuggestedEvents.invalidate(vodAnalysisId),
+          utils.vodAnalysis.list.invalidate(),
+        ]);
+
+        if (result.status === "complete") {
+          setProcessCaptureJobMessage({
+            type: "success",
+            text: `Processed ${result.processedSamples} samples and created ${result.createdSuggestionCount} pending suggestions.`,
+          });
+        } else {
+          setProcessCaptureJobMessage({
+            type: "error",
+            text:
+              result.errorMessage ??
+              `Capture job processing returned ${result.status}.`,
+          });
+        }
+      },
+      onError: error => {
+        setProcessCaptureJobMessage({ type: "error", text: error.message });
+      },
+    });
   const mockAutomationMutation =
     trpc.vodAnalysis.runMockAutomationDetections.useMutation({
       onMutate: () => {
@@ -98,6 +134,15 @@ export function VodAutomationStatusPanel({
     ? getVodCaptureJobStatusTone(latestCaptureJob.status)
     : null;
   const captureJobDisabledReason = readiness.isReady ? null : readiness.reason;
+  const processCaptureJobDisabledReason = !latestCaptureJob
+    ? "Queue a capture job first."
+    : latestCaptureJob.status === "processing"
+      ? "This capture job is already processing."
+      : latestCaptureJob.status === "complete"
+        ? "This capture job is already complete."
+        : latestCaptureJob.status !== "queued"
+          ? "Only queued capture jobs can be processed."
+          : null;
   const sourceTypeLabel =
     vod.sourceType === "twitch" ||
     vod.sourceType === "youtube" ||
@@ -114,8 +159,8 @@ export function VodAutomationStatusPanel({
             Automation Status
           </h3>
           <p className="mt-2 font-mono text-sm text-white/50">
-            Frame scanning is not active yet. Future scanner output will enter
-            this review queue as pending suggestions.
+            First-pass capture processing can now walk planned samples and send
+            conservative detector output into the pending review queue.
           </p>
         </div>
         <span className="rounded border border-white/10 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-white/50">
@@ -164,9 +209,10 @@ export function VodAutomationStatusPanel({
         </div>
 
         <div className="rounded border border-neon-magenta/30 bg-neon-magenta/10 p-3 font-mono text-sm text-white/70">
-          Capture jobs plan frame-sampling work. Suggested events are the review
-          queue output. Confirmed manual events are the approved output used by
-          Team Summary and Team Insights.
+          Capture jobs plan frame-sampling work and can run a conservative
+          first-pass processor. Suggested events are the review queue output.
+          Confirmed manual events are the approved output used by Team Summary
+          and Team Insights.
         </div>
 
         {automationStatus ? (
@@ -321,25 +367,59 @@ export function VodAutomationStatusPanel({
           </p>
         ) : null}
 
-        <button
-          type="button"
-          onClick={() =>
-            createCaptureJobMutation.mutate({
-              vodAnalysisId,
-              source: "manual_debug",
-            })
-          }
-          disabled={!readiness.isReady || createCaptureJobMutation.isPending}
-          title={captureJobDisabledReason ?? undefined}
-          className="w-full rounded-sm border-2 border-neon-cyan px-4 py-2 font-mono text-xs font-bold uppercase tracking-widest text-neon-cyan transition hover:bg-neon-cyan/10 hover-glow-cyan disabled:cursor-not-allowed disabled:border-white/15 disabled:text-white/35 disabled:hover:bg-transparent"
-        >
-          {createCaptureJobMutation.isPending
-            ? "Queueing capture job…"
-            : "Queue capture job"}
-        </button>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() =>
+              createCaptureJobMutation.mutate({
+                vodAnalysisId,
+                source: "manual_debug",
+              })
+            }
+            disabled={!readiness.isReady || createCaptureJobMutation.isPending}
+            title={captureJobDisabledReason ?? undefined}
+            className="rounded-sm border-2 border-neon-cyan px-4 py-2 font-mono text-xs font-bold uppercase tracking-widest text-neon-cyan transition hover:bg-neon-cyan/10 hover-glow-cyan disabled:cursor-not-allowed disabled:border-white/15 disabled:text-white/35 disabled:hover:bg-transparent"
+          >
+            {createCaptureJobMutation.isPending
+              ? "Queueing capture job…"
+              : "Queue capture job"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (!latestCaptureJob) return;
+              processCaptureJobMutation.mutate({
+                vodAnalysisId,
+                captureJobId: latestCaptureJob.id,
+              });
+            }}
+            disabled={
+              !latestCaptureJob ||
+              latestCaptureJob.status !== "queued" ||
+              processCaptureJobMutation.isPending
+            }
+            title={processCaptureJobDisabledReason ?? undefined}
+            className="rounded-sm border-2 border-neon-gold px-4 py-2 font-mono text-xs font-bold uppercase tracking-widest text-neon-gold transition hover:bg-neon-gold/10 disabled:cursor-not-allowed disabled:border-white/15 disabled:text-white/35 disabled:hover:bg-transparent"
+          >
+            {processCaptureJobMutation.isPending
+              ? "Processing capture job…"
+              : "Process latest capture job"}
+          </button>
+        </div>
+        {processCaptureJobMessage ? (
+          <p
+            className={`rounded border p-3 font-mono text-sm ${
+              processCaptureJobMessage.type === "success"
+                ? "border-neon-cyan/30 bg-neon-cyan/10 text-neon-cyan"
+                : "border-red-500/40 bg-red-950/30 text-red-100"
+            }`}
+          >
+            {processCaptureJobMessage.text}
+          </p>
+        ) : null}
         <p className="font-mono text-xs text-white/45">
-          This records planned sampling work. Actual frame processing will be
-          added later.
+          Processing currently tracks sample progress and uses a conservative
+          detector; full frame extraction/OCR can replace it later.
         </p>
         {captureJobDisabledReason ? (
           <p className="font-mono text-xs text-white/45">
