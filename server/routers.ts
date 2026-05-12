@@ -29,6 +29,8 @@ import {
   createVodAnalysisEventInputSchema,
   createVodCaptureJob,
   createVodCaptureJobInputSchema,
+  processVodCaptureJob,
+  processVodCaptureJobInputSchema,
   updateVodCaptureJobStatus,
   updateVodCaptureJobStatusInputSchema,
   createVodSuggestedEvent,
@@ -774,6 +776,12 @@ export const appRouter = router({
       .input(createVodCaptureJobInputSchema)
       .mutation(async ({ input }) => {
         return createVodCaptureJob(input.vodAnalysisId, input.source);
+      }),
+
+    processCaptureJob: publicProcedure
+      .input(processVodCaptureJobInputSchema)
+      .mutation(async ({ input }) => {
+        return processVodCaptureJob(input);
       }),
 
     updateCaptureJobStatus: publicProcedure
