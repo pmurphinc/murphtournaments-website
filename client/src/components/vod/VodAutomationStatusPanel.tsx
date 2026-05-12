@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { formatVodEventTimestamp } from "@shared/vod/events";
+import type { VodHudZoneId } from "@shared/vod/hud-zones";
 import {
   formatCaptureReadinessLabel,
   formatVodCaptureJobStatus,
@@ -47,10 +48,20 @@ export function VodAutomationStatusPanel({
       staleTime: 1000 * 10,
     }
   );
+  const framePreviewQuery =
+    trpc.vodAnalysis.getLatestCaptureFramePreview.useQuery(
+      { vodAnalysisId },
+      { staleTime: 1000 * 10 }
+    );
   const createCaptureJobMutation =
     trpc.vodAnalysis.createCaptureJob.useMutation({
       onSuccess: async () => {
-        await utils.vodAnalysis.getAutomationStatus.invalidate(vodAnalysisId);
+        await Promise.all([
+          utils.vodAnalysis.getAutomationStatus.invalidate(vodAnalysisId),
+          utils.vodAnalysis.getLatestCaptureFramePreview.invalidate({
+            vodAnalysisId,
+          }),
+        ]);
       },
     });
   const updateCaptureJobStatusMutation =
@@ -85,6 +96,9 @@ export function VodAutomationStatusPanel({
           utils.vodAnalysis.listCaptureJobs.invalidate(vodAnalysisId),
           utils.vodAnalysis.listSuggestedEvents.invalidate(vodAnalysisId),
           utils.vodAnalysis.list.invalidate(),
+          utils.vodAnalysis.getLatestCaptureFramePreview.invalidate({
+            vodAnalysisId,
+          }),
         ]);
 
         if (result.status === "complete") {
@@ -150,6 +164,28 @@ export function VodAutomationStatusPanel({
     vod.sourceType === "generic"
       ? formatVodSourceType(vod.sourceType)
       : "Unknown";
+  const framePreview = framePreviewQuery.data;
+  const zoneToneClasses: Record<VodHudZoneId, string> = {
+    scoreboard: "border-neon-gold bg-neon-gold/15 text-neon-gold",
+    kill_feed: "border-neon-magenta bg-neon-magenta/15 text-neon-magenta",
+    objective_hud: "border-neon-cyan bg-neon-cyan/15 text-neon-cyan",
+    center_event_text: "border-white/80 bg-white/10 text-white",
+    player_team_hud: "border-emerald-300 bg-emerald-400/15 text-emerald-200",
+  };
+  const legendZoneOrder: VodHudZoneId[] = [
+    "scoreboard",
+    "kill_feed",
+    "objective_hud",
+    "center_event_text",
+    "player_team_hud",
+  ];
+  const previewZones =
+    framePreview?.zones
+      .slice()
+      .sort(
+        (left, right) =>
+          legendZoneOrder.indexOf(left.id) - legendZoneOrder.indexOf(right.id)
+      ) ?? [];
 
   return (
     <details className="group rounded-lg border border-neon-cyan/20 bg-black/30 p-5">
@@ -215,6 +251,82 @@ export function VodAutomationStatusPanel({
           and ffmpeg are available. Suggested events are the review queue
           output. Confirmed manual events are the approved output used by Team
           Summary and Team Insights.
+        </div>
+
+        <div className="rounded border border-neon-cyan/20 bg-black/40 p-3">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-neon-cyan">
+                Debug frame HUD zones
+              </div>
+              <p className="mt-1 font-mono text-xs text-white/55">
+                Read-only detector inspection zones over the latest captured
+                Twitch debug frame. These boxes do not create suggestions, OCR,
+                or AI detections.
+              </p>
+            </div>
+            {framePreview?.status === "available" &&
+            framePreview.timestampSeconds !== null ? (
+              <span className="rounded border border-neon-gold/40 bg-neon-gold/10 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-neon-gold">
+                {formatVodEventTimestamp(framePreview.timestampSeconds)}
+              </span>
+            ) : null}
+          </div>
+
+          {framePreviewQuery.isLoading ? (
+            <div className="mt-3 rounded border border-white/10 bg-black/30 p-3 font-mono text-sm text-white/50">
+              Loading debug frame preview…
+            </div>
+          ) : framePreview?.status === "available" ? (
+            <div className="mt-3 space-y-3">
+              <div className="relative overflow-hidden rounded border border-white/10 bg-black shadow-[0_0_24px_rgba(0,229,255,0.12)]">
+                <img
+                  src={framePreview.frameUrl}
+                  alt="Latest captured VOD debug frame with HUD detection zones"
+                  className="block h-auto w-full"
+                  loading="lazy"
+                />
+                <div className="absolute inset-0">
+                  {previewZones.map(zone => (
+                    <div
+                      key={zone.id}
+                      className={`absolute border-2 ${zoneToneClasses[zone.id]} shadow-[0_0_14px_currentColor]`}
+                      style={{
+                        left: `${zone.rect.x * 100}%`,
+                        top: `${zone.rect.y * 100}%`,
+                        width: `${zone.rect.width * 100}%`,
+                        height: `${zone.rect.height * 100}%`,
+                      }}
+                      title={zone.purpose}
+                    >
+                      <span className="absolute left-1 top-1 rounded bg-black/75 px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-widest sm:text-[10px]">
+                        {zone.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                {previewZones.map(zone => (
+                  <div
+                    key={zone.id}
+                    className={`rounded border px-2 py-1.5 font-mono text-[10px] uppercase tracking-widest ${zoneToneClasses[zone.id]}`}
+                    title={zone.purpose}
+                  >
+                    {zone.label}
+                  </div>
+                ))}
+              </div>
+              <p className="font-mono text-[10px] text-white/40">
+                {framePreview.relativeFramePath}
+              </p>
+            </div>
+          ) : (
+            <div className="mt-3 rounded border border-white/10 bg-black/30 p-3 font-mono text-sm text-white/50">
+              No debug frame captured yet. Queue and process a Twitch capture
+              job first.
+            </div>
+          )}
         </div>
 
         {automationStatus ? (
