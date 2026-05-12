@@ -141,6 +141,8 @@ export function VodAutomationStatusPanel({
     });
   const automationStatus = automationStatusQuery.data;
   const latestCaptureJob = automationStatus?.latestCaptureJob ?? null;
+  const ocrEnabled = automationStatus?.ocrEnabled ?? false;
+  const ocrConfidenceThreshold = automationStatus?.ocrConfidenceThreshold ?? 70;
   const captureJobProgress = latestCaptureJob
     ? getVodCaptureJobProgress(latestCaptureJob)
     : null;
@@ -195,10 +197,10 @@ export function VodAutomationStatusPanel({
             Automation Status
           </h3>
           <p className="mt-2 font-mono text-sm text-white/50">
-            First-pass capture processing keeps frame extraction and HUD zones
-            active, then sends conservative center-event-text detector output
-            into the pending review queue only when text is confidently detected
-            or provided by detector input.
+            First-pass capture processing keeps frame extraction active and HUD
+            crop zones active. OCR is feature-flagged, and the conservative
+            center-event-text detector emits pending suggestions only when OCR
+            text is confidently recognized.
           </p>
         </div>
         <span className="rounded border border-white/10 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-white/50">
@@ -221,6 +223,14 @@ export function VodAutomationStatusPanel({
           <VodDetailPill
             label="Planned samples"
             value={String(samplePlan.timestamps.length)}
+          />
+          <VodDetailPill
+            label="OCR"
+            value={ocrEnabled ? "Enabled" : "Disabled"}
+          />
+          <VodDetailPill
+            label="OCR threshold"
+            value={`${ocrConfidenceThreshold}%`}
           />
         </div>
 
@@ -249,11 +259,12 @@ export function VodAutomationStatusPanel({
         <div className="rounded border border-neon-magenta/30 bg-neon-magenta/10 p-3 font-mono text-sm text-white/70">
           Capture jobs plan frame-sampling work and can run a conservative
           first-pass processor that saves local Twitch debug frames when yt-dlp
-          and ffmpeg are available. HUD zones are active for inspection, and the
-          center event text detector only emits suggestions when text is
-          confidently detected or provided by detector input. Suggested events
-          are the review queue output. Confirmed manual events are the approved
-          output used by Team Summary and Team Insights.
+          and ffmpeg are available. Frame extraction is active, HUD crop zones
+          are active, and OCR is currently {ocrEnabled ? "enabled" : "disabled"}
+          . The center-event detector emits pending suggestions only when OCR
+          text is confidently recognized above the configured threshold.
+          Suggested events are the review queue output. Confirmed manual events
+          are the approved output used by Team Summary and Team Insights.
         </div>
 
         <div className="rounded border border-neon-cyan/20 bg-black/40 p-3">
@@ -264,9 +275,10 @@ export function VodAutomationStatusPanel({
               </div>
               <p className="mt-1 font-mono text-xs text-white/55">
                 Read-only detector inspection zones over the latest captured
-                Twitch debug frame. Frame extraction and HUD zones are active;
-                the center event text detector remains conservative and does not
-                add OCR or AI configuration yet.
+                Twitch debug frame. Frame extraction is active, HUD crop zones
+                are active, and OCR is {ocrEnabled ? "enabled" : "disabled"};
+                the center-event detector emits pending suggestions only when
+                text is confidently recognized.
               </p>
             </div>
             {framePreview?.status === "available" &&

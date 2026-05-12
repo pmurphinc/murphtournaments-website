@@ -35,6 +35,10 @@ import {
 import { getVodHudZonePreset, type VodHudZone } from "../shared/vod/hud-zones";
 import { createCenterEventTextSampleDetector } from "./vodDetectors/centerEventTextDetector";
 import {
+  getVodAutomationOcrConfidenceThreshold,
+  isVodAutomationOcrEnabled,
+} from "./vodDetectors/centerEventTextOcr";
+import {
   buildVodCaptureFrameUrl,
   extractVodFrame,
   getLatestVodCaptureFrameFile,
@@ -101,6 +105,8 @@ export type ManualEventCountRow = {
 
 export type VodAutomationStatusSummary = {
   vodAnalysisId: number;
+  ocrEnabled: boolean;
+  ocrConfidenceThreshold: number;
   readiness: VodCaptureReadiness;
   latestCaptureJob: VodCaptureJobRecord | null;
   pendingSuggestedCount: number;
@@ -1530,6 +1536,8 @@ export async function getVodAutomationStatus(
 
   return {
     vodAnalysisId: parsedVodAnalysisId,
+    ocrEnabled: isVodAutomationOcrEnabled(),
+    ocrConfidenceThreshold: getVodAutomationOcrConfidenceThreshold(),
     readiness: getVodCaptureReadiness(vodAnalysis),
     latestCaptureJob,
     pendingSuggestedCount: suggestedCounts.pending,
