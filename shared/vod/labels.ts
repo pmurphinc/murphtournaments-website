@@ -1,6 +1,7 @@
 import { getVodEventTargetKind, type VodAnalysisEventType } from "./events";
 
 export const DEFAULT_THE_FINALS_TEAM_LABELS = [
+  "The Big Splash",
   "The High Notes",
   "The Live Wires",
   "The Kingfish",
