@@ -56,12 +56,20 @@ import {
   updateVodCaptureJobStatusInputSchema,
   type UpdateVodCaptureJobStatusInput,
   type VodCaptureSampleDetector,
+  type VodFrameExtractor,
 } from "./vodAnalysis";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 
 afterEach(() => {
   vi.unstubAllEnvs();
+});
+
+const skippedFrameExtractor: VodFrameExtractor = async input => ({
+  status: "skipped",
+  timestampSeconds: input.timestampSeconds,
+  sampleIndex: input.sampleIndex,
+  errorMessage: "Frame extraction skipped in unit test.",
 });
 
 function createPublicContext(): TrpcContext {
@@ -2121,7 +2129,9 @@ describe("processVodCaptureJob", () => {
     await expect(
       processVodCaptureJob(
         { vodAnalysisId: 44, captureJobId: 99 },
-        missingVod.db
+        missingVod.db,
+        undefined,
+        skippedFrameExtractor
       )
     ).resolves.toMatchObject({
       status: "not_found",
@@ -2139,7 +2149,9 @@ describe("processVodCaptureJob", () => {
     await expect(
       processVodCaptureJob(
         { vodAnalysisId: 44, captureJobId: 99 },
-        missingJob.db
+        missingJob.db,
+        undefined,
+        skippedFrameExtractor
       )
     ).resolves.toMatchObject({ status: "not_found" });
     expect(missingJob.update).not.toHaveBeenCalled();
@@ -2152,7 +2164,12 @@ describe("processVodCaptureJob", () => {
     });
 
     await expect(
-      processVodCaptureJob({ vodAnalysisId: 44, captureJobId: 99 }, db)
+      processVodCaptureJob(
+        { vodAnalysisId: 44, captureJobId: 99 },
+        db,
+        undefined,
+        skippedFrameExtractor
+      )
     ).resolves.toMatchObject({ status: "invalid_capture_job" });
 
     expect(update).not.toHaveBeenCalled();
@@ -2166,7 +2183,12 @@ describe("processVodCaptureJob", () => {
     });
 
     await expect(
-      processVodCaptureJob({ vodAnalysisId: 44, captureJobId: 99 }, db)
+      processVodCaptureJob(
+        { vodAnalysisId: 44, captureJobId: 99 },
+        db,
+        undefined,
+        skippedFrameExtractor
+      )
     ).resolves.toMatchObject({
       status: "complete",
       processedSamples: 4,
@@ -2196,7 +2218,12 @@ describe("processVodCaptureJob", () => {
     });
 
     await expect(
-      processVodCaptureJob({ vodAnalysisId: 44, captureJobId: 99 }, db)
+      processVodCaptureJob(
+        { vodAnalysisId: 44, captureJobId: 99 },
+        db,
+        undefined,
+        skippedFrameExtractor
+      )
     ).resolves.toMatchObject({ processedSamples: 4 });
 
     expect(updateSets).toEqual(
@@ -2232,7 +2259,8 @@ describe("processVodCaptureJob", () => {
       processVodCaptureJob(
         { vodAnalysisId: 44, captureJobId: 99 },
         db,
-        detector
+        detector,
+        skippedFrameExtractor
       )
     ).resolves.toMatchObject({
       status: "complete",
@@ -2248,8 +2276,143 @@ describe("processVodCaptureJob", () => {
       status: "pending",
       metadata: JSON.stringify({
         captureJobId: 99,
-        detectorMetadata: { detector: "unit-test" },
+        detectorMetadata: {
+          detector: "unit-test",
+          detectorVersion: "debug-frame-v1",
+          sampleIndex: 0,
+          timestampSeconds: 0,
+          frameCaptureStatus: "skipped",
+          frameCaptureMessage: "Frame extraction skipped in unit test.",
+        },
       }),
+    });
+  });
+
+  it("passes frame capture results into the detector", async () => {
+    const capturedFrames: unknown[] = [];
+    const frameExtractor: VodFrameExtractor = async input => ({
+      status: "captured",
+      timestampSeconds: input.timestampSeconds,
+      sampleIndex: input.sampleIndex,
+      framePath: `/workspace/murphtournaments-website/server/.cache/vod-capture/${input.vodAnalysisId}/${input.captureJobId}/sample-0001-000000.jpg`,
+      relativeFramePath: `server/.cache/vod-capture/${input.vodAnalysisId}/${input.captureJobId}/sample-0001-000000.jpg`,
+      fileName: "sample-0001-000000.jpg",
+    });
+    const detector: VodCaptureSampleDetector = async input => {
+      capturedFrames.push(input.frameCapture);
+      return [];
+    };
+    const { db } = createProcessCaptureJobDb({
+      vodRows: [captureReadyVod()],
+      captureRows: [captureJob({ id: 99 })],
+    });
+
+    await expect(
+      processVodCaptureJob(
+        { vodAnalysisId: 44, captureJobId: 99 },
+        db,
+        detector,
+        frameExtractor
+      )
+    ).resolves.toMatchObject({ status: "complete", processedSamples: 4 });
+
+    expect(capturedFrames).toHaveLength(4);
+    expect(capturedFrames[0]).toMatchObject({
+      status: "captured",
+      relativeFramePath:
+        "server/.cache/vod-capture/44/99/sample-0001-000000.jpg",
+    });
+  });
+
+  it("tracks failed frame extractions without failing the whole job", async () => {
+    const frameExtractor: VodFrameExtractor = async input => ({
+      status: "failed",
+      timestampSeconds: input.timestampSeconds,
+      sampleIndex: input.sampleIndex,
+      errorMessage:
+        "Frame extraction requires missing system binaries: yt-dlp, ffmpeg.",
+    });
+    const { db, updateSets } = createProcessCaptureJobDb({
+      vodRows: [captureReadyVod()],
+      captureRows: [captureJob({ id: 99 })],
+    });
+
+    await expect(
+      processVodCaptureJob(
+        { vodAnalysisId: 44, captureJobId: 99 },
+        db,
+        undefined,
+        frameExtractor
+      )
+    ).resolves.toMatchObject({
+      status: "complete",
+      processedSamples: 0,
+      failedSamples: 4,
+      createdSuggestionCount: 0,
+      errorMessage:
+        "Frame extraction requires missing system binaries: yt-dlp, ffmpeg.",
+    });
+
+    expect(updateSets.at(-1)).toMatchObject({
+      status: "complete",
+      processedSamples: 0,
+      failedSamples: 4,
+      errorMessage:
+        "Frame extraction requires missing system binaries: yt-dlp, ffmpeg.",
+    });
+  });
+
+  it("adds debug frame metadata to detector-created suggestions", async () => {
+    const frameExtractor: VodFrameExtractor = async input => ({
+      status: "captured",
+      timestampSeconds: input.timestampSeconds,
+      sampleIndex: input.sampleIndex,
+      framePath:
+        "/workspace/murphtournaments-website/server/.cache/vod-capture/44/99/sample-0001-000000.jpg",
+      relativeFramePath:
+        "server/.cache/vod-capture/44/99/sample-0001-000000.jpg",
+      fileName: "sample-0001-000000.jpg",
+    });
+    const detector: VodCaptureSampleDetector = async ({ sampleIndex }) =>
+      sampleIndex === 0
+        ? [
+            {
+              eventType: "cashout",
+              timestampSeconds: 0,
+              targetLabel: "A",
+              teamLabel: "The Live Wires",
+              confidence: 80,
+            },
+          ]
+        : [];
+    const { db, insertedSuggestedEvents } = createProcessCaptureJobDb({
+      vodRows: [captureReadyVod()],
+      captureRows: [captureJob({ id: 99 })],
+    });
+
+    await processVodCaptureJob(
+      { vodAnalysisId: 44, captureJobId: 99 },
+      db,
+      detector,
+      frameExtractor
+    );
+
+    expect(insertedSuggestedEvents).toHaveLength(1);
+    expect(
+      JSON.parse(
+        String((insertedSuggestedEvents[0] as { metadata: string }).metadata)
+      )
+    ).toEqual({
+      captureJobId: 99,
+      detectorMetadata: {
+        detectorVersion: "debug-frame-v1",
+        sampleIndex: 0,
+        timestampSeconds: 0,
+        frameCaptureStatus: "captured",
+        relativeFramePath:
+          "server/.cache/vod-capture/44/99/sample-0001-000000.jpg",
+        fileName: "sample-0001-000000.jpg",
+      },
     });
   });
 
@@ -2266,20 +2429,21 @@ describe("processVodCaptureJob", () => {
       processVodCaptureJob(
         { vodAnalysisId: 44, captureJobId: 99 },
         db,
-        detector
+        detector,
+        skippedFrameExtractor
       )
     ).resolves.toMatchObject({
       status: "failed",
-      processedSamples: 0,
+      processedSamples: 1,
       failedSamples: 1,
-      errorMessage: "Capture sample 1 at 0s failed.",
+      errorMessage: "Capture sample 1 at 0s failed: OCR engine unavailable",
     });
 
     expect(updateSets.at(-1)).toMatchObject({
       status: "failed",
-      processedSamples: 0,
+      processedSamples: 1,
       failedSamples: 1,
-      errorMessage: "Capture sample 1 at 0s failed.",
+      errorMessage: "Capture sample 1 at 0s failed: OCR engine unavailable",
       completedAt: expect.any(Date),
     });
   });
