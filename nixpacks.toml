@@ -1,2 +1,0 @@
-[phases.install]
-cmds = ["pnpm store prune || true && pnpm install --frozen-lockfile --force"]
