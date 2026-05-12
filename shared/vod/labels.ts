@@ -2,12 +2,19 @@ import { getVodEventTargetKind, type VodAnalysisEventType } from "./events";
 
 export const DEFAULT_THE_FINALS_TEAM_LABELS = [
   "The Big Splash",
+  "The Boundless",
+  "The Shock and Awe",
+  "The Steamrollers",
+  "The Jet Setters",
+  "The Mighty",
+  "The Overdogs",
   "The High Notes",
   "The Live Wires",
   "The Kingfish",
   "The Ultra-Rares",
   "The Socialites",
   "The Tough Shells",
+  "The Retros",
   "The Vogues",
   "The Powerhouses",
 ] as const;
