@@ -32,6 +32,11 @@ import {
   type FrameSamplingPlan,
   type VodCaptureReadiness,
 } from "../shared/vod/frame-sampling";
+import {
+  extractVodFrame,
+  type VodFrameCaptureInput,
+  type VodFrameCaptureResult,
+} from "./vodFrameCapture";
 
 export type VideoPov = "player" | "spectator";
 export type VodAnalysisStatus = "created";
@@ -259,11 +264,16 @@ export type VodCaptureSampleDetectionInput = {
   sampleTimestampSeconds: number;
   sampleIndex: number;
   samplePlan: FrameSamplingPlan;
+  frameCapture?: VodFrameCaptureResult;
 };
 
 export type VodCaptureSampleDetector = (
   input: VodCaptureSampleDetectionInput
 ) => Promise<DetectedAutomationEventInput[]>;
+
+export type VodFrameExtractor = (
+  input: VodFrameCaptureInput
+) => Promise<VodFrameCaptureResult>;
 
 export type RunMockVodAutomationDetectionsResult = Pick<
   IngestAutomationDetectionsResult,
@@ -1081,7 +1091,8 @@ function getErrorMessage(error: unknown): string {
 export async function processVodCaptureJob(
   input: ProcessVodCaptureJobInput,
   dbClient?: ProcessVodCaptureJobDb | null,
-  detector: VodCaptureSampleDetector = conservativeVodCaptureSampleDetector
+  detector: VodCaptureSampleDetector = conservativeVodCaptureSampleDetector,
+  frameExtractor: VodFrameExtractor = extractVodFrame
 ): Promise<ProcessVodCaptureJobResult> {
   const parsedInput = processVodCaptureJobInputSchema.parse(input);
   const db = dbClient ?? ((await getDb()) as ProcessVodCaptureJobDb | null);
@@ -1133,6 +1144,7 @@ export async function processVodCaptureJob(
   let processedSamples = 0;
   let failedSamples = 0;
   let createdSuggestionCount = 0;
+  let firstFrameCaptureErrorMessage: string | undefined;
   const samplePlan = buildFrameSamplingPlan(
     vodAnalysis.durationSeconds,
     captureJob.sampleIntervalSeconds
@@ -1166,20 +1178,59 @@ export async function processVodCaptureJob(
     ) {
       const sampleTimestampSeconds = samplePlan.timestamps[sampleIndex];
       try {
+        const frameCapture = await frameExtractor({
+          vodAnalysisId: parsedInput.vodAnalysisId,
+          captureJobId: parsedInput.captureJobId,
+          sourceUrl:
+            vodAnalysis.normalizedSourceUrl ?? vodAnalysis.sourceUrl ?? "",
+          timestampSeconds: sampleTimestampSeconds,
+          sampleIndex,
+        });
+
+        if (frameCapture.status === "failed") {
+          failedSamples += 1;
+          firstFrameCaptureErrorMessage ??= frameCapture.errorMessage;
+        } else {
+          processedSamples += 1;
+        }
+
         const detections = await detector({
           vodAnalysis,
           captureJob,
           sampleTimestampSeconds,
           sampleIndex,
           samplePlan,
+          frameCapture,
         });
 
         if (detections.length > 0) {
+          const enrichedDetections = detections.map(detection => ({
+            ...detection,
+            metadata: {
+              ...(typeof detection.metadata === "object" &&
+              detection.metadata !== null &&
+              !Array.isArray(detection.metadata)
+                ? detection.metadata
+                : Object.hasOwn(detection, "metadata")
+                  ? { detectorMetadata: detection.metadata }
+                  : {}),
+              detectorVersion: "debug-frame-v1",
+              sampleIndex,
+              timestampSeconds: sampleTimestampSeconds,
+              frameCaptureStatus: frameCapture.status,
+              ...(frameCapture.status === "captured"
+                ? {
+                    relativeFramePath: frameCapture.relativeFramePath,
+                    fileName: frameCapture.fileName,
+                  }
+                : { frameCaptureMessage: frameCapture.errorMessage }),
+            },
+          }));
           const ingestResult = await ingestAutomationDetections(
             {
               vodAnalysisId: parsedInput.vodAnalysisId,
               captureJobId: parsedInput.captureJobId,
-              detections,
+              detections: enrichedDetections,
             },
             db
           );
@@ -1192,22 +1243,24 @@ export async function processVodCaptureJob(
 
           createdSuggestionCount += ingestResult.createdCount;
         }
-
-        processedSamples += 1;
-      } catch {
+      } catch (error) {
         failedSamples += 1;
         throw new Error(
-          `Capture sample ${sampleIndex + 1} at ${sampleTimestampSeconds}s failed.`
+          `Capture sample ${sampleIndex + 1} at ${sampleTimestampSeconds}s failed: ${getErrorMessage(error)}`
         );
       } finally {
         await updateJob({ processedSamples, failedSamples });
       }
     }
 
+    const completedErrorMessage =
+      failedSamples > 0 ? firstFrameCaptureErrorMessage : undefined;
+
     await updateJob({
       status: "complete",
       processedSamples,
       failedSamples,
+      errorMessage: completedErrorMessage ?? null,
       completedAt: new Date(),
     });
 
@@ -1218,6 +1271,7 @@ export async function processVodCaptureJob(
       processedSamples,
       failedSamples,
       createdSuggestionCount,
+      ...(completedErrorMessage ? { errorMessage: completedErrorMessage } : {}),
     };
   } catch (error) {
     const errorMessage = getErrorMessage(error);
