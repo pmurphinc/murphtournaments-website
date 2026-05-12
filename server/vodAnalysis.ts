@@ -32,8 +32,12 @@ import {
   type FrameSamplingPlan,
   type VodCaptureReadiness,
 } from "../shared/vod/frame-sampling";
+import { getVodHudZonePreset, type VodHudZone } from "../shared/vod/hud-zones";
 import {
+  buildVodCaptureFrameUrl,
   extractVodFrame,
+  getLatestVodCaptureFrameFile,
+  type VodCaptureFrameFilePreview,
   type VodFrameCaptureInput,
   type VodFrameCaptureResult,
 } from "./vodFrameCapture";
@@ -294,6 +298,28 @@ export type ProcessVodCaptureJobResult = {
   createdSuggestionCount: number;
   errorMessage?: string;
 };
+
+export type VodLatestCaptureFramePreviewResult =
+  | {
+      status: "available";
+      vodAnalysisId: number;
+      captureJobId: number;
+      frameUrl: string;
+      relativeFramePath: string;
+      fileName: string;
+      timestampSeconds: number | null;
+      zones: VodHudZone[];
+    }
+  | {
+      status: "not_found";
+      vodAnalysisId: number;
+      captureJobId: number | null;
+      frameUrl: null;
+      relativeFramePath: null;
+      fileName: null;
+      timestampSeconds: null;
+      zones: VodHudZone[];
+    };
 
 export type IngestAutomationDetectionsResult =
   | {
@@ -712,6 +738,11 @@ export const runMockVodAutomationDetectionsInputSchema = z.object({
 export const processVodCaptureJobInputSchema = z.object({
   vodAnalysisId: vodAnalysisIdInputSchema,
   captureJobId: z.number().int().positive(),
+});
+
+export const latestCaptureFramePreviewInputSchema = z.object({
+  vodAnalysisId: vodAnalysisIdInputSchema,
+  captureJobId: z.number().int().positive().optional(),
 });
 
 export const updateVodSuggestedEventInputSchema =
@@ -1340,6 +1371,101 @@ export async function getLatestVodCaptureJob(
 
   const [captureJob] = await runQuery(db);
   return captureJob ?? null;
+}
+
+async function getVodCaptureJobByIdForPreview(
+  id: number,
+  db: ProcessVodCaptureJobDb
+): Promise<VodCaptureJobRecord | null> {
+  const [captureJob] = (await db
+    .select(vodCaptureJobFields)
+    .from(vodCaptureJobs)
+    .where(eq(vodCaptureJobs.id, id))
+    .limit(1)) as unknown as VodCaptureJobRecord[];
+
+  return captureJob ?? null;
+}
+
+function buildLatestFramePreviewResult(
+  vodAnalysis: VodAnalysisRecord,
+  captureJobId: number | null,
+  frame: VodCaptureFrameFilePreview | null
+): VodLatestCaptureFramePreviewResult {
+  const zones = getVodHudZonePreset(vodAnalysis.videoPov).zones;
+
+  if (!frame || captureJobId === null) {
+    return {
+      status: "not_found",
+      vodAnalysisId: vodAnalysis.id,
+      captureJobId,
+      frameUrl: null,
+      relativeFramePath: null,
+      fileName: null,
+      timestampSeconds: null,
+      zones,
+    };
+  }
+
+  return {
+    status: "available",
+    vodAnalysisId: vodAnalysis.id,
+    captureJobId,
+    frameUrl: buildVodCaptureFrameUrl(
+      vodAnalysis.id,
+      captureJobId,
+      frame.fileName
+    ),
+    relativeFramePath: frame.relativeFramePath,
+    fileName: frame.fileName,
+    timestampSeconds: frame.timestampSeconds,
+    zones,
+  };
+}
+
+export async function getLatestCaptureFramePreview(
+  input: z.infer<typeof latestCaptureFramePreviewInputSchema>,
+  dbClient?: (GetByIdDb & CaptureJobLatestDb & ProcessVodCaptureJobDb) | null
+): Promise<VodLatestCaptureFramePreviewResult | null> {
+  const parsedInput = latestCaptureFramePreviewInputSchema.parse(input);
+  const db =
+    dbClient ??
+    ((await getDb()) as
+      | (GetByIdDb & CaptureJobLatestDb & ProcessVodCaptureJobDb)
+      | null);
+
+  if (!db) {
+    throw new Error(
+      "Database is not available for VOD capture frame preview lookup."
+    );
+  }
+
+  const vodAnalysis = await getVodAnalysisById(
+    parsedInput.vodAnalysisId,
+    db as GetByIdDb
+  );
+
+  if (!vodAnalysis) {
+    return null;
+  }
+
+  const captureJob = parsedInput.captureJobId
+    ? await getVodCaptureJobByIdForPreview(parsedInput.captureJobId, db)
+    : await getLatestVodCaptureJob(parsedInput.vodAnalysisId, db);
+
+  if (!captureJob || captureJob.vodAnalysisId !== parsedInput.vodAnalysisId) {
+    return buildLatestFramePreviewResult(
+      vodAnalysis,
+      parsedInput.captureJobId ?? null,
+      null
+    );
+  }
+
+  const frame = await getLatestVodCaptureFrameFile(
+    parsedInput.vodAnalysisId,
+    captureJob.id
+  );
+
+  return buildLatestFramePreviewResult(vodAnalysis, captureJob.id, frame);
 }
 
 function normalizeCountValue(value: number | string | bigint): number {

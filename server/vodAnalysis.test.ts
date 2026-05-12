@@ -1,3 +1,6 @@
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   vodAnalyses,
@@ -24,6 +27,7 @@ import {
   deleteVodAnalysisEventInputSchema,
   createVodSuggestedEvent,
   createVodSuggestedEventInputSchema,
+  getLatestCaptureFramePreview,
   getLatestVodCaptureJob,
   getVodAutomationStatus,
   getPendingSuggestedEventCountsByVodAnalysisIds,
@@ -58,6 +62,12 @@ import {
   type VodCaptureSampleDetector,
   type VodFrameExtractor,
 } from "./vodAnalysis";
+import { getVodHudZonePreset, VOD_HUD_ZONE_IDS } from "../shared/vod/hud-zones";
+import {
+  getLatestVodCaptureFrameFile,
+  resolveVodCaptureFramePath,
+} from "./vodFrameCapture";
+import { getSafeVodCaptureFramePathForRequest } from "./vodCaptureFrameRoute";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 
@@ -2985,5 +2995,141 @@ describe("getVodAutomationStatus", () => {
 
     await expect(getVodAutomationStatus(0, db)).rejects.toThrow();
     expect(select).not.toHaveBeenCalled();
+  });
+});
+
+describe("VOD HUD zone presets", () => {
+  it.each(["player", "spectator"] as const)(
+    "returns normalized zones for %s POV",
+    videoPov => {
+      const preset = getVodHudZonePreset(videoPov);
+
+      expect(preset.id).toBe(videoPov);
+      expect(preset.zones.map(zone => zone.id).sort()).toEqual(
+        [...VOD_HUD_ZONE_IDS].sort()
+      );
+
+      for (const zone of preset.zones) {
+        expect(zone.label).toBeTruthy();
+        expect(zone.purpose).toBeTruthy();
+        expect(zone.rect.x).toBeGreaterThanOrEqual(0);
+        expect(zone.rect.y).toBeGreaterThanOrEqual(0);
+        expect(zone.rect.width).toBeGreaterThan(0);
+        expect(zone.rect.height).toBeGreaterThan(0);
+        expect(zone.rect.x + zone.rect.width).toBeLessThanOrEqual(1);
+        expect(zone.rect.y + zone.rect.height).toBeLessThanOrEqual(1);
+      }
+    }
+  );
+});
+
+describe("VOD capture frame preview", () => {
+  it("returns not_found when no cached frame exists", async () => {
+    const vodId = 404044;
+    const captureId = 990099;
+    const cacheDir = path.join(
+      process.cwd(),
+      "server",
+      ".cache",
+      "vod-capture",
+      String(vodId)
+    );
+    await rm(cacheDir, { recursive: true, force: true });
+
+    const { db } = createAutomationStatusDb({
+      vodRows: [captureReadyVod({ id: vodId, videoPov: "player" })],
+      captureRows: [captureJob({ id: captureId, vodAnalysisId: vodId })],
+    });
+
+    await expect(
+      getLatestCaptureFramePreview({ vodAnalysisId: vodId }, db)
+    ).resolves.toMatchObject({
+      status: "not_found",
+      vodAnalysisId: vodId,
+      captureJobId: captureId,
+      frameUrl: null,
+      zones: getVodHudZonePreset("player").zones,
+    });
+  });
+
+  it("rejects path traversal and invalid frame filenames", async () => {
+    const tempRoot = await mkdtemp(path.join(os.tmpdir(), "vod-preview-safe-"));
+    try {
+      expect(
+        resolveVodCaptureFramePath(44, 99, "../secret.jpg", tempRoot)
+      ).toBeNull();
+      expect(
+        resolveVodCaptureFramePath(44, 99, "sample-0001-000000.png", tempRoot)
+      ).toBeNull();
+      expect(
+        resolveVodCaptureFramePath(
+          "44/../45",
+          99,
+          "sample-0001-000000.jpg",
+          tempRoot
+        )
+      ).toBeNull();
+      await expect(
+        getSafeVodCaptureFramePathForRequest(
+          "44",
+          "99",
+          "../../package.json",
+          tempRoot
+        )
+      ).resolves.toBeNull();
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("returns an available frame URL when a cached sample frame exists", async () => {
+    const vodId = 505044;
+    const captureId = 990100;
+    const fileName = "sample-0002-000030.jpg";
+    const cacheRoot = path.join(
+      process.cwd(),
+      "server",
+      ".cache",
+      "vod-capture"
+    );
+    const frameDir = path.join(cacheRoot, String(vodId), String(captureId));
+    await rm(path.join(cacheRoot, String(vodId)), {
+      recursive: true,
+      force: true,
+    });
+    await mkdir(frameDir, { recursive: true });
+    await writeFile(path.join(frameDir, fileName), "fake jpg bytes");
+
+    try {
+      const { db } = createAutomationStatusDb({
+        vodRows: [captureReadyVod({ id: vodId, videoPov: "spectator" })],
+        captureRows: [captureJob({ id: captureId, vodAnalysisId: vodId })],
+      });
+
+      await expect(
+        getLatestCaptureFramePreview({ vodAnalysisId: vodId }, db)
+      ).resolves.toMatchObject({
+        status: "available",
+        vodAnalysisId: vodId,
+        captureJobId: captureId,
+        frameUrl: `/api/vod-capture-frame/${vodId}/${captureId}/${fileName}`,
+        fileName,
+        timestampSeconds: 30,
+        zones: getVodHudZonePreset("spectator").zones,
+      });
+      await expect(
+        getSafeVodCaptureFramePathForRequest(
+          String(vodId),
+          String(captureId),
+          fileName,
+          cacheRoot
+        )
+      ).resolves.toBe(path.join(frameDir, fileName));
+    } finally {
+      await rm(path.join(cacheRoot, String(vodId)), {
+        recursive: true,
+        force: true,
+      });
+    }
   });
 });

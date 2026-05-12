@@ -9,6 +9,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { handleTournamentWebhook, handleGetTournamentState } from "../webhooks";
 import { scrapeAndStorePatchNotes } from "../patchNoteScraper";
+import { serveVodCaptureFrame } from "../vodCaptureFrameRoute";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -44,6 +45,11 @@ async function startServer() {
   // Public endpoint to fetch current tournament state
   app.get("/api/tournament/:tournamentId/state", handleGetTournamentState);
   
+  app.get(
+    "/api/vod-capture-frame/:vodAnalysisId/:captureJobId/:fileName",
+    serveVodCaptureFrame
+  );
+
   // tRPC API
   app.use(
     "/api/trpc",

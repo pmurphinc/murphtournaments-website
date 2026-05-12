@@ -1,10 +1,10 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { mkdir } from "node:fs/promises";
+import { mkdir, readdir, stat } from "node:fs/promises";
 import path from "node:path";
 
 const execFileAsync = promisify(execFile);
-const VOD_CAPTURE_CACHE_ROOT = path.join(
+export const VOD_CAPTURE_CACHE_ROOT = path.join(
   process.cwd(),
   "server",
   ".cache",
@@ -19,6 +19,139 @@ export type VodFrameCaptureInput = {
   timestampSeconds: number;
   sampleIndex: number;
 };
+
+export type VodCaptureFrameFilePreview = {
+  vodAnalysisId: number;
+  captureJobId: number;
+  fileName: string;
+  relativeFramePath: string;
+  framePath: string;
+  timestampSeconds: number | null;
+};
+
+const VOD_CAPTURE_FRAME_FILE_NAME_PATTERN = /^sample-\d{4}-(\d{6})\.jpg$/;
+
+export function parseVodCaptureFrameTimestamp(fileName: string): number | null {
+  const match = VOD_CAPTURE_FRAME_FILE_NAME_PATTERN.exec(fileName);
+  if (!match) return null;
+
+  return Number(match[1]);
+}
+
+export function isSafeVodCaptureFrameRequestPart(value: string): boolean {
+  return /^\d+$/.test(value) && Number(value) > 0;
+}
+
+export function isSafeVodCaptureFrameFileName(fileName: string): boolean {
+  return VOD_CAPTURE_FRAME_FILE_NAME_PATTERN.test(fileName);
+}
+
+export function resolveVodCaptureFramePath(
+  vodAnalysisId: string | number,
+  captureJobId: string | number,
+  fileName: string,
+  cacheRoot: string = VOD_CAPTURE_CACHE_ROOT
+): string | null {
+  const vodAnalysisIdPart = String(vodAnalysisId);
+  const captureJobIdPart = String(captureJobId);
+
+  if (
+    !isSafeVodCaptureFrameRequestPart(vodAnalysisIdPart) ||
+    !isSafeVodCaptureFrameRequestPart(captureJobIdPart) ||
+    !isSafeVodCaptureFrameFileName(fileName)
+  ) {
+    return null;
+  }
+
+  const rootPath = path.resolve(cacheRoot);
+  const framePath = path.resolve(
+    rootPath,
+    vodAnalysisIdPart,
+    captureJobIdPart,
+    fileName
+  );
+  const relativeToRoot = path.relative(rootPath, framePath);
+
+  if (relativeToRoot.startsWith("..") || path.isAbsolute(relativeToRoot)) {
+    return null;
+  }
+
+  return framePath;
+}
+
+export function buildVodCaptureFrameUrl(
+  vodAnalysisId: number,
+  captureJobId: number,
+  fileName: string
+): string {
+  return `/api/vod-capture-frame/${vodAnalysisId}/${captureJobId}/${encodeURIComponent(
+    fileName
+  )}`;
+}
+
+export async function getLatestVodCaptureFrameFile(
+  vodAnalysisId: number,
+  captureJobId: number,
+  cacheRoot: string = VOD_CAPTURE_CACHE_ROOT
+): Promise<VodCaptureFrameFilePreview | null> {
+  const directoryPath = path.join(
+    cacheRoot,
+    String(vodAnalysisId),
+    String(captureJobId)
+  );
+
+  let entries: string[];
+  try {
+    entries = await readdir(directoryPath);
+  } catch {
+    return null;
+  }
+
+  const candidates = await Promise.all(
+    entries.filter(isSafeVodCaptureFrameFileName).map(async fileName => {
+      const framePath = resolveVodCaptureFramePath(
+        vodAnalysisId,
+        captureJobId,
+        fileName,
+        cacheRoot
+      );
+
+      if (!framePath) return null;
+
+      try {
+        const fileStat = await stat(framePath);
+        if (!fileStat.isFile()) return null;
+
+        return { fileName, framePath, mtimeMs: fileStat.mtimeMs };
+      } catch {
+        return null;
+      }
+    })
+  );
+  const latest = candidates
+    .filter((candidate): candidate is NonNullable<typeof candidate> =>
+      Boolean(candidate)
+    )
+    .sort((left, right) => {
+      const timestampDiff =
+        (parseVodCaptureFrameTimestamp(right.fileName) ?? -1) -
+        (parseVodCaptureFrameTimestamp(left.fileName) ?? -1);
+      if (timestampDiff !== 0) return timestampDiff;
+
+      return right.mtimeMs - left.mtimeMs;
+    })[0];
+
+  if (!latest) return null;
+
+  return {
+    vodAnalysisId,
+    captureJobId,
+    fileName: latest.fileName,
+    framePath: latest.framePath,
+    relativeFramePath: path.relative(process.cwd(), latest.framePath),
+    timestampSeconds: parseVodCaptureFrameTimestamp(latest.fileName),
+  };
+}
 
 export type VodFrameCaptureResult =
   | {
