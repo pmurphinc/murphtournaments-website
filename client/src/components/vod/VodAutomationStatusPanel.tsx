@@ -153,7 +153,7 @@ export function VodAutomationStatusPanel({
   const binaryStatusLabel = frameCaptureBinaries
     ? areFrameCaptureBinariesAvailable
       ? "Ready"
-      : "Missing binaries"
+      : "Missing"
     : "Checking";
   const ocrEnabled = automationStatus?.ocrEnabled ?? false;
   const ocrConfidenceThreshold = automationStatus?.ocrConfidenceThreshold ?? 70;
@@ -166,15 +166,17 @@ export function VodAutomationStatusPanel({
   const captureJobDisabledReason = readiness.isReady ? null : readiness.reason;
   const processCaptureJobDisabledReason = !latestCaptureJob
     ? "Queue a capture job first."
-    : !areFrameCaptureBinariesAvailable
-      ? "Twitch frame extraction needs ffmpeg and yt-dlp in the Railway runtime."
-      : latestCaptureJob.status === "processing"
-        ? "This capture job is already processing."
-        : latestCaptureJob.status === "complete"
-          ? "This capture job is already complete."
-          : latestCaptureJob.status !== "queued"
-            ? "Only queued capture jobs can be processed."
-            : null;
+    : !frameCaptureBinaries
+      ? "Checking runtime binaries."
+      : !areFrameCaptureBinariesAvailable
+        ? "Twitch frame extraction needs ffmpeg and yt-dlp in the Railway runtime."
+        : latestCaptureJob.status === "processing"
+          ? "This capture job is already processing."
+          : latestCaptureJob.status === "complete"
+            ? "This capture job is already complete."
+            : latestCaptureJob.status !== "queued"
+              ? "Only queued capture jobs can be processed."
+              : null;
   const sourceTypeLabel =
     vod.sourceType === "twitch" ||
     vod.sourceType === "youtube" ||
@@ -205,133 +207,133 @@ export function VodAutomationStatusPanel({
           legendZoneOrder.indexOf(left.id) - legendZoneOrder.indexOf(right.id)
       ) ?? [];
 
+  const captureStatusLabel = latestCaptureJob
+    ? latestCaptureJob.status === "processing"
+      ? "Processing"
+      : latestCaptureJob.status === "complete"
+        ? "Complete"
+        : !readiness.isReady ||
+            (frameCaptureBinaries && !areFrameCaptureBinariesAvailable)
+          ? "Blocked"
+          : "Ready"
+    : !readiness.isReady ||
+        (frameCaptureBinaries && !areFrameCaptureBinariesAvailable)
+      ? "Blocked"
+      : "Ready";
+  const captureSummary = latestCaptureJob
+    ? latestCaptureJob.status === "complete"
+      ? "Capture job complete. Review pending suggestions below."
+      : latestCaptureJob.status === "processing"
+        ? "A capture job is processing frame samples now."
+        : latestCaptureJob.status === "queued"
+          ? frameCaptureBinaries && !areFrameCaptureBinariesAvailable
+            ? "Frame capture is blocked until the Railway runtime has ffmpeg and yt-dlp."
+            : "A capture job is queued and ready to process."
+          : !readiness.isReady
+            ? readiness.reason
+            : "This Twitch VOD is ready for frame capture and OCR review."
+    : frameCaptureBinaries && !areFrameCaptureBinariesAvailable
+      ? "Frame capture is blocked until the Railway runtime has ffmpeg and yt-dlp."
+      : !readiness.isReady
+        ? readiness.reason
+        : "This Twitch VOD is ready for frame capture and OCR review.";
+  const pendingSuggestionLabel = automationStatus
+    ? String(automationStatus.pendingSuggestedCount)
+    : "—";
+  const processedAndFailedSamples = captureJobProgress
+    ? captureJobProgress.processedSamples + captureJobProgress.failedSamples
+    : 0;
+  const progressLine = captureJobProgress
+    ? `${processedAndFailedSamples} / ${captureJobProgress.plannedSamples} samples processed`
+    : null;
+  const isProcessingDisabledByBinaries =
+    Boolean(latestCaptureJob) &&
+    Boolean(frameCaptureBinaries) &&
+    !areFrameCaptureBinariesAvailable;
+
   return (
-    <details className="group rounded-lg border border-neon-cyan/20 bg-black/30 p-5">
+    <details className="group rounded-lg border border-neon-cyan/20 bg-black/30 p-4 sm:p-5">
       <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
         <div>
           <h3 className="font-mono text-lg font-bold uppercase tracking-widest text-neon-cyan">
             Automation Status
           </h3>
-          <p className="mt-2 font-mono text-sm text-white/50">
-            First-pass capture processing keeps frame extraction active and HUD
-            crop zones active. OCR is feature-flagged, and the conservative
-            center-event-text detector emits pending suggestions only when OCR
-            text is confidently recognized.
+          <p className="mt-2 font-mono text-sm text-white/65">
+            {captureSummary}
           </p>
         </div>
-        <span className="rounded border border-white/10 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-white/50">
-          {formatCaptureReadinessLabel(readiness.status)}
+        <span className="shrink-0 rounded border border-neon-cyan/40 bg-neon-cyan/10 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-neon-cyan">
+          {captureStatusLabel}
         </span>
       </summary>
 
       <div className="mt-4 space-y-4 border-t border-white/10 pt-4">
-        <div className="grid gap-2 sm:grid-cols-2">
-          <VodDetailPill
-            label="Status"
-            value={formatCaptureReadinessLabel(readiness.status)}
-          />
-          <VodDetailPill label="Source type" value={sourceTypeLabel} />
-          <VodDetailPill label="Duration" value={durationLabel} />
-          <VodDetailPill
-            label="Sample interval"
-            value={`${samplePlan.intervalSeconds}s`}
-          />
-          <VodDetailPill
-            label="Planned samples"
-            value={String(samplePlan.timestamps.length)}
-          />
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <VodDetailPill label="Capture" value={captureStatusLabel} />
+          <VodDetailPill label="Binaries" value={binaryStatusLabel} />
           <VodDetailPill
             label="OCR"
             value={ocrEnabled ? "Enabled" : "Disabled"}
           />
-          <VodDetailPill
-            label="OCR threshold"
-            value={`${ocrConfidenceThreshold}%`}
-          />
-          <VodDetailPill label="Frame binaries" value={binaryStatusLabel} />
+          <VodDetailPill label="Suggestions" value={pendingSuggestionLabel} />
         </div>
 
-        <div className="rounded border border-white/10 bg-black/30 p-3">
-          <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-white/45">
-            Runtime frame extraction binaries
-          </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            <VodDetailPill
-              label="ffmpeg"
-              value={
-                frameCaptureBinaries
-                  ? isFfmpegAvailable
-                    ? "Available"
-                    : "Missing"
-                  : "Checking"
-              }
-            />
-            <VodDetailPill
-              label="yt-dlp"
-              value={
-                frameCaptureBinaries
-                  ? isYtDlpAvailable
-                    ? "Available"
-                    : "Missing"
-                  : "Checking"
-              }
-            />
-          </div>
-          {frameCaptureBinaries && !areFrameCaptureBinariesAvailable ? (
-            <p className="mt-3 rounded border border-neon-gold/30 bg-neon-gold/10 p-3 font-mono text-sm text-neon-gold">
-              Twitch frame extraction cannot run until the Railway runtime has
-              both ffmpeg and yt-dlp available. Capture jobs can still be
-              reviewed here, but processing will fail until deployment includes
-              both binaries.
+        {frameCaptureBinaries && !areFrameCaptureBinariesAvailable ? (
+          <div className="rounded border border-neon-gold/35 bg-neon-gold/10 p-3 font-mono text-sm text-neon-gold">
+            <p className="font-bold">
+              Frame capture is blocked. Railway does not currently expose ffmpeg
+              and yt-dlp at runtime.
             </p>
-          ) : null}
-        </div>
-
-        <div className="rounded border border-white/10 bg-black/30 p-3">
-          <div className="font-mono text-[10px] uppercase tracking-widest text-white/45">
-            First 5 timestamps
+            <p className="mt-1 text-neon-gold/80">
+              Redeploy after the Nixpacks binary fix, then refresh this page.
+            </p>
           </div>
-          {firstTimestamps.length > 0 ? (
-            <div className="mt-2 flex flex-wrap gap-2">
-              {firstTimestamps.map(timestamp => (
-                <span
-                  key={timestamp}
-                  className="rounded border border-neon-cyan/30 px-2 py-1 font-mono text-xs text-neon-cyan"
-                >
-                  {formatVodEventTimestamp(timestamp)}
-                </span>
-              ))}
+        ) : null}
+
+        {automationStatusQuery.isLoading ? (
+          <div className="rounded border border-white/10 bg-black/30 p-3 font-mono text-sm text-white/50">
+            Loading automation status…
+          </div>
+        ) : latestCaptureJob && captureJobProgress ? (
+          <div className="rounded border border-white/10 bg-black/30 p-3">
+            <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-white/45">
+              Latest capture job
             </div>
-          ) : (
-            <p className="mt-2 font-mono text-sm text-white/50">
-              No timestamps planned until duration metadata is available.
-            </p>
-          )}
-        </div>
-
-        <div className="rounded border border-neon-magenta/30 bg-neon-magenta/10 p-3 font-mono text-sm text-white/70">
-          Capture jobs plan frame-sampling work and can run a conservative
-          first-pass processor that saves local Twitch debug frames when yt-dlp
-          and ffmpeg are available. Frame extraction is active, HUD crop zones
-          are active, and OCR is currently {ocrEnabled ? "enabled" : "disabled"}
-          . The center-event detector emits pending suggestions only when OCR
-          text is confidently recognized above the configured threshold.
-          Suggested events are the review queue output. Confirmed manual events
-          are the approved output used by Team Summary and Team Insights.
-        </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <VodDetailPill
+                label="Job status"
+                value={formatVodCaptureJobStatus(latestCaptureJob.status)}
+              />
+              <VodDetailPill
+                label="Progress"
+                value={progressLine ?? "No samples planned"}
+              />
+              <VodDetailPill label="Source" value={latestCaptureJob.source} />
+              <VodDetailPill
+                label="Created"
+                value={formatDateTime(latestCaptureJob.createdAt)}
+              />
+            </div>
+            {latestCaptureJob.errorMessage ? (
+              <p className="mt-3 rounded border border-red-500/40 bg-red-950/30 p-3 font-mono text-sm text-red-100">
+                {latestCaptureJob.errorMessage}
+              </p>
+            ) : null}
+          </div>
+        ) : (
+          <div className="rounded border border-white/10 bg-black/30 p-3 font-mono text-sm text-white/50">
+            No capture jobs have been recorded for this VOD yet.
+          </div>
+        )}
 
         <div className="rounded border border-neon-cyan/20 bg-black/40 p-3">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
               <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-neon-cyan">
-                Debug frame HUD zones
+                Debug frame
               </div>
               <p className="mt-1 font-mono text-xs text-white/55">
-                Read-only detector inspection zones over the latest captured
-                Twitch debug frame. Frame extraction is active, HUD crop zones
-                are active, and OCR is {ocrEnabled ? "enabled" : "disabled"};
-                the center-event detector emits pending suggestions only when
-                text is confidently recognized.
+                Latest captured frame with HUD detector zones overlaid.
               </p>
             </div>
             {framePreview?.status === "available" &&
@@ -375,172 +377,35 @@ export function VodAutomationStatusPanel({
                   ))}
                 </div>
               </div>
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-                {previewZones.map(zone => (
-                  <div
-                    key={zone.id}
-                    className={`rounded border px-2 py-1.5 font-mono text-[10px] uppercase tracking-widest ${zoneToneClasses[zone.id]}`}
-                    title={zone.purpose}
-                  >
-                    {zone.label}
-                  </div>
-                ))}
-              </div>
-              <p className="font-mono text-[10px] text-white/40">
-                Latest captured debug frame: {framePreview.fileName}
+              <p className="font-mono text-[10px] text-white/45">
+                {framePreview.fileName}
               </p>
             </div>
           ) : (
             <div className="mt-3 rounded border border-white/10 bg-black/30 p-3 font-mono text-sm text-white/50">
-              No debug frame captured yet. Queue and process a Twitch capture
-              job first.
+              No debug frame captured yet.
             </div>
           )}
         </div>
 
-        {automationStatus ? (
-          <div className="grid gap-2 sm:grid-cols-4">
-            <VodDetailPill
-              label="Pending suggestions"
-              value={String(automationStatus.pendingSuggestedCount)}
-            />
-            <VodDetailPill
-              label="Approved suggestions"
-              value={String(automationStatus.approvedSuggestedCount)}
-            />
-            <VodDetailPill
-              label="Rejected suggestions"
-              value={String(automationStatus.rejectedSuggestedCount)}
-            />
-            <VodDetailPill
-              label="Confirmed events"
-              value={String(automationStatus.confirmedManualEventCount)}
-            />
-          </div>
-        ) : null}
-
-        {automationStatusQuery.isLoading ? (
-          <div className="rounded border border-white/10 bg-black/30 p-3 font-mono text-sm text-white/50">
-            Loading automation status…
-          </div>
-        ) : latestCaptureJob && captureJobProgress ? (
-          <div className="rounded border border-white/10 bg-black/30 p-3">
-            <div className="font-mono text-[10px] uppercase tracking-widest text-white/45">
-              Latest capture job
-            </div>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              <VodDetailPill
-                label="Status"
-                value={formatVodCaptureJobStatus(latestCaptureJob.status)}
-              />
-              <VodDetailPill
-                label="Status tone"
-                value={latestCaptureJobTone ?? "neutral"}
-              />
-              <VodDetailPill label="Source" value={latestCaptureJob.source} />
-              <VodDetailPill
-                label="Planned samples"
-                value={String(captureJobProgress.plannedSamples)}
-              />
-              <VodDetailPill
-                label="Processed samples"
-                value={String(captureJobProgress.processedSamples)}
-              />
-              <VodDetailPill
-                label="Failed samples"
-                value={String(captureJobProgress.failedSamples)}
-              />
-              <VodDetailPill
-                label="Percent complete"
-                value={`${captureJobProgress.percentComplete}%`}
-              />
-              <VodDetailPill
-                label="Remaining samples"
-                value={String(captureJobProgress.remainingSamples)}
-              />
-              <VodDetailPill
-                label="Created"
-                value={formatDateTime(latestCaptureJob.createdAt)}
-              />
-            </div>
-            {latestCaptureJob.errorMessage ? (
-              <p className="mt-3 rounded border border-red-500/40 bg-red-950/30 p-3 font-mono text-sm text-red-100">
-                {latestCaptureJob.errorMessage}
-              </p>
-            ) : null}
-            {import.meta.env.DEV ? (
-              <div className="mt-3 rounded border border-neon-cyan/25 bg-neon-cyan/10 p-3">
-                <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-neon-cyan">
-                  Dev capture lifecycle
-                </div>
-                <p className="mt-1 font-mono text-xs text-white/60">
-                  Dev only. Simulates capture job lifecycle. No frames are
-                  processed.
-                </p>
-                {captureJobStatusMessage ? (
-                  <p
-                    className={`mt-2 rounded border p-2 font-mono text-xs ${
-                      captureJobStatusMessage.type === "success"
-                        ? "border-neon-cyan/30 bg-neon-cyan/10 text-neon-cyan"
-                        : "border-red-500/40 bg-red-950/30 text-red-100"
-                    }`}
-                  >
-                    {captureJobStatusMessage.text}
-                  </p>
-                ) : null}
-                <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                  {[
-                    {
-                      label: "Mark processing",
-                      status: "processing" as const,
-                      errorMessage: undefined,
-                    },
-                    {
-                      label: "Mark complete",
-                      status: "complete" as const,
-                      errorMessage: undefined,
-                    },
-                    {
-                      label: "Mark failed",
-                      status: "failed" as const,
-                      errorMessage: "Mock capture failure.",
-                    },
-                    {
-                      label: "Cancel job",
-                      status: "cancelled" as const,
-                      errorMessage: undefined,
-                    },
-                  ].map(action => (
-                    <button
-                      key={action.status}
-                      type="button"
-                      onClick={() =>
-                        updateCaptureJobStatusMutation.mutate({
-                          id: latestCaptureJob.id,
-                          vodAnalysisId,
-                          status: action.status,
-                          errorMessage: action.errorMessage,
-                        })
-                      }
-                      disabled={updateCaptureJobStatusMutation.isPending}
-                      className="rounded-sm border border-neon-cyan/60 px-3 py-2 font-mono text-xs font-bold uppercase tracking-widest text-neon-cyan transition hover:bg-neon-cyan/10 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      {action.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-          </div>
-        ) : (
-          <div className="rounded border border-white/10 bg-black/30 p-3 font-mono text-sm text-white/50">
-            No capture jobs have been recorded for this VOD yet.
-          </div>
-        )}
-
         {!readiness.isReady ? (
           <p className="rounded border border-neon-gold/30 bg-neon-gold/10 p-3 font-mono text-sm text-neon-gold">
             {readiness.reason}
+          </p>
+        ) : null}
+        {isProcessingDisabledByBinaries ? (
+          <p className="rounded border border-neon-gold/30 bg-neon-gold/10 p-3 font-mono text-sm text-neon-gold">
+            Processing disabled: missing runtime binaries.
+          </p>
+        ) : null}
+        {processCaptureJobDisabledReason && !isProcessingDisabledByBinaries ? (
+          <p className="font-mono text-xs text-white/45">
+            Processing disabled: {processCaptureJobDisabledReason}
+          </p>
+        ) : null}
+        {captureJobDisabledReason ? (
+          <p className="font-mono text-xs text-white/45">
+            Capture job creation is disabled: {captureJobDisabledReason}
           </p>
         ) : null}
 
@@ -590,6 +455,7 @@ export function VodAutomationStatusPanel({
               : "Process latest capture job"}
           </button>
         </div>
+
         {processCaptureJobMessage ? (
           <p
             className={`rounded border p-3 font-mono text-sm ${
@@ -601,60 +467,232 @@ export function VodAutomationStatusPanel({
             {processCaptureJobMessage.text}
           </p>
         ) : null}
-        <p className="font-mono text-xs text-white/45">
-          Processing attempts Twitch frame extraction for planned samples when
-          yt-dlp and ffmpeg are installed, then uses a conservative center event
-          text detector that only emits suggestions when text is confidently
-          detected or provided by detector input.
-        </p>
-        {captureJobDisabledReason ? (
-          <p className="font-mono text-xs text-white/45">
-            Capture job creation is disabled: {captureJobDisabledReason}
-          </p>
-        ) : null}
+
+        <details className="rounded border border-white/10 bg-black/30 p-3">
+          <summary className="cursor-pointer font-mono text-[10px] font-bold uppercase tracking-widest text-white/55">
+            Advanced diagnostics
+          </summary>
+          <div className="mt-3 space-y-3">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <VodDetailPill label="Source type" value={sourceTypeLabel} />
+              <VodDetailPill label="Duration" value={durationLabel} />
+              <VodDetailPill
+                label="Sample interval"
+                value={`${samplePlan.intervalSeconds}s`}
+              />
+              <VodDetailPill
+                label="Planned samples"
+                value={String(samplePlan.timestamps.length)}
+              />
+              <VodDetailPill
+                label="OCR threshold"
+                value={`${ocrConfidenceThreshold}%`}
+              />
+              <VodDetailPill
+                label="ffmpeg"
+                value={
+                  frameCaptureBinaries
+                    ? isFfmpegAvailable
+                      ? "Available"
+                      : "Missing"
+                    : "Checking"
+                }
+              />
+              <VodDetailPill
+                label="yt-dlp"
+                value={
+                  frameCaptureBinaries
+                    ? isYtDlpAvailable
+                      ? "Available"
+                      : "Missing"
+                    : "Checking"
+                }
+              />
+              <VodDetailPill
+                label="Status tone"
+                value={latestCaptureJobTone ?? "neutral"}
+              />
+              <VodDetailPill
+                label="Remaining samples"
+                value={
+                  captureJobProgress
+                    ? String(captureJobProgress.remainingSamples)
+                    : "—"
+                }
+              />
+              <VodDetailPill
+                label="Created date"
+                value={
+                  latestCaptureJob
+                    ? formatDateTime(latestCaptureJob.createdAt)
+                    : "—"
+                }
+              />
+              {automationStatus ? (
+                <>
+                  <VodDetailPill
+                    label="Approved suggestions"
+                    value={String(automationStatus.approvedSuggestedCount)}
+                  />
+                  <VodDetailPill
+                    label="Rejected suggestions"
+                    value={String(automationStatus.rejectedSuggestedCount)}
+                  />
+                  <VodDetailPill
+                    label="Confirmed events"
+                    value={String(automationStatus.confirmedManualEventCount)}
+                  />
+                </>
+              ) : null}
+            </div>
+
+            <div className="rounded border border-white/10 bg-black/30 p-3">
+              <div className="font-mono text-[10px] uppercase tracking-widest text-white/45">
+                First 5 timestamps
+              </div>
+              {firstTimestamps.length > 0 ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {firstTimestamps.map(timestamp => (
+                    <span
+                      key={timestamp}
+                      className="rounded border border-neon-cyan/30 px-2 py-1 font-mono text-xs text-neon-cyan"
+                    >
+                      {formatVodEventTimestamp(timestamp)}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2 font-mono text-sm text-white/50">
+                  No timestamps planned until duration metadata is available.
+                </p>
+              )}
+            </div>
+
+            <p className="rounded border border-neon-magenta/30 bg-neon-magenta/10 p-3 font-mono text-xs text-white/60">
+              Capture jobs plan frame-sampling work and can run a conservative
+              first-pass processor when yt-dlp and ffmpeg are available. OCR is
+              currently {ocrEnabled ? "enabled" : "disabled"}, and the detector
+              creates pending suggestions when center-event text meets the
+              configured confidence threshold.
+            </p>
+          </div>
+        </details>
 
         {import.meta.env.DEV ? (
-          <div className="rounded border border-neon-gold/30 bg-neon-gold/10 p-3">
-            <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-neon-gold">
-              Dev mock automation
+          <details className="rounded border border-neon-gold/30 bg-neon-gold/10 p-3">
+            <summary className="cursor-pointer font-mono text-[10px] font-bold uppercase tracking-widest text-neon-gold">
+              Dev automation controls
+            </summary>
+            <div className="mt-3 space-y-3">
+              {latestCaptureJob ? (
+                <div className="rounded border border-neon-cyan/25 bg-neon-cyan/10 p-3">
+                  <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-neon-cyan">
+                    Dev capture lifecycle
+                  </div>
+                  <p className="mt-1 font-mono text-xs text-white/60">
+                    Dev only. Simulates capture job lifecycle. No frames are
+                    processed.
+                  </p>
+                  {captureJobStatusMessage ? (
+                    <p
+                      className={`mt-2 rounded border p-2 font-mono text-xs ${
+                        captureJobStatusMessage.type === "success"
+                          ? "border-neon-cyan/30 bg-neon-cyan/10 text-neon-cyan"
+                          : "border-red-500/40 bg-red-950/30 text-red-100"
+                      }`}
+                    >
+                      {captureJobStatusMessage.text}
+                    </p>
+                  ) : null}
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {[
+                      {
+                        label: "Mark processing",
+                        status: "processing" as const,
+                        errorMessage: undefined,
+                      },
+                      {
+                        label: "Mark complete",
+                        status: "complete" as const,
+                        errorMessage: undefined,
+                      },
+                      {
+                        label: "Mark failed",
+                        status: "failed" as const,
+                        errorMessage: "Mock capture failure.",
+                      },
+                      {
+                        label: "Cancel job",
+                        status: "cancelled" as const,
+                        errorMessage: undefined,
+                      },
+                    ].map(action => (
+                      <button
+                        key={action.status}
+                        type="button"
+                        onClick={() =>
+                          updateCaptureJobStatusMutation.mutate({
+                            id: latestCaptureJob.id,
+                            vodAnalysisId,
+                            status: action.status,
+                            errorMessage: action.errorMessage,
+                          })
+                        }
+                        disabled={updateCaptureJobStatusMutation.isPending}
+                        className="rounded-sm border border-neon-cyan/60 px-3 py-2 font-mono text-xs font-bold uppercase tracking-widest text-neon-cyan transition hover:bg-neon-cyan/10 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {action.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              <div>
+                <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-neon-gold">
+                  Dev mock automation
+                </div>
+                <p className="mt-1 font-mono text-xs text-white/60">
+                  Dev only. Creates deterministic pending suggestions. No video
+                  frames are scanned.
+                </p>
+                {!latestCaptureJob ? (
+                  <p className="mt-2 font-mono text-xs text-white/45">
+                    Queue a capture job first.
+                  </p>
+                ) : null}
+                {mockAutomationMessage ? (
+                  <p
+                    className={`mt-2 rounded border p-2 font-mono text-xs ${
+                      mockAutomationMessage.type === "success"
+                        ? "border-neon-cyan/30 bg-neon-cyan/10 text-neon-cyan"
+                        : "border-red-500/40 bg-red-950/30 text-red-100"
+                    }`}
+                  >
+                    {mockAutomationMessage.text}
+                  </p>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!latestCaptureJob) return;
+                    mockAutomationMutation.mutate({
+                      vodAnalysisId,
+                      captureJobId: latestCaptureJob.id,
+                    });
+                  }}
+                  disabled={
+                    !latestCaptureJob || mockAutomationMutation.isPending
+                  }
+                  className="mt-3 rounded-sm border border-neon-gold/70 px-3 py-2 font-mono text-xs font-bold uppercase tracking-widest text-neon-gold transition hover:bg-neon-gold/10 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {mockAutomationMutation.isPending
+                    ? "Running mock automation…"
+                    : "Run mock automation detections"}
+                </button>
+              </div>
             </div>
-            <p className="mt-1 font-mono text-xs text-white/60">
-              Dev only. Creates deterministic pending suggestions. No video
-              frames are scanned.
-            </p>
-            {!latestCaptureJob ? (
-              <p className="mt-2 font-mono text-xs text-white/45">
-                Queue a capture job first.
-              </p>
-            ) : null}
-            {mockAutomationMessage ? (
-              <p
-                className={`mt-2 rounded border p-2 font-mono text-xs ${
-                  mockAutomationMessage.type === "success"
-                    ? "border-neon-cyan/30 bg-neon-cyan/10 text-neon-cyan"
-                    : "border-red-500/40 bg-red-950/30 text-red-100"
-                }`}
-              >
-                {mockAutomationMessage.text}
-              </p>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => {
-                if (!latestCaptureJob) return;
-                mockAutomationMutation.mutate({
-                  vodAnalysisId,
-                  captureJobId: latestCaptureJob.id,
-                });
-              }}
-              disabled={!latestCaptureJob || mockAutomationMutation.isPending}
-              className="mt-3 rounded-sm border border-neon-gold/70 px-3 py-2 font-mono text-xs font-bold uppercase tracking-widest text-neon-gold transition hover:bg-neon-gold/10 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {mockAutomationMutation.isPending
-                ? "Running mock automation…"
-                : "Run mock automation detections"}
-            </button>
-          </div>
+          </details>
         ) : null}
       </div>
     </details>
