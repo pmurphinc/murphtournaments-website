@@ -2317,6 +2317,7 @@ describe("processVodCaptureJob", () => {
       failedSamples: 0,
       errorMessage: null,
       startedAt: expect.any(Date),
+      updatedAt: expect.any(Date),
     });
     expect(updateSets.at(-1)).toMatchObject({
       status: "complete",
@@ -2343,10 +2344,30 @@ describe("processVodCaptureJob", () => {
 
     expect(updateSets).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ processedSamples: 1, failedSamples: 0 }),
-        expect.objectContaining({ processedSamples: 2, failedSamples: 0 }),
-        expect.objectContaining({ processedSamples: 3, failedSamples: 0 }),
-        expect.objectContaining({ processedSamples: 4, failedSamples: 0 }),
+        expect.objectContaining({
+          status: "processing",
+          processedSamples: 1,
+          failedSamples: 0,
+          updatedAt: expect.any(Date),
+        }),
+        expect.objectContaining({
+          status: "processing",
+          processedSamples: 2,
+          failedSamples: 0,
+          updatedAt: expect.any(Date),
+        }),
+        expect.objectContaining({
+          status: "processing",
+          processedSamples: 3,
+          failedSamples: 0,
+          updatedAt: expect.any(Date),
+        }),
+        expect.objectContaining({
+          status: "processing",
+          processedSamples: 4,
+          failedSamples: 0,
+          updatedAt: expect.any(Date),
+        }),
       ])
     );
   });
