@@ -19,9 +19,11 @@ describe("getVodCaptureReadiness", () => {
 
     expect(readiness.status).toBe("ready");
     expect(readiness.isReady).toBe(true);
+    expect(readiness.samplePlan.baseIntervalSeconds).toBe(5);
     expect(readiness.samplePlan.intervalSeconds).toBe(5);
+    expect(readiness.samplePlan.burstOffsetsSeconds).toEqual([1, 2, 3]);
     expect(readiness.samplePlan.timestamps.slice(0, 5)).toEqual([
-      0, 5, 10, 15, 20,
+      0, 1, 2, 3, 5,
     ]);
   });
 
@@ -107,24 +109,29 @@ describe("getVodCaptureReadiness", () => {
 });
 
 describe("buildFrameSamplingPlan", () => {
-  it("builds the default sampling plan", () => {
-    expect(buildFrameSamplingPlan(95)).toEqual({
-      durationSeconds: 95,
+  it("builds the default burst sampling plan", () => {
+    expect(buildFrameSamplingPlan(15)).toEqual({
+      durationSeconds: 15,
+      baseIntervalSeconds: 5,
       intervalSeconds: 5,
+      burstOffsetsSeconds: [1, 2, 3],
       maxSamples: 2_500,
-      timestamps: [
-        0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85,
-        90, 95,
-      ],
+      timestamps: [0, 1, 2, 3, 5, 6, 7, 8, 10, 11, 12, 13, 15],
     });
   });
 
-  it("plans a 12m30s VOD every 5 seconds", () => {
+  it("plans a 12m30s VOD with base 5-second samples plus burst offsets", () => {
     const plan = buildFrameSamplingPlan(750);
+    const baseTimestampCount = Math.floor(750 / 5) + 1;
+    const baseTimestampsWithFullBursts = baseTimestampCount - 1;
+    const expectedSampleCount = baseTimestampsWithFullBursts * 4 + 1;
 
+    expect(plan.baseIntervalSeconds).toBe(5);
     expect(plan.intervalSeconds).toBe(5);
-    expect(plan.timestamps).toHaveLength(151);
-    expect(plan.timestamps.slice(0, 6)).toEqual([0, 5, 10, 15, 20, 25]);
+    expect(plan.burstOffsetsSeconds).toEqual([1, 2, 3]);
+    expect(plan.timestamps).toHaveLength(expectedSampleCount);
+    expect(expectedSampleCount).toBe(601);
+    expect(plan.timestamps.slice(0, 9)).toEqual([0, 1, 2, 3, 5, 6, 7, 8, 10]);
     expect(plan.timestamps.at(-1)).toBe(750);
   });
 
@@ -132,18 +139,43 @@ describe("buildFrameSamplingPlan", () => {
     const plan = buildFrameSamplingPlan(20_000);
 
     expect(plan.timestamps).toHaveLength(2_500);
-    expect(plan.timestamps.at(-1)).toBe(12_495);
+    expect(plan.timestamps.at(-1)).toBe(3_123);
   });
 
   it("honors an explicit maximum sample count", () => {
     const plan = buildFrameSamplingPlan(10_000, 30, 3);
 
-    expect(plan.timestamps).toEqual([0, 30, 60]);
+    expect(plan.timestamps).toEqual([0, 1, 2]);
     expect(plan.timestamps).toHaveLength(3);
   });
 
   it("normalizes the interval to a minimum of one second", () => {
     expect(buildFrameSamplingPlan(3, 0, 10).timestamps).toEqual([0, 1, 2, 3]);
+  });
+
+  it("keeps burst sampling timestamps sorted and unique", () => {
+    const plan = buildFrameSamplingPlan(8, 2, 100, [3, 1, 1, 2]);
+    const sortedTimestamps = [...plan.timestamps].sort(
+      (left, right) => left - right
+    );
+
+    expect(plan.burstOffsetsSeconds).toEqual([1, 2, 3]);
+    expect(plan.timestamps).toEqual(sortedTimestamps);
+    expect(new Set(plan.timestamps).size).toBe(plan.timestamps.length);
+    expect(plan.timestamps).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+  });
+
+  it("does not include burst timestamps beyond the VOD duration", () => {
+    const plan = buildFrameSamplingPlan(12);
+
+    expect(plan.timestamps).toEqual([0, 1, 2, 3, 5, 6, 7, 8, 10, 11, 12]);
+    expect(plan.timestamps.every(timestamp => timestamp <= 12)).toBe(true);
+  });
+
+  it("allows burst sampling to be disabled for compatibility", () => {
+    expect(buildFrameSamplingPlan(15, 5, 100, []).timestamps).toEqual([
+      0, 5, 10, 15,
+    ]);
   });
 });
 
