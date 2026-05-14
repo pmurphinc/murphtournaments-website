@@ -10,6 +10,7 @@ import { serveStatic, setupVite } from "./vite";
 import { handleTournamentWebhook, handleGetTournamentState } from "../webhooks";
 import { scrapeAndStorePatchNotes } from "../patchNoteScraper";
 import { serveVodCaptureFrame } from "../vodCaptureFrameRoute";
+import { logVodFrameCaptureBinaryAvailability } from "../vodFrameCapture";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -38,13 +39,13 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
-  
+
   // Webhook endpoint for Discord bot tournament updates
   app.post("/api/webhooks/tournament", handleTournamentWebhook);
-  
+
   // Public endpoint to fetch current tournament state
   app.get("/api/tournament/:tournamentId/state", handleGetTournamentState);
-  
+
   app.get(
     "/api/vod-capture-frame/:vodAnalysisId/:captureJobId/:fileName",
     serveVodCaptureFrame
@@ -75,18 +76,24 @@ async function startServer() {
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
   });
+
+  void logVodFrameCaptureBinaryAvailability();
 }
 
 // Weekly patch notes scraper scheduler
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
 
 async function runPatchNoteScraper() {
-  console.log(`[scheduler] Running patch notes scraper at ${new Date().toISOString()}`);
+  console.log(
+    `[scheduler] Running patch notes scraper at ${new Date().toISOString()}`
+  );
   try {
     const result = await scrapeAndStorePatchNotes();
-    console.log(`[scheduler] Patch notes scrape complete: ${result.added} added, ${result.skipped} skipped, ${result.errors} errors`);
+    console.log(
+      `[scheduler] Patch notes scrape complete: ${result.added} added, ${result.skipped} skipped, ${result.errors} errors`
+    );
   } catch (err) {
-    console.error('[scheduler] Patch notes scraper failed:', err);
+    console.error("[scheduler] Patch notes scraper failed:", err);
   }
 }
 
@@ -102,6 +109,8 @@ startServer()
       runPatchNoteScraper();
     }, ONE_WEEK_MS);
 
-    console.log('[scheduler] Patch notes scraper scheduled: runs on startup + every 7 days');
+    console.log(
+      "[scheduler] Patch notes scraper scheduled: runs on startup + every 7 days"
+    );
   })
   .catch(console.error);

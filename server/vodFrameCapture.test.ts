@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { execFile } from "node:child_process";
 import {
   buildVodFrameCapturePath,
+  checkVodFrameCaptureBinaries,
   extractVodFrame,
   isTwitchVodSource,
 } from "./vodFrameCapture";
@@ -72,7 +73,25 @@ describe("vodFrameCapture", () => {
       timestampSeconds: 30,
       sampleIndex: 1,
       errorMessage:
-        "Frame extraction requires missing system binaries: yt-dlp, ffmpeg. Install yt-dlp and ffmpeg on the server to enable Twitch frame capture.",
+        "Frame extraction requires missing system binaries: ffmpeg, yt-dlp. Install yt-dlp and ffmpeg on the server to enable Twitch frame capture.",
+    });
+  });
+
+  it("can include safe binary check failure reasons for server diagnostics", async () => {
+    mockExecFileResults([
+      { error: new Error("spawn ffmpeg ENOENT") },
+      { error: new Error("spawn yt-dlp ENOENT") },
+    ]);
+
+    await expect(
+      checkVodFrameCaptureBinaries({ includeFailureReasons: true })
+    ).resolves.toEqual({
+      available: false,
+      missing: ["ffmpeg", "yt-dlp"],
+      failureReasons: {
+        ffmpeg: "not found on PATH",
+        "yt-dlp": "not found on PATH",
+      },
     });
   });
 

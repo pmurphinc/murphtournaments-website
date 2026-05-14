@@ -3,7 +3,10 @@ import { COOKIE_NAME } from "../shared/const";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
-import { checkVodFrameCaptureBinaries } from "./vodFrameCapture";
+import {
+  checkVodFrameCaptureBinaries,
+  formatRequiredBinaryList,
+} from "./vodFrameCapture";
 import {
   getOrCreateDevDivisionTournament,
   getOrCreateSeventhCircleTournament,
@@ -784,12 +787,22 @@ export const appRouter = router({
     processCaptureJob: publicProcedure
       .input(processVodCaptureJobInputSchema)
       .mutation(async ({ input }) => {
-        const frameCaptureBinaries = await checkVodFrameCaptureBinaries();
+        const frameCaptureBinaries = await checkVodFrameCaptureBinaries({
+          includeFailureReasons: true,
+        });
 
         if (!frameCaptureBinaries.available) {
+          if (frameCaptureBinaries.failureReasons) {
+            console.warn(
+              `[vod-capture] process blocked by missing runtime binaries: ${formatRequiredBinaryList(
+                frameCaptureBinaries.missing
+              )}`
+            );
+          }
+
           throw new Error(
-            `Capture job processing is blocked until ffmpeg and yt-dlp are available in the Railway runtime. Missing: ${frameCaptureBinaries.missing.join(
-              ", "
+            `Capture job processing is blocked until ffmpeg and yt-dlp are available in the Railway runtime. Missing: ${formatRequiredBinaryList(
+              frameCaptureBinaries.missing
             )}.`
           );
         }

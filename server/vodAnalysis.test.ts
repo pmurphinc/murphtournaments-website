@@ -2445,7 +2445,7 @@ describe("processVodCaptureJob", () => {
       timestampSeconds: input.timestampSeconds,
       sampleIndex: input.sampleIndex,
       errorMessage:
-        "Frame extraction requires missing system binaries: yt-dlp, ffmpeg.",
+        "Frame extraction requires missing system binaries: ffmpeg, yt-dlp.",
     });
     const { db, updateSets } = createProcessCaptureJobDb({
       vodRows: [captureReadyVod()],
@@ -2465,7 +2465,7 @@ describe("processVodCaptureJob", () => {
       failedSamples: 4,
       createdSuggestionCount: 0,
       errorMessage:
-        "Frame extraction requires missing system binaries: yt-dlp, ffmpeg.",
+        "Frame extraction requires missing system binaries: ffmpeg, yt-dlp.",
     });
 
     expect(updateSets.at(-1)).toMatchObject({
@@ -2473,7 +2473,7 @@ describe("processVodCaptureJob", () => {
       processedSamples: 0,
       failedSamples: 4,
       errorMessage:
-        "Frame extraction requires missing system binaries: yt-dlp, ffmpeg.",
+        "Frame extraction requires missing system binaries: ffmpeg, yt-dlp.",
     });
   });
 

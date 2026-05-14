@@ -1339,6 +1339,13 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
               </section>
             ) : null}
 
+            {vod ? (
+              <VodAutomationStatusPanel
+                vodAnalysisId={vodAnalysisId}
+                vod={vod}
+              />
+            ) : null}
+
             <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
               <div className="space-y-4 lg:col-span-2">
                 <NeonCard variant="cyan">
@@ -1804,12 +1811,6 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
                   summaries={teamSummaries}
                   vodAnalysisId={vodAnalysisId}
                 />
-                {vod ? (
-                  <VodAutomationStatusPanel
-                    vodAnalysisId={vodAnalysisId}
-                    vod={vod}
-                  />
-                ) : null}
               </div>
             </section>
           </>

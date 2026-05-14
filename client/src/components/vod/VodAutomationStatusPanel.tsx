@@ -326,8 +326,8 @@ export function VodAutomationStatusPanel({
     !areFrameCaptureBinariesAvailable;
 
   return (
-    <details className="group rounded-lg border border-neon-cyan/20 bg-black/30 p-4 sm:p-5">
-      <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
+    <section className="rounded-lg border border-neon-cyan/25 bg-black/35 p-4 shadow-[0_0_32px_rgba(0,229,255,0.08)] sm:p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h3 className="font-mono text-lg font-bold uppercase tracking-widest text-neon-cyan">
             Automation Status
@@ -339,17 +339,22 @@ export function VodAutomationStatusPanel({
         <span className="shrink-0 rounded border border-neon-cyan/40 bg-neon-cyan/10 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-neon-cyan">
           {captureStatusLabel}
         </span>
-      </summary>
+      </div>
 
       <div className="mt-4 space-y-4 border-t border-white/10 pt-4">
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          <VodDetailPill label="Capture" value={captureStatusLabel} />
-          <VodDetailPill label="Binaries" value={binaryStatusLabel} />
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <VodDetailPill label="Capture" value={captureStatusLabel} compact />
+          <VodDetailPill label="Binaries" value={binaryStatusLabel} compact />
           <VodDetailPill
             label="OCR"
             value={ocrEnabled ? "Enabled" : "Disabled"}
+            compact
           />
-          <VodDetailPill label="Suggestions" value={pendingSuggestionLabel} />
+          <VodDetailPill
+            label="Suggestions"
+            value={pendingSuggestionLabel}
+            compact
+          />
         </div>
 
         {frameCaptureBinaries && !areFrameCaptureBinariesAvailable ? (
@@ -364,102 +369,111 @@ export function VodAutomationStatusPanel({
           </div>
         ) : null}
 
-        {automationStatusQuery.isLoading ? (
-          <div className="rounded border border-white/10 bg-black/30 p-3 font-mono text-sm text-white/50">
-            Loading automation status…
-          </div>
-        ) : latestCaptureJob && captureJobProgress ? (
-          <div className="rounded border border-white/10 bg-black/30 p-3">
-            <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-white/45">
-              Latest capture job
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.85fr)] xl:items-start">
+          {automationStatusQuery.isLoading ? (
+            <div className="rounded border border-white/10 bg-black/30 p-3 font-mono text-sm text-white/50">
+              Loading automation status…
             </div>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              <VodDetailPill
-                label="Job status"
-                value={formatVodCaptureJobStatus(latestCaptureJob.status)}
-              />
-              <VodDetailPill
-                label="Progress"
-                value={progressLine ?? "No samples planned"}
-              />
-              <VodDetailPill label="Source" value={latestCaptureJob.source} />
-              <VodDetailPill
-                label="Created"
-                value={formatDateTime(latestCaptureJob.createdAt)}
-              />
-            </div>
-            {latestCaptureJob.errorMessage ? (
-              <p className="mt-3 rounded border border-red-500/40 bg-red-950/30 p-3 font-mono text-sm text-red-100">
-                {latestCaptureJob.errorMessage}
-              </p>
-            ) : null}
-          </div>
-        ) : (
-          <div className="rounded border border-white/10 bg-black/30 p-3 font-mono text-sm text-white/50">
-            No capture jobs have been recorded for this VOD yet.
-          </div>
-        )}
-
-        <div className="rounded border border-neon-cyan/20 bg-black/40 p-3">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div>
-              <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-neon-cyan">
-                Debug frame
+          ) : latestCaptureJob && captureJobProgress ? (
+            <div className="rounded border border-white/10 bg-black/30 p-3">
+              <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-white/45">
+                Latest capture job
               </div>
-              <p className="mt-1 font-mono text-xs text-white/55">
-                Latest captured frame with HUD detector zones overlaid.
-              </p>
-            </div>
-            {framePreview?.status === "available" &&
-            framePreview.timestampSeconds !== null ? (
-              <span className="rounded border border-neon-gold/40 bg-neon-gold/10 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-neon-gold">
-                {formatVodEventTimestamp(framePreview.timestampSeconds)}
-              </span>
-            ) : null}
-          </div>
-
-          {framePreviewQuery.isLoading ? (
-            <div className="mt-3 rounded border border-white/10 bg-black/30 p-3 font-mono text-sm text-white/50">
-              Loading debug frame preview…
-            </div>
-          ) : framePreview?.status === "available" ? (
-            <div className="mt-3 space-y-3">
-              <div className="relative overflow-hidden rounded border border-white/10 bg-black shadow-[0_0_24px_rgba(0,229,255,0.12)]">
-                <img
-                  src={framePreview.frameUrl}
-                  alt="Latest captured VOD debug frame with HUD detection zones"
-                  className="block h-auto w-full"
-                  loading="lazy"
+              <div className="mt-3 grid gap-2 md:grid-cols-2">
+                <VodDetailPill
+                  label="Job status"
+                  value={formatVodCaptureJobStatus(latestCaptureJob.status)}
+                  compact
                 />
-                <div className="absolute inset-0">
-                  {previewZones.map(zone => (
-                    <div
-                      key={zone.id}
-                      className={`absolute border-2 ${zoneToneClasses[zone.id]} shadow-[0_0_14px_currentColor]`}
-                      style={{
-                        left: `${zone.rect.x * 100}%`,
-                        top: `${zone.rect.y * 100}%`,
-                        width: `${zone.rect.width * 100}%`,
-                        height: `${zone.rect.height * 100}%`,
-                      }}
-                      title={zone.purpose}
-                    >
-                      <span className="absolute left-1 top-1 rounded bg-black/75 px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-widest sm:text-[10px]">
-                        {zone.label}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                <VodDetailPill
+                  label="Progress"
+                  value={progressLine ?? "No samples planned"}
+                  compact
+                />
+                <VodDetailPill
+                  label="Source"
+                  value={latestCaptureJob.source}
+                  compact
+                />
+                <VodDetailPill
+                  label="Created"
+                  value={formatDateTime(latestCaptureJob.createdAt)}
+                  compact
+                />
               </div>
-              <p className="font-mono text-[10px] text-white/45">
-                {framePreview.fileName}
-              </p>
+              {latestCaptureJob.errorMessage ? (
+                <p className="mt-3 rounded border border-red-500/40 bg-red-950/30 p-3 font-mono text-sm text-red-100">
+                  {latestCaptureJob.errorMessage}
+                </p>
+              ) : null}
             </div>
           ) : (
-            <div className="mt-3 rounded border border-white/10 bg-black/30 p-3 font-mono text-sm text-white/50">
-              No debug frame captured yet.
+            <div className="rounded border border-white/10 bg-black/30 p-3 font-mono text-sm text-white/50">
+              No capture jobs have been recorded for this VOD yet.
             </div>
           )}
+
+          <div className="rounded border border-neon-cyan/20 bg-black/40 p-3">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-neon-cyan">
+                  Debug frame
+                </div>
+                <p className="mt-1 font-mono text-xs text-white/55">
+                  Latest captured frame with HUD detector zones overlaid.
+                </p>
+              </div>
+              {framePreview?.status === "available" &&
+              framePreview.timestampSeconds !== null ? (
+                <span className="rounded border border-neon-gold/40 bg-neon-gold/10 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-neon-gold">
+                  {formatVodEventTimestamp(framePreview.timestampSeconds)}
+                </span>
+              ) : null}
+            </div>
+
+            {framePreviewQuery.isLoading ? (
+              <div className="mt-3 rounded border border-white/10 bg-black/30 p-3 font-mono text-sm text-white/50">
+                Loading debug frame preview…
+              </div>
+            ) : framePreview?.status === "available" ? (
+              <div className="mt-3 space-y-3">
+                <div className="relative overflow-hidden rounded border border-white/10 bg-black shadow-[0_0_24px_rgba(0,229,255,0.12)]">
+                  <img
+                    src={framePreview.frameUrl}
+                    alt="Latest captured VOD debug frame with HUD detection zones"
+                    className="block h-auto w-full"
+                    loading="lazy"
+                  />
+                  <div className="absolute inset-0">
+                    {previewZones.map(zone => (
+                      <div
+                        key={zone.id}
+                        className={`absolute border-2 ${zoneToneClasses[zone.id]} shadow-[0_0_14px_currentColor]`}
+                        style={{
+                          left: `${zone.rect.x * 100}%`,
+                          top: `${zone.rect.y * 100}%`,
+                          width: `${zone.rect.width * 100}%`,
+                          height: `${zone.rect.height * 100}%`,
+                        }}
+                        title={zone.purpose}
+                      >
+                        <span className="absolute left-1 top-1 rounded bg-black/75 px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-widest sm:text-[10px]">
+                          {zone.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <p className="font-mono text-[10px] text-white/45">
+                  {framePreview.fileName}
+                </p>
+              </div>
+            ) : (
+              <div className="mt-3 rounded border border-white/10 bg-black/30 p-3 font-mono text-sm text-white/50">
+                No debug frame captured yet.
+              </div>
+            )}
+          </div>
         </div>
 
         {!readiness.isReady ? (
@@ -484,52 +498,54 @@ export function VodAutomationStatusPanel({
           </p>
         ) : null}
 
-        <p className="rounded border border-neon-cyan/25 bg-neon-cyan/10 p-3 font-mono text-sm text-neon-cyan">
-          {actionHint}
-        </p>
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+          <p className="rounded border border-neon-cyan/25 bg-neon-cyan/10 p-3 font-mono text-sm text-neon-cyan">
+            {actionHint}
+          </p>
 
-        <div className="grid gap-2 sm:grid-cols-2">
-          <button
-            type="button"
-            onClick={() =>
-              createCaptureJobMutation.mutate({
-                vodAnalysisId,
-                source: "manual_debug",
-              })
-            }
-            disabled={
-              !readiness.isReady ||
-              isCaptureJobAlreadyQueued ||
-              isCaptureJobProcessing ||
-              createCaptureJobMutation.isPending
-            }
-            title={captureJobDisabledReason ?? undefined}
-            className="rounded-sm border-2 border-neon-cyan px-4 py-2 font-mono text-xs font-bold uppercase tracking-widest text-neon-cyan transition hover:bg-neon-cyan/10 hover-glow-cyan disabled:cursor-not-allowed disabled:border-white/15 disabled:text-white/35 disabled:hover:bg-transparent"
-          >
-            {queueCaptureButtonLabel}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (!latestCaptureJob) return;
-              processCaptureJobMutation.mutate({
-                vodAnalysisId,
-                captureJobId: latestCaptureJob.id,
-              });
-            }}
-            disabled={
-              !latestCaptureJob ||
-              !areFrameCaptureBinariesAvailable ||
-              latestCaptureJob.status !== "queued" ||
-              processCaptureJobMutation.isPending
-            }
-            title={processCaptureJobDisabledReason ?? undefined}
-            className="rounded-sm border-2 border-neon-gold px-4 py-2 font-mono text-xs font-bold uppercase tracking-widest text-neon-gold transition hover:bg-neon-gold/10 disabled:cursor-not-allowed disabled:border-white/15 disabled:text-white/35 disabled:hover:bg-transparent"
-          >
-            {processCaptureJobMutation.isPending
-              ? "Processing capture job…"
-              : "Process latest capture job"}
-          </button>
+          <div className="grid gap-2 sm:grid-cols-2 lg:min-w-[460px]">
+            <button
+              type="button"
+              onClick={() =>
+                createCaptureJobMutation.mutate({
+                  vodAnalysisId,
+                  source: "manual_debug",
+                })
+              }
+              disabled={
+                !readiness.isReady ||
+                isCaptureJobAlreadyQueued ||
+                isCaptureJobProcessing ||
+                createCaptureJobMutation.isPending
+              }
+              title={captureJobDisabledReason ?? undefined}
+              className="rounded-sm border-2 border-neon-cyan px-4 py-2 font-mono text-xs font-bold uppercase tracking-widest text-neon-cyan transition hover:bg-neon-cyan/10 hover-glow-cyan disabled:cursor-not-allowed disabled:border-white/15 disabled:text-white/35 disabled:hover:bg-transparent"
+            >
+              {queueCaptureButtonLabel}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!latestCaptureJob) return;
+                processCaptureJobMutation.mutate({
+                  vodAnalysisId,
+                  captureJobId: latestCaptureJob.id,
+                });
+              }}
+              disabled={
+                !latestCaptureJob ||
+                !areFrameCaptureBinariesAvailable ||
+                latestCaptureJob.status !== "queued" ||
+                processCaptureJobMutation.isPending
+              }
+              title={processCaptureJobDisabledReason ?? undefined}
+              className="rounded-sm border-2 border-neon-gold px-4 py-2 font-mono text-xs font-bold uppercase tracking-widest text-neon-gold transition hover:bg-neon-gold/10 disabled:cursor-not-allowed disabled:border-white/15 disabled:text-white/35 disabled:hover:bg-transparent"
+            >
+              {processCaptureJobMutation.isPending
+                ? "Processing capture job…"
+                : "Process latest capture job"}
+            </button>
+          </div>
         </div>
 
         {queueCaptureJobMessage ? (
@@ -785,6 +801,6 @@ export function VodAutomationStatusPanel({
           </details>
         ) : null}
       </div>
-    </details>
+    </section>
   );
 }

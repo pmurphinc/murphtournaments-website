@@ -174,7 +174,22 @@ export type RequiredBinary = "yt-dlp" | "ffmpeg";
 export type VodFrameCaptureBinaryCheck = {
   available: boolean;
   missing: RequiredBinary[];
+  failureReasons?: Partial<Record<RequiredBinary, string>>;
 };
+
+type BinaryAvailabilityResult = {
+  binary: RequiredBinary;
+  available: boolean;
+  failureReason?: string;
+};
+
+type VodFrameCaptureBinaryCheckOptions = {
+  includeFailureReasons?: boolean;
+};
+
+const REQUIRED_BINARY_DISPLAY_ORDER: RequiredBinary[] = ["ffmpeg", "yt-dlp"];
+
+let hasLoggedVodFrameCaptureBinaryAvailability = false;
 
 function baseCaptureResult(input: VodFrameCaptureInput) {
   return {
@@ -191,28 +206,127 @@ function getChildProcessErrorMessage(error: unknown): string {
   return "Unknown frame extraction process error.";
 }
 
-async function isBinaryAvailable(binary: RequiredBinary): Promise<boolean> {
+function getSafeBinaryCheckFailureReason(error: unknown): string {
+  const errorRecord =
+    error && typeof error === "object"
+      ? (error as { code?: unknown; signal?: unknown; killed?: unknown })
+      : null;
+  const code = typeof errorRecord?.code === "string" ? errorRecord.code : null;
+  const signal =
+    typeof errorRecord?.signal === "string" ? errorRecord.signal : null;
+  const killed = errorRecord?.killed === true;
+  const message = error instanceof Error ? error.message : "";
+
+  if (code === "ENOENT" || /ENOENT/i.test(message)) {
+    return "not found on PATH";
+  }
+
+  if (code === "ETIMEDOUT" || killed) {
+    return "version check timed out";
+  }
+
+  if (code) {
+    return `version check failed with ${code}`;
+  }
+
+  if (signal) {
+    return `version check stopped by ${signal}`;
+  }
+
+  return "version check failed";
+}
+
+async function checkBinaryAvailability(
+  binary: RequiredBinary,
+  options: VodFrameCaptureBinaryCheckOptions = {}
+): Promise<BinaryAvailabilityResult> {
   try {
     await execFileAsync(binary, ["--version"], {
       timeout: CHILD_PROCESS_TIMEOUT_MS,
     });
-    return true;
-  } catch {
-    return false;
+    return { binary, available: true };
+  } catch (error) {
+    return {
+      binary,
+      available: false,
+      ...(options.includeFailureReasons
+        ? { failureReason: getSafeBinaryCheckFailureReason(error) }
+        : {}),
+    };
   }
 }
 
-export async function checkVodFrameCaptureBinaries(): Promise<VodFrameCaptureBinaryCheck> {
-  const checks = await Promise.all([
-    isBinaryAvailable("yt-dlp"),
-    isBinaryAvailable("ffmpeg"),
-  ]);
-  const missing: RequiredBinary[] = [];
+export function formatRequiredBinaryList(binaries: RequiredBinary[]): string {
+  return REQUIRED_BINARY_DISPLAY_ORDER.filter(binary =>
+    binaries.includes(binary)
+  ).join(", ");
+}
 
-  if (!checks[0]) missing.push("yt-dlp");
-  if (!checks[1]) missing.push("ffmpeg");
+export async function checkVodFrameCaptureBinaries(
+  options: VodFrameCaptureBinaryCheckOptions = {}
+): Promise<VodFrameCaptureBinaryCheck> {
+  const checks = await Promise.all(
+    REQUIRED_BINARY_DISPLAY_ORDER.map(binary =>
+      checkBinaryAvailability(binary, options)
+    )
+  );
+  const missing = checks
+    .filter(check => !check.available)
+    .map(check => check.binary);
+  const failureReasons = options.includeFailureReasons
+    ? checks.reduce<Partial<Record<RequiredBinary, string>>>(
+        (reasons, check) => {
+          if (!check.available && check.failureReason) {
+            reasons[check.binary] = check.failureReason;
+          }
+          return reasons;
+        },
+        {}
+      )
+    : undefined;
 
-  return { available: missing.length === 0, missing };
+  return {
+    available: missing.length === 0,
+    missing,
+    ...(failureReasons && Object.keys(failureReasons).length > 0
+      ? { failureReasons }
+      : {}),
+  };
+}
+
+export async function logVodFrameCaptureBinaryAvailability(): Promise<void> {
+  if (hasLoggedVodFrameCaptureBinaryAvailability) {
+    return;
+  }
+
+  hasLoggedVodFrameCaptureBinaryAvailability = true;
+
+  try {
+    const check = await checkVodFrameCaptureBinaries({
+      includeFailureReasons: true,
+    });
+    const statusParts = REQUIRED_BINARY_DISPLAY_ORDER.map(binary =>
+      check.missing.includes(binary)
+        ? `${binary}=missing`
+        : `${binary}=available`
+    );
+    const detailParts = REQUIRED_BINARY_DISPLAY_ORDER.flatMap(binary => {
+      const reason = check.failureReasons?.[binary];
+      return reason ? [`${binary}: ${reason}`] : [];
+    });
+
+    console.log(
+      `[vod-capture] runtime binaries: ${statusParts.join(", ")}${
+        detailParts.length ? ` (${detailParts.join("; ")})` : ""
+      }`
+    );
+  } catch (error) {
+    console.warn(
+      `[vod-capture] runtime binaries: ffmpeg=missing, yt-dlp=missing (check failed: ${getSafeBinaryCheckFailureReason(
+        error
+      )})`
+    );
+  }
 }
 
 export function isTwitchVodSource(sourceUrl: string): boolean {
@@ -283,8 +397,8 @@ export async function extractVodFrame(
     return {
       ...baseCaptureResult(input),
       status: "failed",
-      errorMessage: `Frame extraction requires missing system binaries: ${binaryCheck.missing.join(
-        ", "
+      errorMessage: `Frame extraction requires missing system binaries: ${formatRequiredBinaryList(
+        binaryCheck.missing
       )}. Install yt-dlp and ffmpeg on the server to enable Twitch frame capture.`,
     };
   }
