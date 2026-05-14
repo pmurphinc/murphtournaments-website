@@ -77,6 +77,33 @@ describe("vodFrameCapture", () => {
     });
   });
 
+  it("checks required runtime binaries with their supported version flags", async () => {
+    mockExecFileResults([
+      { stdout: "ffmpeg version 8" },
+      { stdout: "2026.01.01" },
+    ]);
+
+    await expect(checkVodFrameCaptureBinaries()).resolves.toEqual({
+      available: true,
+      missing: [],
+    });
+
+    expect(execFileMock).toHaveBeenNthCalledWith(
+      1,
+      "ffmpeg",
+      ["-version"],
+      expect.objectContaining({ timeout: 30_000 }),
+      expect.any(Function)
+    );
+    expect(execFileMock).toHaveBeenNthCalledWith(
+      2,
+      "yt-dlp",
+      ["--version"],
+      expect.objectContaining({ timeout: 30_000 }),
+      expect.any(Function)
+    );
+  });
+
   it("can include safe binary check failure reasons for server diagnostics", async () => {
     mockExecFileResults([
       { error: new Error("spawn ffmpeg ENOENT") },
@@ -116,8 +143,8 @@ describe("vodFrameCapture", () => {
 
   it("captures Twitch frames through yt-dlp and ffmpeg when binaries are available", async () => {
     mockExecFileResults([
-      { stdout: "yt-dlp 2026.01.01" },
       { stdout: "ffmpeg version 8" },
+      { stdout: "yt-dlp 2026.01.01" },
       { stdout: "https://vod-secure.twitch.tv/example.m3u8\n" },
       { stdout: "" },
     ]);

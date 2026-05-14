@@ -188,6 +188,10 @@ type VodFrameCaptureBinaryCheckOptions = {
 };
 
 const REQUIRED_BINARY_DISPLAY_ORDER: RequiredBinary[] = ["ffmpeg", "yt-dlp"];
+const REQUIRED_BINARY_VERSION_ARGS: Record<RequiredBinary, string[]> = {
+  ffmpeg: ["-version"],
+  "yt-dlp": ["--version"],
+};
 
 let hasLoggedVodFrameCaptureBinaryAvailability = false;
 
@@ -241,7 +245,7 @@ async function checkBinaryAvailability(
   options: VodFrameCaptureBinaryCheckOptions = {}
 ): Promise<BinaryAvailabilityResult> {
   try {
-    await execFileAsync(binary, ["--version"], {
+    await execFileAsync(binary, REQUIRED_BINARY_VERSION_ARGS[binary], {
       timeout: CHILD_PROCESS_TIMEOUT_MS,
     });
     return { binary, available: true };
