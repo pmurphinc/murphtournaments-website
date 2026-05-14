@@ -1193,7 +1193,7 @@ export async function processVodCaptureJob(
   const updateJob = async (values: Partial<InsertVodCaptureJob>) => {
     await db
       .update(vodCaptureJobs)
-      .set(values)
+      .set({ ...values, updatedAt: new Date() })
       .where(
         and(
           eq(vodCaptureJobs.id, parsedInput.captureJobId),
@@ -1296,7 +1296,11 @@ export async function processVodCaptureJob(
           `Capture sample ${sampleIndex + 1} at ${sampleTimestampSeconds}s failed: ${getErrorMessage(error)}`
         );
       } finally {
-        await updateJob({ processedSamples, failedSamples });
+        await updateJob({
+          status: "processing",
+          processedSamples,
+          failedSamples,
+        });
       }
     }
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { formatVodEventTimestamp } from "@shared/vod/events";
 import type { VodHudZoneId } from "@shared/vod/hud-zones";
@@ -42,6 +42,22 @@ export function VodAutomationStatusPanel({
     type: "success" | "error";
     text: string;
   } | null>(null);
+  const [isProcessingCaptureJob, setIsProcessingCaptureJob] = useState(false);
+  const [processingStartedAt, setProcessingStartedAt] = useState<Date | null>(
+    null
+  );
+  const [processingCaptureJobId, setProcessingCaptureJobId] = useState<
+    number | null
+  >(null);
+  const refetchCaptureJobViews = () =>
+    Promise.all([
+      utils.vodAnalysis.getAutomationStatus.invalidate(vodAnalysisId),
+      utils.vodAnalysis.getLatestCaptureJob.invalidate(vodAnalysisId),
+      utils.vodAnalysis.listCaptureJobs.invalidate(vodAnalysisId),
+      utils.vodAnalysis.getLatestCaptureFramePreview.invalidate({
+        vodAnalysisId,
+      }),
+    ]);
   const readiness = getVodCaptureReadiness(vod);
   const samplePlan = readiness.samplePlan;
   const firstTimestamps = samplePlan.timestamps.slice(0, 5);
@@ -124,9 +140,13 @@ export function VodAutomationStatusPanel({
     });
   const processCaptureJobMutation =
     trpc.vodAnalysis.processCaptureJob.useMutation({
-      onMutate: () => {
+      onMutate: variables => {
+        setIsProcessingCaptureJob(true);
+        setProcessingStartedAt(new Date());
+        setProcessingCaptureJobId(variables.captureJobId);
         setQueueCaptureJobMessage(null);
         setProcessCaptureJobMessage(null);
+        void refetchCaptureJobViews();
       },
       onSuccess: async result => {
         await Promise.all([
@@ -134,6 +154,7 @@ export function VodAutomationStatusPanel({
           utils.vodAnalysis.getLatestCaptureJob.invalidate(vodAnalysisId),
           utils.vodAnalysis.listCaptureJobs.invalidate(vodAnalysisId),
           utils.vodAnalysis.listSuggestedEvents.invalidate(vodAnalysisId),
+          utils.vodAnalysis.listEvents.invalidate(vodAnalysisId),
           utils.vodAnalysis.list.invalidate(),
           utils.vodAnalysis.getLatestCaptureFramePreview.invalidate({
             vodAnalysisId,
@@ -156,6 +177,11 @@ export function VodAutomationStatusPanel({
       },
       onError: error => {
         setProcessCaptureJobMessage({ type: "error", text: error.message });
+      },
+      onSettled: () => {
+        setIsProcessingCaptureJob(false);
+        setProcessingStartedAt(null);
+        setProcessingCaptureJobId(null);
       },
     });
   const mockAutomationMutation =
@@ -205,50 +231,61 @@ export function VodAutomationStatusPanel({
     : "Checking";
   const ocrEnabled = automationStatus?.ocrEnabled ?? false;
   const ocrConfidenceThreshold = automationStatus?.ocrConfidenceThreshold ?? 70;
+  const isLocalProcessingLatestCaptureJob =
+    isProcessingCaptureJob &&
+    latestCaptureJob !== null &&
+    processingCaptureJobId === latestCaptureJob.id;
+  const effectiveLatestCaptureJobStatus = isLocalProcessingLatestCaptureJob
+    ? "processing"
+    : latestCaptureJob?.status;
   const captureJobProgress = latestCaptureJob
     ? getVodCaptureJobProgress(latestCaptureJob)
     : null;
-  const latestCaptureJobTone = latestCaptureJob
-    ? getVodCaptureJobStatusTone(latestCaptureJob.status)
+  const latestCaptureJobTone = effectiveLatestCaptureJobStatus
+    ? getVodCaptureJobStatusTone(effectiveLatestCaptureJobStatus)
     : null;
-  const isCaptureJobAlreadyQueued = latestCaptureJob?.status === "queued";
-  const isCaptureJobProcessing = latestCaptureJob?.status === "processing";
+  const isCaptureJobAlreadyQueued = effectiveLatestCaptureJobStatus === "queued";
+  const isCaptureJobProcessing = effectiveLatestCaptureJobStatus === "processing";
+  const isCaptureJobProcessingInUi =
+    processCaptureJobMutation.isPending ||
+    isProcessingCaptureJob ||
+    latestCaptureJob?.status === "processing";
   const captureJobDisabledReason = !readiness.isReady
     ? readiness.reason
-    : isCaptureJobAlreadyQueued
-      ? "A capture job is already queued."
-      : isCaptureJobProcessing
-        ? "A capture job is already processing."
+    : isCaptureJobProcessingInUi
+      ? "A capture job is already processing."
+      : isCaptureJobAlreadyQueued
+        ? "A capture job is already queued."
         : null;
   const queueCaptureButtonLabel = createCaptureJobMutation.isPending
     ? "Queueing capture job…"
-    : isCaptureJobAlreadyQueued
-      ? "Capture job already queued"
-      : isCaptureJobProcessing
-        ? "Capture job processing"
+    : isCaptureJobProcessingInUi
+      ? "Capture job processing"
+      : isCaptureJobAlreadyQueued
+        ? "Capture job already queued"
         : "Queue capture job";
-  const actionHint = isCaptureJobAlreadyQueued
-    ? frameCaptureBinaries && !areFrameCaptureBinariesAvailable
-      ? "A job is queued, but processing is disabled until ffmpeg and yt-dlp are available."
-      : areFrameCaptureBinariesAvailable
-        ? "A job is queued. Process it to scan frames."
-        : "A capture job is already queued. Process it when runtime binaries are ready."
-    : isCaptureJobProcessing
-      ? "A capture job is processing frame samples now."
+  const actionHint = isCaptureJobProcessingInUi
+    ? "Processing capture job. This may take a few minutes for 5-second sampling."
+    : isCaptureJobAlreadyQueued
+      ? frameCaptureBinaries && !areFrameCaptureBinariesAvailable
+        ? "A job is queued, but processing is disabled until ffmpeg and yt-dlp are available."
+        : areFrameCaptureBinariesAvailable
+          ? "A job is queued. Process it to scan frames."
+          : "A capture job is already queued. Process it when runtime binaries are ready."
       : readiness.isReady
         ? "Queue a capture job to prepare frame sampling."
         : readiness.reason;
   const processCaptureJobDisabledReason = !latestCaptureJob
     ? "Queue a capture job first."
-    : !frameCaptureBinaries
-      ? "Checking runtime binaries."
-      : !areFrameCaptureBinariesAvailable
-        ? "Twitch frame extraction needs ffmpeg and yt-dlp in the Railway runtime."
-        : latestCaptureJob.status === "processing"
-          ? "This capture job is already processing."
-          : latestCaptureJob.status === "complete"
+    : isCaptureJobProcessingInUi
+      ? "This capture job is already processing."
+      : !frameCaptureBinaries
+        ? "Checking runtime binaries."
+        : !areFrameCaptureBinariesAvailable
+          ? "Twitch frame extraction needs ffmpeg and yt-dlp in the Railway runtime."
+          : effectiveLatestCaptureJobStatus === "complete"
             ? "This capture job is already complete."
-            : latestCaptureJob.status !== "queued"
+            : effectiveLatestCaptureJobStatus !== "queued"
               ? "Only queued capture jobs can be processed."
               : null;
   const sourceTypeLabel =
@@ -282,9 +319,9 @@ export function VodAutomationStatusPanel({
       ) ?? [];
 
   const captureStatusLabel = latestCaptureJob
-    ? latestCaptureJob.status === "processing"
+    ? effectiveLatestCaptureJobStatus === "processing"
       ? "Processing"
-      : latestCaptureJob.status === "complete"
+      : effectiveLatestCaptureJobStatus === "complete"
         ? "Complete"
         : !readiness.isReady ||
             (frameCaptureBinaries && !areFrameCaptureBinariesAvailable)
@@ -295,11 +332,11 @@ export function VodAutomationStatusPanel({
       ? "Blocked"
       : "Ready";
   const captureSummary = latestCaptureJob
-    ? latestCaptureJob.status === "complete"
+    ? effectiveLatestCaptureJobStatus === "complete"
       ? "Capture job complete. Review pending suggestions below."
-      : latestCaptureJob.status === "processing"
+      : effectiveLatestCaptureJobStatus === "processing"
         ? "A capture job is processing frame samples now."
-        : latestCaptureJob.status === "queued"
+        : effectiveLatestCaptureJobStatus === "queued"
           ? frameCaptureBinaries && !areFrameCaptureBinariesAvailable
             ? "Capture job queued. Processing is blocked until Railway exposes ffmpeg and yt-dlp at runtime."
             : "A capture job is queued and ready to process."
@@ -318,12 +355,37 @@ export function VodAutomationStatusPanel({
     ? captureJobProgress.processedSamples + captureJobProgress.failedSamples
     : 0;
   const progressLine = captureJobProgress
-    ? `${processedAndFailedSamples} / ${captureJobProgress.plannedSamples} samples processed`
+    ? isLocalProcessingLatestCaptureJob && processedAndFailedSamples === 0
+      ? "Starting…"
+      : `${processedAndFailedSamples} / ${captureJobProgress.plannedSamples} samples processed`
+    : null;
+  const processingStartedLabel = processingStartedAt
+    ? formatDateTime(processingStartedAt)
     : null;
   const isProcessingDisabledByBinaries =
     Boolean(latestCaptureJob) &&
     Boolean(frameCaptureBinaries) &&
     !areFrameCaptureBinariesAvailable;
+
+  useEffect(() => {
+    if (!isCaptureJobProcessingInUi) return;
+
+    const intervalId = window.setInterval(() => {
+      void automationStatusQuery.refetch();
+    }, 2000);
+
+    return () => window.clearInterval(intervalId);
+  }, [automationStatusQuery, isCaptureJobProcessingInUi]);
+
+  useEffect(() => {
+    if (!isCaptureJobProcessingInUi) return;
+
+    const intervalId = window.setInterval(() => {
+      void framePreviewQuery.refetch();
+    }, 2500);
+
+    return () => window.clearInterval(intervalId);
+  }, [framePreviewQuery, isCaptureJobProcessingInUi]);
 
   return (
     <section className="rounded-lg border border-neon-cyan/25 bg-black/35 p-4 shadow-[0_0_32px_rgba(0,229,255,0.08)] sm:p-5">
@@ -370,6 +432,18 @@ export function VodAutomationStatusPanel({
           </div>
         ) : null}
 
+        {isProcessingCaptureJob ? (
+          <p className="rounded border border-neon-gold/35 bg-neon-gold/10 p-3 font-mono text-sm text-neon-gold">
+            Processing started. Capturing frames now…
+            {processingStartedLabel ? (
+              <span className="block text-xs text-neon-gold/75">
+                Started {processingStartedLabel}. Status and debug frames will
+                refresh automatically.
+              </span>
+            ) : null}
+          </p>
+        ) : null}
+
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.85fr)] xl:items-start">
           {automationStatusQuery.isLoading ? (
             <div className="rounded border border-white/10 bg-black/30 p-3 font-mono text-sm text-white/50">
@@ -383,7 +457,9 @@ export function VodAutomationStatusPanel({
               <div className="mt-3 grid gap-2 md:grid-cols-2">
                 <VodDetailPill
                   label="Job status"
-                  value={formatVodCaptureJobStatus(latestCaptureJob.status)}
+                  value={formatVodCaptureJobStatus(
+                    effectiveLatestCaptureJobStatus ?? latestCaptureJob.status
+                  )}
                   compact
                 />
                 <VodDetailPill
@@ -516,7 +592,7 @@ export function VodAutomationStatusPanel({
               disabled={
                 !readiness.isReady ||
                 isCaptureJobAlreadyQueued ||
-                isCaptureJobProcessing ||
+                isCaptureJobProcessingInUi ||
                 createCaptureJobMutation.isPending
               }
               title={captureJobDisabledReason ?? undefined}
@@ -536,13 +612,13 @@ export function VodAutomationStatusPanel({
               disabled={
                 !latestCaptureJob ||
                 !areFrameCaptureBinariesAvailable ||
-                latestCaptureJob.status !== "queued" ||
-                processCaptureJobMutation.isPending
+                effectiveLatestCaptureJobStatus !== "queued" ||
+                isCaptureJobProcessingInUi
               }
               title={processCaptureJobDisabledReason ?? undefined}
               className="rounded-sm border-2 border-neon-gold px-4 py-2 font-mono text-xs font-bold uppercase tracking-widest text-neon-gold transition hover:bg-neon-gold/10 disabled:cursor-not-allowed disabled:border-white/15 disabled:text-white/35 disabled:hover:bg-transparent"
             >
-              {processCaptureJobMutation.isPending
+              {isCaptureJobProcessingInUi
                 ? "Processing capture job…"
                 : "Process latest capture job"}
             </button>
