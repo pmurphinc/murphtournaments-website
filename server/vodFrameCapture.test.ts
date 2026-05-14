@@ -1,5 +1,6 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 import { execFile } from "node:child_process";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import {
   buildVodFrameCapturePath,
   checkVodFrameCaptureBinaries,
@@ -12,6 +13,10 @@ vi.mock("node:child_process", () => ({
 }));
 
 const execFileMock = vi.mocked(execFile);
+
+afterEach(async () => {
+  await rm("server/.cache/vod-capture/44/99", { recursive: true, force: true });
+});
 
 function mockExecFileResults(
   results: Array<{ error?: Error; stdout?: string; stderr?: string }>
@@ -148,14 +153,18 @@ describe("vodFrameCapture", () => {
       { stdout: "https://vod-secure.twitch.tv/example.m3u8\n" },
       { stdout: "" },
     ]);
-
-    const captureResult = await extractVodFrame({
+    const input = {
       vodAnalysisId: 44,
       captureJobId: 99,
       sourceUrl: "https://www.twitch.tv/videos/1234567890",
       timestampSeconds: 30,
       sampleIndex: 0,
-    });
+    };
+    const paths = buildVodFrameCapturePath(input);
+    await mkdir(paths.directoryPath, { recursive: true });
+    await writeFile(paths.framePath, "fake jpg");
+
+    const captureResult = await extractVodFrame(input);
     expect(captureResult).toMatchObject({
       status: "captured",
       timestampSeconds: 30,
@@ -186,6 +195,32 @@ describe("vodFrameCapture", () => {
       expect.any(Object),
       expect.any(Function)
     );
+  });
+
+
+  it("returns failed when ffmpeg exits but the output frame is missing", async () => {
+    mockExecFileResults([
+      { stdout: "ffmpeg version 8" },
+      { stdout: "yt-dlp 2026.01.01" },
+      { stdout: "https://vod-secure.twitch.tv/example.m3u8\n" },
+      { stdout: "" },
+    ]);
+
+    await expect(
+      extractVodFrame({
+        vodAnalysisId: 44,
+        captureJobId: 99,
+        sourceUrl: "https://www.twitch.tv/videos/1234567890",
+        timestampSeconds: 30,
+        sampleIndex: 0,
+      })
+    ).resolves.toMatchObject({
+      status: "failed",
+      timestampSeconds: 30,
+      sampleIndex: 0,
+      errorMessage:
+        "Frame extraction did not create an output image for this sample.",
+    });
   });
 
   it("recognizes Twitch VOD URLs only", () => {

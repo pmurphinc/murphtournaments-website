@@ -39,7 +39,7 @@ export function VodAutomationStatusPanel({
     text: string;
   } | null>(null);
   const [processCaptureJobMessage, setProcessCaptureJobMessage] = useState<{
-    type: "success" | "error";
+    type: "success" | "warning" | "error";
     text: string;
   } | null>(null);
   const [isProcessingCaptureJob, setIsProcessingCaptureJob] = useState(false);
@@ -182,7 +182,7 @@ export function VodAutomationStatusPanel({
 
         if (result.status === "complete") {
           setProcessCaptureJobMessage({
-            type: "success",
+            type: result.failedSamples > 0 ? "warning" : "success",
             text: `Processed ${result.processedSamples} samples, failed ${result.failedSamples} samples, and created ${result.createdSuggestionCount} pending suggestions.${result.errorMessage ? ` ${result.errorMessage}` : ""}`,
           });
         } else {
@@ -275,6 +275,9 @@ export function VodAutomationStatusPanel({
   const latestCaptureJobTone = effectiveLatestCaptureJobStatus
     ? getVodCaptureJobStatusTone(effectiveLatestCaptureJobStatus)
     : null;
+  const hasLatestCaptureJobWarning =
+    latestCaptureJob?.status === "complete" &&
+    (captureJobProgress?.failedSamples ?? 0) > 0;
   const isCaptureJobAlreadyQueued =
     effectiveLatestCaptureJobStatus === "queued";
   const isCaptureJobProcessing =
@@ -367,7 +370,9 @@ export function VodAutomationStatusPanel({
     ? effectiveLatestCaptureJobStatus === "processing"
       ? "Processing"
       : effectiveLatestCaptureJobStatus === "complete"
-        ? "Complete"
+        ? hasLatestCaptureJobWarning
+          ? "Complete with warnings"
+          : "Complete"
         : !readiness.isReady ||
             (frameCaptureBinaries && !areFrameCaptureBinariesAvailable)
           ? "Blocked"
@@ -423,6 +428,40 @@ export function VodAutomationStatusPanel({
     Boolean(latestCaptureJob) &&
     Boolean(frameCaptureBinaries) &&
     !areFrameCaptureBinariesAvailable;
+  const latestCaptureJobStatusLabel = latestCaptureJob
+    ? hasLatestCaptureJobWarning
+      ? "Complete with warnings"
+      : formatVodCaptureJobStatus(
+          effectiveLatestCaptureJobStatus ?? latestCaptureJob.status
+        )
+    : "—";
+  const normalizeBrowserMessage = (message: string) =>
+    message
+      .toLowerCase()
+      .replace(
+        /processed \d+ samples, failed \d+ samples, and created \d+ pending suggestions\.?/g,
+        ""
+      )
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+  const shouldShowProcessCaptureJobMessage = (() => {
+    if (!processCaptureJobMessage) return false;
+    if (!latestCaptureJob?.errorMessage) return true;
+
+    const latestMessage = normalizeBrowserMessage(
+      latestCaptureJob.errorMessage
+    );
+    const processMessage = normalizeBrowserMessage(
+      processCaptureJobMessage.text
+    );
+
+    return (
+      latestMessage.length === 0 ||
+      processMessage.length === 0 ||
+      (!processMessage.includes(latestMessage) &&
+        !latestMessage.includes(processMessage))
+    );
+  })();
 
   useEffect(() => {
     if (framePreviewQuery.status !== "success") return;
@@ -518,9 +557,7 @@ export function VodAutomationStatusPanel({
               <div className="mt-3 grid gap-2 md:grid-cols-2">
                 <VodDetailPill
                   label="Job status"
-                  value={formatVodCaptureJobStatus(
-                    effectiveLatestCaptureJobStatus ?? latestCaptureJob.status
-                  )}
+                  value={latestCaptureJobStatusLabel}
                   compact
                 />
                 <VodDetailPill
@@ -544,7 +581,13 @@ export function VodAutomationStatusPanel({
                 <span>Failed/skipped: {captureJobProgress.failedSamples}</span>
               </div>
               {latestCaptureJob.errorMessage ? (
-                <p className="mt-3 rounded border border-red-500/40 bg-red-950/30 p-3 font-mono text-sm text-red-100">
+                <p
+                  className={`mt-3 rounded border p-3 font-mono text-sm ${
+                    hasLatestCaptureJobWarning
+                      ? "border-neon-gold/35 bg-neon-gold/10 text-neon-gold"
+                      : "border-red-500/40 bg-red-950/30 text-red-100"
+                  }`}
+                >
                   {latestCaptureJob.errorMessage}
                 </p>
               ) : null}
@@ -720,12 +763,14 @@ export function VodAutomationStatusPanel({
           </p>
         ) : null}
 
-        {processCaptureJobMessage ? (
+        {processCaptureJobMessage && shouldShowProcessCaptureJobMessage ? (
           <p
             className={`rounded border p-3 font-mono text-sm ${
               processCaptureJobMessage.type === "success"
                 ? "border-neon-cyan/30 bg-neon-cyan/10 text-neon-cyan"
-                : "border-red-500/40 bg-red-950/30 text-red-100"
+                : processCaptureJobMessage.type === "warning"
+                  ? "border-neon-gold/35 bg-neon-gold/10 text-neon-gold"
+                  : "border-red-500/40 bg-red-950/30 text-red-100"
             }`}
           >
             {processCaptureJobMessage.text}

@@ -451,6 +451,36 @@ export async function extractVodFrame(
       }
     );
 
+    try {
+      const frameStat = await stat(paths.framePath);
+      if (!frameStat.isFile()) {
+        console.warn(
+          `[vod-capture] ffmpeg did not create a file for sample ${
+            input.sampleIndex + 1
+          } at ${input.timestampSeconds}s: ${paths.framePath}`
+        );
+        return {
+          ...baseCaptureResult(input),
+          status: "failed",
+          errorMessage:
+            "Frame extraction did not create an output image for this sample.",
+        };
+      }
+    } catch (error) {
+      console.warn(
+        `[vod-capture] missing extracted frame for sample ${
+          input.sampleIndex + 1
+        } at ${input.timestampSeconds}s: ${paths.framePath}`,
+        error
+      );
+      return {
+        ...baseCaptureResult(input),
+        status: "failed",
+        errorMessage:
+          "Frame extraction did not create an output image for this sample.",
+      };
+    }
+
     return {
       ...baseCaptureResult(input),
       status: "captured",
