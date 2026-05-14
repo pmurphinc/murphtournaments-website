@@ -35,6 +35,12 @@ import {
 import { getVodHudZonePreset, type VodHudZone } from "../shared/vod/hud-zones";
 import { createCenterEventTextSampleDetector } from "./vodDetectors/centerEventTextDetector";
 import {
+  readVodAutomationScanEvidenceFile,
+  writeVodAutomationScanEvidence,
+  type VodAutomationSampleEvidence,
+  type VodAutomationScanEvidence,
+} from "./vodAutomationEvidence";
+import {
   getVodAutomationOcrConfidenceThreshold,
   isVodAutomationOcrEnabled,
 } from "./vodDetectors/centerEventTextOcr";
@@ -279,6 +285,7 @@ export type VodCaptureSampleDetectionInput = {
   sampleIndex: number;
   samplePlan: FrameSamplingPlan;
   frameCapture?: VodFrameCaptureResult;
+  reportAutomationEvidence?: (evidence: VodAutomationSampleEvidence) => void;
 };
 
 export type VodCaptureSampleDetector = (
@@ -756,6 +763,11 @@ export const latestCaptureFramePreviewInputSchema = z.object({
   captureJobId: z.number().int().positive().optional(),
 });
 
+export const latestCaptureJobEvidenceInputSchema = z.object({
+  vodAnalysisId: vodAnalysisIdInputSchema,
+  captureJobId: z.number().int().positive().optional(),
+});
+
 export const updateVodSuggestedEventInputSchema =
   vodAnalysisEventPayloadBaseSchema
     .omit({ vodAnalysisId: true })
@@ -1175,6 +1187,54 @@ function buildAllSamplesFailedMessage(
   }`;
 }
 
+function incrementEvidenceCounters(
+  counters: {
+    ocrAttemptedCount: number;
+    ocrReadableTextCount: number;
+    detectionCandidateCount: number;
+    skippedLowConfidenceCount: number;
+    skippedNoPatternMatchCount: number;
+    skippedMissingRequiredFieldCount: number;
+  },
+  evidence: VodAutomationSampleEvidence
+) {
+  if (evidence.ocrAttempted) counters.ocrAttemptedCount += 1;
+  if (evidence.ocrNormalizedText?.trim()) counters.ocrReadableTextCount += 1;
+  if (evidence.matchedPattern) counters.detectionCandidateCount += 1;
+  if (evidence.detectionOutcome === "low_confidence") {
+    counters.skippedLowConfidenceCount += 1;
+  }
+  if (evidence.detectionOutcome === "no_pattern_match") {
+    counters.skippedNoPatternMatchCount += 1;
+  }
+  if (evidence.detectionOutcome === "missing_required_fields") {
+    counters.skippedMissingRequiredFieldCount += 1;
+  }
+}
+
+function replaceEvidenceForSample(
+  samples: VodAutomationSampleEvidence[],
+  evidence: VodAutomationSampleEvidence
+) {
+  const existingIndex = samples.findIndex(
+    sample => sample.sampleIndex === evidence.sampleIndex
+  );
+
+  if (existingIndex >= 0) {
+    samples[existingIndex] = evidence;
+    return;
+  }
+
+  samples.push(evidence);
+}
+
+function getSafeFrameIssueMessage(message: string): string {
+  return message
+    .replace(/(?:[A-Za-z]:)?[\/][^\s:]+(?:[\/][^\s:]+)+/g, "[internal path]")
+    .replace(/server\/\.cache\/vod-capture\/\S+/g, "[capture frame]")
+    .trim();
+}
+
 export async function processVodCaptureJob(
   input: ProcessVodCaptureJobInput,
   dbClient?: ProcessVodCaptureJobDb | null,
@@ -1232,11 +1292,40 @@ export async function processVodCaptureJob(
   let failedSamples = 0;
   let createdSuggestionCount = 0;
   let usableFrameSamples = 0;
+  const evidenceSamples: VodAutomationSampleEvidence[] = [];
+  const evidenceCounters = {
+    ocrAttemptedCount: 0,
+    ocrReadableTextCount: 0,
+    detectionCandidateCount: 0,
+    skippedLowConfidenceCount: 0,
+    skippedNoPatternMatchCount: 0,
+    skippedMissingRequiredFieldCount: 0,
+  };
   let lastSampleIssueMessage: string | undefined;
   const samplePlan = buildFrameSamplingPlan(
     vodAnalysis.durationSeconds,
     captureJob.sampleIntervalSeconds
   );
+
+  const persistEvidence = async () => {
+    await writeVodAutomationScanEvidence(parsedInput.vodAnalysisId, {
+      captureJobId: parsedInput.captureJobId,
+      plannedSamples: samplePlan.timestamps.length,
+      processedSamples,
+      failedSamples,
+      capturedFrameCount: usableFrameSamples,
+      ocrEnabled: isVodAutomationOcrEnabled(),
+      ocrConfidenceThreshold: getVodAutomationOcrConfidenceThreshold(),
+      ...evidenceCounters,
+      createdSuggestionCount,
+      samples: evidenceSamples,
+    });
+  };
+
+  const recordEvidence = (evidence: VodAutomationSampleEvidence) => {
+    replaceEvidenceForSample(evidenceSamples, evidence);
+    incrementEvidenceCounters(evidenceCounters, evidence);
+  };
 
   const updateJob = async (values: Partial<InsertVodCaptureJob>) => {
     await db
@@ -1282,6 +1371,14 @@ export async function processVodCaptureJob(
             sampleTimestampSeconds,
             frameCapture.errorMessage
           );
+          recordEvidence({
+            sampleIndex,
+            timestampSeconds: sampleTimestampSeconds,
+            frameCaptureStatus: frameCapture.status,
+            ocrAttempted: false,
+            detectionOutcome: "frame_failed",
+            safeMessage: getSafeFrameIssueMessage(frameCapture.errorMessage),
+          });
           continue;
         }
 
@@ -1297,6 +1394,7 @@ export async function processVodCaptureJob(
             sampleIndex,
             samplePlan,
             frameCapture,
+            reportAutomationEvidence: recordEvidence,
           });
         } catch (error) {
           failedSamples += 1;
@@ -1310,6 +1408,15 @@ export async function processVodCaptureJob(
             error
           );
           detections = [];
+          recordEvidence({
+            sampleIndex,
+            timestampSeconds: sampleTimestampSeconds,
+            frameFileName: frameCapture.fileName,
+            frameCaptureStatus: frameCapture.status,
+            ocrAttempted: false,
+            detectionOutcome: "ocr_failed",
+            safeMessage: getSafeFrameIssueMessage(getErrorMessage(error)),
+          });
         }
 
         if (detections.length > 0) {
@@ -1354,6 +1461,13 @@ export async function processVodCaptureJob(
           }
 
           createdSuggestionCount += ingestResult.createdCount;
+          const currentSampleEvidence = evidenceSamples.find(
+            sample => sample.sampleIndex === sampleIndex
+          );
+          if (currentSampleEvidence) {
+            currentSampleEvidence.detectionOutcome = "suggestion_created";
+            currentSampleEvidence.safeMessage = `${ingestResult.createdCount} suggestion(s) created from center-event text.`;
+          }
         }
       } catch (error) {
         failedSamples += 1;
@@ -1366,7 +1480,16 @@ export async function processVodCaptureJob(
           `[vod-capture] sample ${sampleIndex + 1} at ${sampleTimestampSeconds}s failed`,
           error
         );
+        recordEvidence({
+          sampleIndex,
+          timestampSeconds: sampleTimestampSeconds,
+          frameCaptureStatus: "failed",
+          ocrAttempted: false,
+          detectionOutcome: "frame_failed",
+          safeMessage: getSafeFrameIssueMessage(getErrorMessage(error)),
+        });
       } finally {
+        await persistEvidence();
         await updateJob({
           status: "processing",
           processedSamples,
@@ -1381,6 +1504,7 @@ export async function processVodCaptureJob(
         lastSampleIssueMessage
       );
 
+      await persistEvidence();
       await updateJob({
         status: "failed",
         processedSamples,
@@ -1405,6 +1529,7 @@ export async function processVodCaptureJob(
         ? buildCaptureJobWarningMessage(failedSamples, lastSampleIssueMessage)
         : undefined;
 
+    await persistEvidence();
     await updateJob({
       status: "complete",
       processedSamples,
@@ -1425,6 +1550,7 @@ export async function processVodCaptureJob(
   } catch (error) {
     const errorMessage = getErrorMessage(error);
 
+    await persistEvidence();
     await updateJob({
       status: "failed",
       processedSamples,
@@ -1588,6 +1714,46 @@ export async function getLatestCaptureFramePreview(
 
 function normalizeCountValue(value: number | string | bigint): number {
   return Number(value);
+}
+
+export async function getLatestCaptureJobEvidence(
+  input: z.infer<typeof latestCaptureJobEvidenceInputSchema>,
+  dbClient?: (GetByIdDb & CaptureJobLatestDb & ProcessVodCaptureJobDb) | null
+): Promise<VodAutomationScanEvidence | null> {
+  const parsedInput = latestCaptureJobEvidenceInputSchema.parse(input);
+  const db =
+    dbClient ??
+    ((await getDb()) as
+      | (GetByIdDb & CaptureJobLatestDb & ProcessVodCaptureJobDb)
+      | null);
+
+  if (!db) {
+    throw new Error(
+      "Database is not available for VOD automation evidence lookup."
+    );
+  }
+
+  const vodAnalysis = await getVodAnalysisById(
+    parsedInput.vodAnalysisId,
+    db as GetByIdDb
+  );
+
+  if (!vodAnalysis) {
+    return null;
+  }
+
+  const captureJob = parsedInput.captureJobId
+    ? await getVodCaptureJobByIdForPreview(parsedInput.captureJobId, db)
+    : await getLatestVodCaptureJob(parsedInput.vodAnalysisId, db);
+
+  if (!captureJob || captureJob.vodAnalysisId !== parsedInput.vodAnalysisId) {
+    return null;
+  }
+
+  return readVodAutomationScanEvidenceFile(
+    parsedInput.vodAnalysisId,
+    captureJob.id
+  );
 }
 
 export async function getVodAutomationStatus(

@@ -43,6 +43,7 @@ import {
   deleteVodAnalysisEvent,
   deleteVodAnalysisEventInputSchema,
   getLatestCaptureFramePreview,
+  getLatestCaptureJobEvidence,
   getLatestVodCaptureJob,
   getVodAutomationStatus,
   getVodAnalysisById,
@@ -50,6 +51,7 @@ import {
   ingestAutomationDetectionsInputSchema,
   listVodAnalysisEvents,
   latestCaptureFramePreviewInputSchema,
+  latestCaptureJobEvidenceInputSchema,
   listVodCaptureJobs,
   listVodAnalyses,
   listVodSuggestedEvents,
@@ -838,6 +840,12 @@ export const appRouter = router({
       .input(latestCaptureFramePreviewInputSchema)
       .query(async ({ input }) => {
         return getLatestCaptureFramePreview(input);
+      }),
+
+    getLatestCaptureJobEvidence: publicProcedure
+      .input(latestCaptureJobEvidenceInputSchema)
+      .query(async ({ input }) => {
+        return getLatestCaptureJobEvidence(input);
       }),
 
     getAutomationStatus: publicProcedure

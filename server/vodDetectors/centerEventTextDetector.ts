@@ -13,6 +13,10 @@ import type {
   VodCaptureSampleDetector,
 } from "../vodAnalysis";
 import type { VodFrameCaptureResult } from "../vodFrameCapture";
+import type {
+  VodAutomationDetectionOutcome,
+  VodAutomationSampleEvidence,
+} from "../vodAutomationEvidence";
 import {
   getVodAutomationOcrConfidenceThreshold,
   isVodAutomationOcrEnabled,
@@ -37,6 +41,10 @@ export type CenterEventTextDetectionResult = {
   debugText: string | null;
   ocrResult: CenterEventTextOcrResult | null;
   detectorVersion: string;
+  evidence: Omit<
+    VodAutomationSampleEvidence,
+    "frameFileName" | "frameCaptureStatus"
+  >;
 };
 
 export type CenterEventTextParseContext = {
@@ -226,6 +234,86 @@ export function parseCenterEventTextToDetections(
   return [];
 }
 
+function getMatchedCenterEventPattern(text: string | null): string | undefined {
+  if (!text) return undefined;
+
+  const normalizedText = normalizeDetectedText(text);
+
+  if (/\bTEAM\s+WIP(?:ED|E)\b/.test(normalizedText)) {
+    return "team_wipe_text";
+  }
+
+  if (/\bCASHOUT\s+COMPLETE\b/.test(normalizedText)) {
+    return "cashout_complete_text";
+  }
+
+  if (
+    /\bCASHOUT\s+STOLEN\b/.test(normalizedText) ||
+    /\bSTOLEN\b/.test(normalizedText)
+  ) {
+    return "cashout_stolen_text";
+  }
+
+  return undefined;
+}
+
+function buildDetectionEvidence(input: {
+  sampleIndex: number;
+  timestampSeconds: number;
+  ocrAttempted: boolean;
+  ocrResult: CenterEventTextOcrResult | null;
+  debugText: string | null;
+  matchedPattern?: string;
+  detections: DetectedAutomationEventInput[];
+  ocrConfidenceThreshold: number;
+  ocrFailed: boolean;
+  ocrEnabled: boolean;
+}): CenterEventTextDetectionResult["evidence"] {
+  const confidence = input.ocrResult?.confidence;
+  const normalizedText = input.debugText?.trim() || undefined;
+  let detectionOutcome: VodAutomationDetectionOutcome = "no_text";
+  let safeMessage: string | undefined;
+
+  if (input.ocrFailed) {
+    detectionOutcome = "ocr_failed";
+    safeMessage = "OCR failed for this center-event text crop.";
+  } else if (!input.ocrEnabled && !normalizedText) {
+    detectionOutcome = "no_text";
+    safeMessage = "OCR was disabled, so no center-event text was read.";
+  } else if (!normalizedText) {
+    detectionOutcome = "no_text";
+    safeMessage = "No readable center-event text was returned.";
+  } else if (
+    input.ocrResult &&
+    (confidence ?? 0) < input.ocrConfidenceThreshold
+  ) {
+    detectionOutcome = "low_confidence";
+    safeMessage = `OCR confidence ${confidence ?? 0} was below threshold ${input.ocrConfidenceThreshold}.`;
+  } else if (!input.matchedPattern) {
+    detectionOutcome = "no_pattern_match";
+    safeMessage =
+      "Readable text did not match supported center-event patterns.";
+  } else if (input.detections.length === 0) {
+    detectionOutcome = "missing_required_fields";
+    safeMessage =
+      "Matched text was missing labels required to create a suggestion.";
+  } else {
+    detectionOutcome = "suggestion_created";
+    safeMessage = "Matched center-event text produced a suggestion candidate.";
+  }
+
+  return {
+    sampleIndex: input.sampleIndex,
+    timestampSeconds: input.timestampSeconds,
+    ocrAttempted: input.ocrAttempted,
+    ...(confidence !== undefined ? { ocrConfidence: confidence } : {}),
+    ...(normalizedText ? { ocrNormalizedText: normalizedText } : {}),
+    ...(input.matchedPattern ? { matchedPattern: input.matchedPattern } : {}),
+    detectionOutcome,
+    ...(safeMessage ? { safeMessage } : {}),
+  };
+}
+
 export function getCenterEventTextZone(
   vodAnalysis: Pick<VodAnalysisRecord, "videoPov">
 ): VodHudZone {
@@ -254,6 +342,7 @@ export async function detectCenterEventText(
   const shouldRunOcr =
     !explicitText && ocrEnabled && Boolean(capturedFrameCapture);
   let ocrResult: CenterEventTextOcrResult | null = null;
+  let ocrFailed = false;
 
   if (shouldRunOcr) {
     try {
@@ -275,9 +364,11 @@ export async function detectCenterEventText(
         error
       );
       ocrResult = null;
+      ocrFailed = true;
     }
   }
   const debugText = explicitText ?? ocrResult?.normalizedText ?? null;
+  const matchedPattern = getMatchedCenterEventPattern(debugText);
 
   if (ocrResult) {
     const confidence = ocrResult.confidence ?? 0;
@@ -287,6 +378,18 @@ export async function detectCenterEventText(
         debugText,
         ocrResult,
         detectorVersion: CENTER_EVENT_TEXT_DETECTOR_VERSION,
+        evidence: buildDetectionEvidence({
+          sampleIndex: input.sampleIndex,
+          timestampSeconds: input.timestampSeconds,
+          ocrAttempted: shouldRunOcr,
+          ocrResult,
+          debugText,
+          matchedPattern,
+          detections: [],
+          ocrConfidenceThreshold,
+          ocrFailed,
+          ocrEnabled,
+        }),
       };
     }
   }
@@ -328,6 +431,18 @@ export async function detectCenterEventText(
     debugText,
     ocrResult,
     detectorVersion: CENTER_EVENT_TEXT_DETECTOR_VERSION,
+    evidence: buildDetectionEvidence({
+      sampleIndex: input.sampleIndex,
+      timestampSeconds: input.timestampSeconds,
+      ocrAttempted: shouldRunOcr,
+      ocrResult,
+      debugText,
+      matchedPattern,
+      detections,
+      ocrConfidenceThreshold,
+      ocrFailed,
+      ocrEnabled,
+    }),
   };
 }
 
@@ -362,6 +477,14 @@ export function createCenterEventTextSampleDetector(
       },
       options
     );
+
+    input.reportAutomationEvidence?.({
+      ...result.evidence,
+      frameCaptureStatus: frameCapture.status,
+      ...(frameCapture.status === "captured"
+        ? { frameFileName: frameCapture.fileName }
+        : {}),
+    });
 
     const dedupedDetections = result.detections.filter(detection => {
       const dedupeKey = buildDedupeKey(detection);

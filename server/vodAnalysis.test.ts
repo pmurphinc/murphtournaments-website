@@ -28,6 +28,7 @@ import {
   createVodSuggestedEvent,
   createVodSuggestedEventInputSchema,
   getLatestCaptureFramePreview,
+  getLatestCaptureJobEvidence,
   getLatestVodCaptureJob,
   getVodAutomationStatus,
   getPendingSuggestedEventCountsByVodAnalysisIds,
@@ -73,6 +74,10 @@ import {
   getLatestVodCaptureFrameFile,
   resolveVodCaptureFramePath,
 } from "./vodFrameCapture";
+import {
+  readVodAutomationScanEvidenceFile,
+  resolveVodAutomationEvidencePath,
+} from "./vodAutomationEvidence";
 import {
   getSafeVodCaptureFramePathForRequest,
   serveVodCaptureFrame,
@@ -2792,6 +2797,121 @@ describe("processVodCaptureJob", () => {
     expect(insertedSuggestedEvents).toHaveLength(0);
   });
 
+  it("writes automation scan evidence for OCR outcomes and failed frames", async () => {
+    vi.stubEnv("VOD_AUTOMATION_OCR_ENABLED", "true");
+    vi.stubEnv("VOD_AUTOMATION_OCR_CONFIDENCE_THRESHOLD", "70");
+    const vodAnalysisId = 440044;
+    const captureJobId = 990099;
+    await rm(
+      path.join(
+        process.cwd(),
+        "server",
+        ".cache",
+        "vod-capture",
+        String(vodAnalysisId)
+      ),
+      { recursive: true, force: true }
+    );
+    const frameExtractor: VodFrameExtractor = async input => {
+      if (input.sampleIndex === 4) {
+        return {
+          status: "failed",
+          timestampSeconds: input.timestampSeconds,
+          sampleIndex: input.sampleIndex,
+          errorMessage:
+            "Input file is missing: /app/server/.cache/vod-capture/440044/990099/sample.jpg",
+        };
+      }
+
+      return {
+        status: "captured",
+        timestampSeconds: input.timestampSeconds,
+        sampleIndex: input.sampleIndex,
+        framePath: `/workspace/murphtournaments-website/server/.cache/vod-capture/${input.vodAnalysisId}/${input.captureJobId}/sample-${String(input.sampleIndex + 1).padStart(4, "0")}-${String(input.timestampSeconds).padStart(6, "0")}.jpg`,
+        relativeFramePath: `server/.cache/vod-capture/${input.vodAnalysisId}/${input.captureJobId}/sample-${String(input.sampleIndex + 1).padStart(4, "0")}-${String(input.timestampSeconds).padStart(6, "0")}.jpg`,
+        fileName: `sample-${String(input.sampleIndex + 1).padStart(4, "0")}-${String(input.timestampSeconds).padStart(6, "0")}.jpg`,
+      };
+    };
+    const detector = createCenterEventTextSampleDetector({
+      ocrEnabled: true,
+      ocrConfidenceThreshold: 70,
+      getOcrResult: async ({ sampleIndex }) => {
+        if (sampleIndex === 0) return null;
+        if (sampleIndex === 1) {
+          return mockedCenterEventOcrResult("CASHOUT COMPLETE", 69);
+        }
+        if (sampleIndex === 2)
+          return mockedCenterEventOcrResult("ROUND STARTING");
+        if (sampleIndex === 3)
+          return mockedCenterEventOcrResult("CASHOUT COMPLETE");
+        return null;
+      },
+      parseContext: { targetLabel: "A", teamLabel: "The Live Wires" },
+    });
+    const { db } = createProcessCaptureJobDb({
+      vodRows: [
+        captureReadyVod({
+          id: vodAnalysisId,
+          durationSeconds: 20,
+        }),
+      ],
+      captureRows: [
+        captureJob({
+          id: captureJobId,
+          vodAnalysisId,
+          sampleIntervalSeconds: 5,
+        }),
+      ],
+    });
+
+    await expect(
+      processVodCaptureJob(
+        { vodAnalysisId, captureJobId },
+        db,
+        detector,
+        frameExtractor
+      )
+    ).resolves.toMatchObject({
+      status: "complete",
+      processedSamples: 4,
+      failedSamples: 1,
+      createdSuggestionCount: 1,
+    });
+
+    const evidence = await readVodAutomationScanEvidenceFile(
+      vodAnalysisId,
+      captureJobId
+    );
+    expect(evidence).toMatchObject({
+      captureJobId,
+      plannedSamples: 5,
+      processedSamples: 4,
+      failedSamples: 1,
+      capturedFrameCount: 4,
+      ocrEnabled: true,
+      ocrConfidenceThreshold: 70,
+      ocrAttemptedCount: 4,
+      ocrReadableTextCount: 3,
+      detectionCandidateCount: 2,
+      createdSuggestionCount: 1,
+      skippedLowConfidenceCount: 1,
+      skippedNoPatternMatchCount: 1,
+    });
+    expect(
+      evidence?.recentSamples.map(sample => sample.detectionOutcome)
+    ).toEqual([
+      "no_text",
+      "low_confidence",
+      "no_pattern_match",
+      "suggestion_created",
+      "frame_failed",
+    ]);
+    expect(JSON.stringify(evidence)).not.toContain("/app/server/.cache");
+    expect(JSON.stringify(evidence)).not.toContain(
+      "/workspace/murphtournaments-website/server/.cache"
+    );
+  });
+
   it("dedupes repeated OCR text across adjacent frames", async () => {
     const detector = createCenterEventTextSampleDetector({
       ocrEnabled: true,
@@ -3387,6 +3507,97 @@ describe("getLatestVodCaptureJob", () => {
     expect(from).toHaveBeenCalledWith(vodCaptureJobs);
     expect(orderBy).toHaveBeenCalledTimes(1);
     expect(limit).toHaveBeenCalledWith(1);
+  });
+});
+
+describe("VOD automation scan evidence", () => {
+  it("returns latest capture job evidence safely and omits absolute paths", async () => {
+    vi.stubEnv("VOD_AUTOMATION_OCR_ENABLED", "true");
+    const vodAnalysisId = 440045;
+    const captureJobId = 990100;
+    await rm(
+      path.join(
+        process.cwd(),
+        "server",
+        ".cache",
+        "vod-capture",
+        String(vodAnalysisId)
+      ),
+      { recursive: true, force: true }
+    );
+    const detector = createCenterEventTextSampleDetector({
+      ocrEnabled: true,
+      getOcrResult: async ({ sampleIndex }) =>
+        sampleIndex === 0
+          ? mockedCenterEventOcrResult("CASHOUT COMPLETE")
+          : null,
+      parseContext: { targetLabel: "A", teamLabel: "The Live Wires" },
+    });
+    const { db } = createProcessCaptureJobDb({
+      vodRows: [captureReadyVod({ id: vodAnalysisId, durationSeconds: 1 })],
+      captureRows: [captureJob({ id: captureJobId, vodAnalysisId })],
+    });
+
+    await processVodCaptureJob(
+      { vodAnalysisId, captureJobId },
+      db,
+      detector,
+      capturedFrameExtractor
+    );
+
+    const evidence = await getLatestCaptureJobEvidence(
+      { vodAnalysisId },
+      createAutomationStatusDb({
+        vodRows: [captureReadyVod({ id: vodAnalysisId })],
+        captureRows: [captureJob({ id: captureJobId, vodAnalysisId })],
+      }).db
+    );
+
+    expect(evidence).toMatchObject({
+      captureJobId,
+      createdSuggestionCount: 1,
+      recentSamples: [
+        expect.objectContaining({
+          frameFileName: "sample-0001-000000.jpg",
+          detectionOutcome: "suggestion_created",
+        }),
+      ],
+    });
+    expect(JSON.stringify(evidence)).not.toContain(process.cwd());
+    expect(JSON.stringify(evidence)).not.toContain("server/.cache/vod-capture");
+  });
+
+  it("returns null when no scan evidence file exists", async () => {
+    const vodAnalysisId = 440046;
+    const captureJobId = 990101;
+    await rm(
+      path.join(
+        process.cwd(),
+        "server",
+        ".cache",
+        "vod-capture",
+        String(vodAnalysisId)
+      ),
+      { recursive: true, force: true }
+    );
+
+    await expect(
+      getLatestCaptureJobEvidence(
+        { vodAnalysisId },
+        createAutomationStatusDb({
+          vodRows: [captureReadyVod({ id: vodAnalysisId })],
+          captureRows: [captureJob({ id: captureJobId, vodAnalysisId })],
+        }).db
+      )
+    ).resolves.toBeNull();
+  });
+
+  it("rejects unsafe evidence path parts", () => {
+    expect(resolveVodAutomationEvidencePath(44, 99)).toContain(
+      "automation-evidence.json"
+    );
+    expect(resolveVodAutomationEvidencePath("../44", 99)).toBeNull();
+    expect(resolveVodAutomationEvidencePath(44, "../99")).toBeNull();
   });
 });
 

@@ -83,6 +83,9 @@ export function VodAutomationStatusPanel({
       utils.vodAnalysis.getLatestCaptureJob.invalidate(vodAnalysisId),
       utils.vodAnalysis.listCaptureJobs.invalidate(vodAnalysisId),
       invalidateFramePreviewQueries(captureJobId),
+      utils.vodAnalysis.getLatestCaptureJobEvidence.invalidate(
+        captureJobId ? { vodAnalysisId, captureJobId } : { vodAnalysisId }
+      ),
     ]);
   const readiness = getVodCaptureReadiness(vod);
   const samplePlan = readiness.samplePlan;
@@ -108,6 +111,9 @@ export function VodAutomationStatusPanel({
           utils.vodAnalysis.getLatestCaptureJob.invalidate(vodAnalysisId),
           utils.vodAnalysis.listCaptureJobs.invalidate(vodAnalysisId),
           invalidateFramePreviewQueries(),
+          utils.vodAnalysis.getLatestCaptureJobEvidence.invalidate({
+            vodAnalysisId,
+          }),
         ]);
 
         switch (result.status) {
@@ -178,6 +184,10 @@ export function VodAutomationStatusPanel({
           utils.vodAnalysis.listEvents.invalidate(vodAnalysisId),
           utils.vodAnalysis.list.invalidate(),
           invalidateFramePreviewQueries(result.captureJobId),
+          utils.vodAnalysis.getLatestCaptureJobEvidence.invalidate({
+            vodAnalysisId,
+            captureJobId: result.captureJobId,
+          }),
         ]);
 
         if (result.status === "complete") {
@@ -297,6 +307,16 @@ export function VodAutomationStatusPanel({
         staleTime: isCaptureJobProcessingInUi ? 0 : 1000 * 10,
       }
     );
+  const evidenceQueryInput = processingCaptureJobId
+    ? { vodAnalysisId, captureJobId: processingCaptureJobId }
+    : { vodAnalysisId };
+  const evidenceQuery = trpc.vodAnalysis.getLatestCaptureJobEvidence.useQuery(
+    evidenceQueryInput,
+    {
+      refetchInterval: isCaptureJobProcessingInUi ? 2500 : false,
+      staleTime: isCaptureJobProcessingInUi ? 0 : 1000 * 10,
+    }
+  );
 
   const captureJobDisabledReason = !readiness.isReady
     ? readiness.reason
@@ -344,6 +364,7 @@ export function VodAutomationStatusPanel({
       ? formatVodSourceType(vod.sourceType)
       : "Unknown";
   const framePreview = framePreviewQuery.data;
+  const scanEvidence = evidenceQuery.data;
   const zoneToneClasses: Record<VodHudZoneId, string> = {
     scoreboard: "border-neon-gold bg-neon-gold/15 text-neon-gold",
     kill_feed: "border-neon-magenta bg-neon-magenta/15 text-neon-magenta",
@@ -435,6 +456,13 @@ export function VodAutomationStatusPanel({
           effectiveLatestCaptureJobStatus ?? latestCaptureJob.status
         )
     : "—";
+  const formatEvidenceOutcome = (outcome: string) =>
+    outcome
+      .split("_")
+      .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ");
+  const formatEvidenceConfidence = (confidence?: number | null) =>
+    typeof confidence === "number" ? `${confidence}%` : "—";
   const normalizeBrowserMessage = (message: string) =>
     message
       .toLowerCase()
@@ -675,6 +703,142 @@ export function VodAutomationStatusPanel({
               </div>
             )}
           </div>
+
+          <details
+            className="rounded border border-neon-magenta/20 bg-black/40 p-3 xl:col-span-2"
+            open={!scanEvidence || scanEvidence.createdSuggestionCount === 0}
+          >
+            <summary className="cursor-pointer font-mono text-[10px] font-bold uppercase tracking-widest text-neon-magenta">
+              Automation Scan Evidence
+            </summary>
+            <div className="mt-3 space-y-3">
+              {evidenceQuery.isLoading ? (
+                <div className="rounded border border-white/10 bg-black/30 p-3 font-mono text-sm text-white/50">
+                  Loading scan evidence…
+                </div>
+              ) : scanEvidence ? (
+                <>
+                  {scanEvidence.createdSuggestionCount === 0 ? (
+                    <p className="rounded border border-neon-gold/30 bg-neon-gold/10 p-3 font-mono text-xs text-neon-gold">
+                      No suggestions were created. The current detector only
+                      creates suggestions for center-event text such as CASHOUT
+                      COMPLETE, CASHOUT STOLEN, STOLEN, or TEAM WIPED.
+                    </p>
+                  ) : null}
+
+                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                    <VodDetailPill
+                      label="OCR attempts"
+                      value={`${scanEvidence.ocrAttemptedCount} / ${scanEvidence.processedSamples}`}
+                      compact
+                    />
+                    <VodDetailPill
+                      label="Readable text"
+                      value={String(scanEvidence.ocrReadableTextCount)}
+                      compact
+                    />
+                    <VodDetailPill
+                      label="Detections matched"
+                      value={String(scanEvidence.detectionCandidateCount)}
+                      compact
+                    />
+                    <VodDetailPill
+                      label="Suggestions created"
+                      value={String(scanEvidence.createdSuggestionCount)}
+                      compact
+                    />
+                    <VodDetailPill
+                      label="Low confidence skipped"
+                      value={String(scanEvidence.skippedLowConfidenceCount)}
+                      compact
+                    />
+                    <VodDetailPill
+                      label="No pattern match"
+                      value={String(scanEvidence.skippedNoPatternMatchCount)}
+                      compact
+                    />
+                    <VodDetailPill
+                      label="Missing fields"
+                      value={String(
+                        scanEvidence.skippedMissingRequiredFieldCount
+                      )}
+                      compact
+                    />
+                    <VodDetailPill
+                      label="Frame failures/skips"
+                      value={String(scanEvidence.failedSamples)}
+                      compact
+                    />
+                  </div>
+
+                  <div className="overflow-x-auto rounded border border-white/10 bg-black/30">
+                    <table className="min-w-full divide-y divide-white/10 font-mono text-xs">
+                      <thead className="bg-white/5 text-[10px] uppercase tracking-widest text-white/45">
+                        <tr>
+                          <th className="px-3 py-2 text-left">Timestamp</th>
+                          <th className="px-3 py-2 text-left">Frame</th>
+                          <th className="px-3 py-2 text-left">
+                            OCR confidence
+                          </th>
+                          <th className="px-3 py-2 text-left">OCR text</th>
+                          <th className="px-3 py-2 text-left">Outcome</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/10 text-white/65">
+                        {scanEvidence.recentSamples.length > 0 ? (
+                          scanEvidence.recentSamples.map(sample => (
+                            <tr
+                              key={`${sample.sampleIndex}-${sample.timestampSeconds}`}
+                            >
+                              <td className="whitespace-nowrap px-3 py-2 text-neon-cyan">
+                                {formatVodEventTimestamp(
+                                  sample.timestampSeconds
+                                )}
+                              </td>
+                              <td className="whitespace-nowrap px-3 py-2 text-white/55">
+                                {sample.frameFileName ??
+                                  sample.frameCaptureStatus}
+                              </td>
+                              <td className="whitespace-nowrap px-3 py-2">
+                                {formatEvidenceConfidence(sample.ocrConfidence)}
+                              </td>
+                              <td className="max-w-[360px] px-3 py-2 text-white/70">
+                                <span className="line-clamp-2">
+                                  {sample.ocrNormalizedText ?? "—"}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2">
+                                <span className="rounded border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-widest text-white/60">
+                                  {formatEvidenceOutcome(
+                                    sample.detectionOutcome
+                                  )}
+                                </span>
+                                {sample.safeMessage ? (
+                                  <span className="mt-1 block text-[10px] text-white/40">
+                                    {sample.safeMessage}
+                                  </span>
+                                ) : null}
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td className="px-3 py-3 text-white/45" colSpan={5}>
+                              No recent sample evidence rows were saved.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : (
+                <div className="rounded border border-white/10 bg-black/30 p-3 font-mono text-sm text-white/50">
+                  No scan evidence found for this job.
+                </div>
+              )}
+            </div>
+          </details>
         </div>
 
         {!readiness.isReady ? (
