@@ -58,7 +58,7 @@ const PLAYER_HUD_ZONES = [
     id: "player_team_hud",
     purpose:
       "Lower-left player squad status, teammate, health, and revive indicators.",
-    rect: { x: 0.02, y: 0.64, width: 0.27, height: 0.32 },
+    rect: { x: 0.02, y: 0.58, width: 0.29, height: 0.38 },
   },
   {
     id: "center_event_text",
@@ -89,7 +89,7 @@ const SPECTATOR_HUD_ZONES = [
   {
     id: "player_team_hud",
     purpose: "Spectator lower-left player/team roster and status readouts.",
-    rect: { x: 0.02, y: 0.63, width: 0.28, height: 0.33 },
+    rect: { x: 0.02, y: 0.57, width: 0.3, height: 0.39 },
   },
   {
     id: "center_event_text",

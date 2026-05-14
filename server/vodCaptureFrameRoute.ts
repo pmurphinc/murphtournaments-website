@@ -26,6 +26,10 @@ export async function getSafeVodCaptureFramePathForRequest(
 }
 
 export const serveVodCaptureFrame: RequestHandler = async (req, res, next) => {
+  res.set("Cache-Control", "no-store");
+  res.set("Pragma", "no-cache");
+  res.set("Expires", "0");
+
   try {
     const framePath = await getSafeVodCaptureFramePathForRequest(
       req.params.vodAnalysisId,

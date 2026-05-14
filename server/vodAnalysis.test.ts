@@ -73,7 +73,10 @@ import {
   getLatestVodCaptureFrameFile,
   resolveVodCaptureFramePath,
 } from "./vodFrameCapture";
-import { getSafeVodCaptureFramePathForRequest } from "./vodCaptureFrameRoute";
+import {
+  getSafeVodCaptureFramePathForRequest,
+  serveVodCaptureFrame,
+} from "./vodCaptureFrameRoute";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 
@@ -3522,6 +3525,56 @@ describe("VOD capture frame preview", () => {
       ).resolves.toBeNull();
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("serves capture frames with no-store cache headers", async () => {
+    const vodId = 606044;
+    const captureId = 990101;
+    const fileName = "sample-0003-000045.jpg";
+    const cacheRoot = path.join(
+      process.cwd(),
+      "server",
+      ".cache",
+      "vod-capture"
+    );
+    const frameDir = path.join(cacheRoot, String(vodId), String(captureId));
+    await rm(path.join(cacheRoot, String(vodId)), {
+      recursive: true,
+      force: true,
+    });
+    await mkdir(frameDir, { recursive: true });
+    await writeFile(path.join(frameDir, fileName), "fake jpg bytes");
+
+    try {
+      const set = vi.fn();
+      const type = vi.fn().mockReturnThis();
+      const sendFile = vi.fn();
+      const next = vi.fn();
+
+      await serveVodCaptureFrame(
+        {
+          params: {
+            vodAnalysisId: String(vodId),
+            captureJobId: String(captureId),
+            fileName,
+          },
+        } as never,
+        { set, type, sendFile } as never,
+        next
+      );
+
+      expect(set).toHaveBeenCalledWith("Cache-Control", "no-store");
+      expect(set).toHaveBeenCalledWith("Pragma", "no-cache");
+      expect(set).toHaveBeenCalledWith("Expires", "0");
+      expect(type).toHaveBeenCalledWith("jpg");
+      expect(sendFile).toHaveBeenCalledWith(path.join(frameDir, fileName));
+      expect(next).not.toHaveBeenCalled();
+    } finally {
+      await rm(path.join(cacheRoot, String(vodId)), {
+        recursive: true,
+        force: true,
+      });
     }
   });
 
