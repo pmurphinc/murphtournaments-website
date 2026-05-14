@@ -91,8 +91,8 @@ function extractExplicitTeamLabel(text: string): string | null {
   const patterns = [
     /\bTEAM\s+([A-Z][A-Z0-9 '&-]{1,40})\s+(?:WIPED|WIPE)\b/i,
     /\b([A-Z][A-Z0-9 '&-]{1,40})\s+TEAM\s+(?:WIPED|WIPE)\b/i,
-    /\b([A-Z][A-Z0-9 '&-]{1,40})\s+(?:CASHOUT\s+COMPLETE|CASHOUT\s+STOLEN|STOLEN)\b/i,
-    /\b(?:CASHOUT\s+COMPLETE|CASHOUT\s+STOLEN|STOLEN)\s+(?:BY|FOR)\s+([A-Z][A-Z0-9 '&-]{1,40})\b/i,
+    /\b([A-Z][A-Z0-9 '&-]{1,40})\s+(?:CASHOUT\s+COMPLETE|CASHOUT\s+STOLEN|STOLEN|CASHOUT\s+STARTED(?:\s+BONUS)?|VAULT\s+OPENED(?:\s+BONUS)?)\b/i,
+    /\b(?:CASHOUT\s+COMPLETE|CASHOUT\s+STOLEN|STOLEN|CASHOUT\s+STARTED(?:\s+BONUS)?|VAULT\s+OPENED(?:\s+BONUS)?)\s+(?:BY|FOR)\s+([A-Z][A-Z0-9 '&-]{1,40})\b/i,
   ];
 
   for (const pattern of patterns) {
@@ -109,8 +109,66 @@ function extractCashoutLabel(text: string): string | null {
   if (match?.[1]) return match[1].toUpperCase();
 
   const trailingMatch =
-    /\b(?:CASHOUT\s+COMPLETE|CASHOUT\s+STOLEN|STOLEN)\s+([A-E])\b/i.exec(text);
+    /\b(?:CASHOUT\s+COMPLETE|CASHOUT\s+STOLEN|STOLEN|CASHOUT\s+STARTED(?:\s+BONUS)?)\s+([A-E])\b/i.exec(
+      text
+    );
   return trailingMatch?.[1]?.toUpperCase() ?? null;
+}
+
+function extractVaultLabel(text: string): string | null {
+  const match = /\bVAULT\s*#?\s*([1-6])\b/i.exec(text);
+  if (match?.[1]) return match[1];
+
+  const trailingMatch = /\bVAULT\s+OPENED(?:\s+BONUS)?\s+([1-6])\b/i.exec(text);
+  return trailingMatch?.[1] ?? null;
+}
+
+function trimPlayerLabel(value: string | null | undefined): string | null {
+  const withoutTrailingContext = value
+    ?.replace(
+      /\b(?:ASSIST(?:ED)?|REVIV(?:E|ED|ING)|ELIMINATED(?:\s+BY)?|CASHOUT|VAULT|TEAM\s+WIP(?:ED|E))\b.*$/i,
+      ""
+    )
+    .replace(/\s+(?:\+?\$?\d[\d,]*|\+\d[\d,]*\s*(?:XP|PTS?)?)\b.*$/i, "")
+    .replace(/^[\s:"'“”‘’]+|[\s.,!?:;"'“”‘’]+$/g, "");
+  const label = normalizeOptionalLabel(withoutTrailingContext);
+  return label && /^[A-Z0-9_. -]+$/i.test(label) ? label : null;
+}
+
+function extractEliminatedPlayer(text: string): string | null {
+  const match =
+    /\bELIMINATED\s+(?!BY\b)([A-Z0-9_. -]{1,40})(?=\s+ASSIST(?:ED)?\b|\s+REVIV(?:E|ED|ING)\b|\s+\+?\$?\d|[.,!?:;"'“”‘’]*\s*$)/i.exec(
+      text
+    );
+  return trimPlayerLabel(match?.[1]);
+}
+
+function extractEliminatedByPlayer(text: string): string | null {
+  const match =
+    /\bELIMINATED\s+BY\s+([A-Z0-9_. -]{1,40})(?=\s+ASSIST(?:ED)?\b|\s+REVIV(?:E|ED|ING)\b|\s+\+?\$?\d|[.,!?:;"'“”‘’]*\s*$)/i.exec(
+      text
+    );
+  return trimPlayerLabel(match?.[1]);
+}
+
+function extractAssistPlayer(
+  text: string
+): { label: string; text: string } | null {
+  const match =
+    /\b(ASSIST(?:ED)?\s+([A-Z0-9_. -]{1,40}))(?=\s+ELIMINATED(?:\s+BY)?\b|\s+REVIV(?:E|ED|ING)\b|\s+\+?\$?\d|[.,!?:;"'“”‘’]*\s*$)/i.exec(
+      text
+    );
+  const label = trimPlayerLabel(match?.[2]);
+  const assistText = normalizeOptionalLabel(match?.[1]);
+  return label && assistText ? { label, text: assistText } : null;
+}
+
+function extractRevivePlayer(text: string): string | null {
+  const match =
+    /\bREVIV(?:E|ED|ING)\s+([A-Z0-9_. -]{1,40})(?=\s+\+?\$?\d|[.,!?:;"'“”‘’]*\s*$)/i.exec(
+      text
+    );
+  return trimPlayerLabel(match?.[1]);
 }
 
 function hasRequiredFields(detection: DetectedAutomationEventInput): boolean {
@@ -145,7 +203,7 @@ function withValidation(
 }
 
 function buildObjectiveDetection(
-  eventType: Extract<VodAnalysisEventType, "cashout" | "steal_flip">,
+  eventType: Extract<VodAnalysisEventType, "cashout" | "steal_flip" | "plug">,
   timestampSeconds: number,
   matchedText: string,
   context: CenterEventTextParseContext,
@@ -157,17 +215,103 @@ function buildObjectiveDetection(
   const targetLabel =
     normalizeOptionalLabel(context.targetLabel) ??
     extractCashoutLabel(matchedText);
+  const actorLabel = normalizeOptionalLabel(context.actorLabel);
 
   return withValidation(
     {
       eventType,
       timestampSeconds,
+      actorLabel,
       targetLabel,
       teamLabel,
-      confidence: eventType === "cashout" ? 86 : 84,
+      confidence: eventType === "cashout" ? 86 : eventType === "plug" ? 83 : 84,
     },
     matchedText,
     reason
+  );
+}
+
+function buildVaultDetection(
+  timestampSeconds: number,
+  matchedText: string,
+  context: CenterEventTextParseContext,
+  reason: string
+): DetectedAutomationEventInput[] {
+  const teamLabel =
+    normalizeOptionalLabel(context.teamLabel) ??
+    extractExplicitTeamLabel(matchedText);
+  const actorLabel = normalizeOptionalLabel(context.actorLabel);
+  const targetLabel =
+    normalizeOptionalLabel(context.targetLabel) ??
+    extractVaultLabel(matchedText);
+
+  return withValidation(
+    {
+      eventType: "tap",
+      timestampSeconds,
+      actorLabel,
+      targetLabel,
+      teamLabel,
+      confidence: 83,
+    },
+    matchedText,
+    reason
+  );
+}
+
+function buildDeathDetection(
+  timestampSeconds: number,
+  matchedText: string,
+  context: CenterEventTextParseContext
+): DetectedAutomationEventInput[] {
+  const byPlayer = extractEliminatedByPlayer(matchedText);
+  const eliminatedPlayer = extractEliminatedPlayer(matchedText);
+  const assist = extractAssistPlayer(matchedText);
+  const actorLabel = byPlayer ?? normalizeOptionalLabel(context.actorLabel);
+  const targetLabel = byPlayer
+    ? normalizeOptionalLabel(context.targetLabel)
+    : (eliminatedPlayer ?? normalizeOptionalLabel(context.targetLabel));
+
+  return withValidation(
+    {
+      eventType: "death",
+      timestampSeconds,
+      actorLabel,
+      targetLabel,
+      confidence: 82,
+      ...(assist
+        ? { metadata: { assistLabel: assist.label, assistText: assist.text } }
+        : {}),
+    },
+    matchedText,
+    byPlayer ? "eliminated_by_text" : "eliminated_text"
+  );
+}
+
+function buildReviveDetection(
+  timestampSeconds: number,
+  matchedText: string,
+  context: CenterEventTextParseContext
+): DetectedAutomationEventInput[] {
+  const teamLabel =
+    normalizeOptionalLabel(context.teamLabel) ??
+    extractExplicitTeamLabel(matchedText);
+  const actorLabel = normalizeOptionalLabel(context.actorLabel);
+  const targetLabel =
+    extractRevivePlayer(matchedText) ??
+    normalizeOptionalLabel(context.targetLabel);
+
+  return withValidation(
+    {
+      eventType: "revive",
+      timestampSeconds,
+      actorLabel,
+      targetLabel,
+      teamLabel,
+      confidence: 82,
+    },
+    matchedText,
+    "revive_text"
   );
 }
 
@@ -231,6 +375,52 @@ export function parseCenterEventTextToDetections(
     );
   }
 
+  if (/\bCASHOUT\s+STARTED\s+BONUS\b/.test(normalizedText)) {
+    return buildObjectiveDetection(
+      "plug",
+      timestampSeconds,
+      matchedText,
+      context,
+      "cashout_started_bonus_text"
+    );
+  }
+
+  if (/\bCASHOUT\s+STARTED\b/.test(normalizedText)) {
+    return buildObjectiveDetection(
+      "plug",
+      timestampSeconds,
+      matchedText,
+      context,
+      "cashout_started_text"
+    );
+  }
+
+  if (/\bVAULT\s+OPENED\s+BONUS\b/.test(normalizedText)) {
+    return buildVaultDetection(
+      timestampSeconds,
+      matchedText,
+      context,
+      "vault_opened_bonus_text"
+    );
+  }
+
+  if (/\bVAULT\s+OPENED\b/.test(normalizedText)) {
+    return buildVaultDetection(
+      timestampSeconds,
+      matchedText,
+      context,
+      "vault_opened_text"
+    );
+  }
+
+  if (/\bELIMINATED(?:\s+BY)?\s+[A-Z0-9_. -]+/.test(normalizedText)) {
+    return buildDeathDetection(timestampSeconds, matchedText, context);
+  }
+
+  if (/\bREVIV(?:E|ED|ING)\s+[A-Z0-9_. -]+/.test(normalizedText)) {
+    return buildReviveDetection(timestampSeconds, matchedText, context);
+  }
+
   return [];
 }
 
@@ -252,6 +442,38 @@ function getMatchedCenterEventPattern(text: string | null): string | undefined {
     /\bSTOLEN\b/.test(normalizedText)
   ) {
     return "cashout_stolen_text";
+  }
+
+  if (/\bCASHOUT\s+STARTED\s+BONUS\b/.test(normalizedText)) {
+    return "cashout_started_bonus_text";
+  }
+
+  if (/\bCASHOUT\s+STARTED\b/.test(normalizedText)) {
+    return "cashout_started_text";
+  }
+
+  if (/\bVAULT\s+OPENED\s+BONUS\b/.test(normalizedText)) {
+    return "vault_opened_bonus_text";
+  }
+
+  if (/\bVAULT\s+OPENED\b/.test(normalizedText)) {
+    return "vault_opened_text";
+  }
+
+  if (/\bELIMINATED\s+BY\s+[A-Z0-9_. -]+/.test(normalizedText)) {
+    return "eliminated_by_text";
+  }
+
+  if (/\bELIMINATED\s+[A-Z0-9_. -]+/.test(normalizedText)) {
+    return "eliminated_text";
+  }
+
+  if (/\bREVIV(?:E|ED|ING)\s+[A-Z0-9_. -]+/.test(normalizedText)) {
+    return "revive_text";
+  }
+
+  if (/\bASSIST(?:ED)?\s+[A-Z0-9_. -]+/.test(normalizedText)) {
+    return "assist_text";
   }
 
   return undefined;
@@ -293,8 +515,12 @@ function buildDetectionEvidence(input: {
     detectionOutcome = "no_pattern_match";
     safeMessage =
       "Readable text did not match supported center-event patterns.";
+  } else if (input.matchedPattern === "assist_text") {
+    detectionOutcome = "evidence_only_assist_text";
+    safeMessage =
+      "Matched assist text is evidence only unless paired with a death suggestion.";
   } else if (input.detections.length === 0) {
-    detectionOutcome = "missing_required_fields";
+    detectionOutcome = "matched_missing_required_fields";
     safeMessage =
       "Matched text was missing labels required to create a suggestion.";
   } else {

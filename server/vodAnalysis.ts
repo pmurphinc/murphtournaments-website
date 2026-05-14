@@ -1213,7 +1213,10 @@ function incrementEvidenceCounters(
   if (evidence.detectionOutcome === "no_pattern_match") {
     counters.skippedNoPatternMatchCount += 1;
   }
-  if (evidence.detectionOutcome === "missing_required_fields") {
+  if (
+    evidence.detectionOutcome === "missing_required_fields" ||
+    evidence.detectionOutcome === "matched_missing_required_fields"
+  ) {
     counters.skippedMissingRequiredFieldCount += 1;
   }
 }
