@@ -2249,7 +2249,7 @@ describe("processVodCaptureJob", () => {
         { vodAnalysisId: 44, captureJobId: 99 },
         missingVod.db,
         undefined,
-        skippedFrameExtractor
+        capturedFrameExtractor
       )
     ).resolves.toMatchObject({
       status: "not_found",
@@ -2269,7 +2269,7 @@ describe("processVodCaptureJob", () => {
         { vodAnalysisId: 44, captureJobId: 99 },
         missingJob.db,
         undefined,
-        skippedFrameExtractor
+        capturedFrameExtractor
       )
     ).resolves.toMatchObject({ status: "not_found" });
     expect(missingJob.update).not.toHaveBeenCalled();
@@ -2286,7 +2286,7 @@ describe("processVodCaptureJob", () => {
         { vodAnalysisId: 44, captureJobId: 99 },
         db,
         undefined,
-        skippedFrameExtractor
+        capturedFrameExtractor
       )
     ).resolves.toMatchObject({ status: "invalid_capture_job" });
 
@@ -2305,7 +2305,7 @@ describe("processVodCaptureJob", () => {
         { vodAnalysisId: 44, captureJobId: 99 },
         db,
         undefined,
-        skippedFrameExtractor
+        capturedFrameExtractor
       )
     ).resolves.toMatchObject({
       status: "complete",
@@ -2341,7 +2341,7 @@ describe("processVodCaptureJob", () => {
         { vodAnalysisId: 44, captureJobId: 99 },
         db,
         undefined,
-        skippedFrameExtractor
+        capturedFrameExtractor
       )
     ).resolves.toMatchObject({ processedSamples: 4 });
 
@@ -2399,7 +2399,7 @@ describe("processVodCaptureJob", () => {
         { vodAnalysisId: 44, captureJobId: 99 },
         db,
         detector,
-        skippedFrameExtractor
+        capturedFrameExtractor
       )
     ).resolves.toMatchObject({
       status: "complete",
@@ -2420,8 +2420,10 @@ describe("processVodCaptureJob", () => {
           detectorVersion: "debug-frame-v1",
           sampleIndex: 0,
           timestampSeconds: 0,
-          frameCaptureStatus: "skipped",
-          frameCaptureMessage: "Frame extraction skipped in unit test.",
+          frameCaptureStatus: "captured",
+          relativeFramePath:
+            "server/.cache/vod-capture/44/99/sample-0001-000000.jpg",
+          fileName: "sample-0001-000000.jpg",
         },
       }),
     });
@@ -2463,14 +2465,24 @@ describe("processVodCaptureJob", () => {
     });
   });
 
-  it("tracks failed frame extractions without failing the whole job", async () => {
-    const frameExtractor: VodFrameExtractor = async input => ({
-      status: "failed",
-      timestampSeconds: input.timestampSeconds,
-      sampleIndex: input.sampleIndex,
-      errorMessage:
-        "Frame extraction requires missing system binaries: ffmpeg, yt-dlp.",
-    });
+  it("completes with a sanitized warning when one sample fails after other samples succeed", async () => {
+    const frameExtractor: VodFrameExtractor = async input =>
+      input.sampleIndex === 2
+        ? {
+            status: "failed",
+            timestampSeconds: input.timestampSeconds,
+            sampleIndex: input.sampleIndex,
+            errorMessage:
+              "Input file is missing: /app/server/.cache/vod-capture/5/35/sample-0003-000060.jpg",
+          }
+        : {
+            status: "captured",
+            timestampSeconds: input.timestampSeconds,
+            sampleIndex: input.sampleIndex,
+            framePath: `/app/server/.cache/vod-capture/${input.vodAnalysisId}/${input.captureJobId}/sample-${String(input.sampleIndex + 1).padStart(4, "0")}-${String(input.timestampSeconds).padStart(6, "0")}.jpg`,
+            relativeFramePath: `server/.cache/vod-capture/${input.vodAnalysisId}/${input.captureJobId}/sample-${String(input.sampleIndex + 1).padStart(4, "0")}-${String(input.timestampSeconds).padStart(6, "0")}.jpg`,
+            fileName: `sample-${String(input.sampleIndex + 1).padStart(4, "0")}-${String(input.timestampSeconds).padStart(6, "0")}.jpg`,
+          };
     const { db, updateSets } = createProcessCaptureJobDb({
       vodRows: [captureReadyVod()],
       captureRows: [captureJob({ id: 99 })],
@@ -2485,20 +2497,64 @@ describe("processVodCaptureJob", () => {
       )
     ).resolves.toMatchObject({
       status: "complete",
-      processedSamples: 0,
-      failedSamples: 4,
+      processedSamples: 3,
+      failedSamples: 1,
       createdSuggestionCount: 0,
       errorMessage:
-        "Frame extraction requires missing system binaries: ffmpeg, yt-dlp.",
+        "Completed with 1 failed/skipped sample. Last issue: sample 3 at 60s did not produce a frame image.",
     });
 
     expect(updateSets.at(-1)).toMatchObject({
       status: "complete",
+      processedSamples: 3,
+      failedSamples: 1,
+      errorMessage:
+        "Completed with 1 failed/skipped sample. Last issue: sample 3 at 60s did not produce a frame image.",
+    });
+    expect(String(updateSets.at(-1)?.errorMessage)).not.toContain(
+      "/app/server/.cache"
+    );
+  });
+
+  it("fails with a sanitized error when all samples fail", async () => {
+    const frameExtractor: VodFrameExtractor = async input => ({
+      status: "failed",
+      timestampSeconds: input.timestampSeconds,
+      sampleIndex: input.sampleIndex,
+      errorMessage:
+        "Input file is missing: /app/server/.cache/vod-capture/5/35/sample-0001-000000.jpg",
+    });
+    const { db, updateSets } = createProcessCaptureJobDb({
+      vodRows: [captureReadyVod()],
+      captureRows: [captureJob({ id: 99 })],
+    });
+
+    await expect(
+      processVodCaptureJob(
+        { vodAnalysisId: 44, captureJobId: 99 },
+        db,
+        undefined,
+        frameExtractor
+      )
+    ).resolves.toMatchObject({
+      status: "failed",
+      processedSamples: 0,
+      failedSamples: 4,
+      createdSuggestionCount: 0,
+      errorMessage:
+        "Capture job failed because no frame samples produced usable images. Last issue: sample 4 at 90s did not produce a frame image.",
+    });
+
+    expect(updateSets.at(-1)).toMatchObject({
+      status: "failed",
       processedSamples: 0,
       failedSamples: 4,
       errorMessage:
-        "Frame extraction requires missing system binaries: ffmpeg, yt-dlp.",
+        "Capture job failed because no frame samples produced usable images. Last issue: sample 4 at 90s did not produce a frame image.",
     });
+    expect(String(updateSets.at(-1)?.errorMessage)).not.toMatch(
+      /\/app\/server\/.cache|\/vod-capture\//
+    );
   });
 
   it("ingests center-event-text detector output into pending suggestions", async () => {
@@ -2845,7 +2901,7 @@ describe("processVodCaptureJob", () => {
     });
   });
 
-  it("marks failed with errorMessage when the detector throws", async () => {
+  it("completes with warning when the detector throws for every captured sample", async () => {
     const detector: VodCaptureSampleDetector = async () => {
       throw new Error("OCR engine unavailable");
     };
@@ -2859,20 +2915,22 @@ describe("processVodCaptureJob", () => {
         { vodAnalysisId: 44, captureJobId: 99 },
         db,
         detector,
-        skippedFrameExtractor
+        capturedFrameExtractor
       )
     ).resolves.toMatchObject({
-      status: "failed",
-      processedSamples: 1,
-      failedSamples: 1,
-      errorMessage: "Capture sample 1 at 0s failed: OCR engine unavailable",
+      status: "complete",
+      processedSamples: 4,
+      failedSamples: 4,
+      errorMessage:
+        "Completed with 4 failed/skipped samples. Last issue: sample 4 at 90s failed: OCR engine unavailable",
     });
 
     expect(updateSets.at(-1)).toMatchObject({
-      status: "failed",
-      processedSamples: 1,
-      failedSamples: 1,
-      errorMessage: "Capture sample 1 at 0s failed: OCR engine unavailable",
+      status: "complete",
+      processedSamples: 4,
+      failedSamples: 4,
+      errorMessage:
+        "Completed with 4 failed/skipped samples. Last issue: sample 4 at 90s failed: OCR engine unavailable",
       completedAt: expect.any(Date),
     });
   });

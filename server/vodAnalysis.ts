@@ -1128,6 +1128,53 @@ function getErrorMessage(error: unknown): string {
     : "Unknown capture processing error.";
 }
 
+function pluralizeSample(count: number): string {
+  return count === 1 ? "sample" : "samples";
+}
+
+function sanitizeSampleIssueMessage(
+  sampleIndex: number,
+  timestampSeconds: number,
+  errorMessage: string
+): string {
+  const sampleLabel = `sample ${sampleIndex + 1} at ${timestampSeconds}s`;
+
+  if (/did not create an output image/i.test(errorMessage)) {
+    return `${sampleLabel} did not produce a frame image.`;
+  }
+
+  if (/missing|not found|no such file|input file/i.test(errorMessage)) {
+    return `${sampleLabel} did not produce a frame image.`;
+  }
+
+  const sanitizedDetail = errorMessage
+    .replace(/(?:[A-Za-z]:)?[\/][^\s:]+(?:[\/][^\s:]+)+/g, "[internal path]")
+    .replace(/server\/\.cache\/vod-capture\/\S+/g, "[capture frame]")
+    .trim();
+
+  return sanitizedDetail
+    ? `${sampleLabel} failed: ${sanitizedDetail}`
+    : `${sampleLabel} failed.`;
+}
+
+function buildCaptureJobWarningMessage(
+  failedSamples: number,
+  lastSampleIssueMessage: string
+): string {
+  return `Completed with ${failedSamples} failed/skipped ${pluralizeSample(
+    failedSamples
+  )}. Last issue: ${lastSampleIssueMessage}`;
+}
+
+function buildAllSamplesFailedMessage(
+  failedSamples: number,
+  lastSampleIssueMessage: string | undefined
+): string {
+  return `Capture job failed because no frame samples produced usable images.${
+    lastSampleIssueMessage ? ` Last issue: ${lastSampleIssueMessage}` : ""
+  }`;
+}
+
 export async function processVodCaptureJob(
   input: ProcessVodCaptureJobInput,
   dbClient?: ProcessVodCaptureJobDb | null,
@@ -1184,7 +1231,8 @@ export async function processVodCaptureJob(
   let processedSamples = 0;
   let failedSamples = 0;
   let createdSuggestionCount = 0;
-  let firstFrameCaptureErrorMessage: string | undefined;
+  let usableFrameSamples = 0;
+  let lastSampleIssueMessage: string | undefined;
   const samplePlan = buildFrameSamplingPlan(
     vodAnalysis.durationSeconds,
     captureJob.sampleIntervalSeconds
@@ -1227,21 +1275,42 @@ export async function processVodCaptureJob(
           sampleIndex,
         });
 
-        if (frameCapture.status === "failed") {
+        if (frameCapture.status !== "captured") {
           failedSamples += 1;
-          firstFrameCaptureErrorMessage ??= frameCapture.errorMessage;
-        } else {
-          processedSamples += 1;
+          lastSampleIssueMessage = sanitizeSampleIssueMessage(
+            sampleIndex,
+            sampleTimestampSeconds,
+            frameCapture.errorMessage
+          );
+          continue;
         }
 
-        const detections = await detector({
-          vodAnalysis,
-          captureJob,
-          sampleTimestampSeconds,
-          sampleIndex,
-          samplePlan,
-          frameCapture,
-        });
+        processedSamples += 1;
+        usableFrameSamples += 1;
+
+        let detections: DetectedAutomationEventInput[];
+        try {
+          detections = await detector({
+            vodAnalysis,
+            captureJob,
+            sampleTimestampSeconds,
+            sampleIndex,
+            samplePlan,
+            frameCapture,
+          });
+        } catch (error) {
+          failedSamples += 1;
+          lastSampleIssueMessage = sanitizeSampleIssueMessage(
+            sampleIndex,
+            sampleTimestampSeconds,
+            getErrorMessage(error)
+          );
+          console.warn(
+            `[vod-capture] detector failed for sample ${sampleIndex + 1} at ${sampleTimestampSeconds}s`,
+            error
+          );
+          detections = [];
+        }
 
         if (detections.length > 0) {
           const enrichedDetections = detections.map(detection => ({
@@ -1265,12 +1334,8 @@ export async function processVodCaptureJob(
               sampleIndex,
               timestampSeconds: sampleTimestampSeconds,
               frameCaptureStatus: frameCapture.status,
-              ...(frameCapture.status === "captured"
-                ? {
-                    relativeFramePath: frameCapture.relativeFramePath,
-                    fileName: frameCapture.fileName,
-                  }
-                : { frameCaptureMessage: frameCapture.errorMessage }),
+              relativeFramePath: frameCapture.relativeFramePath,
+              fileName: frameCapture.fileName,
             },
           }));
           const ingestResult = await ingestAutomationDetections(
@@ -1292,8 +1357,14 @@ export async function processVodCaptureJob(
         }
       } catch (error) {
         failedSamples += 1;
-        throw new Error(
-          `Capture sample ${sampleIndex + 1} at ${sampleTimestampSeconds}s failed: ${getErrorMessage(error)}`
+        lastSampleIssueMessage = sanitizeSampleIssueMessage(
+          sampleIndex,
+          sampleTimestampSeconds,
+          getErrorMessage(error)
+        );
+        console.warn(
+          `[vod-capture] sample ${sampleIndex + 1} at ${sampleTimestampSeconds}s failed`,
+          error
         );
       } finally {
         await updateJob({
@@ -1304,8 +1375,35 @@ export async function processVodCaptureJob(
       }
     }
 
+    if (usableFrameSamples === 0 && failedSamples > 0) {
+      const failedErrorMessage = buildAllSamplesFailedMessage(
+        failedSamples,
+        lastSampleIssueMessage
+      );
+
+      await updateJob({
+        status: "failed",
+        processedSamples,
+        failedSamples,
+        errorMessage: failedErrorMessage,
+        completedAt: new Date(),
+      });
+
+      return {
+        status: "failed",
+        vodAnalysisId: parsedInput.vodAnalysisId,
+        captureJobId: parsedInput.captureJobId,
+        processedSamples,
+        failedSamples,
+        createdSuggestionCount,
+        errorMessage: failedErrorMessage,
+      };
+    }
+
     const completedErrorMessage =
-      failedSamples > 0 ? firstFrameCaptureErrorMessage : undefined;
+      failedSamples > 0 && lastSampleIssueMessage
+        ? buildCaptureJobWarningMessage(failedSamples, lastSampleIssueMessage)
+        : undefined;
 
     await updateJob({
       status: "complete",

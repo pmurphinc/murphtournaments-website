@@ -253,21 +253,30 @@ export async function detectCenterEventText(
     input.frameCapture.status === "captured" ? input.frameCapture : null;
   const shouldRunOcr =
     !explicitText && ocrEnabled && Boolean(capturedFrameCapture);
-  const mockedOcrResult = shouldRunOcr
-    ? await options.getOcrResult?.(input)
-    : null;
-  const ocrResult = shouldRunOcr
-    ? (mockedOcrResult ??
-      (mockedOcrResult === undefined
-        ? await recognizeCenterEventTextFromFrame({
-            framePath: capturedFrameCapture!.framePath,
-            zone: input.zone,
-            timestampSeconds: input.timestampSeconds,
-            sampleIndex: input.sampleIndex,
-            frameCapture: capturedFrameCapture!,
-          })
-        : null))
-    : null;
+  let ocrResult: CenterEventTextOcrResult | null = null;
+
+  if (shouldRunOcr) {
+    try {
+      const mockedOcrResult = await options.getOcrResult?.(input);
+      ocrResult =
+        mockedOcrResult ??
+        (mockedOcrResult === undefined
+          ? await recognizeCenterEventTextFromFrame({
+              framePath: capturedFrameCapture!.framePath,
+              zone: input.zone,
+              timestampSeconds: input.timestampSeconds,
+              sampleIndex: input.sampleIndex,
+              frameCapture: capturedFrameCapture!,
+            })
+          : null);
+    } catch (error) {
+      console.warn(
+        `[vod-capture] OCR failed for sample ${input.sampleIndex + 1} at ${input.timestampSeconds}s`,
+        error
+      );
+      ocrResult = null;
+    }
+  }
   const debugText = explicitText ?? ocrResult?.normalizedText ?? null;
 
   if (ocrResult) {
