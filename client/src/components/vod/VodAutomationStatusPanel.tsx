@@ -34,6 +34,10 @@ export function VodAutomationStatusPanel({
     type: "success" | "error";
     text: string;
   } | null>(null);
+  const [queueCaptureJobMessage, setQueueCaptureJobMessage] = useState<{
+    type: "success" | "error" | "info";
+    text: string;
+  } | null>(null);
   const [processCaptureJobMessage, setProcessCaptureJobMessage] = useState<{
     type: "success" | "error";
     text: string;
@@ -55,13 +59,47 @@ export function VodAutomationStatusPanel({
     );
   const createCaptureJobMutation =
     trpc.vodAnalysis.createCaptureJob.useMutation({
-      onSuccess: async () => {
+      onMutate: () => {
+        setQueueCaptureJobMessage(null);
+        setProcessCaptureJobMessage(null);
+      },
+      onSuccess: async result => {
         await Promise.all([
           utils.vodAnalysis.getAutomationStatus.invalidate(vodAnalysisId),
+          utils.vodAnalysis.getLatestCaptureJob.invalidate(vodAnalysisId),
+          utils.vodAnalysis.listCaptureJobs.invalidate(vodAnalysisId),
           utils.vodAnalysis.getLatestCaptureFramePreview.invalidate({
             vodAnalysisId,
           }),
         ]);
+
+        switch (result.status) {
+          case "created":
+            setQueueCaptureJobMessage({
+              type: "success",
+              text: "Capture job queued.",
+            });
+            break;
+          case "not_ready":
+            setQueueCaptureJobMessage({
+              type: "info",
+              text: result.readiness.reason,
+            });
+            break;
+          case "not_found":
+            setQueueCaptureJobMessage({
+              type: "error",
+              text: "VOD analysis was not found.",
+            });
+            break;
+          default: {
+            const _exhaustiveResult: never = result;
+            return _exhaustiveResult;
+          }
+        }
+      },
+      onError: error => {
+        setQueueCaptureJobMessage({ type: "error", text: error.message });
       },
     });
   const updateCaptureJobStatusMutation =
@@ -87,6 +125,7 @@ export function VodAutomationStatusPanel({
   const processCaptureJobMutation =
     trpc.vodAnalysis.processCaptureJob.useMutation({
       onMutate: () => {
+        setQueueCaptureJobMessage(null);
         setProcessCaptureJobMessage(null);
       },
       onSuccess: async result => {
@@ -163,7 +202,33 @@ export function VodAutomationStatusPanel({
   const latestCaptureJobTone = latestCaptureJob
     ? getVodCaptureJobStatusTone(latestCaptureJob.status)
     : null;
-  const captureJobDisabledReason = readiness.isReady ? null : readiness.reason;
+  const isCaptureJobAlreadyQueued = latestCaptureJob?.status === "queued";
+  const isCaptureJobProcessing = latestCaptureJob?.status === "processing";
+  const captureJobDisabledReason = !readiness.isReady
+    ? readiness.reason
+    : isCaptureJobAlreadyQueued
+      ? "A capture job is already queued."
+      : isCaptureJobProcessing
+        ? "A capture job is already processing."
+        : null;
+  const queueCaptureButtonLabel = createCaptureJobMutation.isPending
+    ? "Queueing capture job…"
+    : isCaptureJobAlreadyQueued
+      ? "Capture job already queued"
+      : isCaptureJobProcessing
+        ? "Capture job processing"
+        : "Queue capture job";
+  const actionHint = isCaptureJobAlreadyQueued
+    ? frameCaptureBinaries && !areFrameCaptureBinariesAvailable
+      ? "A job is queued, but processing is disabled until ffmpeg and yt-dlp are available."
+      : areFrameCaptureBinariesAvailable
+        ? "A job is queued. Process it to scan frames."
+        : "A capture job is already queued. Process it when runtime binaries are ready."
+    : isCaptureJobProcessing
+      ? "A capture job is processing frame samples now."
+      : readiness.isReady
+        ? "Queue a capture job to prepare frame sampling."
+        : readiness.reason;
   const processCaptureJobDisabledReason = !latestCaptureJob
     ? "Queue a capture job first."
     : !frameCaptureBinaries
@@ -409,11 +474,9 @@ export function VodAutomationStatusPanel({
           </p>
         ) : null}
 
-        {createCaptureJobMutation.isError ? (
-          <p className="rounded border border-red-500/40 bg-red-950/30 p-3 font-mono text-sm text-red-100">
-            {createCaptureJobMutation.error.message}
-          </p>
-        ) : null}
+        <p className="rounded border border-neon-cyan/25 bg-neon-cyan/10 p-3 font-mono text-sm text-neon-cyan">
+          {actionHint}
+        </p>
 
         <div className="grid gap-2 sm:grid-cols-2">
           <button
@@ -424,13 +487,16 @@ export function VodAutomationStatusPanel({
                 source: "manual_debug",
               })
             }
-            disabled={!readiness.isReady || createCaptureJobMutation.isPending}
+            disabled={
+              !readiness.isReady ||
+              isCaptureJobAlreadyQueued ||
+              isCaptureJobProcessing ||
+              createCaptureJobMutation.isPending
+            }
             title={captureJobDisabledReason ?? undefined}
             className="rounded-sm border-2 border-neon-cyan px-4 py-2 font-mono text-xs font-bold uppercase tracking-widest text-neon-cyan transition hover:bg-neon-cyan/10 hover-glow-cyan disabled:cursor-not-allowed disabled:border-white/15 disabled:text-white/35 disabled:hover:bg-transparent"
           >
-            {createCaptureJobMutation.isPending
-              ? "Queueing capture job…"
-              : "Queue capture job"}
+            {queueCaptureButtonLabel}
           </button>
           <button
             type="button"
@@ -455,6 +521,20 @@ export function VodAutomationStatusPanel({
               : "Process latest capture job"}
           </button>
         </div>
+
+        {queueCaptureJobMessage ? (
+          <p
+            className={`rounded border p-3 font-mono text-sm ${
+              queueCaptureJobMessage.type === "success"
+                ? "border-neon-cyan/30 bg-neon-cyan/10 text-neon-cyan"
+                : queueCaptureJobMessage.type === "info"
+                  ? "border-neon-gold/30 bg-neon-gold/10 text-neon-gold"
+                  : "border-red-500/40 bg-red-950/30 text-red-100"
+            }`}
+          >
+            {queueCaptureJobMessage.text}
+          </p>
+        ) : null}
 
         {processCaptureJobMessage ? (
           <p
