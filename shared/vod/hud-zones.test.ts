@@ -61,17 +61,23 @@ describe("VOD HUD zone presets", () => {
   it("keeps the player POV team HUD high enough and tightly scoped", () => {
     const playerTeamHud = getZone("player", "player_team_hud");
 
-    expect(playerTeamHud.rect.y).toBeLessThanOrEqual(0.64);
-    expect(playerTeamHud.rect.width).toBeLessThanOrEqual(0.29);
-    expect(playerTeamHud.rect.height).toBeGreaterThanOrEqual(0.32);
+    expect(playerTeamHud.rect.y).toBeLessThanOrEqual(0.58);
+    expect(playerTeamHud.rect.width).toBeLessThanOrEqual(0.3);
+    expect(playerTeamHud.rect.height).toBeGreaterThanOrEqual(0.38);
+    expect(
+      playerTeamHud.rect.y + playerTeamHud.rect.height
+    ).toBeLessThanOrEqual(1);
   });
 
   it("keeps the spectator POV team HUD high enough and tightly scoped", () => {
     const playerTeamHud = getZone("spectator", "player_team_hud");
 
-    expect(playerTeamHud.rect.y).toBeLessThanOrEqual(0.63);
-    expect(playerTeamHud.rect.width).toBeLessThanOrEqual(0.29);
-    expect(playerTeamHud.rect.height).toBeGreaterThanOrEqual(0.32);
+    expect(playerTeamHud.rect.y).toBeLessThanOrEqual(0.57);
+    expect(playerTeamHud.rect.width).toBeLessThanOrEqual(0.3);
+    expect(playerTeamHud.rect.height).toBeGreaterThanOrEqual(0.38);
+    expect(
+      playerTeamHud.rect.y + playerTeamHud.rect.height
+    ).toBeLessThanOrEqual(1);
   });
 
   it.each(["player", "spectator"] as const)(

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { formatVodEventTimestamp } from "@shared/vod/events";
 import type { VodHudZoneId } from "@shared/vod/hud-zones";
@@ -49,30 +49,53 @@ export function VodAutomationStatusPanel({
   const [processingCaptureJobId, setProcessingCaptureJobId] = useState<
     number | null
   >(null);
-  const refetchCaptureJobViews = () =>
+  const [lastFramePreviewCheckedAt, setLastFramePreviewCheckedAt] =
+    useState<Date | null>(null);
+  const [lastFramePreviewFileName, setLastFramePreviewFileName] = useState<
+    string | null
+  >(null);
+  const [lastFramePreviewChangedAt, setLastFramePreviewChangedAt] =
+    useState<Date | null>(null);
+  const lastFramePreviewFileNameRef = useRef<string | null>(null);
+  const getFramePreviewQueryInput = (captureJobId?: number | null) =>
+    captureJobId ? { vodAnalysisId, captureJobId } : { vodAnalysisId };
+  const invalidateFramePreviewQueries = (captureJobId?: number | null) => {
+    const invalidations = [
+      utils.vodAnalysis.getLatestCaptureFramePreview.invalidate({
+        vodAnalysisId,
+      }),
+    ];
+
+    if (captureJobId) {
+      invalidations.push(
+        utils.vodAnalysis.getLatestCaptureFramePreview.invalidate({
+          vodAnalysisId,
+          captureJobId,
+        })
+      );
+    }
+
+    return Promise.all(invalidations);
+  };
+  const refetchCaptureJobViews = (captureJobId?: number | null) =>
     Promise.all([
       utils.vodAnalysis.getAutomationStatus.invalidate(vodAnalysisId),
       utils.vodAnalysis.getLatestCaptureJob.invalidate(vodAnalysisId),
       utils.vodAnalysis.listCaptureJobs.invalidate(vodAnalysisId),
-      utils.vodAnalysis.getLatestCaptureFramePreview.invalidate({
-        vodAnalysisId,
-      }),
+      invalidateFramePreviewQueries(captureJobId),
     ]);
   const readiness = getVodCaptureReadiness(vod);
   const samplePlan = readiness.samplePlan;
   const firstTimestamps = samplePlan.timestamps.slice(0, 5);
   const durationLabel = formatDuration(vod.durationSeconds) ?? "Unavailable";
-  const automationStatusQuery = trpc.vodAnalysis.getAutomationStatus.useQuery(
-    vodAnalysisId,
-    {
-      staleTime: 1000 * 10,
-    }
-  );
-  const framePreviewQuery =
-    trpc.vodAnalysis.getLatestCaptureFramePreview.useQuery(
-      { vodAnalysisId },
-      { staleTime: 1000 * 10 }
-    );
+  const formatFramePreviewStatusTime = (date: Date | null) =>
+    date
+      ? date.toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        })
+      : "—";
   const createCaptureJobMutation =
     trpc.vodAnalysis.createCaptureJob.useMutation({
       onMutate: () => {
@@ -84,9 +107,7 @@ export function VodAutomationStatusPanel({
           utils.vodAnalysis.getAutomationStatus.invalidate(vodAnalysisId),
           utils.vodAnalysis.getLatestCaptureJob.invalidate(vodAnalysisId),
           utils.vodAnalysis.listCaptureJobs.invalidate(vodAnalysisId),
-          utils.vodAnalysis.getLatestCaptureFramePreview.invalidate({
-            vodAnalysisId,
-          }),
+          invalidateFramePreviewQueries(),
         ]);
 
         switch (result.status) {
@@ -146,7 +167,7 @@ export function VodAutomationStatusPanel({
         setProcessingCaptureJobId(variables.captureJobId);
         setQueueCaptureJobMessage(null);
         setProcessCaptureJobMessage(null);
-        void refetchCaptureJobViews();
+        void refetchCaptureJobViews(variables.captureJobId);
       },
       onSuccess: async result => {
         await Promise.all([
@@ -156,9 +177,7 @@ export function VodAutomationStatusPanel({
           utils.vodAnalysis.listSuggestedEvents.invalidate(vodAnalysisId),
           utils.vodAnalysis.listEvents.invalidate(vodAnalysisId),
           utils.vodAnalysis.list.invalidate(),
-          utils.vodAnalysis.getLatestCaptureFramePreview.invalidate({
-            vodAnalysisId,
-          }),
+          invalidateFramePreviewQueries(result.captureJobId),
         ]);
 
         if (result.status === "complete") {
@@ -204,6 +223,18 @@ export function VodAutomationStatusPanel({
         setMockAutomationMessage({ type: "error", text: error.message });
       },
     });
+  const automationStatusQuery = trpc.vodAnalysis.getAutomationStatus.useQuery(
+    vodAnalysisId,
+    {
+      refetchInterval: query => {
+        const latestStatus = query.state.data?.latestCaptureJob?.status;
+        return isProcessingCaptureJob || latestStatus === "processing"
+          ? 2000
+          : false;
+      },
+      staleTime: 0,
+    }
+  );
   const automationStatus = automationStatusQuery.data;
   const latestCaptureJob = automationStatus?.latestCaptureJob ?? null;
   const frameCaptureBinaries = automationStatus?.frameCaptureBinaries ?? null;
@@ -244,12 +275,26 @@ export function VodAutomationStatusPanel({
   const latestCaptureJobTone = effectiveLatestCaptureJobStatus
     ? getVodCaptureJobStatusTone(effectiveLatestCaptureJobStatus)
     : null;
-  const isCaptureJobAlreadyQueued = effectiveLatestCaptureJobStatus === "queued";
-  const isCaptureJobProcessing = effectiveLatestCaptureJobStatus === "processing";
+  const isCaptureJobAlreadyQueued =
+    effectiveLatestCaptureJobStatus === "queued";
+  const isCaptureJobProcessing =
+    effectiveLatestCaptureJobStatus === "processing";
   const isCaptureJobProcessingInUi =
     processCaptureJobMutation.isPending ||
     isProcessingCaptureJob ||
     latestCaptureJob?.status === "processing";
+  const framePreviewQueryInput = getFramePreviewQueryInput(
+    processingCaptureJobId
+  );
+  const framePreviewQuery =
+    trpc.vodAnalysis.getLatestCaptureFramePreview.useQuery(
+      framePreviewQueryInput,
+      {
+        refetchInterval: isCaptureJobProcessingInUi ? 2500 : false,
+        staleTime: isCaptureJobProcessingInUi ? 0 : 1000 * 10,
+      }
+    );
+
   const captureJobDisabledReason = !readiness.isReady
     ? readiness.reason
     : isCaptureJobProcessingInUi
@@ -359,6 +404,18 @@ export function VodAutomationStatusPanel({
       ? "Starting…"
       : `${processedAndFailedSamples} / ${captureJobProgress.plannedSamples} samples processed`
     : null;
+  const hasFramePreviewPollingChecked = lastFramePreviewCheckedAt !== null;
+  const hasNoNewerFramePreview =
+    isCaptureJobProcessingInUi &&
+    hasFramePreviewPollingChecked &&
+    lastFramePreviewChangedAt !== null &&
+    lastFramePreviewCheckedAt.getTime() > lastFramePreviewChangedAt.getTime();
+  const framePreviewImageUrl =
+    framePreview?.status === "available"
+      ? `${framePreview.frameUrl}?v=${encodeURIComponent(
+          `${framePreview.fileName}:${lastFramePreviewChangedAt?.getTime() ?? ""}`
+        )}`
+      : null;
   const processingStartedLabel = processingStartedAt
     ? formatDateTime(processingStartedAt)
     : null;
@@ -368,24 +425,28 @@ export function VodAutomationStatusPanel({
     !areFrameCaptureBinariesAvailable;
 
   useEffect(() => {
-    if (!isCaptureJobProcessingInUi) return;
+    if (framePreviewQuery.status !== "success") return;
 
-    const intervalId = window.setInterval(() => {
-      void automationStatusQuery.refetch();
-    }, 2000);
+    const checkedAt = new Date();
+    const fileName =
+      framePreviewQuery.data?.status === "available"
+        ? framePreviewQuery.data.fileName
+        : null;
 
-    return () => window.clearInterval(intervalId);
-  }, [automationStatusQuery, isCaptureJobProcessingInUi]);
+    setLastFramePreviewCheckedAt(checkedAt);
+    setLastFramePreviewFileName(fileName);
 
-  useEffect(() => {
-    if (!isCaptureJobProcessingInUi) return;
-
-    const intervalId = window.setInterval(() => {
-      void framePreviewQuery.refetch();
-    }, 2500);
-
-    return () => window.clearInterval(intervalId);
-  }, [framePreviewQuery, isCaptureJobProcessingInUi]);
+    if (fileName !== lastFramePreviewFileNameRef.current) {
+      lastFramePreviewFileNameRef.current = fileName;
+      if (fileName) {
+        setLastFramePreviewChangedAt(checkedAt);
+      }
+    }
+  }, [
+    framePreviewQuery.data,
+    framePreviewQuery.dataUpdatedAt,
+    framePreviewQuery.status,
+  ]);
 
   return (
     <section className="rounded-lg border border-neon-cyan/25 bg-black/35 p-4 shadow-[0_0_32px_rgba(0,229,255,0.08)] sm:p-5">
@@ -422,8 +483,8 @@ export function VodAutomationStatusPanel({
         {frameCaptureBinaries && !areFrameCaptureBinariesAvailable ? (
           <div className="rounded border border-neon-gold/35 bg-neon-gold/10 p-3 font-mono text-sm text-neon-gold">
             <p className="font-bold">
-              Processing is blocked until ffmpeg and yt-dlp are available in
-              the Railway runtime.
+              Processing is blocked until ffmpeg and yt-dlp are available in the
+              Railway runtime.
             </p>
             <p className="mt-1 text-neon-gold/80">
               Redeploy after the Docker runtime binary fix, then refresh this
@@ -478,6 +539,10 @@ export function VodAutomationStatusPanel({
                   compact
                 />
               </div>
+              <div className="mt-3 flex flex-wrap gap-2 font-mono text-[10px] uppercase tracking-widest text-white/50">
+                <span>Processed: {captureJobProgress.processedSamples}</span>
+                <span>Failed/skipped: {captureJobProgress.failedSamples}</span>
+              </div>
               {latestCaptureJob.errorMessage ? (
                 <p className="mt-3 rounded border border-red-500/40 bg-red-950/30 p-3 font-mono text-sm text-red-100">
                   {latestCaptureJob.errorMessage}
@@ -508,6 +573,22 @@ export function VodAutomationStatusPanel({
               ) : null}
             </div>
 
+            {isCaptureJobProcessingInUi ? (
+              <div className="mt-3 space-y-1 rounded border border-neon-cyan/15 bg-neon-cyan/5 p-2 font-mono text-[10px] text-white/55">
+                <p className="text-neon-cyan/80">
+                  Checking for new debug frames every 2.5s.
+                </p>
+                <p>
+                  Last checked:{" "}
+                  {formatFramePreviewStatusTime(lastFramePreviewCheckedAt)}
+                </p>
+                <p>Current frame: {lastFramePreviewFileName ?? "—"}</p>
+                {hasNoNewerFramePreview ? (
+                  <p>No newer frame captured yet.</p>
+                ) : null}
+              </div>
+            ) : null}
+
             {framePreviewQuery.isLoading ? (
               <div className="mt-3 rounded border border-white/10 bg-black/30 p-3 font-mono text-sm text-white/50">
                 Loading debug frame preview…
@@ -516,7 +597,7 @@ export function VodAutomationStatusPanel({
               <div className="mt-3 space-y-3">
                 <div className="relative overflow-hidden rounded border border-white/10 bg-black shadow-[0_0_24px_rgba(0,229,255,0.12)]">
                   <img
-                    src={framePreview.frameUrl}
+                    src={framePreviewImageUrl ?? framePreview.frameUrl}
                     alt="Latest captured VOD debug frame with HUD detection zones"
                     className="block h-auto w-full"
                     loading="lazy"
