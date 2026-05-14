@@ -54,8 +54,8 @@ export type VodCaptureReadiness = {
   samplePlan: FrameSamplingPlan;
 };
 
-const DEFAULT_FRAME_SAMPLING_INTERVAL_SECONDS = 30;
-const DEFAULT_FRAME_SAMPLING_MAX_SAMPLES = 200;
+const DEFAULT_FRAME_SAMPLING_INTERVAL_SECONDS = 5;
+const DEFAULT_FRAME_SAMPLING_MAX_SAMPLES = 2_500;
 
 const VOD_CAPTURE_JOB_STATUS_LABELS: Record<VodCaptureJobStatus, string> = {
   queued: "Queued",
