@@ -2,13 +2,19 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-function getSetupNixPackages(config: string): string[] {
-  const setupMatch = /\[phases\.setup\]([\s\S]*?)(?:\n\[|$)/.exec(config);
-  expect(setupMatch).not.toBeNull();
+function getTomlSection(config: string, sectionName: string): string {
+  const escapedSectionName = sectionName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const sectionMatch = new RegExp(
+    `\\[${escapedSectionName}\\]([\\s\\S]*?)(?:\\n\\[|$)`
+  ).exec(config);
+  expect(sectionMatch).not.toBeNull();
 
-  const nixPkgsMatch = /nixPkgs\s*=\s*\[([^\]]+)\]/s.exec(
-    setupMatch?.[1] ?? ""
-  );
+  return sectionMatch?.[1] ?? "";
+}
+
+function getSetupNixPackages(config: string): string[] {
+  const setupSection = getTomlSection(config, "phases.setup");
+  const nixPkgsMatch = /nixPkgs\s*=\s*\[([^\]]+)\]/s.exec(setupSection);
   expect(nixPkgsMatch).not.toBeNull();
 
   return [...(nixPkgsMatch?.[1] ?? "").matchAll(/"([^"]+)"/g)].map(
@@ -21,10 +27,15 @@ describe("nixpacks deployment config", () => {
     const config = readFileSync(path.resolve("nixpacks.toml"), "utf8");
     const setupNixPackages = getSetupNixPackages(config);
 
-    expect(setupNixPackages).toContain("...");
-    expect(setupNixPackages).toContain("ffmpeg");
-    expect(setupNixPackages).toContain("yt-dlp-light");
+    expect(setupNixPackages).toEqual(["...", "ffmpeg", "yt-dlp-light"]);
     expect(setupNixPackages).not.toContain("yt-dlp");
     expect(config).not.toMatch(/aptPkgs\s*=/);
+  });
+
+  it("keeps Railway runtime startup on the production Node server", () => {
+    const config = readFileSync(path.resolve("nixpacks.toml"), "utf8");
+    const startSection = getTomlSection(config, "start");
+
+    expect(startSection).toMatch(/cmd\s*=\s*"pnpm start"/);
   });
 });
