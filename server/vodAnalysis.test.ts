@@ -2245,6 +2245,189 @@ describe("parseCenterEventTextToDetections", () => {
     }
   );
 
+  it("does not create CASHOUT STOLEN suggestions when required fields are missing", () => {
+    expect(parseCenterEventTextToDetections("CASHOUT STOLEN", 60)).toEqual([]);
+  });
+
+  it.each(["CASHOUT STARTED BONUS", "CASHOUT STARTED BONUS $1,000"])(
+    "maps %s to plug when required context is present",
+    text => {
+      const [detection] = parseCenterEventTextToDetections(text, 90, {
+        actorLabel: "PlugPlayer",
+        targetLabel: "C",
+        teamLabel: "The Retros",
+      });
+
+      expect(detection).toMatchObject({
+        eventType: "plug",
+        timestampSeconds: 90,
+        actorLabel: "PlugPlayer",
+        targetLabel: "C",
+        teamLabel: "The Retros",
+        metadata: expect.objectContaining({
+          matchedPattern: "cashout_started_bonus_text",
+        }),
+      });
+      expect(
+        detectedAutomationEventInputSchema.safeParse(detection).success
+      ).toBe(true);
+    }
+  );
+
+  it("maps CASHOUT STARTED without bonus to plug with the started matched pattern", () => {
+    const [detection] = parseCenterEventTextToDetections(
+      "CASHOUT STARTED",
+      91,
+      { actorLabel: "PlugPlayer", targetLabel: "D", teamLabel: "The Retros" }
+    );
+
+    expect(detection).toMatchObject({
+      eventType: "plug",
+      metadata: expect.objectContaining({
+        matchedPattern: "cashout_started_text",
+      }),
+    });
+  });
+
+  it("does not create CASHOUT STARTED suggestions when required fields are missing", () => {
+    expect(
+      parseCenterEventTextToDetections("CASHOUT STARTED BONUS", 90)
+    ).toEqual([]);
+  });
+
+  it("does not create ELIMINATED death suggestions without actor context", () => {
+    expect(
+      parseCenterEventTextToDetections("ELIMINATED SomePlayer", 100)
+    ).toEqual([]);
+  });
+
+  it("maps ELIMINATED player text to death when actor context is present", () => {
+    const [detection] = parseCenterEventTextToDetections(
+      "ELIMINATED SomePlayer",
+      100,
+      { actorLabel: "Killer.Player" }
+    );
+
+    expect(detection).toMatchObject({
+      eventType: "death",
+      timestampSeconds: 100,
+      actorLabel: "Killer.Player",
+      targetLabel: "SomePlayer",
+    });
+    expect(
+      detectedAutomationEventInputSchema.safeParse(detection).success
+    ).toBe(true);
+  });
+
+  it("maps ELIMINATED BY player text to death when target context is present", () => {
+    const [detection] = parseCenterEventTextToDetections(
+      "ELIMINATED BY Killer-42",
+      101,
+      { targetLabel: "Victim_Name" }
+    );
+
+    expect(detection).toMatchObject({
+      eventType: "death",
+      actorLabel: "Killer-42",
+      targetLabel: "Victim_Name",
+    });
+  });
+
+  it("does not create standalone assist suggestions", () => {
+    expect(parseCenterEventTextToDetections("ASSIST SomePlayer", 102)).toEqual(
+      []
+    );
+  });
+
+  it("adds assist metadata to death detections parsed from the same text", () => {
+    const [detection] = parseCenterEventTextToDetections(
+      "ELIMINATED SomePlayer ASSIST Assist_Player",
+      103,
+      { actorLabel: "Killer" }
+    );
+
+    expect(detection).toMatchObject({
+      eventType: "death",
+      actorLabel: "Killer",
+      targetLabel: "SomePlayer",
+      metadata: expect.objectContaining({
+        assistLabel: "Assist_Player",
+        assistText: "ASSIST Assist_Player",
+      }),
+    });
+  });
+
+  it("does not create REVIVE suggestions unless actor and team context are present", () => {
+    expect(parseCenterEventTextToDetections("REVIVE SomePlayer", 110)).toEqual(
+      []
+    );
+  });
+
+  it.each(["REVIVE SomePlayer", "REVIVED SomePlayer", "REVIVING SomePlayer"])(
+    "maps %s to revive when required context is present",
+    text => {
+      const [detection] = parseCenterEventTextToDetections(text, 110, {
+        actorLabel: "Medic",
+        teamLabel: "The Revivers",
+      });
+
+      expect(detection).toMatchObject({
+        eventType: "revive",
+        actorLabel: "Medic",
+        targetLabel: "SomePlayer",
+        teamLabel: "The Revivers",
+      });
+      expect(
+        detectedAutomationEventInputSchema.safeParse(detection).success
+      ).toBe(true);
+    }
+  );
+
+  it.each(["VAULT OPENED BONUS", "VAULT OPENED BONUS +$1,000"])(
+    "maps %s to tap when required context is present",
+    text => {
+      const [detection] = parseCenterEventTextToDetections(text, 120, {
+        actorLabel: "Tapper",
+        targetLabel: "3",
+        teamLabel: "The Vaults",
+      });
+
+      expect(detection).toMatchObject({
+        eventType: "tap",
+        actorLabel: "Tapper",
+        targetLabel: "3",
+        teamLabel: "The Vaults",
+        metadata: expect.objectContaining({
+          matchedPattern: "vault_opened_bonus_text",
+        }),
+      });
+      expect(
+        detectedAutomationEventInputSchema.safeParse(detection).success
+      ).toBe(true);
+    }
+  );
+
+  it("maps VAULT OPENED without bonus to tap with the opened matched pattern", () => {
+    const [detection] = parseCenterEventTextToDetections("VAULT OPENED", 121, {
+      actorLabel: "Tapper",
+      targetLabel: "4",
+      teamLabel: "The Vaults",
+    });
+
+    expect(detection).toMatchObject({
+      eventType: "tap",
+      metadata: expect.objectContaining({
+        matchedPattern: "vault_opened_text",
+      }),
+    });
+  });
+
+  it("does not create VAULT OPENED suggestions when required fields are missing", () => {
+    expect(parseCenterEventTextToDetections("VAULT OPENED BONUS", 120)).toEqual(
+      []
+    );
+  });
+
   it("does not emit invalid team_wipe detections when no team label is present", () => {
     expect(parseCenterEventTextToDetections("TEAM WIPED", 75)).toEqual([]);
   });
@@ -2819,6 +3002,65 @@ describe("processVodCaptureJob", () => {
     );
 
     expect(insertedSuggestedEvents).toHaveLength(0);
+  });
+
+  it("records assist-only center-event text as evidence without creating suggestions", async () => {
+    const vodAnalysisId = 440045;
+    const captureJobId = 990100;
+    await rm(
+      path.join(
+        process.cwd(),
+        "server",
+        ".cache",
+        "vod-capture",
+        String(vodAnalysisId)
+      ),
+      { recursive: true, force: true }
+    );
+    const detector = createCenterEventTextSampleDetector({
+      ocrEnabled: true,
+      getOcrResult: async ({ sampleIndex }) =>
+        sampleIndex === 0
+          ? mockedCenterEventOcrResult("ASSIST SomePlayer")
+          : null,
+    });
+    const { db, insertedSuggestedEvents } = createProcessCaptureJobDb({
+      vodRows: [
+        captureReadyVod({
+          id: vodAnalysisId,
+          durationSeconds: 1,
+        }),
+      ],
+      captureRows: [
+        captureJob({
+          id: captureJobId,
+          vodAnalysisId,
+          sampleIntervalSeconds: 5,
+        }),
+      ],
+    });
+
+    await expect(
+      processVodCaptureJob(
+        { vodAnalysisId, captureJobId },
+        db,
+        detector,
+        capturedFrameExtractor
+      )
+    ).resolves.toMatchObject({
+      status: "complete",
+      createdSuggestionCount: 0,
+    });
+
+    expect(insertedSuggestedEvents).toHaveLength(0);
+    const evidence = await readVodAutomationScanEvidenceFile(
+      vodAnalysisId,
+      captureJobId
+    );
+    expect(evidence?.recentSamples[0]).toMatchObject({
+      matchedPattern: "assist_text",
+      detectionOutcome: "evidence_only_assist_text",
+    });
   });
 
   it("writes automation scan evidence for OCR outcomes and failed frames", async () => {

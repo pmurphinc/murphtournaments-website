@@ -16,6 +16,8 @@ export const VOD_AUTOMATION_DETECTION_OUTCOMES = [
   "low_confidence",
   "no_pattern_match",
   "missing_required_fields",
+  "matched_missing_required_fields",
+  "evidence_only_assist_text",
   "frame_failed",
   "ocr_failed",
 ] as const;
