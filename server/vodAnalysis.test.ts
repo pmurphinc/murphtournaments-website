@@ -3328,9 +3328,15 @@ describe("getVodAutomationStatus", () => {
         manualCountRows: [{ confirmedManualEventCount: 6 }],
       });
 
-    await expect(getVodAutomationStatus(44, db)).resolves.toMatchObject({
+    await expect(
+      getVodAutomationStatus(44, db, async () => ({
+        available: true,
+        missing: [],
+      }))
+    ).resolves.toMatchObject({
       vodAnalysisId: 44,
       readiness: { status: "ready", isReady: true },
+      frameCaptureBinaries: { available: true, missing: [] },
       latestCaptureJob,
       pendingSuggestedCount: 3,
       approvedSuggestedCount: 2,
@@ -3349,7 +3355,13 @@ describe("getVodAutomationStatus", () => {
       captureRows: [],
     });
 
-    await expect(getVodAutomationStatus(44, db)).resolves.toMatchObject({
+    await expect(
+      getVodAutomationStatus(44, db, async () => ({
+        available: false,
+        missing: ["ffmpeg"],
+      }))
+    ).resolves.toMatchObject({
+      frameCaptureBinaries: { available: false, missing: ["ffmpeg"] },
       latestCaptureJob: null,
       pendingSuggestedCount: 0,
       approvedSuggestedCount: 0,
@@ -3365,7 +3377,12 @@ describe("getVodAutomationStatus", () => {
       manualCountRows: [],
     });
 
-    await expect(getVodAutomationStatus(44, db)).resolves.toMatchObject({
+    await expect(
+      getVodAutomationStatus(44, db, async () => ({
+        available: true,
+        missing: [],
+      }))
+    ).resolves.toMatchObject({
       pendingSuggestedCount: 0,
       approvedSuggestedCount: 0,
       rejectedSuggestedCount: 0,
@@ -3377,7 +3394,12 @@ describe("getVodAutomationStatus", () => {
     const { db, captureOrderBy, suggestedGroupBy, manualWhere } =
       createAutomationStatusDb({ vodRows: [] });
 
-    await expect(getVodAutomationStatus(44, db)).resolves.toBeNull();
+    await expect(
+      getVodAutomationStatus(44, db, async () => ({
+        available: true,
+        missing: [],
+      }))
+    ).resolves.toBeNull();
     expect(captureOrderBy).not.toHaveBeenCalled();
     expect(suggestedGroupBy).not.toHaveBeenCalled();
     expect(manualWhere).not.toHaveBeenCalled();
@@ -3388,7 +3410,12 @@ describe("getVodAutomationStatus", () => {
       vodRows: [captureReadyVod()],
     });
 
-    await expect(getVodAutomationStatus(0, db)).rejects.toThrow();
+    await expect(
+      getVodAutomationStatus(0, db, async () => ({
+        available: true,
+        missing: [],
+      }))
+    ).rejects.toThrow();
     expect(select).not.toHaveBeenCalled();
   });
 });

@@ -169,7 +169,7 @@ export type VodFrameCaptureResult =
       errorMessage: string;
     };
 
-type RequiredBinary = "yt-dlp" | "ffmpeg";
+export type RequiredBinary = "yt-dlp" | "ffmpeg";
 
 export type VodFrameCaptureBinaryCheck = {
   available: boolean;

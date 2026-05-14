@@ -40,9 +40,11 @@ import {
 } from "./vodDetectors/centerEventTextOcr";
 import {
   buildVodCaptureFrameUrl,
+  checkVodFrameCaptureBinaries,
   extractVodFrame,
   getLatestVodCaptureFrameFile,
   type VodCaptureFrameFilePreview,
+  type VodFrameCaptureBinaryCheck,
   type VodFrameCaptureInput,
   type VodFrameCaptureResult,
 } from "./vodFrameCapture";
@@ -108,6 +110,7 @@ export type VodAutomationStatusSummary = {
   ocrEnabled: boolean;
   ocrConfidenceThreshold: number;
   readiness: VodCaptureReadiness;
+  frameCaptureBinaries: VodFrameCaptureBinaryCheck;
   latestCaptureJob: VodCaptureJobRecord | null;
   pendingSuggestedCount: number;
   approvedSuggestedCount: number;
@@ -1487,7 +1490,8 @@ function normalizeCountValue(value: number | string | bigint): number {
 
 export async function getVodAutomationStatus(
   vodAnalysisId: number,
-  dbClient?: AutomationStatusDb | null
+  dbClient?: AutomationStatusDb | null,
+  binaryChecker: () => Promise<VodFrameCaptureBinaryCheck> = checkVodFrameCaptureBinaries
 ): Promise<VodAutomationStatusSummary | null> {
   const parsedVodAnalysisId = vodAnalysisIdInputSchema.parse(vodAnalysisId);
   const db = dbClient ?? ((await getDb()) as AutomationStatusDb | null);
@@ -1507,22 +1511,27 @@ export async function getVodAutomationStatus(
 
   const suggestedCountDb = db as SuggestedEventStatusCountDb;
   const manualCountDb = db as ManualEventCountDb;
-  const [latestCaptureJob, suggestedCountRows, manualCountRows] =
-    await Promise.all([
-      getLatestVodCaptureJob(parsedVodAnalysisId, db as CaptureJobLatestDb),
-      suggestedCountDb
-        .select({
-          status: vodSuggestedEvents.status,
-          suggestedCount: count(),
-        })
-        .from(vodSuggestedEvents)
-        .where(eq(vodSuggestedEvents.vodAnalysisId, parsedVodAnalysisId))
-        .groupBy(vodSuggestedEvents.status),
-      manualCountDb
-        .select({ confirmedManualEventCount: count() })
-        .from(vodAnalysisEvents)
-        .where(eq(vodAnalysisEvents.vodAnalysisId, parsedVodAnalysisId)),
-    ]);
+  const [
+    latestCaptureJob,
+    suggestedCountRows,
+    manualCountRows,
+    frameCaptureBinaries,
+  ] = await Promise.all([
+    getLatestVodCaptureJob(parsedVodAnalysisId, db as CaptureJobLatestDb),
+    suggestedCountDb
+      .select({
+        status: vodSuggestedEvents.status,
+        suggestedCount: count(),
+      })
+      .from(vodSuggestedEvents)
+      .where(eq(vodSuggestedEvents.vodAnalysisId, parsedVodAnalysisId))
+      .groupBy(vodSuggestedEvents.status),
+    manualCountDb
+      .select({ confirmedManualEventCount: count() })
+      .from(vodAnalysisEvents)
+      .where(eq(vodAnalysisEvents.vodAnalysisId, parsedVodAnalysisId)),
+    binaryChecker(),
+  ]);
 
   const suggestedCounts: Record<VodSuggestedEventStatus, number> = {
     pending: 0,
@@ -1539,6 +1548,7 @@ export async function getVodAutomationStatus(
     ocrEnabled: isVodAutomationOcrEnabled(),
     ocrConfidenceThreshold: getVodAutomationOcrConfidenceThreshold(),
     readiness: getVodCaptureReadiness(vodAnalysis),
+    frameCaptureBinaries,
     latestCaptureJob,
     pendingSuggestedCount: suggestedCounts.pending,
     approvedSuggestedCount: suggestedCounts.approved,
