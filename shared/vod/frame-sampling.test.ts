@@ -19,7 +19,10 @@ describe("getVodCaptureReadiness", () => {
 
     expect(readiness.status).toBe("ready");
     expect(readiness.isReady).toBe(true);
-    expect(readiness.samplePlan.timestamps).toEqual([0, 30, 60, 90]);
+    expect(readiness.samplePlan.intervalSeconds).toBe(5);
+    expect(readiness.samplePlan.timestamps.slice(0, 5)).toEqual([
+      0, 5, 10, 15, 20,
+    ]);
   });
 
   it("marks a Twitch VOD without duration as missing duration", () => {
@@ -107,17 +110,29 @@ describe("buildFrameSamplingPlan", () => {
   it("builds the default sampling plan", () => {
     expect(buildFrameSamplingPlan(95)).toEqual({
       durationSeconds: 95,
-      intervalSeconds: 30,
-      maxSamples: 200,
-      timestamps: [0, 30, 60, 90],
+      intervalSeconds: 5,
+      maxSamples: 2_500,
+      timestamps: [
+        0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85,
+        90, 95,
+      ],
     });
   });
 
-  it("caps planned timestamps at the default maximum sample count", () => {
-    const plan = buildFrameSamplingPlan(10_000);
+  it("plans a 12m30s VOD every 5 seconds", () => {
+    const plan = buildFrameSamplingPlan(750);
 
-    expect(plan.timestamps).toHaveLength(200);
-    expect(plan.timestamps.at(-1)).toBe(5_970);
+    expect(plan.intervalSeconds).toBe(5);
+    expect(plan.timestamps).toHaveLength(151);
+    expect(plan.timestamps.slice(0, 6)).toEqual([0, 5, 10, 15, 20, 25]);
+    expect(plan.timestamps.at(-1)).toBe(750);
+  });
+
+  it("caps planned timestamps at the default maximum sample count", () => {
+    const plan = buildFrameSamplingPlan(20_000);
+
+    expect(plan.timestamps).toHaveLength(2_500);
+    expect(plan.timestamps.at(-1)).toBe(12_495);
   });
 
   it("honors an explicit maximum sample count", () => {

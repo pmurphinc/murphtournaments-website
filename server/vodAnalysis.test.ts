@@ -1984,8 +1984,8 @@ describe("createVodCaptureJob", () => {
         captureJob: {
           status: "queued",
           source: "manual_debug",
-          sampleIntervalSeconds: 30,
-          plannedSamples: 4,
+          sampleIntervalSeconds: 5,
+          plannedSamples: 20,
           processedSamples: 0,
           failedSamples: 0,
         },
@@ -2000,7 +2000,7 @@ describe("createVodCaptureJob", () => {
       expect.objectContaining({
         vodAnalysisId: 44,
         status: "queued",
-        plannedSamples: 4,
+        plannedSamples: 20,
       })
     );
   });

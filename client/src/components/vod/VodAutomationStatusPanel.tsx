@@ -189,6 +189,15 @@ export function VodAutomationStatusPanel({
     : false;
   const areFrameCaptureBinariesAvailable =
     frameCaptureBinaries?.available ?? false;
+  const missingBinaryNames = frameCaptureBinaries?.missing.length
+    ? ["ffmpeg", "yt-dlp"]
+        .filter(binaryName =>
+          frameCaptureBinaries.missing.includes(
+            binaryName as "ffmpeg" | "yt-dlp"
+          )
+        )
+        .join(" and ")
+    : "ffmpeg and yt-dlp";
   const binaryStatusLabel = frameCaptureBinaries
     ? areFrameCaptureBinariesAvailable
       ? "Ready"
@@ -292,7 +301,7 @@ export function VodAutomationStatusPanel({
         ? "A capture job is processing frame samples now."
         : latestCaptureJob.status === "queued"
           ? frameCaptureBinaries && !areFrameCaptureBinariesAvailable
-            ? "Frame capture is blocked until the Railway runtime has ffmpeg and yt-dlp."
+            ? "Capture job queued. Processing is blocked until Railway exposes ffmpeg and yt-dlp at runtime."
             : "A capture job is queued and ready to process."
           : !readiness.isReady
             ? readiness.reason
@@ -460,7 +469,8 @@ export function VodAutomationStatusPanel({
         ) : null}
         {isProcessingDisabledByBinaries ? (
           <p className="rounded border border-neon-gold/30 bg-neon-gold/10 p-3 font-mono text-sm text-neon-gold">
-            Processing disabled: missing runtime binaries.
+            Processing disabled: {missingBinaryNames} unavailable in the Railway
+            runtime.
           </p>
         ) : null}
         {processCaptureJobDisabledReason && !isProcessingDisabledByBinaries ? (
