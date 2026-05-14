@@ -141,6 +141,20 @@ export function VodAutomationStatusPanel({
     });
   const automationStatus = automationStatusQuery.data;
   const latestCaptureJob = automationStatus?.latestCaptureJob ?? null;
+  const frameCaptureBinaries = automationStatus?.frameCaptureBinaries ?? null;
+  const isFfmpegAvailable = frameCaptureBinaries
+    ? !frameCaptureBinaries.missing.includes("ffmpeg")
+    : false;
+  const isYtDlpAvailable = frameCaptureBinaries
+    ? !frameCaptureBinaries.missing.includes("yt-dlp")
+    : false;
+  const areFrameCaptureBinariesAvailable =
+    frameCaptureBinaries?.available ?? false;
+  const binaryStatusLabel = frameCaptureBinaries
+    ? areFrameCaptureBinariesAvailable
+      ? "Ready"
+      : "Missing binaries"
+    : "Checking";
   const ocrEnabled = automationStatus?.ocrEnabled ?? false;
   const ocrConfidenceThreshold = automationStatus?.ocrConfidenceThreshold ?? 70;
   const captureJobProgress = latestCaptureJob
@@ -152,13 +166,15 @@ export function VodAutomationStatusPanel({
   const captureJobDisabledReason = readiness.isReady ? null : readiness.reason;
   const processCaptureJobDisabledReason = !latestCaptureJob
     ? "Queue a capture job first."
-    : latestCaptureJob.status === "processing"
-      ? "This capture job is already processing."
-      : latestCaptureJob.status === "complete"
-        ? "This capture job is already complete."
-        : latestCaptureJob.status !== "queued"
-          ? "Only queued capture jobs can be processed."
-          : null;
+    : !areFrameCaptureBinariesAvailable
+      ? "Twitch frame extraction needs ffmpeg and yt-dlp in the Railway runtime."
+      : latestCaptureJob.status === "processing"
+        ? "This capture job is already processing."
+        : latestCaptureJob.status === "complete"
+          ? "This capture job is already complete."
+          : latestCaptureJob.status !== "queued"
+            ? "Only queued capture jobs can be processed."
+            : null;
   const sourceTypeLabel =
     vod.sourceType === "twitch" ||
     vod.sourceType === "youtube" ||
@@ -232,6 +248,43 @@ export function VodAutomationStatusPanel({
             label="OCR threshold"
             value={`${ocrConfidenceThreshold}%`}
           />
+          <VodDetailPill label="Frame binaries" value={binaryStatusLabel} />
+        </div>
+
+        <div className="rounded border border-white/10 bg-black/30 p-3">
+          <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-white/45">
+            Runtime frame extraction binaries
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <VodDetailPill
+              label="ffmpeg"
+              value={
+                frameCaptureBinaries
+                  ? isFfmpegAvailable
+                    ? "Available"
+                    : "Missing"
+                  : "Checking"
+              }
+            />
+            <VodDetailPill
+              label="yt-dlp"
+              value={
+                frameCaptureBinaries
+                  ? isYtDlpAvailable
+                    ? "Available"
+                    : "Missing"
+                  : "Checking"
+              }
+            />
+          </div>
+          {frameCaptureBinaries && !areFrameCaptureBinariesAvailable ? (
+            <p className="mt-3 rounded border border-neon-gold/30 bg-neon-gold/10 p-3 font-mono text-sm text-neon-gold">
+              Twitch frame extraction cannot run until the Railway runtime has
+              both ffmpeg and yt-dlp available. Capture jobs can still be
+              reviewed here, but processing will fail until deployment includes
+              both binaries.
+            </p>
+          ) : null}
         </div>
 
         <div className="rounded border border-white/10 bg-black/30 p-3">
@@ -334,7 +387,7 @@ export function VodAutomationStatusPanel({
                 ))}
               </div>
               <p className="font-mono text-[10px] text-white/40">
-                {framePreview.relativeFramePath}
+                Latest captured debug frame: {framePreview.fileName}
               </p>
             </div>
           ) : (
@@ -525,6 +578,7 @@ export function VodAutomationStatusPanel({
             }}
             disabled={
               !latestCaptureJob ||
+              !areFrameCaptureBinariesAvailable ||
               latestCaptureJob.status !== "queued" ||
               processCaptureJobMutation.isPending
             }
