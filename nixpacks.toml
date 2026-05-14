@@ -1,5 +1,0 @@
-[phases.setup]
-nixPkgs = ["...", "ffmpeg", "yt-dlp-light"]
-
-[start]
-cmd = "pnpm start"

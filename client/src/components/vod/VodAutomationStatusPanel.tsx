@@ -364,7 +364,8 @@ export function VodAutomationStatusPanel({
               and yt-dlp at runtime.
             </p>
             <p className="mt-1 text-neon-gold/80">
-              Redeploy after the Nixpacks binary fix, then refresh this page.
+              Redeploy after the Railpack runtime binary fix, then refresh this
+              page.
             </p>
           </div>
         ) : null}
