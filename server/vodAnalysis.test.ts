@@ -2013,6 +2013,30 @@ describe("createVodCaptureJob", () => {
     );
   });
 
+  it("uses burst sampling for automation capture jobs", async () => {
+    const { db, insert, values } = createCaptureJobDb([captureReadyVod()]);
+
+    await expect(
+      createVodCaptureJob(44, "automation", db)
+    ).resolves.toMatchObject({
+      status: "created",
+      captureJob: {
+        source: "automation",
+        sampleIntervalSeconds: 5,
+        plannedSamples: 77,
+      },
+    });
+
+    expect(insert).toHaveBeenCalledWith(vodCaptureJobs);
+    expect(values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        vodAnalysisId: 44,
+        source: "automation",
+        plannedSamples: 77,
+      })
+    );
+  });
+
   it("does not create events or suggested events", async () => {
     const { db, insert } = createCaptureJobDb([captureReadyVod()]);
 

@@ -90,6 +90,11 @@ export function VodAutomationStatusPanel({
   const readiness = getVodCaptureReadiness(vod);
   const samplePlan = readiness.samplePlan;
   const firstTimestamps = samplePlan.timestamps.slice(0, 5);
+  const burstOffsetsLabel = samplePlan.burstOffsetsSeconds.length
+    ? samplePlan.burstOffsetsSeconds
+        .map(offsetSeconds => `+${offsetSeconds}s`)
+        .join(", ")
+    : "None";
   const durationLabel = formatDuration(vod.durationSeconds) ?? "Unavailable";
   const formatFramePreviewStatusTime = (date: Date | null) =>
     date
@@ -874,7 +879,7 @@ export function VodAutomationStatusPanel({
               onClick={() =>
                 createCaptureJobMutation.mutate({
                   vodAnalysisId,
-                  source: "manual_debug",
+                  source: "automation",
                 })
               }
               disabled={
@@ -950,9 +955,10 @@ export function VodAutomationStatusPanel({
               <VodDetailPill label="Source type" value={sourceTypeLabel} />
               <VodDetailPill label="Duration" value={durationLabel} />
               <VodDetailPill
-                label="Sample interval"
-                value={`${samplePlan.intervalSeconds}s`}
+                label="Base interval"
+                value={`${samplePlan.baseIntervalSeconds}s`}
               />
+              <VodDetailPill label="Burst offsets" value={burstOffsetsLabel} />
               <VodDetailPill
                 label="Planned samples"
                 value={String(samplePlan.timestamps.length)}
@@ -1041,13 +1047,19 @@ export function VodAutomationStatusPanel({
               )}
             </div>
 
-            <p className="rounded border border-neon-magenta/30 bg-neon-magenta/10 p-3 font-mono text-xs text-white/60">
-              Capture jobs plan frame-sampling work and can run a conservative
-              first-pass processor when yt-dlp and ffmpeg are available. OCR is
-              currently {ocrEnabled ? "enabled" : "disabled"}, and the detector
-              creates pending suggestions when center-event text meets the
-              configured confidence threshold.
-            </p>
+            <div className="space-y-2 rounded border border-neon-magenta/30 bg-neon-magenta/10 p-3 font-mono text-xs text-white/60">
+              <p>
+                Burst sampling helps catch short 3–4 second HUD banners like
+                CASHOUT STARTED BONUS.
+              </p>
+              <p>
+                Capture jobs plan frame-sampling work and can run a conservative
+                first-pass processor when yt-dlp and ffmpeg are available. OCR
+                is currently {ocrEnabled ? "enabled" : "disabled"}, and the
+                detector creates pending suggestions when center-event text
+                meets the configured confidence threshold.
+              </p>
+            </div>
           </div>
         </details>
 

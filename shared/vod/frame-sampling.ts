@@ -42,7 +42,10 @@ export type VodCaptureJobProgress = VodCaptureJobProgressSource & {
 
 export type FrameSamplingPlan = {
   durationSeconds: number;
+  baseIntervalSeconds: number;
+  /** @deprecated Use baseIntervalSeconds for capture planning diagnostics. */
   intervalSeconds: number;
+  burstOffsetsSeconds: number[];
   maxSamples: number;
   timestamps: number[];
 };
@@ -54,7 +57,8 @@ export type VodCaptureReadiness = {
   samplePlan: FrameSamplingPlan;
 };
 
-const DEFAULT_FRAME_SAMPLING_INTERVAL_SECONDS = 5;
+export const DEFAULT_FRAME_SAMPLING_INTERVAL_SECONDS = 5;
+export const DEFAULT_FRAME_SAMPLING_BURST_OFFSETS_SECONDS = [1, 2, 3] as const;
 const DEFAULT_FRAME_SAMPLING_MAX_SAMPLES = 2_500;
 
 const VOD_CAPTURE_JOB_STATUS_LABELS: Record<VodCaptureJobStatus, string> = {
@@ -105,6 +109,22 @@ function normalizePositiveInteger(value: number | null | undefined): number {
   return Math.floor(value);
 }
 
+function normalizeBurstOffsetsSeconds(
+  burstOffsetsSeconds: readonly number[] | null | undefined
+): number[] {
+  const uniqueOffsets = new Set<number>();
+
+  for (const offset of burstOffsetsSeconds ?? []) {
+    const normalizedOffset = normalizePositiveInteger(offset);
+
+    if (normalizedOffset > 0) {
+      uniqueOffsets.add(normalizedOffset);
+    }
+  }
+
+  return Array.from(uniqueOffsets).sort((left, right) => left - right);
+}
+
 function hasUsableVodUrl(vod: VodCaptureReadinessVod): boolean {
   const candidate = (vod.normalizedSourceUrl || vod.sourceUrl || "").trim();
 
@@ -123,7 +143,11 @@ function hasUsableVodUrl(vod: VodCaptureReadinessVod): boolean {
 export function buildFrameSamplingPlan(
   durationSeconds: number | null | undefined,
   intervalSeconds = DEFAULT_FRAME_SAMPLING_INTERVAL_SECONDS,
-  maxSamples = DEFAULT_FRAME_SAMPLING_MAX_SAMPLES
+  maxSamples = DEFAULT_FRAME_SAMPLING_MAX_SAMPLES,
+  burstOffsetsSeconds:
+    | readonly number[]
+    | null
+    | undefined = DEFAULT_FRAME_SAMPLING_BURST_OFFSETS_SECONDS
 ): FrameSamplingPlan {
   const normalizedDurationSeconds = normalizePositiveInteger(durationSeconds);
   const normalizedIntervalSeconds = Math.max(
@@ -134,29 +158,46 @@ export function buildFrameSamplingPlan(
     0,
     Math.floor(Number.isFinite(maxSamples) ? maxSamples : 0)
   );
-  const timestamps: number[] = [];
+  const normalizedBurstOffsetsSeconds =
+    normalizeBurstOffsetsSeconds(burstOffsetsSeconds);
+  const timestampSet = new Set<number>();
 
   if (normalizedDurationSeconds <= 0 || normalizedMaxSamples <= 0) {
     return {
       durationSeconds: normalizedDurationSeconds,
+      baseIntervalSeconds: normalizedIntervalSeconds,
       intervalSeconds: normalizedIntervalSeconds,
+      burstOffsetsSeconds: normalizedBurstOffsetsSeconds,
       maxSamples: normalizedMaxSamples,
-      timestamps,
+      timestamps: [],
     };
   }
 
   for (
-    let timestamp = 0;
-    timestamp <= normalizedDurationSeconds &&
-    timestamps.length < normalizedMaxSamples;
-    timestamp += normalizedIntervalSeconds
+    let baseTimestamp = 0;
+    baseTimestamp <= normalizedDurationSeconds;
+    baseTimestamp += normalizedIntervalSeconds
   ) {
-    timestamps.push(timestamp);
+    timestampSet.add(baseTimestamp);
+
+    for (const offsetSeconds of normalizedBurstOffsetsSeconds) {
+      const burstTimestamp = baseTimestamp + offsetSeconds;
+
+      if (burstTimestamp >= 0 && burstTimestamp <= normalizedDurationSeconds) {
+        timestampSet.add(burstTimestamp);
+      }
+    }
   }
+
+  const timestamps = Array.from(timestampSet)
+    .sort((left, right) => left - right)
+    .slice(0, normalizedMaxSamples);
 
   return {
     durationSeconds: normalizedDurationSeconds,
+    baseIntervalSeconds: normalizedIntervalSeconds,
     intervalSeconds: normalizedIntervalSeconds,
+    burstOffsetsSeconds: normalizedBurstOffsetsSeconds,
     maxSamples: normalizedMaxSamples,
     timestamps,
   };

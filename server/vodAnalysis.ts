@@ -27,6 +27,7 @@ import {
 import { z } from "zod";
 import { getDb } from "./db";
 import {
+  DEFAULT_FRAME_SAMPLING_INTERVAL_SECONDS,
   buildFrameSamplingPlan,
   getVodCaptureReadiness,
   type FrameSamplingPlan,
@@ -1035,7 +1036,12 @@ export async function createVodCaptureJob(
     return { status: "not_ready", vodAnalysis, readiness };
   }
 
-  const samplePlan = buildFrameSamplingPlan(vodAnalysis.durationSeconds);
+  const samplePlan = buildFrameSamplingPlan(
+    vodAnalysis.durationSeconds,
+    undefined,
+    undefined,
+    parsedSource === "automation" ? undefined : []
+  );
   const captureJob: InsertVodCaptureJob = {
     vodAnalysisId: parsedVodAnalysisId,
     status: "queued",
@@ -1304,7 +1310,13 @@ export async function processVodCaptureJob(
   let lastSampleIssueMessage: string | undefined;
   const samplePlan = buildFrameSamplingPlan(
     vodAnalysis.durationSeconds,
-    captureJob.sampleIntervalSeconds
+    captureJob.sampleIntervalSeconds,
+    undefined,
+    captureJob.source === "automation" &&
+      captureJob.sampleIntervalSeconds ===
+        DEFAULT_FRAME_SAMPLING_INTERVAL_SECONDS
+      ? undefined
+      : []
   );
 
   const persistEvidence = async () => {
