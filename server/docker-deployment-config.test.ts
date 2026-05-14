@@ -14,6 +14,10 @@ function readDockerfile(): string {
   return readFileSync(path.resolve("Dockerfile"), "utf8");
 }
 
+function readDockerignore(): string {
+  return readFileSync(path.resolve(".dockerignore"), "utf8");
+}
+
 function readRailwayConfig(): RailwayConfig {
   return JSON.parse(
     readFileSync(path.resolve("railway.json"), "utf8")
@@ -39,6 +43,31 @@ describe("Docker deployment config", () => {
     );
     expect(runtimeStage).toContain("FROM base AS runtime");
     expect(dockerfile).not.toContain("yt-dlp-light");
+  });
+
+  it("keeps pnpm patches available to Docker builds", () => {
+    const dockerignore = readDockerignore();
+    const dockerignoreEntries = dockerignore
+      .split(/\r?\n/)
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+
+    expect(dockerignoreEntries).not.toContain("patches");
+    expect(dockerignoreEntries).not.toContain("patches/");
+  });
+
+  it("copies pnpm patches before installing dependencies", () => {
+    const dockerfile = readDockerfile();
+    const depsStage = dockerfile.slice(
+      dockerfile.indexOf("FROM base AS deps"),
+      dockerfile.indexOf("FROM deps AS build")
+    );
+    const copyPatchesIndex = depsStage.indexOf("COPY patches ./patches");
+    const installIndex = depsStage.indexOf("RUN pnpm install --frozen-lockfile");
+
+    expect(copyPatchesIndex).toBeGreaterThan(-1);
+    expect(installIndex).toBeGreaterThan(-1);
+    expect(copyPatchesIndex).toBeLessThan(installIndex);
   });
 
   it("builds and starts the app with pnpm", () => {
