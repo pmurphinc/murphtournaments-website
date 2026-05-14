@@ -360,11 +360,11 @@ export function VodAutomationStatusPanel({
         {frameCaptureBinaries && !areFrameCaptureBinariesAvailable ? (
           <div className="rounded border border-neon-gold/35 bg-neon-gold/10 p-3 font-mono text-sm text-neon-gold">
             <p className="font-bold">
-              Frame capture is blocked. Railway does not currently expose ffmpeg
-              and yt-dlp at runtime.
+              Processing is blocked until ffmpeg and yt-dlp are available in
+              the Railway runtime.
             </p>
             <p className="mt-1 text-neon-gold/80">
-              Redeploy after the Railpack runtime binary fix, then refresh this
+              Redeploy after the Docker runtime binary fix, then refresh this
               page.
             </p>
           </div>
