@@ -154,19 +154,6 @@ const eventFieldHelp: Record<
   },
 };
 
-function WorkflowPlaceholder({ title }: { title: string }) {
-  return (
-    <div className="rounded-lg border border-white/10 bg-black/30 p-5 opacity-75">
-      <h3 className="font-mono text-lg font-bold uppercase tracking-widest text-white/70">
-        {title}
-      </h3>
-      <p className="mt-2 font-mono text-sm text-white/45">
-        Coming in a later build.
-      </p>
-    </div>
-  );
-}
-
 export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
   const utils = trpc.useUtils();
   const vodAnalysisId = Number(params.id);
@@ -1823,7 +1810,6 @@ export default function VodAnalysisDetail({ params }: { params: RouteParams }) {
                     vod={vod}
                   />
                 ) : null}
-                <WorkflowPlaceholder title="Auto-capture Setup" />
               </div>
             </section>
           </>
