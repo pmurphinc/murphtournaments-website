@@ -54,22 +54,22 @@ export default function Navigation() {
     <nav className="fixed top-0 left-0 right-0 z-50 bg-dark-charcoal border-b border-neon-magenta/30 backdrop-blur-sm">
       <div className="container flex items-center justify-between h-16">
         {/* Logo Section */}
-        <div className="flex items-center gap-2 sm:gap-3 md:gap-4 lg:gap-6">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3 md:gap-4 lg:gap-6">
           {/* Murph Tournaments Logo - First */}
-          <Link href="/">
+          <Link href="/" className="flex h-12 shrink-0 items-center md:h-14">
             <img 
               src="https://d2xsxph8kpxj0f.cloudfront.net/310519663462787524/GzitzUSk3snQMAtW4LnLnQ/MurphTournaments_logo_747bd67f.png" 
               alt="Murph Tournaments" 
-              className="h-10 sm:h-12 md:h-14 lg:h-16 cursor-pointer hover:opacity-80 transition-opacity" style={{width: 'auto', objectFit: 'contain'}}
+              className="h-12 w-auto shrink-0 cursor-pointer object-contain transition-opacity hover:opacity-80 md:h-14"
             />
           </Link>
           
           {/* DD Logo - Second */}
-          <Link href="/">
+          <Link href="/" className="flex h-12 shrink-0 items-center md:h-14">
             <img 
               src="https://d2xsxph8kpxj0f.cloudfront.net/310519663462787524/GzitzUSk3snQMAtW4LnLnQ/DD_logo-removebg-preview_07cba133.png" 
               alt="Development Division" 
-              className="h-10 sm:h-12 md:h-14 lg:h-16 cursor-pointer hover:opacity-80 transition-opacity" style={{width: 'auto', objectFit: 'contain'}}
+              className="h-12 w-auto shrink-0 cursor-pointer object-contain transition-opacity hover:opacity-80 md:h-14"
             />
           </Link>
         </div>
