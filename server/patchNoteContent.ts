@@ -60,6 +60,90 @@ export const cleanPatchNoteContent = (content: string) => {
 
 export const WEBSITE_PATCH_NOTES: WebsitePatchNote[] = [
   {
+    id: -900,
+    title: "Season 9 | Dragon Rising",
+    date: "2025.12.10",
+    version: "9.0.0",
+    url: "https://www.reachthefinals.com/patchnotes/900",
+    sourceUrl: "https://www.reachthefinals.com/patchnotes/900",
+    isGameUpdate: 1,
+    content: `THE FINALS — Season 9 | Dragon Rising
+
+Season 9 adds Fangwai City, the new Point Break mode, World Tour 2.0, Reward Coins, flexible Sponsor selection, Double Jeopardy for Cashout, Battle Pass updates, expanded customization, optimization work, Smooth Destruction upgrades, Twitch Drops, balance changes, and a broad bug-fix pass.
+
+New Map | Fangwai City
+
+• Fangwai City joins the Arena with elevated walkways, apartment blocks, riverfront routes, gardens, towers, and smooth destruction.
+• Added to Cashout, Ranked Cashout, Quick Cash, Head 2 Head, and Team Deathmatch rotations.
+
+New Mode | Point Break
+
+• New 8v8 Attackers vs Defenders mode built around nine Grand Vaults.
+• Attackers push through phases and destroy Grand Vaults before running out of respawn tokens.
+• Defenders win by depleting the Attackers’ coins.
+• Added Point Break support for Private Matches.
+
+World Tour 2.0 and Reward Coins
+
+• World Tour is now a progression wrapper that tracks play across all modes.
+• The old World Tour Tournament mode is renamed Cashout.
+• Reward Coins let players choose ranked and World Tour weapon-skin rewards instead of receiving fixed end-of-season skins.
+
+Sponsors, Battle Pass, and Quality of Life
+
+• Players can now sign with any Sponsor and swap Sponsors at any time.
+• Season 9 adds VOLPE, OSPUZE, new loyalty tracks, Free/Premium/Ultimate Battle Pass rewards, Calvin the Cube Twitch Drops, expanded privacy options, club party invites, opt-in Instant Replay viewing, skin randomization, and multi-device tablet customization.
+
+Cashout Rules
+
+• Added Double Jeopardy: if a team inserts a second Cashbox into an active Cashout Station and does not control that Cashout when it completes, that team loses 50% of its current cash total.
+• Ranked Tournament Cashboxes no longer despawn when overtime begins.
+
+Balance Changes
+
+Controller
+• Added aim snapping to .50 Akimbo, BFR Titan, CB-01 Repeater, Cerberus 12GA, KS-23, M26 Matter, Model 1887, R.357, Recurve Bow, SA1216, and SR-84.
+• Aim snapping cooldown increased from 0.5s to 0.7s.
+• Added a 1.5s aim-snapping cooldown for sniper rifles.
+• Added a 1s aim-snapping cooldown for shotguns, revolvers, and grenade launchers.
+• Aim snapping now scales with distance.
+
+Gadgets
+• Breach Charge: cooldown decreased from 30s to 20s.
+• Dome Shield: now blocks Winch Claw.
+• Frag Grenade: outer radius increased from 5m to 5.5m; max-damage radius increased from 2.5m to 2.75m.
+• Gas Grenade: cooldown decreased from 30s to 24s.
+• Gateway: max range decreased from 70m to 50m.
+• Glitch Grenade: ammo decreased from 2 to 1; cooldown decreased from 20s to 12s.
+• Goo: explosive damage multiplier against goo increased from 2.0 to 2.25.
+• Pyro Grenade: cooldown decreased from 30s to 24s.
+• Pyro Mine: explosive damage decreased from 80 to 55.
+• Thermal Bore: fuse time decreased from 2.5s to 1.75s; cooldown decreased from 45s to 35s; lingering smoke reduced.
+• RPG-7: damage increased from 100 to 110.
+
+Specializations
+• Mesh Shield: max health increased from 750 to 850 and now blocks Winch Claw.
+• Winch Claw: max stun duration decreased from 0.65s to 0.5s; minimum stun duration decreased from 0.35s to 0.2s; claw breaks if the victim is far from the initial collision point; claw retracts faster when it hits an object it cannot latch onto.
+
+Weapons
+• 93R: damage decreased from 26 to 24; falloff start decreased from 32m to 30m; falloff end decreased from 40m to 37.5m; max-range falloff multiplier increased from 40% to 50%.
+• BFR Titan: environmental damage decreased from 130 to 95; rate of fire decreased from 85 RPM to 82 RPM.
+• Dual Blades: third attack damage increased from 65 to 100.
+• KS-23: ADS bullet dispersion decreased by roughly 30%.
+• Lewis Gun: damage increased from 22 to 23.
+• M134 Minigun: ADS bullet dispersion slightly decreased while crouching or standing still.
+• M60: vertical recoil decreased during the first 8 bullets; vertical recoil slightly increased after the 30th bullet.
+• Model 1887: tactical reload intro animation decreased from 2.2s to 1.5s.
+• V9S: falloff start increased from 10m to 15m; falloff end increased from 15m to 25m; max-range falloff multiplier increased from 62% to 65%.
+
+Content and Bug Fixes
+
+• Animation, audio, contracts, cosmetics, gadgets, gameplay, map, performance, rendering, social, spectator, stability, and UI fixes included.
+• Monaco received Smooth Destruction across all buildings.
+• Point Break was added to Private Matches.
+• Thermal Bore activation, Gateway/Winch Claw edge cases, pull-through-wall cases, recent line-of-sight checks, Quick Melee cooldown behavior, and multiple weapon animation/audio issues were fixed.`,
+  },
+  {
     id: -1060,
     title: "Midseason Update 10.6.0",
     date: "2026.05.07",
