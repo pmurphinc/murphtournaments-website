@@ -164,6 +164,7 @@ async function loadArchiveData() {
     readJsonFile<SeedPatch[]>("patches-seed.json"),
     readOptionalJsonFile<SeedPatch[]>("patches-official-extra-seed.json", []),
     readJsonFile<SeedChange[]>("weapon-changes-seed.json"),
+    readOptionalJsonFile<SeedChange[]>("weapon-changes-corrections-seed.json", []),
     readOptionalJsonFile<SeedChange[]>("weapon-changes-official-extra-seed.json", []),
     readJsonFile<SeedBaselineStat[]>("weapon-baseline-stats-seed.json"),
     readJsonFile<SeedBaselineBatch>("weapon-baseline-batch-seed.json").catch(() => null),
@@ -172,13 +173,14 @@ async function loadArchiveData() {
     patches,
     extraPatches,
     changes,
+    correctionChanges,
     extraChanges,
     baselineStats,
     baselineBatch,
   ]) => ({
     weapons,
     patches: [...patches, ...extraPatches],
-    changes: [...changes, ...extraChanges],
+    changes: [...changes, ...correctionChanges, ...extraChanges],
     baselineStats,
     baselineBatch,
   }));
