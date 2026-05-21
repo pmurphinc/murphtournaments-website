@@ -151,17 +151,34 @@ async function readJsonFile<T>(fileName: string): Promise<T> {
   return JSON.parse(raw) as T;
 }
 
+async function readOptionalJsonFile<T>(fileName: string, fallback: T): Promise<T> {
+  return readJsonFile<T>(fileName).catch(error => {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return fallback;
+    throw error;
+  });
+}
+
 async function loadArchiveData() {
   archivePromise ??= Promise.all([
     readJsonFile<SeedWeapon[]>("weapons-seed.json"),
     readJsonFile<SeedPatch[]>("patches-seed.json"),
+    readOptionalJsonFile<SeedPatch[]>("patches-official-extra-seed.json", []),
     readJsonFile<SeedChange[]>("weapon-changes-seed.json"),
+    readOptionalJsonFile<SeedChange[]>("weapon-changes-official-extra-seed.json", []),
     readJsonFile<SeedBaselineStat[]>("weapon-baseline-stats-seed.json"),
     readJsonFile<SeedBaselineBatch>("weapon-baseline-batch-seed.json").catch(() => null),
-  ]).then(([weapons, patches, changes, baselineStats, baselineBatch]) => ({
+  ]).then(([
     weapons,
     patches,
+    extraPatches,
     changes,
+    extraChanges,
+    baselineStats,
+    baselineBatch,
+  ]) => ({
+    weapons,
+    patches: [...patches, ...extraPatches],
+    changes: [...changes, ...extraChanges],
     baselineStats,
     baselineBatch,
   }));
