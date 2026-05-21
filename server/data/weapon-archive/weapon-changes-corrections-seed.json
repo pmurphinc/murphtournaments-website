@@ -1,0 +1,18 @@
+[
+  {
+    "id": "chg_item_winch_claw_heavy_9_0_0_official_001_correction",
+    "weaponId": "item_winch_claw_heavy",
+    "patchId": "patch_9_0_0_official",
+    "sectionLabel": "9.0.0 — winch_claw",
+    "changeType": "nerf",
+    "changeSummary": "Dome Shield and Mesh Shield now block Winch Claw",
+    "changeText": "Dome Shield and Mesh Shield now block Winch Claw, adding direct shield counterplay against the specialization.",
+    "devNote": "Added here as requested so the Winch Claw archive also reflects the Dome Shield and Mesh Shield block interaction.",
+    "statField": null,
+    "oldValue": null,
+    "newValue": null,
+    "sortOrder": 1,
+    "sourceType": "official",
+    "confidence": "high"
+  }
+]
