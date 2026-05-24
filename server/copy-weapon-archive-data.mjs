@@ -5,13 +5,11 @@ import path from "node:path";
 const source = path.join(process.cwd(), "server", "data", "weapon-archive");
 const target = path.join(process.cwd(), "dist", "server", "data", "weapon-archive");
 const publicImagesRoot = path.join(process.cwd(), "client", "public", "images", "weapons");
-const appReferenceCsv = path.join(
+const localReferenceTsv = path.join(
   process.cwd(),
-  "..",
-  "murph-tournaments-app",
   "data",
   "reference",
-  "THE FINALS - Krome's Weapon Data Sheet (10.3.0) - KWDS - Overview.csv",
+  "kromes-weapon-data-10.6.0-overview.tsv",
 );
 
 function normalizeName(value) {
@@ -73,10 +71,10 @@ async function reportBaselineStatsCoverage() {
     return !statsByWeaponId.has(item.id) && !statsByName.has(normalizeName(item.name));
   });
 
-  if (existsSync(appReferenceCsv)) {
-    console.log(`[weapon-archive] Baseline source: ${appReferenceCsv}`);
+  if (existsSync(localReferenceTsv)) {
+    console.log(`[weapon-archive] Baseline source: ${localReferenceTsv}`);
   } else {
-    console.warn(`[weapon-archive] Baseline source CSV not found: ${appReferenceCsv}`);
+    console.warn(`[weapon-archive] Baseline source TSV not found: ${localReferenceTsv}`);
   }
 
   const label = baselineBatch
