@@ -131,7 +131,7 @@ export default function BaselineStatsCard({ weaponName, stat, source }: Baseline
   const heavyTtk = deriveTtk(stat, CLASS_HEALTH.Heavy);
   const sourceText = source
     ? `Source: ${source.sourceLabel} - ${source.versionLabel} Baseline`
-    : "Source: Krome's Spreadsheet - 10.3.0 Baseline";
+    : "Source: Krome's Spreadsheet Baseline";
 
   return (
     <section className="mb-5 overflow-hidden rounded-lg border border-[#243052] bg-[#0b1028] shadow-[0_0_24px_rgba(0,217,255,0.08)]">

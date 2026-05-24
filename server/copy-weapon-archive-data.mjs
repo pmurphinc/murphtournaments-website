@@ -11,7 +11,7 @@ const appReferenceCsv = path.join(
   "murph-tournaments-app",
   "data",
   "reference",
-  "THE FINALS - Krome's Weapon Data Sheet (10.3.0) - KWDS - Overview.csv",
+  "THE FINALS - Krome's Weapon Data Sheet (10.6.0) - KWDS - Overview.csv",
 );
 
 function normalizeName(value) {
