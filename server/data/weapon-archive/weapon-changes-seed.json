@@ -10884,7 +10884,7 @@
     "weaponId": "weapon_cb_01_repeater",
     "patchId": "patch_9_9_0",
     "sectionLabel": "9.9.0 \u2014 cb_01_repeater",
-    "changeType": "buff",
+    "changeType": "nerf",
     "changeSummary": "Increased lever action duration from 0.71s to 0.73s, causing the gun to fire slower",
     "changeText": "Increased lever action duration from 0.71s to 0.73s, causing the gun to fire slower",
     "devNote": "",
