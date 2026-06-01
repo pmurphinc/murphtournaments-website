@@ -1,6 +1,7 @@
 import { Link } from 'wouter';
 import NeonCard from '@/components/NeonCard';
 import GlitchText from '@/components/GlitchText';
+import CountdownTimer from '@/components/CountdownTimer';
 
 interface PrizeImage {
   src: string;
@@ -11,18 +12,52 @@ interface PrizeImage {
 interface InfoCard {
   label: string;
   value: string;
-  note?: string;
+}
+
+interface FormatRound {
+  title: string;
+  flow: string;
+  description: string;
+  accent: 'gold' | 'cyan' | 'magenta';
 }
 
 const discordUrl = 'https://discord.gg/kcmdxmBgnC';
+const juneTournamentDate = new Date('2026-06-27T17:00:00-07:00');
 
 const infoCards: InfoCard[] = [
-  { label: 'Event Window', value: 'June 2026' },
-  { label: 'Date', value: 'To Be Announced', note: 'Date To Be Announced' },
-  { label: 'Format', value: 'BO3 Final Round Double Elimination', note: 'Format Subject To Change' },
+  { label: 'Event Date', value: 'June 27, 2026' },
+  { label: 'Time', value: '5 PM Pacific / 8 PM Eastern' },
+  { label: 'Format', value: 'Cashout Elim → BO5 Final' },
   { label: 'Buy-In', value: '$30 Per Team' },
   { label: 'Team Cap', value: 'Max 16 Teams' },
-  { label: 'Cash Prize', value: 'Based On 16 Team Buy-In', note: 'No Cash Prize At 8 Teams' },
+  { label: 'Runtime', value: 'Approx. 2 Hours' },
+];
+
+const formatRounds: FormatRound[] = [
+  {
+    title: 'Cashout Round 1',
+    flow: '16 Teams → 8 Teams',
+    description: '4 lobbies run at once. The top 2 teams from each lobby advance; the bottom 2 are eliminated.',
+    accent: 'gold',
+  },
+  {
+    title: 'Cashout Round 2',
+    flow: '8 Teams → 4 Teams',
+    description: '2 lobbies run at once. The top 2 teams from each lobby advance; the bottom 2 are eliminated.',
+    accent: 'cyan',
+  },
+  {
+    title: 'Cashout Round 3',
+    flow: '4 Teams → 2 Teams',
+    description: '1 Cashout lobby remains. The top 2 teams advance to the Grand Final; the bottom 2 are eliminated.',
+    accent: 'magenta',
+  },
+  {
+    title: 'Grand Final',
+    flow: 'BO5 Final Round Championship Series',
+    description: 'Final Round 3v3 BO5. First team to 3 map wins takes the tournament.',
+    accent: 'gold',
+  },
 ];
 
 const firstPlacePrizes = [
@@ -91,8 +126,11 @@ export default function JuneTournament2026() {
                   Tournament
                 </GlitchText>
               </div>
+              <p className="text-neon-cyan font-mono font-bold uppercase tracking-widest">
+                June 27, 2026 — 5:00 PM Pacific / 8:00 PM Eastern
+              </p>
               <p className="text-white/80 font-mono leading-relaxed max-w-2xl">
-                A new THE FINALS competition launching in June 2026 with BO3 Final Round double elimination, a 16-team cap, and a first-place package led by premium 3D printed prizes plus cash if the event reaches the full 16-team buy-in.
+                A 16-team THE FINALS tournament built around Cashout elimination lobbies, a Final Round BO5 Championship Series, and a first-place package led by premium 3D printed prizes plus cash if the event reaches the full 16-team buy-in.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <a href={discordUrl} target="_blank" rel="noopener noreferrer">
@@ -109,23 +147,16 @@ export default function JuneTournament2026() {
             </div>
 
             <NeonCard variant="gold" className="bg-black/60">
-              <p className="text-xs text-white/50 font-mono uppercase tracking-widest mb-2">
-                1st Place Team Cash Prize
-              </p>
-              <p className="text-6xl md:text-7xl font-bold font-mono text-neon-gold mb-3">$240</p>
-              <p className="text-white/70 font-mono">$80 per player</p>
-              <p className="text-xs text-neon-cyan font-mono uppercase tracking-widest mt-4">
-                Based on 16 teams. No cash prize if the event runs with 8 teams.
-              </p>
-              <div className="mt-6 grid grid-cols-2 gap-3">
-                <div className="border border-neon-gold/30 bg-dark-charcoal/70 p-4 rounded-sm">
-                  <p className="text-xs text-white/50 font-mono uppercase">Date</p>
-                  <p className="text-sm text-neon-gold font-bold font-mono mt-2">To Be Announced</p>
-                </div>
-                <div className="border border-neon-cyan/30 bg-dark-charcoal/70 p-4 rounded-sm">
-                  <p className="text-xs text-white/50 font-mono uppercase">Format</p>
-                  <p className="text-sm text-neon-cyan font-bold font-mono mt-2">Subject To Change</p>
-                </div>
+              <CountdownTimer targetDate={juneTournamentDate} eventName="June Tournament" />
+              <div className="border-t border-neon-gold/30 pt-5 mt-2">
+                <p className="text-xs text-white/50 font-mono uppercase tracking-widest mb-2">
+                  1st Place Team Cash Prize
+                </p>
+                <p className="text-5xl md:text-7xl font-bold font-mono text-neon-gold mb-3">$240</p>
+                <p className="text-white/70 font-mono">$80 per player</p>
+                <p className="text-xs text-neon-cyan font-mono uppercase tracking-widest mt-4">
+                  Based on 16 teams. No cash prize if the event runs with 8 teams.
+                </p>
               </div>
             </NeonCard>
           </div>
@@ -138,19 +169,16 @@ export default function JuneTournament2026() {
             <h2 className="text-3xl md:text-4xl font-bold font-mono text-neon-cyan uppercase tracking-widest mb-4">
               Tournament Overview
             </h2>
-            <p className="text-white/70 font-mono leading-relaxed max-w-3xl">
-              Teams should plan around a June 2026 event window while the exact date is finalized. The current target format is BO3 Final Round double elimination, with the final format subject to change before the event goes live. Cash rewards are based on hitting the full 16-team buy-in.
+            <p className="text-white/70 font-mono leading-relaxed max-w-4xl">
+              The June Tournament uses Cashout elimination lobbies to narrow the field from 16 teams to the final 2. Each Cashout lobby eliminates the bottom 2 teams, while the top 2 advance. The final two teams then face off in a Final Round 3v3 Best-of-5 Championship Series.
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {infoCards.map((card) => (
-              <NeonCard key={card.label} variant={card.note ? 'gold' : 'cyan'} className="bg-black/40">
+              <NeonCard key={card.label} variant="cyan" className="bg-black/40">
                 <p className="text-xs text-white/50 font-mono uppercase tracking-widest mb-3">{card.label}</p>
                 <p className="text-lg text-white font-bold font-mono leading-snug">{card.value}</p>
-                {card.note && (
-                  <p className="text-xs text-neon-gold font-mono uppercase tracking-widest mt-4">{card.note}</p>
-                )}
               </NeonCard>
             ))}
           </div>
@@ -158,6 +186,44 @@ export default function JuneTournament2026() {
       </section>
 
       <section className="py-16 md:py-24 border-b border-neon-gold/20 bg-black/20">
+        <div className="container">
+          <div className="mb-10">
+            <h2 className="text-3xl md:text-4xl font-bold font-mono text-neon-gold uppercase tracking-widest mb-4">
+              Format Breakdown
+            </h2>
+            <p className="text-white/70 font-mono leading-relaxed max-w-4xl">
+              Cashout phase lobbies are 3v3v3v3. Each Cashout lobby eliminates the bottom 2 teams. The top 2 teams advance. Once a team finishes bottom 2 in a Cashout lobby, they are eliminated from the tournament.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
+            {formatRounds.map((round, index) => (
+              <NeonCard key={round.title} variant={round.accent} className="relative bg-black/50">
+                <p className="text-xs text-white/40 font-mono uppercase tracking-widest mb-3">Stage {index + 1}</p>
+                <h3 className="text-lg text-white font-bold font-mono uppercase tracking-wider mb-3">{round.title}</h3>
+                <p className="text-base text-neon-cyan font-bold font-mono mb-4">{round.flow}</p>
+                <p className="text-sm text-white/70 font-mono leading-relaxed">{round.description}</p>
+              </NeonCard>
+            ))}
+          </div>
+
+          <NeonCard variant="magenta" className="bg-black/60 mt-6">
+            <p className="text-sm text-neon-magenta font-bold font-mono uppercase tracking-widest mb-3">Important Format Note</p>
+            <p className="text-white/80 font-mono leading-relaxed">
+              This is not a double-elimination bracket. Once a team finishes bottom 2 in a Cashout lobby, they are eliminated.
+            </p>
+            <p className="text-white/80 font-mono leading-relaxed mt-3">
+              The final two teams play a Final Round 3v3 Best-of-5 Championship Series. First team to 3 map wins is champion. There is no bracket reset.
+            </p>
+          </NeonCard>
+
+          <p className="text-sm text-white/60 font-mono leading-relaxed mt-6">
+            Expected runtime is approximately 2 hours. Plan for a 1 hour 45 minute to 2 hour 15 minute window, with a hard buffer of up to 2.5 hours.
+          </p>
+        </div>
+      </section>
+
+      <section className="py-16 md:py-24 border-b border-neon-gold/20">
         <div className="container">
           <div className="grid grid-cols-1 lg:grid-cols-[0.95fr_1.05fr] gap-8 lg:gap-12">
             <NeonCard variant="gold" className="bg-black/60">
@@ -195,7 +261,7 @@ export default function JuneTournament2026() {
                   Stay Ready
                 </p>
                 <p className="text-white/70 font-mono leading-relaxed mb-6">
-                  Registration and date updates will be announced through the Murph Tournaments Discord as details are finalized. Donations toward the prize pool are welcome; DM Murph on Discord to coordinate.
+                  Registration updates will be announced through the Murph Tournaments Discord. Donations toward the prize pool are welcome; DM Murph on Discord to coordinate.
                 </p>
                 <a href={discordUrl} target="_blank" rel="noopener noreferrer">
                   <button className="w-full sm:w-auto px-6 py-3 bg-neon-magenta text-dark-black font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all border-2 border-neon-magenta">

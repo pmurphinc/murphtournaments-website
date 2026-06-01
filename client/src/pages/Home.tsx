@@ -1,6 +1,7 @@
 import { Link } from 'wouter';
 import NeonCard from '@/components/NeonCard';
 import GlitchText from '@/components/GlitchText';
+import CountdownTimer from '@/components/CountdownTimer';
 
 /**
  * Home Page
@@ -11,9 +12,12 @@ import GlitchText from '@/components/GlitchText';
  * - Featured clips section
  */
 
+const juneTournamentDate = new Date('2026-06-27T17:00:00-07:00');
+
 const tournamentFacts = [
-  { label: 'Date', value: 'To Be Announced' },
-  { label: 'Format', value: 'BO3 Final Round Double Elimination' },
+  { label: 'Date', value: 'June 27, 2026' },
+  { label: 'Time', value: '5 PM Pacific / 8 PM Eastern' },
+  { label: 'Format', value: 'Cashout Elim → BO5 Final' },
   { label: 'Team Cap', value: '16 Teams Max' },
   { label: 'Buy-In', value: '$30 Per Team' },
 ];
@@ -69,7 +73,7 @@ export default function Home() {
                   <div className="text-neon-gold font-mono text-sm uppercase tracking-widest font-bold">June 2026</div>
                   <h3 className="text-3xl font-bold font-mono text-neon-gold uppercase tracking-widest">New Tournament Incoming</h3>
                   <p className="text-white/80 font-mono text-sm leading-relaxed">
-                    Date To Be Announced. BO3 Final Round double elimination, up to 16 teams, and a premium prize package for the champions.
+                    June 27, 2026 — 5:00 PM Pacific / 8:00 PM Eastern. Cashout elimination lobbies lead into a Final Round BO5 Championship Series.
                   </p>
                   <Link href="/tournaments/june-2026">
                     <button className="inline-block mt-4 px-6 py-2 border-2 border-neon-cyan text-neon-cyan font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all">
@@ -92,13 +96,13 @@ export default function Home() {
               <div className="relative z-10 space-y-6">
                 <div>
                   <p className="text-sm text-neon-gold font-mono uppercase tracking-widest font-bold mb-3">
-                    New Event Launching June 2026
+                    Live Event · June 27, 2026
                   </p>
                   <GlitchText size="xl" variant="gold" className="mb-4">
                     June Tournament
                   </GlitchText>
                   <p className="text-white/75 font-mono leading-relaxed max-w-2xl">
-                    Murph Tournaments returns with a 16-team THE FINALS event built around BO3 Final Round double elimination, a $30 team buy-in, and a premium first-place prize package.
+                    Murph Tournaments returns June 27 with a 16-team Cashout elimination format leading into a Final Round BO5 Championship Series.
                   </p>
                 </div>
 
@@ -111,10 +115,6 @@ export default function Home() {
                   ))}
                 </div>
 
-                <p className="text-xs text-neon-cyan font-mono uppercase tracking-widest">
-                  Format Subject To Change
-                </p>
-
                 <Link href="/tournaments/june-2026">
                   <button className="w-full sm:w-auto px-8 py-3 bg-neon-gold text-dark-black font-bold font-mono uppercase tracking-widest hover-glow-gold rounded-sm transition-all border-2 border-neon-gold">
                     View June Tournament Details
@@ -124,6 +124,13 @@ export default function Home() {
             </NeonCard>
 
             <div className="grid grid-cols-1 gap-6">
+              <NeonCard variant="cyan" className="bg-black/60">
+                <CountdownTimer targetDate={juneTournamentDate} eventName="June Tournament" />
+                <p className="text-xs text-white/60 font-mono text-center uppercase tracking-widest">
+                  June 27, 2026 — 5:00 PM Pacific / 8:00 PM Eastern
+                </p>
+              </NeonCard>
+
               <NeonCard variant="gold" className="bg-black/60">
                 <p className="text-xs text-white/50 font-mono uppercase tracking-widest mb-2">1st Place Team</p>
                 <p className="text-5xl md:text-6xl font-bold font-mono text-neon-gold mb-2">$240</p>

@@ -62,8 +62,8 @@ describe('CountdownTimer', () => {
   });
 
   it('should have Twitch link when live', () => {
-    // Test that the component would render a link to https://twitch.tv/murph
-    const twitchUrl = 'https://twitch.tv/murph';
-    expect(twitchUrl).toBe('https://twitch.tv/murph');
+    // Test that the component would render a link to https://twitch.tv/pmurphinc
+    const twitchUrl = 'https://twitch.tv/pmurphinc';
+    expect(twitchUrl).toBe('https://twitch.tv/pmurphinc');
   });
 });
