@@ -22,10 +22,10 @@ interface FormatRound {
 }
 
 const discordUrl = 'https://discord.gg/kcmdxmBgnC';
-const juneTournamentDate = new Date('2026-06-27T17:00:00-07:00');
+const juneTournamentDate = new Date('2026-06-28T17:00:00-07:00');
 
 const infoCards: InfoCard[] = [
-  { label: 'Event Date', value: 'June 27, 2026' },
+  { label: 'Event Date', value: 'June 28, 2026' },
   { label: 'Time', value: '5 PM Pacific / 8 PM Eastern' },
   { label: 'Format', value: 'Cashout Elim → BO5 Final' },
   { label: 'Buy-In', value: '$30 Per Team' },
@@ -127,7 +127,7 @@ export default function JuneTournament2026() {
                 </GlitchText>
               </div>
               <p className="text-neon-cyan font-mono font-bold uppercase tracking-widest">
-                June 27, 2026 — 5:00 PM Pacific / 8:00 PM Eastern
+                June 28, 2026 — 5:00 PM Pacific / 8:00 PM Eastern
               </p>
               <p className="text-white/80 font-mono leading-relaxed max-w-2xl">
                 A 16-team THE FINALS tournament built around Cashout elimination lobbies, a Final Round BO5 Championship Series, and a first-place package led by premium 3D printed prizes plus cash if the event reaches the full 16-team buy-in.
