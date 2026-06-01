@@ -8,6 +8,7 @@ import Navigation from "./components/Navigation";
 import Footer from "./components/Footer";
 import Home from "./pages/Home";
 import TournamentHistory from "./pages/TournamentHistory";
+import JuneTournament2026 from "./pages/JuneTournament2026";
 import LiveBracket from "./pages/LiveBracket";
 import DevDivision from "./pages/DevDivision";
 import About from "./pages/About";
@@ -48,6 +49,7 @@ function Router() {
       <main className="flex-1 pt-16">
         <Switch>
           <Route path={"/"} component={Home} />
+          <Route path={"/tournaments/june-2026"} component={JuneTournament2026} />
           <Route path={"/tournaments"} component={TournamentHistory} />
           <Route path={"/bracket"} component={LiveBracket} />
           <Route path={"/dev-division"} component={DevDivision} />

@@ -44,7 +44,6 @@ export default function Navigation() {
     //     { label: '7th Circle', href: '/bracket2' },
     //   ]
     // },
-    { label: 'Dev Division', href: '/dev-division' },
     { label: 'Balance Archive', href: '/balance-archive' },
     { label: 'About', href: '/about' },
     { label: 'Watch', href: '/watch' },
@@ -64,14 +63,6 @@ export default function Navigation() {
             />
           </Link>
           
-          {/* DD Logo - Second */}
-          <Link href="/" className="flex h-12 shrink-0 items-center md:h-14">
-            <img 
-              src="https://d2xsxph8kpxj0f.cloudfront.net/310519663462787524/GzitzUSk3snQMAtW4LnLnQ/DD_logo-removebg-preview_07cba133.png" 
-              alt="Development Division" 
-              className="h-12 w-auto shrink-0 cursor-pointer object-contain transition-opacity hover:opacity-80 md:h-14"
-            />
-          </Link>
         </div>
 
         {/* Desktop Navigation */}
@@ -85,7 +76,7 @@ export default function Navigation() {
                   {item.submenu && <ChevronDown size={14} />}
                 </div>
               ) : (
-                // Regular item or item with submenu (Home, History, Dev Division, About, Watch)
+                // Regular item or item with submenu
                 <Link href={item.href}>
                   <div className="text-sm font-mono uppercase tracking-widest text-white/80 hover:text-neon-magenta transition-colors hover-glow-magenta px-3 py-2 cursor-pointer flex items-center gap-1">
                     {item.label}
