@@ -12,10 +12,10 @@ import CountdownTimer from '@/components/CountdownTimer';
  * - Featured clips section
  */
 
-const juneTournamentDate = new Date('2026-06-27T17:00:00-07:00');
+const juneTournamentDate = new Date('2026-06-28T17:00:00-07:00');
 
 const tournamentFacts = [
-  { label: 'Date', value: 'June 27, 2026' },
+  { label: 'Date', value: 'June 28, 2026' },
   { label: 'Time', value: '5 PM Pacific / 8 PM Eastern' },
   { label: 'Format', value: 'Cashout Elim → BO5 Final' },
   { label: 'Team Cap', value: '16 Teams Max' },
@@ -73,7 +73,7 @@ export default function Home() {
                   <div className="text-neon-gold font-mono text-sm uppercase tracking-widest font-bold">June 2026</div>
                   <h3 className="text-3xl font-bold font-mono text-neon-gold uppercase tracking-widest">New Tournament Incoming</h3>
                   <p className="text-white/80 font-mono text-sm leading-relaxed">
-                    June 27, 2026 — 5:00 PM Pacific / 8:00 PM Eastern. Cashout elimination lobbies lead into a Final Round BO5 Championship Series.
+                    June 28, 2026 — 5:00 PM Pacific / 8:00 PM Eastern. Cashout elimination lobbies lead into a Final Round BO5 Championship Series.
                   </p>
                   <Link href="/tournaments/june-2026">
                     <button className="inline-block mt-4 px-6 py-2 border-2 border-neon-cyan text-neon-cyan font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all">
@@ -96,13 +96,13 @@ export default function Home() {
               <div className="relative z-10 space-y-6">
                 <div>
                   <p className="text-sm text-neon-gold font-mono uppercase tracking-widest font-bold mb-3">
-                    Live Event · June 27, 2026
+                    Live Event · June 28, 2026
                   </p>
                   <GlitchText size="xl" variant="gold" className="mb-4">
                     June Tournament
                   </GlitchText>
                   <p className="text-white/75 font-mono leading-relaxed max-w-2xl">
-                    Murph Tournaments returns June 27 with a 16-team Cashout elimination format leading into a Final Round BO5 Championship Series.
+                    Murph Tournaments returns June 28 with a 16-team Cashout elimination format leading into a Final Round BO5 Championship Series.
                   </p>
                 </div>
 
@@ -127,7 +127,7 @@ export default function Home() {
               <NeonCard variant="cyan" className="bg-black/60">
                 <CountdownTimer targetDate={juneTournamentDate} eventName="June Tournament" />
                 <p className="text-xs text-white/60 font-mono text-center uppercase tracking-widest">
-                  June 27, 2026 — 5:00 PM Pacific / 8:00 PM Eastern
+                  June 28, 2026 — 5:00 PM Pacific / 8:00 PM Eastern
                 </p>
               </NeonCard>
 
