@@ -22,6 +22,7 @@ interface FormatRound {
 }
 
 const discordUrl = 'https://discord.gg/kcmdxmBgnC';
+const juneTournamentSignupUrl = 'https://forms.gle/62uQXhJ6825dYN869';
 const juneTournamentDate = new Date('2026-06-28T17:00:00-07:00');
 
 const infoCards: InfoCard[] = [
@@ -133,8 +134,13 @@ export default function JuneTournament2026() {
                 A 16-team THE FINALS tournament built around Cashout elimination lobbies, a Final Round BO5 Championship Series, and a first-place package led by premium 3D printed prizes plus cash if the event reaches the full 16-team buy-in.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
-                <a href={discordUrl} target="_blank" rel="noopener noreferrer">
+                <a href={juneTournamentSignupUrl} target="_blank" rel="noopener noreferrer">
                   <button className="w-full sm:w-auto px-8 py-3 bg-neon-magenta text-dark-black font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all border-2 border-neon-magenta">
+                    Sign Up Now
+                  </button>
+                </a>
+                <a href={discordUrl} target="_blank" rel="noopener noreferrer">
+                  <button className="w-full sm:w-auto px-8 py-3 border-2 border-neon-gold text-neon-gold font-bold font-mono uppercase tracking-widest hover-glow-gold rounded-sm transition-all">
                     Join Discord
                   </button>
                 </a>
@@ -258,16 +264,23 @@ export default function JuneTournament2026() {
 
               <NeonCard variant="magenta" className="bg-black/50">
                 <p className="text-sm text-neon-magenta font-mono uppercase tracking-widest font-bold mb-4">
-                  Stay Ready
+                  Registration Open
                 </p>
                 <p className="text-white/70 font-mono leading-relaxed mb-6">
-                  Registration updates will be announced through the Murph Tournaments Discord. Donations toward the prize pool are welcome; DM Murph on Discord to coordinate.
+                  Ready to compete? Fill out the June Tournament sign-up form, then join the Murph Tournaments Discord for event updates. Donations toward the prize pool are welcome; DM Murph on Discord to coordinate.
                 </p>
-                <a href={discordUrl} target="_blank" rel="noopener noreferrer">
-                  <button className="w-full sm:w-auto px-6 py-3 bg-neon-magenta text-dark-black font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all border-2 border-neon-magenta">
-                    Join Discord
-                  </button>
-                </a>
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <a href={juneTournamentSignupUrl} target="_blank" rel="noopener noreferrer">
+                    <button className="w-full sm:w-auto px-6 py-3 bg-neon-magenta text-dark-black font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all border-2 border-neon-magenta">
+                      Sign Up Now
+                    </button>
+                  </a>
+                  <a href={discordUrl} target="_blank" rel="noopener noreferrer">
+                    <button className="w-full sm:w-auto px-6 py-3 border-2 border-neon-cyan text-neon-cyan font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all">
+                      Join Discord
+                    </button>
+                  </a>
+                </div>
               </NeonCard>
             </div>
           </div>
