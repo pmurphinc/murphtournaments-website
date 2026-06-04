@@ -28,8 +28,9 @@ const juneTournamentDate = new Date('2026-06-28T17:00:00-07:00');
 const infoCards: InfoCard[] = [
   { label: 'Event Date', value: 'June 28, 2026' },
   { label: 'Time', value: '5 PM Pacific / 8 PM Eastern' },
+  { label: 'Entry', value: 'Free' },
+  { label: 'Prize', value: '1st Place 3D Prints' },
   { label: 'Format', value: 'Cashout Elim → BO5 Final' },
-  { label: 'Buy-In', value: '$30 Per Team' },
   { label: 'Team Cap', value: 'Max 16 Teams' },
   { label: 'Runtime', value: 'Approx. 2 Hours' },
 ];
@@ -62,15 +63,10 @@ const formatRounds: FormatRound[] = [
 ];
 
 const firstPlacePrizes = [
-  '$240 cash prize - $80 per player, based on a full 16-team buy-in',
   '3D printed M11',
   'Alien Nade',
   'Cashbox with vault and cashout station',
   'Assortment of sponsor keychains',
-];
-
-const secondPlacePrizes = [
-  'Any $20 in-game bundle of their choosing',
 ];
 
 const prizeImages: PrizeImage[] = [
@@ -131,7 +127,7 @@ export default function JuneTournament2026() {
                 June 28, 2026 — 5:00 PM Pacific / 8:00 PM Eastern
               </p>
               <p className="text-white/80 font-mono leading-relaxed max-w-2xl">
-                A 16-team THE FINALS tournament built around Cashout elimination lobbies, a Final Round BO5 Championship Series, and a first-place package led by premium 3D printed prizes plus cash if the event reaches the full 16-team buy-in.
+                A 16-team THE FINALS tournament built around Cashout elimination lobbies, a Final Round BO5 Championship Series, and a first-place 3D printed prize bundle.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <a href={juneTournamentSignupUrl} target="_blank" rel="noopener noreferrer">
@@ -156,12 +152,11 @@ export default function JuneTournament2026() {
               <CountdownTimer targetDate={juneTournamentDate} eventName="June Tournament" />
               <div className="border-t border-neon-gold/30 pt-5 mt-2">
                 <p className="text-xs text-white/50 font-mono uppercase tracking-widest mb-2">
-                  1st Place Team Cash Prize
+                  1st Place Prize
                 </p>
-                <p className="text-5xl md:text-7xl font-bold font-mono text-neon-gold mb-3">$240</p>
-                <p className="text-white/70 font-mono">$80 per player</p>
-                <p className="text-xs text-neon-cyan font-mono uppercase tracking-widest mt-4">
-                  Based on 16 teams. No cash prize if the event runs with 8 teams.
+                <p className="text-3xl md:text-4xl font-bold font-mono text-neon-gold mb-3">3D Printed Prize Bundle</p>
+                <p className="text-xs text-neon-cyan font-mono uppercase tracking-widest leading-relaxed">
+                  This event is free entry. No buy-in. No cash pot. 1st place only for prizes.
                 </p>
               </div>
             </NeonCard>
@@ -236,10 +231,9 @@ export default function JuneTournament2026() {
               <p className="text-sm text-neon-gold font-mono uppercase tracking-widest font-bold mb-4">
                 1st Place Team
               </p>
-              <p className="text-5xl font-bold font-mono text-neon-gold mb-2">$240</p>
-              <p className="text-sm text-white/60 font-mono mb-3">$80 per player</p>
-              <p className="text-xs text-neon-cyan font-mono uppercase tracking-widest mb-6">
-                Cash prize requires 16 teams. At 8 teams, prizes are the $20 bundles and 3D prints only.
+              <p className="text-4xl font-bold font-mono text-neon-gold mb-3">3D Printed Prize Bundle</p>
+              <p className="text-sm text-white/70 font-mono leading-relaxed mb-6">
+                1st place takes home the 3D printed prize bundle: M11, Alien Nade, Cashbox/Vault/Cashout display pieces, and sponsor keychains.
               </p>
               <div className="space-y-3">
                 {firstPlacePrizes.map((prize) => (
@@ -250,39 +244,26 @@ export default function JuneTournament2026() {
               </div>
             </NeonCard>
 
-            <div className="space-y-6">
-              <NeonCard variant="cyan" className="bg-black/50">
-                <p className="text-sm text-neon-cyan font-mono uppercase tracking-widest font-bold mb-4">
-                  2nd Place
-                </p>
-                {secondPlacePrizes.map((prize) => (
-                  <p key={prize} className="text-lg text-white font-bold font-mono">
-                    {prize}
-                  </p>
-                ))}
-              </NeonCard>
-
-              <NeonCard variant="magenta" className="bg-black/50">
-                <p className="text-sm text-neon-magenta font-mono uppercase tracking-widest font-bold mb-4">
-                  Registration Open
-                </p>
-                <p className="text-white/70 font-mono leading-relaxed mb-6">
-                  Ready to compete? Fill out the June Tournament sign-up form, then join the Murph Tournaments Discord for event updates. Donations toward the prize pool are welcome; DM Murph on Discord to coordinate.
-                </p>
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <a href={juneTournamentSignupUrl} target="_blank" rel="noopener noreferrer">
-                    <button className="w-full sm:w-auto px-6 py-3 bg-neon-magenta text-dark-black font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all border-2 border-neon-magenta">
-                      Sign Up Now
-                    </button>
-                  </a>
-                  <a href={discordUrl} target="_blank" rel="noopener noreferrer">
-                    <button className="w-full sm:w-auto px-6 py-3 border-2 border-neon-cyan text-neon-cyan font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all">
-                      Join Discord
-                    </button>
-                  </a>
-                </div>
-              </NeonCard>
-            </div>
+            <NeonCard variant="magenta" className="bg-black/50">
+              <p className="text-sm text-neon-magenta font-mono uppercase tracking-widest font-bold mb-4">
+                Registration Open
+              </p>
+              <p className="text-white/70 font-mono leading-relaxed mb-6">
+                Registration updates will be announced through the Murph Tournaments Discord.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <a href={juneTournamentSignupUrl} target="_blank" rel="noopener noreferrer">
+                  <button className="w-full sm:w-auto px-6 py-3 bg-neon-magenta text-dark-black font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all border-2 border-neon-magenta">
+                    Sign Up Now
+                  </button>
+                </a>
+                <a href={discordUrl} target="_blank" rel="noopener noreferrer">
+                  <button className="w-full sm:w-auto px-6 py-3 border-2 border-neon-cyan text-neon-cyan font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all">
+                    Join Discord
+                  </button>
+                </a>
+              </div>
+            </NeonCard>
           </div>
         </div>
       </section>

@@ -19,7 +19,7 @@ const tournamentFacts = [
   { label: 'Time', value: '5 PM Pacific / 8 PM Eastern' },
   { label: 'Format', value: 'Cashout Elim → BO5 Final' },
   { label: 'Team Cap', value: '16 Teams Max' },
-  { label: 'Buy-In', value: '$30 Per Team' },
+  { label: 'Entry', value: 'Free' },
 ];
 
 export default function Home() {
@@ -102,7 +102,7 @@ export default function Home() {
                     June Tournament
                   </GlitchText>
                   <p className="text-white/75 font-mono leading-relaxed max-w-2xl">
-                    Murph Tournaments returns June 28 with a 16-team Cashout elimination format leading into a Final Round BO5 Championship Series.
+                    Murph Tournaments returns June 28 with a free-entry 16-team Cashout elimination event leading into a Final Round BO5 Championship Series.
                   </p>
                 </div>
 
@@ -132,21 +132,13 @@ export default function Home() {
               </NeonCard>
 
               <NeonCard variant="gold" className="bg-black/60">
-                <p className="text-xs text-white/50 font-mono uppercase tracking-widest mb-2">1st Place Team</p>
-                <p className="text-5xl md:text-6xl font-bold font-mono text-neon-gold mb-2">$240</p>
-                <p className="text-sm text-white/70 font-mono mb-5">$80 per player</p>
-                <div className="space-y-2 text-sm text-white/75 font-mono">
-                  <p>3D printed M11</p>
-                  <p>Alien Nade</p>
-                  <p>Cashbox with vault and cashout station</p>
-                  <p>Assortment of sponsor keychains</p>
-                </div>
-              </NeonCard>
-
-              <NeonCard variant="cyan" className="bg-black/50">
-                <p className="text-xs text-white/50 font-mono uppercase tracking-widest mb-2">2nd Place</p>
-                <p className="text-lg text-neon-cyan font-bold font-mono">
-                  Any $20 in-game bundle of their choosing
+                <p className="text-xs text-white/50 font-mono uppercase tracking-widest mb-2">1st Place Prize</p>
+                <p className="text-3xl md:text-4xl font-bold font-mono text-neon-gold mb-3">3D Printed Prize Bundle</p>
+                <p className="text-sm text-white/75 font-mono leading-relaxed mb-5">
+                  M11, Alien Nade, Cashbox/Vault/Cashout display pieces, and sponsor keychains.
+                </p>
+                <p className="text-xs text-neon-cyan font-mono uppercase tracking-widest leading-relaxed">
+                  This event is free entry. No buy-in. No cash pot. 1st place only for prizes.
                 </p>
               </NeonCard>
             </div>
