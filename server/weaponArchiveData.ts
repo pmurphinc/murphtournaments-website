@@ -52,6 +52,7 @@ type SeedBaselineStat = {
   weaponId: string | null;
   name: string | null;
   class?: string | null;
+  weaponType?: "melee" | null;
   bodyDamage: number | null;
   headDamage: number | null;
   rateOfFireRpm: number | null;
@@ -392,7 +393,10 @@ export async function getWeaponArchiveDetail(slug: string): Promise<WeaponArchiv
     });
 
   const stats = baselineStats.filter(row => {
-    return row.weaponId === weapon.id || normalizeBaselineName(row.name) === normalizeBaselineName(weapon.name);
+    const isDirectMatch =
+      row.weaponId === weapon.id || normalizeBaselineName(row.name) === normalizeBaselineName(weapon.name);
+    const isMeleeVariant = row.weaponType === "melee" && row.weaponId?.startsWith(`${weapon.id}_`);
+    return isDirectMatch || isMeleeVariant;
   });
 
   return {

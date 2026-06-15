@@ -1,6 +1,9 @@
+import React from "react";
+
 type BaselineWeaponStat = {
   weaponId: string | null;
   name: string | null;
+  weaponType?: "melee" | null;
   bodyDamage: number | null;
   headDamage: number | null;
   rateOfFireRpm: number | null;
@@ -123,6 +126,64 @@ function TtkCell({
   );
 }
 
+function MeleeStatsCard({
+  weaponName,
+  stat,
+  sourceText,
+}: {
+  weaponName: string;
+  stat: BaselineWeaponStat;
+  sourceText: string;
+}) {
+  const hitsToEliminate = [
+    { label: "Light", value: stat.stkLightBody, accent: "text-[#00d9ff]" },
+    { label: "Medium", value: stat.stkMediumBody, accent: "text-[#E8B84B]" },
+    { label: "Heavy", value: stat.stkHeavyBody, accent: "text-[#E84B4B]" },
+  ].filter(entry => entry.value !== null && entry.value !== undefined);
+
+  return (
+    <section className="mb-5 overflow-hidden rounded-lg border border-[#243052] bg-[#0b1028] shadow-[0_0_24px_rgba(0,217,255,0.08)]">
+      <div className="border-b border-white/10 px-4 py-3">
+        <div className="font-mono text-[11px] font-black uppercase tracking-wide text-white/45">Melee Baseline</div>
+        <h2 className="mt-1 font-mono text-xl font-black uppercase tracking-wide text-[#00d9ff]">{weaponName}</h2>
+      </div>
+
+      {stat.bodyDamage !== null && stat.bodyDamage !== undefined ? (
+        <div className="grid grid-cols-1">
+          <StatCell label="Attack DMG" value={formatNumber(stat.bodyDamage)} accent="text-white" />
+        </div>
+      ) : null}
+
+      {hitsToEliminate.length > 0 ? (
+        <div className="border-t border-white/10">
+          <div className="px-4 pt-3 font-mono text-[11px] font-black uppercase tracking-wide text-white/45">
+            Hits to Eliminate
+          </div>
+          <div className="grid grid-cols-1 divide-y divide-white/10 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+            {hitsToEliminate.map(entry => (
+              <TtkCell
+                key={entry.label}
+                label={entry.label}
+                accent={entry.accent}
+                value={`${entry.value} ${entry.value === 1 ? "hit" : "hits"}`}
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {stat.sourceNotes?.trim() ? (
+        <div className="border-t border-white/10 px-4 py-3">
+          <div className="font-mono text-[10px] font-black uppercase tracking-wide text-white/45">Attack Notes</div>
+          <p className="mt-2 font-mono text-sm leading-6 text-white/75">{stat.sourceNotes.trim()}</p>
+        </div>
+      ) : null}
+
+      <div className="border-t border-white/10 px-4 py-3 font-mono text-xs text-white/45">{sourceText}</div>
+    </section>
+  );
+}
+
 export default function BaselineStatsCard({ weaponName, stat, source }: BaselineStatsCardProps) {
   const raw = parseRawValues(stat.rawValues);
   const damagePerMagazine = deriveDamagePerMagazine(stat);
@@ -131,7 +192,11 @@ export default function BaselineStatsCard({ weaponName, stat, source }: Baseline
   const heavyTtk = deriveTtk(stat, CLASS_HEALTH.Heavy);
   const sourceText = source
     ? `Source: ${source.sourceLabel} - ${source.versionLabel} Baseline`
-    : "Source: Krome's Spreadsheet - 10.3.0 Baseline";
+    : "Source: Krome's Spreadsheet - 10.6.0 Baseline";
+
+  if (stat.weaponType === "melee") {
+    return <MeleeStatsCard weaponName={weaponName} stat={stat} sourceText={sourceText} />;
+  }
 
   return (
     <section className="mb-5 overflow-hidden rounded-lg border border-[#243052] bg-[#0b1028] shadow-[0_0_24px_rgba(0,217,255,0.08)]">

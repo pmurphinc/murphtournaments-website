@@ -20,6 +20,7 @@ export default defineConfig({
       "server/**/*.spec.ts",
       "shared/**/*.test.ts",
       "shared/**/*.spec.ts",
+      "client/src/components/BaselineStatsCard.test.tsx",
     ],
   },
 });
