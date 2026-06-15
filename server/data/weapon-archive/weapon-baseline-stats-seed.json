@@ -93,7 +93,8 @@
     "damageDropoffMaxRange": null,
     "damageDropoffModifierAtMaxRange": null,
     "sourceNotes": null,
-    "rawValues": "{\"bodyDamageRaw\":\"60\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}"
+    "rawValues": "{\"bodyDamageRaw\":\"60\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}",
+    "weaponType": "melee"
   },
   {
     "batchId": "baseline_kromes_spreadsheet_10_6_0",
@@ -125,7 +126,8 @@
     "damageDropoffMaxRange": null,
     "damageDropoffModifierAtMaxRange": null,
     "sourceNotes": "Cannot hit multiple targets in one stab.  Has an 800ms wind-up time.",
-    "rawValues": "{\"bodyDamageRaw\":\"75\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}"
+    "rawValues": "{\"bodyDamageRaw\":\"75\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}",
+    "weaponType": "melee"
   },
   {
     "batchId": "baseline_kromes_spreadsheet_10_6_0",
@@ -157,7 +159,8 @@
     "damageDropoffMaxRange": null,
     "damageDropoffModifierAtMaxRange": null,
     "sourceNotes": "Cannot hit multiple targets in one stab.  Has an 800ms wind-up time. Backstab angle is 150 degrees.",
-    "rawValues": "{\"bodyDamageRaw\":\"320\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}"
+    "rawValues": "{\"bodyDamageRaw\":\"320\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}",
+    "weaponType": "melee"
   },
   {
     "batchId": "baseline_kromes_spreadsheet_10_6_0",
@@ -413,7 +416,8 @@
     "damageDropoffMaxRange": null,
     "damageDropoffModifierAtMaxRange": null,
     "sourceNotes": null,
-    "rawValues": "{\"bodyDamageRaw\":\"88\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}"
+    "rawValues": "{\"bodyDamageRaw\":\"88\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}",
+    "weaponType": "melee"
   },
   {
     "batchId": "baseline_kromes_spreadsheet_10_6_0",
@@ -445,7 +449,8 @@
     "damageDropoffMaxRange": null,
     "damageDropoffModifierAtMaxRange": null,
     "sourceNotes": "Can hit multiple targets in a single lunge.",
-    "rawValues": "{\"bodyDamageRaw\":\"120\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}"
+    "rawValues": "{\"bodyDamageRaw\":\"120\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}",
+    "weaponType": "melee"
   },
   {
     "batchId": "baseline_kromes_spreadsheet_10_6_0",
@@ -797,7 +802,8 @@
     "damageDropoffMaxRange": null,
     "damageDropoffModifierAtMaxRange": null,
     "sourceNotes": "LMB combo = 2x50 damage, then 2x60 damage, then 100 damage.  Can swap-cancel the combo when started.  Swap-cancel will not optimize TTK, but quick melee will. Deflecting bullets deals 100% damage to the enemy, and 10% to you (30% if glancing).  Blocking melee hits will reduce their damage to 25%.",
-    "rawValues": "{\"bodyDamageRaw\":\"(notes)\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}"
+    "rawValues": "{\"bodyDamageRaw\":\"(notes)\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}",
+    "weaponType": "melee"
   },
   {
     "batchId": "baseline_kromes_spreadsheet_10_6_0",
@@ -1021,7 +1027,8 @@
     "damageDropoffMaxRange": null,
     "damageDropoffModifierAtMaxRange": null,
     "sourceNotes": null,
-    "rawValues": "{\"bodyDamageRaw\":\"90\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}"
+    "rawValues": "{\"bodyDamageRaw\":\"90\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}",
+    "weaponType": "melee"
   },
   {
     "batchId": "baseline_kromes_spreadsheet_10_6_0",
@@ -1373,7 +1380,8 @@
     "damageDropoffMaxRange": null,
     "damageDropoffModifierAtMaxRange": null,
     "sourceNotes": null,
-    "rawValues": "{\"bodyDamageRaw\":\"100\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}"
+    "rawValues": "{\"bodyDamageRaw\":\"100\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}",
+    "weaponType": "melee"
   },
   {
     "batchId": "baseline_kromes_spreadsheet_10_6_0",
@@ -1405,7 +1413,8 @@
     "damageDropoffMaxRange": null,
     "damageDropoffModifierAtMaxRange": null,
     "sourceNotes": "Cannot hit multiple targets in one swing.",
-    "rawValues": "{\"bodyDamageRaw\":\"175\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}"
+    "rawValues": "{\"bodyDamageRaw\":\"175\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}",
+    "weaponType": "melee"
   },
   {
     "batchId": "baseline_kromes_spreadsheet_10_6_0",
@@ -1437,7 +1446,8 @@
     "damageDropoffMaxRange": null,
     "damageDropoffModifierAtMaxRange": null,
     "sourceNotes": "LMB combo = 65 damage, then 80 damage, then 90 damage.  Has a ~4.4m range on 1st attack then ~4.6m range on 2nd and 3rd attack (credit to u/beansoncrayons on reddit).",
-    "rawValues": "{\"bodyDamageRaw\":\"(notes)\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}"
+    "rawValues": "{\"bodyDamageRaw\":\"(notes)\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}",
+    "weaponType": "melee"
   },
   {
     "batchId": "baseline_kromes_spreadsheet_10_6_0",
@@ -1469,6 +1479,7 @@
     "damageDropoffMaxRange": null,
     "damageDropoffModifierAtMaxRange": null,
     "sourceNotes": "Damage is per hit in a 3-hit combo.  Has a 3m radius. Cap on how many player are targeted by a spin attack is 24 players.",
-    "rawValues": "{\"bodyDamageRaw\":\"105\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}"
+    "rawValues": "{\"bodyDamageRaw\":\"105\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}",
+    "weaponType": "melee"
   }
 ]
