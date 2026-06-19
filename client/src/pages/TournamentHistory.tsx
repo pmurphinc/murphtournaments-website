@@ -1,5 +1,13 @@
 import NeonCard from '@/components/NeonCard';
 import GlitchText from '@/components/GlitchText';
+import { fclReplays } from '@/data/fclReplays';
+
+const fclReplayRoutes = {
+  day3: `/watch/fcl/${fclReplays[0].slug}`,
+  day4: `/watch/fcl/${fclReplays[1].slug}`,
+  day5: `/watch/fcl/${fclReplays[2].slug}`,
+  day6: `/watch/fcl/${fclReplays[3].slug}`,
+};
 
 /**
  * Tournament History Page
@@ -18,7 +26,7 @@ export default function TournamentHistory() {
       winners: '1 Up - EkaZo, KDKiller, JukerTTV',
       format: 'Finals Contender League, Grand Finals',
       description: 'The grand finals of the Finals Contender League. 1 Up claimed the championship title after 5 weeks of league play.',
-      youtubeLink: 'https://youtu.be/vJRb6i31MrU?si=GEDyLvmupP42GtOZ'
+      replayLink: fclReplayRoutes.day6
     },
     {
       name: 'FCL – Day 5',
@@ -28,7 +36,7 @@ export default function TournamentHistory() {
       winners: 'TBD',
       format: 'Finals Contender League',
       description: 'Day 5 of the Finals Contender League. League play week with no individual day winner.',
-      youtubeLink: 'https://youtu.be/x6nEeSLpSY4?si=EYMLlzeiW0fC7YpW'
+      replayLink: fclReplayRoutes.day5
     },
     {
       name: 'FCL – Day 4',
@@ -38,7 +46,7 @@ export default function TournamentHistory() {
       winners: 'TBD',
       format: 'Finals Contender League',
       description: 'Day 4 of the Finals Contender League. League play week with no individual day winner.',
-      youtubeLink: 'https://youtu.be/RpKcOJ7h-IU?si=EVsZeBVWGwBoYCDr'
+      replayLink: fclReplayRoutes.day4
     },
     {
       name: 'FCL – Day 3',
@@ -48,7 +56,7 @@ export default function TournamentHistory() {
       winners: 'TBD',
       format: 'Finals Contender League',
       description: 'Day 3 of the Finals Contender League. League play week with no individual day winner.',
-      youtubeLink: 'https://youtu.be/FQ1-12OET1I?si=wzicq1DJJFxVLsxr'
+      replayLink: fclReplayRoutes.day3
     },
     {
       name: 'FCL – Day 2',
@@ -237,10 +245,10 @@ export default function TournamentHistory() {
                     <p className="text-xs text-white/50 font-mono uppercase">Description</p>
                     <p className="text-sm font-mono text-white/70">{tournament.description}</p>
                   </div>
-                  {tournament.youtubeLink && (
+                  {"replayLink" in tournament && tournament.replayLink && (
                     <div>
-                      <a href={tournament.youtubeLink} target="_blank" rel="noopener noreferrer" className="inline-block px-4 py-2 border-2 border-neon-magenta text-neon-magenta font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all">
-                        Watch on YouTube
+                      <a href={tournament.replayLink} className="inline-block px-4 py-2 border-2 border-neon-magenta text-neon-magenta font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all">
+                        Watch Replay
                       </a>
                     </div>
                   )}

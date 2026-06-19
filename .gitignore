@@ -114,3 +114,5 @@ client/public/__manus__/version.json
 
 # Server-local VOD debug frame cache
 server/.cache/
+
+data/reference/FCL/*.mp4

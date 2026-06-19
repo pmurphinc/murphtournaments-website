@@ -1,7 +1,9 @@
 import "dotenv/config";
 import express from "express";
+import fs from "fs";
 import { createServer } from "http";
 import net from "net";
+import path from "path";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
@@ -11,6 +13,16 @@ import { handleTournamentWebhook, handleGetTournamentState } from "../webhooks";
 import { scrapeAndStorePatchNotes } from "../patchNoteScraper";
 import { serveVodCaptureFrame } from "../vodCaptureFrameRoute";
 import { logVodFrameCaptureBinaryAvailability } from "../vodFrameCapture";
+
+function resolveFclMediaDirectory() {
+  const candidates = [
+    path.resolve(import.meta.dirname, "..", "..", "data", "reference", "FCL"),
+    path.resolve(import.meta.dirname, "..", "data", "reference", "FCL"),
+    path.resolve(process.cwd(), "data", "reference", "FCL"),
+  ];
+
+  return candidates.find(candidate => fs.existsSync(candidate)) ?? candidates[0];
+}
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -37,6 +49,14 @@ async function startServer() {
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+  app.use(
+    "/media/fcl",
+    express.static(resolveFclMediaDirectory(), {
+      fallthrough: true,
+      index: false,
+    })
+  );
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
 

@@ -13,6 +13,7 @@ import LiveBracket from "./pages/LiveBracket";
 import DevDivision from "./pages/DevDivision";
 import About from "./pages/About";
 import Watch from "./pages/Watch";
+import FclReplay from "./pages/FclReplay";
 import Join from "./pages/Join";
 import AdminControl from "./pages/AdminControl";
 import AdminControl2 from "./pages/AdminControl2";
@@ -59,6 +60,7 @@ function Router() {
           <Route path={"/dev-division"} component={DevDivision} />
           <Route path={"/about"} component={About} />
           <Route path={"/watch"} component={Watch} />
+          <Route path={"/watch/fcl/:slug"} component={FclReplay} />
           <Route
             path={"/vod/:id/team-summary/:teamName"}
             component={VodTeamInsights}
