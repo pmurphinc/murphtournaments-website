@@ -21,6 +21,7 @@ import PlayerArchive from "./pages/PlayerArchive";
 import PlayerProfile from "./pages/PlayerProfile";
 import PatchNotes from "./pages/PatchNotes";
 import LoadoutTracker from "./pages/LoadoutTracker";
+import MapRandomizer from "./pages/MapRandomizer";
 import BalanceArchive from "./pages/BalanceArchive";
 import BalanceArchiveDetail from "./pages/BalanceArchiveDetail";
 import VodAnalysis from "./pages/VodAnalysis";
@@ -49,7 +50,10 @@ function Router() {
       <main className="flex-1 pt-16">
         <Switch>
           <Route path={"/"} component={Home} />
-          <Route path={"/tournaments/june-2026"} component={JuneTournament2026} />
+          <Route
+            path={"/tournaments/june-2026"}
+            component={JuneTournament2026}
+          />
           <Route path={"/tournaments"} component={TournamentHistory} />
           <Route path={"/bracket"} component={LiveBracket} />
           <Route path={"/dev-division"} component={DevDivision} />
@@ -69,6 +73,7 @@ function Router() {
           <Route path={"/player/:id"} component={PlayerProfile} />
           <Route path={"/patchnotes"} component={PatchNotes} />
           <Route path={"/loadout-tracker"} component={LoadoutTracker} />
+          <Route path={"/map-randomizer"} component={MapRandomizer} />
           <Route
             path={"/balance-archive/:slug"}
             component={BalanceArchiveDetail}
