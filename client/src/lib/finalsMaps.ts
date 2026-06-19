@@ -27,8 +27,15 @@ export const THE_FINALS_MAPS = [
 
 export type FinalsMapId = (typeof THE_FINALS_MAPS)[number]["id"];
 
+export const DEFAULT_COMPETITIVE_EXCLUDED_MAP_IDS = ["seoul", "kyoto"] as const satisfies readonly FinalsMapId[];
+
+const defaultCompetitiveExcludedMapIds = new Set<FinalsMapId>(
+  DEFAULT_COMPETITIVE_EXCLUDED_MAP_IDS
+);
+
 export const DEFAULT_COMPETITIVE_MAP_IDS = THE_FINALS_MAPS.filter(
-  map => map.category === "main"
+  map =>
+    map.category === "main" && !defaultCompetitiveExcludedMapIds.has(map.id)
 ).map(map => map.id) as FinalsMapId[];
 
 export function drawUniqueMaps<T>(pool: readonly T[], count: number): T[] {
