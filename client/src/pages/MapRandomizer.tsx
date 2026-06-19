@@ -19,6 +19,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 
 const storageKey = "murph-finals-map-randomizer";
+const storageVersion = 2;
 const defaultCount = 1;
 
 const categoryLabels: Record<FinalsMapCategory, string> = {
@@ -28,7 +29,7 @@ const categoryLabels: Record<FinalsMapCategory, string> = {
 };
 
 const categoryDescriptions: Record<FinalsMapCategory, string> = {
-  main: "Default competitive tournament and scrim pool.",
+  main: "Main arenas. Seoul and Kyoto are available here, but excluded from the Default Competitive preset.",
   compact: "Visible for mode-specific blocks; not selected by default.",
   training: "Non-tournament practice option; not selected by default.",
 };
@@ -36,6 +37,7 @@ const categoryDescriptions: Record<FinalsMapCategory, string> = {
 interface StoredRandomizerState {
   selectedIds: FinalsMapId[];
   count: number;
+  version?: number;
 }
 
 function isFinalsMapId(value: string): value is FinalsMapId {
@@ -50,6 +52,8 @@ function readStoredState(): StoredRandomizerState | null {
     if (!raw) return null;
 
     const parsed = JSON.parse(raw) as Partial<StoredRandomizerState>;
+    if (parsed.version !== storageVersion) return null;
+
     const selectedIds = Array.isArray(parsed.selectedIds)
       ? parsed.selectedIds.filter(
           (id): id is FinalsMapId => typeof id === "string" && isFinalsMapId(id)
@@ -65,6 +69,7 @@ function readStoredState(): StoredRandomizerState | null {
     return {
       selectedIds,
       count: Math.max(0, Math.min(Math.floor(count), selectedIds.length)),
+      version: storageVersion,
     };
   } catch {
     return null;
@@ -76,6 +81,7 @@ function getInitialState(): StoredRandomizerState {
     readStoredState() ?? {
       selectedIds: DEFAULT_COMPETITIVE_MAP_IDS,
       count: defaultCount,
+      version: storageVersion,
     }
   );
 }
@@ -128,7 +134,7 @@ export default function MapRandomizer() {
     try {
       window.localStorage.setItem(
         storageKey,
-        JSON.stringify({ selectedIds, count })
+        JSON.stringify({ selectedIds, count, version: storageVersion })
       );
     } catch {
       // Persistence is convenience-only; ignore unavailable storage.
@@ -194,14 +200,77 @@ export default function MapRandomizer() {
           </GlitchText>
           <p className="max-w-3xl font-mono text-sm leading-7 text-white/75 md:text-base">
             Randomly select maps for tournaments, scrims, warmups, or practice
-            blocks. Choose your pool, pick how many maps you need, and roll
-            instantly.
+            blocks. Default competitive rolls skip Seoul and Kyoto. Choose your
+            pool, pick how many maps you need, and roll instantly.
           </p>
         </div>
       </section>
 
       <section className="container grid gap-6 py-8 lg:grid-cols-[minmax(0,1fr)_minmax(340px,0.72fr)]">
-        <div className="space-y-6">
+        <aside className="lg:sticky lg:top-24 lg:col-start-2 lg:row-start-1 lg:self-start">
+          <NeonCard variant="gold" className="bg-black/70">
+            <div className="mb-5 flex items-center justify-between gap-4">
+              <div>
+                <h2 className="font-mono text-2xl font-bold uppercase tracking-widest text-neon-gold">
+                  Results
+                </h2>
+                <p className="font-mono text-xs uppercase tracking-widest text-white/45">
+                  {rollLabel}
+                </p>
+              </div>
+              <Shuffle className="text-neon-gold" aria-hidden="true" />
+            </div>
+
+            <p className="mb-4 font-mono text-xs uppercase tracking-widest text-white/50">
+              Current pool: <span className="text-white">{selectedMaps.length}</span>{" "}
+              maps • Drawing <span className="text-white">{count}</span>
+            </p>
+
+            <button
+              type="button"
+              onClick={rollMaps}
+              disabled={!canRoll}
+              className="mb-4 flex w-full items-center justify-center gap-3 rounded-sm border-2 border-neon-magenta bg-neon-magenta px-6 py-4 font-mono text-sm font-bold uppercase tracking-widest text-dark-black transition-all hover-glow-magenta disabled:cursor-not-allowed disabled:border-white/15 disabled:bg-white/10 disabled:text-white/35"
+            >
+              <RotateCcw size={18} /> Randomize Maps
+            </button>
+
+            <button
+              type="button"
+              onClick={copyResults}
+              disabled={results.length === 0}
+              className="mb-6 flex w-full items-center justify-center gap-3 rounded-sm border border-neon-cyan px-5 py-3 font-mono text-xs font-bold uppercase tracking-widest text-neon-cyan transition-all hover-glow-cyan disabled:cursor-not-allowed disabled:border-white/15 disabled:text-white/35"
+            >
+              <Clipboard size={16} /> {copyLabel}
+            </button>
+
+            {results.length > 0 ? (
+              <ol className="space-y-3">
+                {results.map((map, index) => (
+                  <li
+                    key={map.id}
+                    className="rounded-sm border border-neon-gold/45 bg-dark-charcoal/90 p-4"
+                  >
+                    <div className="font-mono text-xs uppercase tracking-widest text-neon-cyan">
+                      Map {index + 1}
+                    </div>
+                    <div className="mt-1 text-2xl font-bold font-mono text-white">
+                      {map.name}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <div className="rounded-sm border border-dashed border-white/20 bg-dark-charcoal/60 p-6 text-center font-mono text-sm text-white/55">
+                {canRoll
+                  ? "Tap Randomize Maps to draw from the current pool."
+                  : "Select at least one map to enable randomization."}
+              </div>
+            )}
+          </NeonCard>
+        </aside>
+
+        <div className="space-y-6 lg:col-start-1 lg:row-start-1">
           <NeonCard variant="cyan" className="bg-black/55">
             <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
               <div>
@@ -209,7 +278,7 @@ export default function MapRandomizer() {
                   Roll Setup
                 </h2>
                 <p className="mt-2 font-mono text-sm text-white/60">
-                  Selected pool:{" "}
+                  Selected pool: {" "}
                   <strong className="text-white">{selectedMaps.length}</strong>{" "}
                   / {THE_FINALS_MAPS.length} maps
                 </p>
@@ -322,64 +391,6 @@ export default function MapRandomizer() {
             </NeonCard>
           ))}
         </div>
-
-        <aside className="lg:sticky lg:top-24 lg:self-start">
-          <NeonCard variant="gold" className="bg-black/70">
-            <div className="mb-5 flex items-center justify-between gap-4">
-              <div>
-                <h2 className="font-mono text-2xl font-bold uppercase tracking-widest text-neon-gold">
-                  Results
-                </h2>
-                <p className="font-mono text-xs uppercase tracking-widest text-white/45">
-                  {rollLabel}
-                </p>
-              </div>
-              <Shuffle className="text-neon-gold" aria-hidden="true" />
-            </div>
-
-            <button
-              type="button"
-              onClick={rollMaps}
-              disabled={!canRoll}
-              className="mb-4 flex w-full items-center justify-center gap-3 rounded-sm border-2 border-neon-magenta bg-neon-magenta px-6 py-4 font-mono text-sm font-bold uppercase tracking-widest text-dark-black transition-all hover-glow-magenta disabled:cursor-not-allowed disabled:border-white/15 disabled:bg-white/10 disabled:text-white/35"
-            >
-              <RotateCcw size={18} /> Randomize Maps
-            </button>
-
-            <button
-              type="button"
-              onClick={copyResults}
-              disabled={results.length === 0}
-              className="mb-6 flex w-full items-center justify-center gap-3 rounded-sm border border-neon-cyan px-5 py-3 font-mono text-xs font-bold uppercase tracking-widest text-neon-cyan transition-all hover-glow-cyan disabled:cursor-not-allowed disabled:border-white/15 disabled:text-white/35"
-            >
-              <Clipboard size={16} /> {copyLabel}
-            </button>
-
-            {results.length > 0 ? (
-              <ol className="space-y-3">
-                {results.map((map, index) => (
-                  <li
-                    key={map.id}
-                    className="rounded-sm border border-neon-gold/45 bg-dark-charcoal/90 p-4"
-                  >
-                    <div className="font-mono text-xs uppercase tracking-widest text-neon-cyan">
-                      Map {index + 1}
-                    </div>
-                    <div className="mt-1 text-2xl font-bold font-mono text-white">
-                      {map.name}
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <div className="rounded-sm border border-dashed border-white/20 bg-dark-charcoal/60 p-6 text-center font-mono text-sm text-white/55">
-                {canRoll
-                  ? "Roll once to fill this panel."
-                  : "Select at least one map to enable randomization."}
-              </div>
-            )}
-          </NeonCard>
-        </aside>
       </section>
     </div>
   );
