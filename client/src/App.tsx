@@ -73,7 +73,7 @@ function Router() {
           <Route path={"/player/:id"} component={PlayerProfile} />
           <Route path={"/patchnotes"} component={PatchNotes} />
           <Route path={"/loadout-tracker"} component={LoadoutTracker} />
-          <Route path={"/map-randomizer"} component={MapRandomizer} />
+          <Route path={"/maprng"} component={MapRandomizer} />
           <Route
             path={"/balance-archive/:slug"}
             component={BalanceArchiveDetail}
