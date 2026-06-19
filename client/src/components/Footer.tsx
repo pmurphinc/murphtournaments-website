@@ -44,9 +44,9 @@ export default function Footer() {
                   About
                 </div>
               </Link>
-              <Link href="/map-randomizer">
+              <Link href="/maprng">
                 <div className="text-sm text-white/60 hover:text-neon-magenta transition-colors cursor-pointer">
-                  Map Randomizer
+                  Map RNG
                 </div>
               </Link>
             </div>
