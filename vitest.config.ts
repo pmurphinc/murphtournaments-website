@@ -21,6 +21,7 @@ export default defineConfig({
       "shared/**/*.test.ts",
       "shared/**/*.spec.ts",
       "client/src/components/BaselineStatsCard.test.tsx",
+      "client/src/lib/**/*.test.ts",
     ],
   },
 });
