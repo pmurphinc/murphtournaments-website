@@ -1,5 +1,24 @@
 import { describe, expect, it, vi } from "vitest";
-import { THE_FINALS_MAPS, drawUniqueMaps } from "./finalsMaps";
+import {
+  DEFAULT_COMPETITIVE_MAP_IDS,
+  THE_FINALS_MAPS,
+  drawUniqueMaps,
+} from "./finalsMaps";
+
+describe("default competitive maps", () => {
+  it("excludes Seoul and Kyoto from the default competitive pool", () => {
+    expect(DEFAULT_COMPETITIVE_MAP_IDS).not.toContain("seoul");
+    expect(DEFAULT_COMPETITIVE_MAP_IDS).not.toContain("kyoto");
+  });
+
+  it("keeps every other main arena in the default competitive pool", () => {
+    const expectedDefaultMapIds = THE_FINALS_MAPS.filter(
+      map => map.category === "main" && map.id !== "seoul" && map.id !== "kyoto"
+    ).map(map => map.id);
+
+    expect(DEFAULT_COMPETITIVE_MAP_IDS).toEqual(expectedDefaultMapIds);
+  });
+});
 
 describe("drawUniqueMaps", () => {
   it("draws N unique maps when the pool has at least N maps", () => {
