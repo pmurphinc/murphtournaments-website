@@ -25,6 +25,7 @@ export default function Navigation() {
 
   const navItems: NavItem[] = [
     { label: 'Home', href: '/' },
+    { label: 'Map RNG', href: '/maprng' },
     { 
       label: 'History', 
       href: '/tournaments',
