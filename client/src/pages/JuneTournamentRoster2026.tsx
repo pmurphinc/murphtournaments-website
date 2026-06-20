@@ -27,7 +27,7 @@ const rosterTeams: readonly RosterTeam[] = [
   { id: 7, name: 'Axoloto', captain: 'ZeToniez#3134', players: ['Diamond#2842', 'Rex#7110'] },
   { id: 8, name: "Auntie's Goo Bois", captain: 'ekazo#5318', players: ['appoh#9173', 'kdkiller6021#4000'] },
   { id: 9, name: 'Team Obsidian', captain: 'Prodigy#3252', players: ['Tron#8189', 'Shinobi#3743'], substitute: 'Heegoo#0606' },
-  { id: 10, name: 'spynix', captain: 'Ronthedon.tt#0093', players: ['SkilfulPython10#1048', 'Yaboiivo#1975'], substitute: 'Femboy_enjoyer#8043' },
+  { id: 10, name: 'spynix', captain: 'Ronthedon.tt#0093', players: ['SkilfulPython10#1048', 'Yaboiivo#1975'], substitute: '\u0046emboy_enjoyer#8043' },
   { id: 11, name: 'That one team', captain: 'Merchant#0469', players: ['Sushi_noob#0598', 'Ttvjiggypiggy#7424'] },
   { id: 12, name: 'Opall Esports', captain: 'INVINCIBLE#5854', players: ['NXT#8501', 'TTV_Cloudy6166#9524'], substitute: 'ImSleepy_ttv#0414' },
   { id: 13, name: 'Sup3r Mario Bro’s', captain: 'BMvrph#7255', players: ['SUP3R#5259', 'Mario_vmanTTV#9301'] },
@@ -53,7 +53,7 @@ export default function JuneTournamentRoster2026() {
         <div className="container relative z-10">
           <div className="max-w-5xl space-y-6">
             <p className="text-sm text-neon-gold font-mono uppercase tracking-widest font-bold">Murph Tournaments Presents</p>
-            <div>
+            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
               <GlitchText size="2xl" variant="gold">June 2026</GlitchText>
               <GlitchText size="2xl" variant="cyan">Registered Roster</GlitchText>
             </div>
