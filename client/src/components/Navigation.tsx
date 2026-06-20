@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { Link } from 'wouter';
-import { Menu, X, ChevronDown } from 'lucide-react';
+import { useState } from "react";
+import { Link } from "wouter";
+import { Menu, X, ChevronDown } from "lucide-react";
 
 /**
  * Navigation Component
@@ -22,22 +22,31 @@ export default function Navigation() {
   const [isOpen, setIsOpen] = useState(false);
   const [bracketOpen, setBracketOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [tournamentOpen, setTournamentOpen] = useState(false);
 
   const navItems: NavItem[] = [
-    { label: 'Home', href: '/' },
-    { label: 'Map RNG', href: '/maprng' },
-    { 
-      label: 'History', 
-      href: '/tournaments',
+    { label: "Home", href: "/" },
+    { label: "Map RNG", href: "/maprng" },
+    {
+      label: "Tournament",
+      href: "/tournaments/june-2026",
       submenu: [
-        { label: 'Tournament History', href: '/tournaments' },
-        { label: 'Player Archive', href: '/players' },
-        { label: 'Patch Notes', href: '/patchnotes' },
-        // { label: 'Loadout Tracker', href: '/loadout-tracker' }, // Temporarily hidden for direct URL testing
-      ]
+        { label: "June", href: "/tournaments/june-2026" },
+        { label: "Roster", href: "/tournaments/june-2026/roster" },
+      ],
     },
-    // { 
-    //   label: 'Bracket', 
+    {
+      label: "History",
+      href: "/tournaments",
+      submenu: [
+        { label: "Tournament History", href: "/tournaments" },
+        { label: "Player Archive", href: "/players" },
+        { label: "Patch Notes", href: "/patchnotes" },
+        // { label: 'Loadout Tracker', href: '/loadout-tracker' }, // Temporarily hidden for direct URL testing
+      ],
+    },
+    // {
+    //   label: 'Bracket',
     //   href: '#',
     //   isDropdownOnly: true,
     //   submenu: [
@@ -45,9 +54,9 @@ export default function Navigation() {
     //     { label: '7th Circle', href: '/bracket2' },
     //   ]
     // },
-    { label: 'Balance Archive', href: '/balance-archive' },
-    { label: 'About', href: '/about' },
-    { label: 'Watch', href: '/watch' },
+    { label: "Balance Archive", href: "/balance-archive" },
+    { label: "About", href: "/about" },
+    { label: "Watch", href: "/watch" },
   ];
 
   return (
@@ -57,18 +66,17 @@ export default function Navigation() {
         <div className="flex shrink-0 items-center gap-2 sm:gap-3 md:gap-4 lg:gap-6">
           {/* Murph Tournaments Logo - First */}
           <Link href="/" className="flex h-12 shrink-0 items-center md:h-14">
-            <img 
-              src="https://d2xsxph8kpxj0f.cloudfront.net/310519663462787524/GzitzUSk3snQMAtW4LnLnQ/MurphTournaments_logo_747bd67f.png" 
-              alt="Murph Tournaments" 
+            <img
+              src="https://d2xsxph8kpxj0f.cloudfront.net/310519663462787524/GzitzUSk3snQMAtW4LnLnQ/MurphTournaments_logo_747bd67f.png"
+              alt="Murph Tournaments"
               className="h-12 w-auto shrink-0 cursor-pointer object-contain transition-opacity hover:opacity-80 md:h-14"
             />
           </Link>
-          
         </div>
 
         {/* Desktop Navigation */}
         <div className="hidden md:flex items-center gap-8">
-          {navItems.map((item) => (
+          {navItems.map(item => (
             <div key={item.label} className="relative group">
               {item.isDropdownOnly ? (
                 // Dropdown-only item (Bracket) - not clickable
@@ -87,7 +95,7 @@ export default function Navigation() {
               )}
               {item.submenu && (
                 <div className="absolute left-0 mt-0 w-56 bg-black border-2 border-neon-magenta rounded hidden group-hover:block shadow-lg z-50 overflow-hidden">
-                  {item.submenu.map((subitem) => (
+                  {item.submenu.map(subitem => (
                     <Link key={subitem.href} href={subitem.href}>
                       <div className="px-4 py-3 text-sm font-mono text-white/80 hover:text-white hover:font-bold hover:bg-neon-magenta/20 transition-all duration-200 cursor-pointer first:rounded-t last:rounded-b border-b border-neon-magenta/30 last:border-b-0 hover:border-b-neon-magenta/50 hover:glow-magenta">
                         {subitem.label}
@@ -113,7 +121,7 @@ export default function Navigation() {
       {isOpen && (
         <div className="md:hidden bg-dark-purple border-t border-neon-magenta/30">
           <div className="container py-4 flex flex-col gap-4">
-            {navItems.map((item) => (
+            {navItems.map(item => (
               <div key={item.label}>
                 {item.isDropdownOnly ? (
                   // Dropdown-only item (Bracket) - not clickable
@@ -122,7 +130,12 @@ export default function Navigation() {
                     onClick={() => setBracketOpen(!bracketOpen)}
                   >
                     {item.label}
-                    {item.submenu && <ChevronDown size={14} className={`transition-transform ${bracketOpen ? 'rotate-180' : ''}`} />}
+                    {item.submenu && (
+                      <ChevronDown
+                        size={14}
+                        className={`transition-transform ${bracketOpen ? "rotate-180" : ""}`}
+                      />
+                    )}
                   </div>
                 ) : (
                   // Regular item or item with submenu
@@ -131,17 +144,30 @@ export default function Navigation() {
                       className="text-sm font-mono uppercase tracking-widest text-white/80 hover:text-neon-magenta transition-colors py-2 cursor-pointer flex items-center justify-between"
                       onClick={() => {
                         if (!item.submenu) setIsOpen(false);
-                        if (item.label === 'History') setHistoryOpen(!historyOpen);
+                        if (item.label === "History")
+                          setHistoryOpen(!historyOpen);
+                        if (item.label === "Tournament")
+                          setTournamentOpen(!tournamentOpen);
                       }}
                     >
                       {item.label}
-                      {item.submenu && <ChevronDown size={14} className={`transition-transform ${historyOpen && item.label === 'History' ? 'rotate-180' : ''}`} />}
+                      {item.submenu && (
+                        <ChevronDown
+                          size={14}
+                          className={`transition-transform ${
+                            (historyOpen && item.label === "History") ||
+                            (tournamentOpen && item.label === "Tournament")
+                              ? "rotate-180"
+                              : ""
+                          }`}
+                        />
+                      )}
                     </div>
                   </Link>
                 )}
-                {item.submenu && item.label === 'Bracket' && bracketOpen && (
+                {item.submenu && item.label === "Bracket" && bracketOpen && (
                   <div className="pl-4 flex flex-col gap-1 mt-2 border-l-2 border-neon-magenta/50">
-                    {item.submenu.map((subitem) => (
+                    {item.submenu.map(subitem => (
                       <Link key={subitem.href} href={subitem.href}>
                         <div
                           className="text-xs font-mono text-white/70 hover:text-white hover:font-bold hover:bg-neon-magenta/10 hover:glow-magenta transition-all duration-200 py-2 px-3 cursor-pointer rounded"
@@ -153,9 +179,25 @@ export default function Navigation() {
                     ))}
                   </div>
                 )}
-                {item.submenu && item.label === 'History' && historyOpen && (
+                {item.submenu &&
+                  item.label === "Tournament" &&
+                  tournamentOpen && (
+                    <div className="pl-4 flex flex-col gap-1 mt-2 border-l-2 border-neon-magenta/50">
+                      {item.submenu.map(subitem => (
+                        <Link key={subitem.href} href={subitem.href}>
+                          <div
+                            className="text-xs font-mono text-white/70 hover:text-white hover:font-bold hover:bg-neon-magenta/10 hover:glow-magenta transition-all duration-200 py-2 px-3 cursor-pointer rounded"
+                            onClick={() => setIsOpen(false)}
+                          >
+                            {subitem.label}
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                {item.submenu && item.label === "History" && historyOpen && (
                   <div className="pl-4 flex flex-col gap-1 mt-2 border-l-2 border-neon-magenta/50">
-                    {item.submenu.map((subitem) => (
+                    {item.submenu.map(subitem => (
                       <Link key={subitem.href} href={subitem.href}>
                         <div
                           className="text-xs font-mono text-white/70 hover:text-white hover:font-bold hover:bg-neon-magenta/10 hover:glow-magenta transition-all duration-200 py-2 px-3 cursor-pointer rounded"
