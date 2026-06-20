@@ -21,8 +21,8 @@ interface FormatRound {
   accent: 'gold' | 'cyan' | 'magenta';
 }
 
-const discordUrl = 'https://discord.gg/kcmdxmBgnC';
-const juneTournamentSignupUrl = 'https://forms.gle/62uQXhJ6825dYN869';
+export const discordUrl = 'https://discord.gg/kcmdxmBgnC';
+export const juneTournamentSignupUrl = 'https://forms.gle/62uQXhJ6825dYN869';
 const juneTournamentDate = new Date('2026-06-28T17:00:00-07:00');
 
 const infoCards: InfoCard[] = [
@@ -130,19 +130,14 @@ export default function JuneTournament2026() {
                 A 16-team THE FINALS tournament built around Cashout elimination lobbies, a Final Round BO5 Championship Series, and a first-place 3D printed prize bundle.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
-                <a href={juneTournamentSignupUrl} target="_blank" rel="noopener noreferrer">
-                  <button className="w-full sm:w-auto px-8 py-3 bg-neon-magenta text-dark-black font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all border-2 border-neon-magenta">
-                    Sign Up Now
-                  </button>
-                </a>
                 <a href={discordUrl} target="_blank" rel="noopener noreferrer">
                   <button className="w-full sm:w-auto px-8 py-3 border-2 border-neon-gold text-neon-gold font-bold font-mono uppercase tracking-widest hover-glow-gold rounded-sm transition-all">
                     Join Discord
                   </button>
                 </a>
-                <Link href="/">
+                <Link href="/tournaments/june-2026/roster">
                   <button className="w-full sm:w-auto px-8 py-3 border-2 border-neon-cyan text-neon-cyan font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all">
-                    Back Home
+                    View Registered Roster
                   </button>
                 </Link>
               </div>
@@ -246,15 +241,15 @@ export default function JuneTournament2026() {
 
             <NeonCard variant="magenta" className="bg-black/50">
               <p className="text-sm text-neon-magenta font-mono uppercase tracking-widest font-bold mb-4">
-                Registration Open
+                Field Full — Standby Sign-Ups
               </p>
               <p className="text-white/70 font-mono leading-relaxed mb-6">
-                Registration updates will be announced through the Murph Tournaments Discord.
+                All 16 places are filled. New entries are still accepted as standbys in case late openings become available before check-in. Registration updates will be announced through the Murph Tournaments Discord.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <a href={juneTournamentSignupUrl} target="_blank" rel="noopener noreferrer">
                   <button className="w-full sm:w-auto px-6 py-3 bg-neon-magenta text-dark-black font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all border-2 border-neon-magenta">
-                    Sign Up Now
+                    Join Standby List
                   </button>
                 </a>
                 <a href={discordUrl} target="_blank" rel="noopener noreferrer">
