@@ -57,34 +57,11 @@
 - [ ] SEO optimization
 
 
-## Admin Control Panel (In Progress)
-- [ ] Design admin data structure and state management
-- [ ] Create hidden admin route with non-obvious path
-- [ ] Implement password authentication system
-- [ ] Build admin password unlock screen UI
-- [ ] Create admin control panel main interface
-- [ ] Add event status controls (Not Live / Live / Complete)
-- [ ] Add cycle selector (1 / 2 / 3)
-- [ ] Add stage selector (Check-In / Cashout / Final Round / Finished)
-- [ ] Add current match text field
-- [ ] Add FRP standings editor (4 team rows)
-- [ ] Add optional notes/status field
-- [ ] Implement session storage for admin login
-- [ ] Add logout/lock panel button
-- [ ] Connect admin panel to public bracket page
-- [ ] Test admin updates reflect on public page
-- [ ] Verify data persistence across page refreshes
-- [ ] Test mobile responsiveness of admin panel
-
-
 ## Second Tournament System (7th Circle)
 - [ ] Update database schema to support multiple tournaments
-- [ ] Create 7th Circle admin panel (/admin2)
 - [ ] Create 7th Circle bracket page (/bracket2)
-- [ ] Add tRPC endpoints for 7th Circle tournament
 - [ ] Seed database with 7th Circle tournament and teams
 - [ ] Test both tournament systems independently
-- [ ] Deploy and verify both admin panels working
 
 
 ## Player Archive & Tournament History

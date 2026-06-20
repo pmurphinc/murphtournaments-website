@@ -1,7 +1,8 @@
 import { getSessionCookieOptions } from "./_core/cookies";
 import { COOKIE_NAME } from "../shared/const";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
+import { ENV } from "./_core/env";
+import { publicProcedure, router, adminProcedure } from "./_core/trpc";
 import { z } from "zod";
 import {
   checkVodFrameCaptureBinaries,
@@ -13,9 +14,7 @@ import {
   updateTournamentStatus,
   getTeamsByTournament,
   upsertTeams,
-  updateTeamFRP,
   getTournamentHistory,
-  addTournamentToHistory,
   getAllPatchNotes,
 } from "./db";
 import { scrapeAndStorePatchNotes } from "./patchNoteScraper";
@@ -362,8 +361,12 @@ export const appRouter = router({
 
           // Use the Google Sheets API v4 with public access
           // This works for sheets shared publicly or with "Anyone with the link" access
+          if (!ENV.googleSheetsApiKey) {
+            throw new Error("GOOGLE_SHEETS_API_KEY is not configured");
+          }
+
           const encodedRange = encodeURIComponent(input.range);
-          const url = `https://sheets.googleapis.com/v4/spreadsheets/${input.sheetId}/values/${encodedRange}?key=AIzaSyDaRi0zyNFzCEHGXxKPKLfnGbqJqKqkiYU`;
+          const url = `https://sheets.googleapis.com/v4/spreadsheets/${input.sheetId}/values/${encodedRange}?key=${ENV.googleSheetsApiKey}`;
 
           const response = await fetch(url, {
             method: "GET",
@@ -415,7 +418,7 @@ export const appRouter = router({
     }),
 
     // Update tournament status (admin only)
-    updateStatus: protectedProcedure
+    updateStatus: adminProcedure
       .input(
         z.object({
           eventStatus: z.enum(["not-live", "live", "complete"]).optional(),
@@ -427,12 +430,7 @@ export const appRouter = router({
           eventNote: z.string().optional(),
         })
       )
-      .mutation(async ({ input, ctx }) => {
-        // Only admins can update tournament
-        if (ctx.user?.role !== "admin") {
-          throw new Error("Unauthorized: Only admins can update tournament");
-        }
-
+      .mutation(async ({ input }) => {
         const tournament = await getOrCreateDevDivisionTournament();
         if (!tournament) {
           throw new Error("Failed to get tournament");
@@ -451,7 +449,7 @@ export const appRouter = router({
       }),
 
     // Update teams and their FRP
-    updateTeams: protectedProcedure
+    updateTeams: adminProcedure
       .input(
         z.object({
           teams: z.array(
@@ -462,12 +460,7 @@ export const appRouter = router({
           ),
         })
       )
-      .mutation(async ({ input, ctx }) => {
-        // Only admins can update teams
-        if (ctx.user?.role !== "admin") {
-          throw new Error("Unauthorized: Only admins can update teams");
-        }
-
+      .mutation(async ({ input }) => {
         const tournament = await getOrCreateDevDivisionTournament();
         if (!tournament) {
           throw new Error("Failed to get tournament");
@@ -490,59 +483,6 @@ export const appRouter = router({
         teams: teamList,
       };
     }),
-
-    updateStatus2: publicProcedure
-      .input(
-        z.object({
-          tournamentId: z.number(),
-          eventStatus: z.enum(["not-live", "live", "complete"]).optional(),
-          currentCycle: z.enum(["1", "2", "3"]).optional(),
-          currentStage: z
-            .enum(["check-in", "cashout", "final-round", "finished"])
-            .optional(),
-          currentMatch: z.string().optional(),
-          eventNote: z.string().optional(),
-        })
-      )
-      .mutation(async ({ input }) => {
-        const tournament = await getOrCreateSeventhCircleTournament();
-        if (!tournament) {
-          throw new Error("Failed to get tournament");
-        }
-
-        const updated = await updateTournamentStatus(tournament.id, input);
-        if (!updated) {
-          throw new Error("Failed to update tournament");
-        }
-
-        const teamList = await getTeamsByTournament(tournament.id);
-        return {
-          ...updated,
-          teams: teamList,
-        };
-      }),
-
-    updateTeams2: publicProcedure
-      .input(
-        z.object({
-          tournamentId: z.number(),
-          teams: z.array(
-            z.object({
-              name: z.string(),
-              frp: z.number(),
-            })
-          ),
-        })
-      )
-      .mutation(async ({ input }) => {
-        const tournament = await getOrCreateSeventhCircleTournament();
-        if (!tournament) {
-          throw new Error("Failed to get tournament");
-        }
-
-        const updatedTeams = await upsertTeams(tournament.id, input.teams);
-        return updatedTeams;
-      }),
 
     getHistory: publicProcedure.query(async () => {
       return await getTournamentHistory();
