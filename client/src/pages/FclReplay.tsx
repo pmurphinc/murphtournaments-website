@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Link } from "wouter";
 import GlitchText from "@/components/GlitchText";
 import NeonCard from "@/components/NeonCard";
@@ -10,7 +9,6 @@ type RouteParams = {
 
 export default function FclReplay({ params }: { params: RouteParams }) {
   const replay = getFclReplayBySlug(params.slug);
-  const [videoError, setVideoError] = useState(false);
 
   if (!replay) {
     return (
@@ -52,29 +50,16 @@ export default function FclReplay({ params }: { params: RouteParams }) {
         </div>
 
         <NeonCard variant="gold">
-          {videoError ? (
-            <div className="flex min-h-[240px] items-center justify-center rounded-sm border border-neon-gold/30 bg-black/40 p-6 text-center">
-              <div>
-                <p className="font-mono text-lg font-bold uppercase tracking-widest text-neon-gold">
-                  Replay unavailable
-                </p>
-                <p className="mt-3 max-w-xl font-mono text-sm text-white/65">
-                  The video file could not be loaded from the tournament media
-                  archive. Please try again later.
-                </p>
-              </div>
-            </div>
-          ) : (
-            <video
-              className="aspect-video w-full rounded-sm border border-neon-gold/30 bg-black"
-              controls
-              preload="metadata"
-              onError={() => setVideoError(true)}
-            >
-              <source src={replay.videoPath} type="video/mp4" />
-              Your browser does not support the video tag.
-            </video>
-          )}
+          <div className="overflow-hidden rounded-sm border border-neon-gold/30 bg-black shadow-[0_0_35px_rgba(255,183,3,0.16)]">
+            <iframe
+              className="aspect-video w-full"
+              src={replay.embedUrl}
+              title={`${replay.title} replay`}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              referrerPolicy="strict-origin-when-cross-origin"
+              allowFullScreen
+            />
+          </div>
 
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
@@ -84,10 +69,12 @@ export default function FclReplay({ params }: { params: RouteParams }) {
               Tournament History
             </Link>
             <a
-              href={replay.videoPath}
+              href={replay.youtubeUrl}
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-block rounded-sm border-2 border-neon-gold px-5 py-2 font-mono text-xs font-bold uppercase tracking-widest text-neon-gold transition-all hover-glow-magenta"
             >
-              Open Video File
+              Open on YouTube
             </a>
           </div>
         </NeonCard>
