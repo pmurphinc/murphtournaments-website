@@ -53,7 +53,7 @@ export default function JuneTournamentRoster2026() {
         <div className="container relative z-10">
           <div className="max-w-5xl space-y-6">
             <p className="text-sm text-neon-gold font-mono uppercase tracking-widest font-bold">Murph Tournaments Presents</p>
-            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
+            <div className="flex flex-col items-start gap-2 md:flex-row md:items-baseline md:gap-4">
               <GlitchText size="2xl" variant="gold">June 2026</GlitchText>
               <GlitchText size="2xl" variant="cyan">Registered Roster</GlitchText>
             </div>
