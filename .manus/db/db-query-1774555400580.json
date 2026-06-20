@@ -1,9 +1,0 @@
-{
-  "query": "CREATE TABLE IF NOT EXISTS tournament_history (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  tournamentId INT NOT NULL,\n  name VARCHAR(255) NOT NULL,\n  winner VARCHAR(255) NOT NULL,\n  runner_up VARCHAR(255),\n  finalFrp INT DEFAULT 0 NOT NULL,\n  completedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,\n  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL\n);",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user sBg9DwMAKktGayh.2aaa41cb9841 --database GzitzUSk3snQMAtW4LnLnQ --execute CREATE TABLE IF NOT EXISTS tournament_history (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  tournamentId INT NOT NULL,\n  name VARCHAR(255) NOT NULL,\n  winner VARCHAR(255) NOT NULL,\n  runner_up VARCHAR(255),\n  finalFrp INT DEFAULT 0 NOT NULL,\n  completedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,\n  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL\n);",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 490
-}

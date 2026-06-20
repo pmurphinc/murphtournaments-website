@@ -1,9 +1,0 @@
-{
-  "query": "INSERT INTO tournaments (name, eventStatus, currentCycle, currentStage, currentMatch, eventNote) VALUES ('7th Circle', 'not-live', '1', 'check-in', 'Team A vs Team B', 'Awaiting Results');\n\nINSERT INTO teams (tournamentId, name, frp) SELECT id, 'ULT', 0 FROM tournaments WHERE name = '7th Circle'\nUNION ALL SELECT id, '#BuffWinch', 0 FROM tournaments WHERE name = '7th Circle'\nUNION ALL SELECT id, 'Opium label', 0 FROM tournaments WHERE name = '7th Circle'\nUNION ALL SELECT id, 'Register now', 0 FROM tournaments WHERE name = '7th Circle';",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user sBg9DwMAKktGayh.2aaa41cb9841 --database GzitzUSk3snQMAtW4LnLnQ --execute INSERT INTO tournaments (name, eventStatus, currentCycle, currentStage, currentMatch, eventNote) VALUES ('7th Circle', 'not-live', '1', 'check-in', 'Team A vs Team B', 'Awaiting Results');\n\nINSERT INTO teams (tournamentId, name, frp) SELECT id, 'ULT', 0 FROM tournaments WHERE name = '7th Circle'\nUNION ALL SELECT id, '#BuffWinch', 0 FROM tournaments WHERE name = '7th Circle'\nUNION ALL SELECT id, 'Opium label', 0 FROM tournaments WHERE name = '7th Circle'\nUNION ALL SELECT id, 'Register now', 0 FROM tournaments WHERE name = '7th Circle';",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 255
-}

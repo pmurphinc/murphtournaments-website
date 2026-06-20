@@ -1,9 +1,0 @@
-{
-  "query": "UPDATE tournaments SET name = 'Development Division' WHERE name = 'Dev Division';",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user sBg9DwMAKktGayh.2aaa41cb9841 --database GzitzUSk3snQMAtW4LnLnQ --execute UPDATE tournaments SET name = 'Development Division' WHERE name = 'Dev Division';",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 67
-}

@@ -1,8 +1,0 @@
-{
-  "query": "INSERT INTO teams (name, frp) VALUES \n('EkaZo''s Kittens', 0),\n('Three Deadly Sins', 0),\n('LIQR', 0),\n('The Baiters', 0);",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user sBg9DwMAKktGayh.2aaa41cb9841 --database GzitzUSk3snQMAtW4LnLnQ --execute INSERT INTO teams (name, frp) VALUES \n('EkaZo''s Kittens', 0),\n('Three Deadly Sins', 0),\n('LIQR', 0),\n('The Baiters', 0);",
-  "returncode": 1,
-  "logs": [
-    "ERROR 1364 (HY000) at line 1: Field 'tournamentId' doesn't have a default value"
-  ]
-}

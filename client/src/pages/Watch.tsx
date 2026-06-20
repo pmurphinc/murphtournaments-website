@@ -149,15 +149,15 @@ export default function Watch() {
             <div className="space-y-4">
               <div className="flex justify-between items-center border-b border-neon-lime/20 pb-3">
                 <div>
-                  <p className="font-bold font-mono text-neon-lime">Tournament Nights</p>
-                  <p className="text-sm text-white/60 font-mono">Murph Tournaments</p>
+                  <p className="font-bold font-mono text-neon-lime">Typical Stream</p>
+                  <p className="text-sm text-white/60 font-mono">Pmurphinc on Twitch</p>
                 </div>
-                <p className="text-white/80 font-mono">9 PM - 12 AM PST</p>
+                <p className="text-white/80 font-mono">9 PST</p>
               </div>
               <div className="flex justify-between items-center border-b border-neon-lime/20 pb-3">
                 <div>
                   <p className="font-bold font-mono text-neon-lime">Dev Division</p>
-                  <p className="text-sm text-white/60 font-mono">Monthly Events</p>
+                  <p className="text-sm text-white/60 font-mono">Suspended</p>
                 </div>
                 <p className="text-white/80 font-mono">First Friday</p>
               </div>
