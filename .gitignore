@@ -116,3 +116,6 @@ client/public/__manus__/version.json
 server/.cache/
 
 data/reference/FCL/*.mp4
+.manus/
+.manus-logs/
+client/public/__manus__/
