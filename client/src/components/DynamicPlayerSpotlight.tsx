@@ -40,7 +40,7 @@ export default function DynamicPlayerSpotlight() {
     const weeks = spotlightData.weeks as SpotlightWeek[];
 
     // Find the appropriate week based on current date
-    let activeWeek = weeks[weeks.length - 1]; // Default to latest week
+    let activeWeek = weeks[0]; // Default to first week before the rotation starts
 
     for (let i = 0; i < weeks.length; i++) {
       const weekStartDate = new Date(weeks[i].startDate);

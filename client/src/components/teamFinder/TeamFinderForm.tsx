@@ -46,6 +46,7 @@ type Props = {
   submitting: boolean;
   formError?: string | null;
   fieldErrors?: Record<string, string>;
+  discordUsername?: string | null;
   onSubmit: (payload: TeamFinderFormPayload) => void;
   onCancel?: () => void;
 };
@@ -66,6 +67,7 @@ export default function TeamFinderForm({
   submitting,
   formError,
   fieldErrors = {},
+  discordUsername,
   onSubmit,
   onCancel,
 }: Props) {
@@ -154,6 +156,13 @@ export default function TeamFinderForm({
 
   return (
     <form className="space-y-5" onSubmit={handleSubmit}>
+      <div className="rounded border border-[#5865F2]/50 bg-[#5865F2]/10 p-3 font-mono text-sm text-white/75">
+        Your Discord username
+        {discordUsername ? ` @${discordUsername}` : ""} will be public on this
+        listing so players can contact you. Discord IDs, email, tokens, and
+        private account data are never shown.
+      </div>
+
       {/* Listing type toggle (locked while editing) */}
       <fieldset>
         <legend className={labelClass}>I am a…</legend>

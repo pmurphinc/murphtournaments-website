@@ -67,6 +67,11 @@ function buildAvatarUrl(user: DiscordUser): string | null {
 /** Prefer the modern global display name, falling back to the handle. */
 function resolveDisplayName(user: DiscordUser): string {
   if (user.global_name && user.global_name.length > 0) return user.global_name;
+  return resolveDiscordUsername(user);
+}
+
+/** Resolve the public Discord handle that other users can contact. */
+function resolveDiscordUsername(user: DiscordUser): string {
   if (user.discriminator && user.discriminator !== "0") {
     return `${user.username}#${user.discriminator}`;
   }
@@ -204,6 +209,7 @@ export function registerDiscordOAuthRoutes(app: Express) {
 
       const openId = `${DISCORD_OPEN_ID_PREFIX}${profile.id}`;
       const displayName = resolveDisplayName(profile);
+      const discordUsername = resolveDiscordUsername(profile);
       const avatarUrl = buildAvatarUrl(profile);
 
       await db.upsertUser({
@@ -211,7 +217,7 @@ export function registerDiscordOAuthRoutes(app: Express) {
         name: displayName,
         loginMethod: "discord",
         discordId: profile.id,
-        discordUsername: displayName,
+        discordUsername,
         discordAvatarUrl: avatarUrl,
         lastSignedIn: new Date(),
       });

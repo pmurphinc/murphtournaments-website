@@ -76,7 +76,7 @@ function calculateCurrentWeek(today: Date, weeks: typeof mockSpotlightData.weeks
   const normalizedToday = new Date(today);
   normalizedToday.setHours(0, 0, 0, 0);
 
-  let activeWeek = weeks[weeks.length - 1]; // Default to latest week
+  let activeWeek = weeks[0]; // Default to first week before the rotation starts
 
   for (let i = 0; i < weeks.length; i++) {
     const weekStartDate = new Date(weeks[i].startDate);

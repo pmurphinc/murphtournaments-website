@@ -267,10 +267,10 @@ export const reviewReportInputSchema = z.object({
 // ---------------------------------------------------------------------------
 
 const ownerDisplayName = (row: ListingRow): string => {
+  if (row.ownerName && row.ownerName.length > 0) return row.ownerName;
   if (row.ownerDiscordUsername && row.ownerDiscordUsername.length > 0) {
     return row.ownerDiscordUsername;
   }
-  if (row.ownerName && row.ownerName.length > 0) return row.ownerName;
   return "Murph Tournaments Player";
 };
 
@@ -534,6 +534,28 @@ async function getOwnerUserId(id: number): Promise<number | undefined> {
   return rows[0]?.ownerUserId;
 }
 
+async function getListingOwnershipAndType(
+  id: number
+): Promise<
+  { ownerUserId: number; listingType: TeamFinderListingType } | undefined
+> {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database is not available for Team Finder listings.");
+  }
+
+  const rows = await db
+    .select({
+      ownerUserId: teamFinderListings.ownerUserId,
+      listingType: teamFinderListings.listingType,
+    })
+    .from(teamFinderListings)
+    .where(eq(teamFinderListings.id, id))
+    .limit(1);
+
+  return rows[0];
+}
+
 export type ListingMutationContext = {
   userId: number;
   isAdmin: boolean;
@@ -550,6 +572,20 @@ async function assertCanModify(
   }
   if (!ctx.isAdmin && ownerUserId !== ctx.userId) {
     throw new Error("You do not have permission to modify this listing.");
+  }
+}
+
+/** Throws if an update attempts to turn a player listing into a team listing, or vice versa. */
+async function assertListingTypeUnchanged(
+  id: number,
+  nextListingType: TeamFinderListingType
+): Promise<void> {
+  const existing = await getListingOwnershipAndType(id);
+  if (!existing) {
+    throw new Error("Listing not found.");
+  }
+  if (existing.listingType !== nextListingType) {
+    throw new Error("Listing type cannot be changed after posting.");
   }
 }
 
@@ -578,6 +614,7 @@ export async function updateTeamFinderListing(
   ctx: ListingMutationContext
 ): Promise<TeamFinderListingPublic> {
   await assertCanModify(input.id, ctx);
+  await assertListingTypeUnchanged(input.id, input.listingType);
 
   const db = await getDb();
   if (!db) {

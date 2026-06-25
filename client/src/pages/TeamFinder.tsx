@@ -44,8 +44,9 @@ function extractFieldErrors(error: unknown): Record<string, string> {
 type TypeFilter = "all" | TeamFinderListingType;
 
 export default function TeamFinder() {
-  const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const isAdmin = user?.role === "admin";
+  const hasDiscordIdentity = Boolean(user?.discordId);
   const utils = trpc.useUtils();
 
   // Filters
@@ -78,7 +79,7 @@ export default function TeamFinder() {
   );
 
   const myListingsQuery = trpc.teamFinder.myListings.useQuery(undefined, {
-    enabled: isAuthenticated,
+    enabled: hasDiscordIdentity,
     staleTime: 1000 * 15,
   });
 
@@ -139,10 +140,10 @@ export default function TeamFinder() {
         await updateMutation.mutateAsync({
           id: editing.id,
           ...payload,
-        } as never);
+        });
         toast.success("Listing updated.");
       } else {
-        await createMutation.mutateAsync(payload as never);
+        await createMutation.mutateAsync(payload);
         toast.success("Listing posted.");
       }
       await refreshAll();
@@ -278,7 +279,7 @@ export default function TeamFinder() {
                   publicListings.length + myListings.length === 1 ? "" : "s"
                 }`}
           </div>
-          {isAuthenticated ? (
+          {hasDiscordIdentity ? (
             <button
               type="button"
               onClick={openCreate}
@@ -290,27 +291,27 @@ export default function TeamFinder() {
         </div>
 
         {/* Sign-in gate */}
-        {!authLoading && !isAuthenticated ? (
+        {!authLoading && !hasDiscordIdentity ? (
           <NeonCard variant="magenta" className="text-center">
             <h2 className="mb-2 font-mono text-lg font-bold uppercase text-white">
-              Sign in to post
+              Continue with Discord to post
             </h2>
             <p className="mx-auto mb-5 max-w-xl font-mono text-sm text-white/70">
               Browsing is open to everyone. To post a listing, renew it, or
-              report a problem, sign in with your Discord account — we only read
-              your username and avatar.
+              report a problem, continue with Discord so players can contact
+              your public username.
             </p>
             <a
               href={getDiscordLoginUrl("/team-finder")}
               className="inline-flex items-center gap-2 rounded-sm border-2 border-[#5865F2] bg-[#5865F2]/15 px-6 py-3 font-mono font-bold uppercase tracking-widest text-white transition-all hover:bg-[#5865F2]/25"
             >
-              Sign in with Discord
+              Continue with Discord
             </a>
           </NeonCard>
         ) : null}
 
         {/* My Listings */}
-        {isAuthenticated && myListings.length > 0 ? (
+        {hasDiscordIdentity && myListings.length > 0 ? (
           <section className="space-y-4">
             <h2 className="font-mono text-xl font-bold uppercase tracking-widest text-neon-lime">
               My Listings
@@ -454,7 +455,7 @@ export default function TeamFinder() {
                   key={listing.id}
                   listing={listing}
                   isAdmin={isAdmin}
-                  onReport={isAuthenticated ? setReportTarget : undefined}
+                  onReport={hasDiscordIdentity ? setReportTarget : undefined}
                   onToggleHidden={isAdmin ? handleToggleHidden : undefined}
                 />
               ))}
@@ -494,6 +495,7 @@ export default function TeamFinder() {
               submitting={submitting}
               formError={formError}
               fieldErrors={fieldErrors}
+              discordUsername={user?.discordUsername ?? null}
               onSubmit={handleSubmit}
               onCancel={closeForm}
             />

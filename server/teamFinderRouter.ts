@@ -29,6 +29,9 @@ import {
   type ListingMutationContext,
 } from "./teamFinder";
 
+export const TEAM_FINDER_DISCORD_REQUIRED_MESSAGE =
+  "Sign in with Discord to use Team Finder.";
+
 /**
  * Translate the plain Errors thrown by the feature module into tRPC errors so
  * the client receives meaningful messages and status codes.
@@ -52,6 +55,17 @@ const mutationContext = (user: {
 }): ListingMutationContext => ({
   userId: user.id,
   isAdmin: user.role === "admin",
+});
+
+const discordProcedure = protectedProcedure.use(async ({ ctx, next }) => {
+  if (!ctx.user.discordId) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: TEAM_FINDER_DISCORD_REQUIRED_MESSAGE,
+    });
+  }
+
+  return next({ ctx });
 });
 
 export const teamFinderRouter = router({
@@ -89,7 +103,7 @@ export const teamFinderRouter = router({
     }),
 
   // --- Owner actions --------------------------------------------------------
-  myListings: protectedProcedure.query(async ({ ctx }) => {
+  myListings: discordProcedure.query(async ({ ctx }) => {
     try {
       return await listMyTeamFinderListings(ctx.user.id);
     } catch (error) {
@@ -97,7 +111,7 @@ export const teamFinderRouter = router({
     }
   }),
 
-  create: protectedProcedure
+  create: discordProcedure
     .input(createTeamFinderListingInputSchema)
     .mutation(async ({ input, ctx }) => {
       try {
@@ -107,7 +121,7 @@ export const teamFinderRouter = router({
       }
     }),
 
-  update: protectedProcedure
+  update: discordProcedure
     .input(updateTeamFinderListingInputSchema)
     .mutation(async ({ input, ctx }) => {
       try {
@@ -117,7 +131,7 @@ export const teamFinderRouter = router({
       }
     }),
 
-  setStatus: protectedProcedure
+  setStatus: discordProcedure
     .input(setListingStatusInputSchema)
     .mutation(async ({ input, ctx }) => {
       try {
@@ -131,7 +145,7 @@ export const teamFinderRouter = router({
       }
     }),
 
-  renew: protectedProcedure
+  renew: discordProcedure
     .input(listingIdInputSchema)
     .mutation(async ({ input, ctx }) => {
       try {
@@ -144,7 +158,7 @@ export const teamFinderRouter = router({
       }
     }),
 
-  delete: protectedProcedure
+  delete: discordProcedure
     .input(listingIdInputSchema)
     .mutation(async ({ input, ctx }) => {
       try {
@@ -158,7 +172,7 @@ export const teamFinderRouter = router({
     }),
 
   // --- Reporting (any signed-in user) --------------------------------------
-  report: protectedProcedure
+  report: discordProcedure
     .input(reportListingInputSchema)
     .mutation(async ({ input, ctx }) => {
       try {

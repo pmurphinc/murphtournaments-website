@@ -5,6 +5,7 @@ import {
 } from "@shared/teamFinder";
 import {
   Clock,
+  Copy,
   Flag,
   Globe2,
   Pencil,
@@ -16,6 +17,7 @@ import {
   Users,
   Youtube,
 } from "lucide-react";
+import { toast } from "sonner";
 
 /**
  * Public shape returned by the teamFinder router. Kept structurally in sync with
@@ -136,6 +138,17 @@ export default function TeamFinderListingCard({
     : listing.teamName || "Team recruiting";
 
   const busy = ownerActions?.pendingAction != null;
+  const discordUsername = listing.owner.discordUsername;
+
+  const copyDiscordUsername = async () => {
+    if (!discordUsername) return;
+    try {
+      await navigator.clipboard.writeText(discordUsername);
+      toast.success("Discord username copied.");
+    } catch {
+      toast.error("Could not copy Discord username.");
+    }
+  };
 
   return (
     <NeonCard variant={variant} className="flex h-full flex-col">
@@ -258,8 +271,8 @@ export default function TeamFinderListingCard({
 
       {/* Footer */}
       <div className="mt-auto border-t border-white/10 pt-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-2">
             {listing.owner.discordAvatarUrl ? (
               <img
                 src={listing.owner.discordAvatarUrl}
@@ -271,15 +284,30 @@ export default function TeamFinderListingCard({
                 {listing.owner.displayName.slice(0, 2).toUpperCase()}
               </div>
             )}
-            <span className="truncate font-mono text-xs text-white/70">
-              {listing.owner.displayName}
-            </span>
+            <div className="min-w-0 font-mono text-xs">
+              <div className="truncate text-white/75">
+                {listing.owner.displayName}
+              </div>
+              {discordUsername ? (
+                <div className="truncate text-[#B9C0FF]">@{discordUsername}</div>
+              ) : null}
+            </div>
           </div>
           <span className="inline-flex shrink-0 items-center gap-1 font-mono text-[11px] uppercase tracking-widest text-white/40">
             <Clock size={11} />
             {formatRelativeExpiry(listing.expiresAt, listing.isExpired)}
           </span>
         </div>
+
+        {discordUsername ? (
+          <button
+            type="button"
+            onClick={copyDiscordUsername}
+            className="mt-3 inline-flex items-center gap-1.5 rounded-sm border border-[#5865F2]/60 px-3 py-1.5 font-mono text-xs uppercase tracking-widest text-[#B9C0FF] transition-colors hover:bg-[#5865F2]/15"
+          >
+            <Copy size={12} /> Copy Discord Username
+          </button>
+        ) : null}
 
         {/* Owner action row */}
         {ownerActions ? (
