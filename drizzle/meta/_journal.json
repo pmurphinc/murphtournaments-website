@@ -64,6 +64,13 @@
       "when": 1778323200000,
       "tag": "0008_add_vod_steal_flip_event_type",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1782345738522,
+      "tag": "0009_add_team_finder",
+      "breakpoints": true
     }
   ]
 }

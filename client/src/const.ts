@@ -15,3 +15,12 @@ export const getLoginUrl = () => {
 
   return url.toString();
 };
+
+/**
+ * Build the Discord sign-in URL. The server route redirects to Discord's
+ * consent screen and, after callback, returns the user to `redirectPath`.
+ */
+export const getDiscordLoginUrl = (redirectPath = "/team-finder") => {
+  const params = new URLSearchParams({ redirect: redirectPath });
+  return `/api/auth/discord/login?${params.toString()}`;
+};

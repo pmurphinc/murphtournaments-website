@@ -27,6 +27,12 @@ export const users = mysqlTable("users", {
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
+  /** Stable Discord user id for accounts that signed in via Discord OAuth. */
+  discordId: varchar("discordId", { length: 32 }),
+  /** Discord username (global handle) used for display in Team Finder listings. */
+  discordUsername: varchar("discordUsername", { length: 64 }),
+  /** Fully-resolved Discord avatar URL, derived server-side from the avatar hash. */
+  discordAvatarUrl: varchar("discordAvatarUrl", { length: 512 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -279,3 +285,118 @@ export const vodSuggestedEvents = mysqlTable(
 
 export type VodSuggestedEvent = typeof vodSuggestedEvents.$inferSelect;
 export type InsertVodSuggestedEvent = typeof vodSuggestedEvents.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// Team Finder
+// Public feature that helps THE FINALS players find teammates and helps teams
+// recruit players for upcoming tournaments. A single table backs both listing
+// types, discriminated by `listingType`. Type-specific columns are nullable so
+// the same table can describe a player or a team without a sparse join.
+// ---------------------------------------------------------------------------
+export const teamFinderListings = mysqlTable(
+  "team_finder_listings",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    /** Owner of the listing. Only the owner or an admin may edit/renew/close/delete. */
+    ownerUserId: int("ownerUserId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** Discriminator: "player" (looking for team) or "team" (looking for player). */
+    listingType: mysqlEnum("listingType", ["player", "team"]).notNull(),
+    /** Lifecycle status of the listing. */
+    status: mysqlEnum("status", ["active", "filled", "closed", "expired"])
+      .default("active")
+      .notNull(),
+    /** Region applies to both listing types. */
+    region: mysqlEnum("region", [
+      "NA",
+      "EU",
+      "SA",
+      "ASIA",
+      "OCE",
+      "MENA",
+      "GLOBAL",
+    ]).notNull(),
+    /** Optional target tournament both listing types may reference. */
+    targetTournament: varchar("targetTournament", { length: 120 }),
+    /** Free-text description shared by both listing types. */
+    description: varchar("description", { length: 600 }).notNull(),
+
+    // --- Player listing fields (null for team listings) ---
+    embarkId: varchar("embarkId", { length: 64 }),
+    /** Comma-separated subset of Light,Medium,Heavy for the player's main class(es). */
+    mainClasses: varchar("mainClasses", { length: 32 }),
+    preferredRole: varchar("preferredRole", { length: 120 }),
+    experience: varchar("experience", { length: 240 }),
+    availability: varchar("availability", { length: 240 }),
+    twitchUrl: varchar("twitchUrl", { length: 256 }),
+    youtubeUrl: varchar("youtubeUrl", { length: 256 }),
+
+    // --- Team listing fields (null for player listings) ---
+    teamName: varchar("teamName", { length: 120 }),
+    rosterCount: int("rosterCount"),
+    /** Class or role the team needs. */
+    neededClass: varchar("neededClass", { length: 120 }),
+    practiceAvailability: varchar("practiceAvailability", { length: 240 }),
+
+    // --- Moderation / lifecycle ---
+    /** When set, the listing is hidden from the public board by a moderator. */
+    hiddenByAdmin: int("hiddenByAdmin").default(0).notNull(),
+    /** Listings expire automatically 30 days after creation/renewal. */
+    expiresAt: datetime("expiresAt").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    index("team_finder_listings_ownerUserId_idx").on(table.ownerUserId),
+    index("team_finder_listings_listingType_idx").on(table.listingType),
+    index("team_finder_listings_status_idx").on(table.status),
+    index("team_finder_listings_region_idx").on(table.region),
+    index("team_finder_listings_expiresAt_idx").on(table.expiresAt),
+    index("team_finder_listings_createdAt_idx").on(table.createdAt),
+    check(
+      "team_finder_listings_rosterCount_range",
+      sql`${table.rosterCount} IS NULL OR (${table.rosterCount} >= 0 AND ${table.rosterCount} <= 10)`
+    ),
+  ]
+);
+
+export type TeamFinderListing = typeof teamFinderListings.$inferSelect;
+export type InsertTeamFinderListing = typeof teamFinderListings.$inferInsert;
+
+// Private moderation records created by the "Report Listing" action. These are
+// never exposed publicly and are only readable by admins.
+export const teamFinderReports = mysqlTable(
+  "team_finder_reports",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    listingId: int("listingId")
+      .notNull()
+      .references(() => teamFinderListings.id, { onDelete: "cascade" }),
+    /** Reporter user id when the report came from a signed-in user. */
+    reporterUserId: int("reporterUserId").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    reason: mysqlEnum("reason", [
+      "spam",
+      "inappropriate",
+      "scam",
+      "impersonation",
+      "other",
+    ]).notNull(),
+    details: varchar("details", { length: 600 }),
+    status: mysqlEnum("status", ["open", "reviewed", "dismissed"])
+      .default("open")
+      .notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    index("team_finder_reports_listingId_idx").on(table.listingId),
+    index("team_finder_reports_status_idx").on(table.status),
+    index("team_finder_reports_createdAt_idx").on(table.createdAt),
+  ]
+);
+
+export type TeamFinderReport = typeof teamFinderReports.$inferSelect;
+export type InsertTeamFinderReport = typeof teamFinderReports.$inferInsert;

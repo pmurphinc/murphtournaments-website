@@ -10,4 +10,9 @@ export const ENV = {
   twitchClientId: process.env.TWITCH_CLIENT_ID ?? "",
   twitchClientSecret: process.env.TWITCH_CLIENT_SECRET ?? "",
   googleSheetsApiKey: process.env.GOOGLE_SHEETS_API_KEY ?? "",
+  // Discord OAuth2 (Team Finder sign-in). Only the basic `identify` scope is used.
+  discordClientId: process.env.DISCORD_CLIENT_ID ?? "",
+  discordClientSecret: process.env.DISCORD_CLIENT_SECRET ?? "",
+  // Optional fixed redirect URI; when empty it is derived from the request origin.
+  discordRedirectUri: process.env.DISCORD_REDIRECT_URI ?? "",
 };

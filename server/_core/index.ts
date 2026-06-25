@@ -6,6 +6,7 @@ import net from "net";
 import path from "path";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
+import { registerDiscordOAuthRoutes } from "./discordOAuth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -59,6 +60,9 @@ async function startServer() {
   );
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
+
+  // Discord OAuth2 sign-in under /api/auth/discord/*
+  registerDiscordOAuthRoutes(app);
 
   // Webhook endpoint for Discord bot tournament updates
   app.post("/api/webhooks/tournament", handleTournamentWebhook);

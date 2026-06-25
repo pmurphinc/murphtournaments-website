@@ -55,6 +55,7 @@ export default function Navigation() {
     //   ]
     // },
     { label: "Balance Archive", href: "/balance-archive" },
+    { label: "Team Finder", href: "/team-finder" },
     { label: "About", href: "/about" },
     { label: "Watch", href: "/watch" },
   ];
