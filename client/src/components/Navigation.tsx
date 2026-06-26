@@ -65,17 +65,21 @@ export default function Navigation() {
         {/* Logo Section */}
         <div className="flex shrink-0 items-center gap-2 sm:gap-3 md:gap-4 lg:gap-6">
           {/* Murph Tournaments Logo - First */}
-          <Link href="/" className="flex h-12 shrink-0 items-center md:h-14">
+          <Link
+            href="/"
+            aria-label="Murph Tournaments home"
+            className="flex h-14 shrink-0 items-center"
+          >
             <img
-              src="https://d2xsxph8kpxj0f.cloudfront.net/310519663462787524/GzitzUSk3snQMAtW4LnLnQ/MurphTournaments_logo_747bd67f.png"
+              src="/images/Murph%20Tournaments_logo.png"
               alt="Murph Tournaments"
-              className="h-12 w-auto shrink-0 cursor-pointer object-contain transition-opacity hover:opacity-80 md:h-14"
+              className="block h-full w-auto shrink-0 cursor-pointer object-contain transition-opacity hover:opacity-80"
             />
           </Link>
         </div>
 
         {/* Desktop Navigation */}
-        <div className="hidden md:flex items-center gap-8">
+        <div className="hidden lg:flex items-center gap-8">
           {navItems.map(item => (
             <div key={item.label} className="relative group">
               {item.isDropdownOnly ? (
@@ -111,7 +115,7 @@ export default function Navigation() {
         {/* Mobile Menu Button */}
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="md:hidden text-neon-cyan hover:text-neon-magenta transition-colors"
+          className="lg:hidden text-neon-cyan hover:text-neon-magenta transition-colors"
         >
           {isOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
@@ -119,7 +123,7 @@ export default function Navigation() {
 
       {/* Mobile Navigation */}
       {isOpen && (
-        <div className="md:hidden bg-dark-purple border-t border-neon-magenta/30">
+        <div className="lg:hidden bg-dark-purple border-t border-neon-magenta/30">
           <div className="container py-4 flex flex-col gap-4">
             {navItems.map(item => (
               <div key={item.label}>
