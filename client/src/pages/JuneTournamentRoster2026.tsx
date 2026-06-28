@@ -18,7 +18,7 @@ interface StatCard {
 }
 
 const rosterTeams: readonly RosterTeam[] = [
-  { id: 1, name: 'Team Tempo', captain: 'Mike#2590', players: ['Jerahmeel#8692', 'straightkix.ttv#5818'] },
+  { id: 1, name: 'Daystar', captain: 'Mike#2590', players: ['Jerahmeel#8692', 'straightkix.ttv#5818'] },
   { id: 2, name: 'Dojo Of Fao', captain: 'Wei_Faostest#2505', players: ['Wei_Faoster#0592', 'Wei_Fao#4674'], substitute: 'Wei_Faostify#9907' },
   { id: 3, name: 'Seismic', captain: 'Kzoe#0633', players: ['NiceBoy#1697', 'Pluto#8051'] },
   { id: 4, name: 'SHOOTERZ ONLY', captain: 'MISFIT_GM#5193', players: ['Boog2SmootgYFS#5600', 'Alwayscapone#9684'] },
