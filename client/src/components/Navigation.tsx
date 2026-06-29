@@ -27,6 +27,7 @@ export default function Navigation() {
   const navItems: NavItem[] = [
     { label: "Home", href: "/" },
     { label: "Map RNG", href: "/maprng" },
+    { label: "Weapon Archive", href: "/balance-archive" },
     {
       label: "Tournament",
       href: "/tournaments/june-2026",
@@ -54,7 +55,6 @@ export default function Navigation() {
     //     { label: '7th Circle', href: '/bracket2' },
     //   ]
     // },
-    { label: "Balance Archive", href: "/balance-archive" },
     { label: "About", href: "/about" },
     { label: "Watch", href: "/watch" },
   ];
