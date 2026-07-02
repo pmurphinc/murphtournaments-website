@@ -28,6 +28,7 @@ export default function Navigation() {
     { label: "Home", href: "/" },
     { label: "Map RNG", href: "/maprng" },
     { label: "Weapon Archive", href: "/balance-archive" },
+    { label: "Team Finder", href: "/team-finder" },
     {
       label: "Tournament",
       href: "/tournaments/june-2026",
