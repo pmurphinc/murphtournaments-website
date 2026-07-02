@@ -27,6 +27,7 @@ import BalanceArchiveDetail from "./pages/BalanceArchiveDetail";
 import VodAnalysis from "./pages/VodAnalysis";
 import VodAnalysisDetail from "./pages/VodAnalysisDetail";
 import VodTeamInsights from "./pages/VodTeamInsights";
+import TeamFinder from "./pages/TeamFinder";
 import { useEffect } from "react";
 
 /**
@@ -82,6 +83,7 @@ function Router() {
             component={BalanceArchiveDetail}
           />
           <Route path={"/balance-archive"} component={BalanceArchive} />
+          <Route path={"/team-finder"} component={TeamFinder} />
           <Route path={"/404"} component={NotFound} />
           {/* Final fallback route */}
           <Route component={NotFound} />

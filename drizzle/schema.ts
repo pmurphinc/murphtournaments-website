@@ -8,6 +8,7 @@ import {
   mysqlTable,
   text,
   timestamp,
+  uniqueIndex,
   varchar,
 } from "drizzle-orm/mysql-core";
 
@@ -31,10 +32,64 @@ export const users = mysqlTable("users", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
+  discordDisplayName: varchar("discordDisplayName", { length: 255 }),
+  discordUsername: varchar("discordUsername", { length: 255 }),
 });
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
+
+export const teamFinderListings = mysqlTable(
+  "team_finder_listings",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    title: varchar("title", { length: 120 }).notNull(),
+    description: text("description").notNull(),
+    platform: varchar("platform", { length: 64 }),
+    region: varchar("region", { length: 64 }),
+    availability: varchar("availability", { length: 255 }),
+    contact: varchar("contact", { length: 255 }),
+    hiddenByAdmin: int("hiddenByAdmin").default(0).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    index("team_finder_listings_userId_idx").on(table.userId),
+    index("team_finder_listings_hiddenByAdmin_idx").on(table.hiddenByAdmin),
+    index("team_finder_listings_createdAt_idx").on(table.createdAt),
+  ]
+);
+
+export type TeamFinderListing = typeof teamFinderListings.$inferSelect;
+export type InsertTeamFinderListing = typeof teamFinderListings.$inferInsert;
+
+export const teamFinderReports = mysqlTable(
+  "team_finder_reports",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    listingId: int("listingId")
+      .notNull()
+      .references(() => teamFinderListings.id, { onDelete: "cascade" }),
+    reporterUserId: int("reporterUserId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    reason: text("reason").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [
+    index("team_finder_reports_listingId_idx").on(table.listingId),
+    uniqueIndex("team_finder_reports_listing_reporter_unique").on(
+      table.listingId,
+      table.reporterUserId
+    ),
+  ]
+);
+
+export type TeamFinderReport = typeof teamFinderReports.$inferSelect;
+export type InsertTeamFinderReport = typeof teamFinderReports.$inferInsert;
 
 // Tournament status and live data
 export const tournaments = mysqlTable("tournaments", {
