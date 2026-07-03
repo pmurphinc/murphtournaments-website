@@ -35,10 +35,63 @@ export const users = mysqlTable("users", {
   discordDisplayName: varchar("discordDisplayName", { length: 255 }),
   discordUsername: varchar("discordUsername", { length: 255 }),
   discordAvatarUrl: varchar("discordAvatarUrl", { length: 512 }),
-});
+}, table => [
+  index("users_discordUsername_idx").on(table.discordUsername),
+]);
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
+
+export const managedTeams = mysqlTable(
+  "managed_teams",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    name: varchar("name", { length: 64 }).notNull(),
+    slug: varchar("slug", { length: 80 }).notNull().unique(),
+    captainUserId: int("captainUserId").notNull().references(() => users.id),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [index("managed_teams_captainUserId_idx").on(table.captainUserId)]
+);
+
+export const managedTeamMembers = mysqlTable(
+  "managed_team_members",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    teamId: int("teamId").notNull().references(() => managedTeams.id, { onDelete: "cascade" }),
+    userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    role: mysqlEnum("role", ["captain", "member"]).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [
+    index("managed_team_members_teamId_idx").on(table.teamId),
+    index("managed_team_members_userId_idx").on(table.userId),
+    uniqueIndex("managed_team_members_team_user_unique").on(table.teamId, table.userId),
+  ]
+);
+
+export const managedTeamInvites = mysqlTable(
+  "managed_team_invites",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    teamId: int("teamId").notNull().references(() => managedTeams.id, { onDelete: "cascade" }),
+    invitedUserId: int("invitedUserId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    createdByUserId: int("createdByUserId").notNull().references(() => users.id),
+    status: mysqlEnum("status", ["pending", "accepted", "declined", "revoked"]).default("pending").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    index("managed_team_invites_invited_status_idx").on(table.invitedUserId, table.status),
+    index("managed_team_invites_team_status_idx").on(table.teamId, table.status),
+  ]
+);
+
+export type ManagedTeam = typeof managedTeams.$inferSelect;
+export type ManagedTeamMember = typeof managedTeamMembers.$inferSelect;
+export type ManagedTeamInvite = typeof managedTeamInvites.$inferSelect;
+
 
 export const teamFinderListings = mysqlTable(
   "team_finder_listings",

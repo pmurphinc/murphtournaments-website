@@ -41,22 +41,22 @@ export default function Navigation() {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="flex items-center gap-2 rounded-full border border-yellow-400/40 bg-black/60 px-2 py-1 text-left transition hover:border-yellow-400 hover:bg-yellow-400/10 focus:outline-none focus:ring-2 focus:ring-yellow-400/60"
+          className="flex h-10 min-h-10 min-w-10 flex-none shrink-0 items-center gap-2 rounded-full border border-yellow-400/40 bg-black/60 px-1.5 py-1 text-left transition hover:border-yellow-400 hover:bg-yellow-400/10 focus:outline-none focus:ring-2 focus:ring-yellow-400/60 2xl:px-2"
           aria-label="Open Discord account menu"
         >
           <img
             src={user.discordAvatarUrl || undefined}
             alt=""
-            className="h-8 w-8 rounded-full border border-neon-cyan/40 bg-dark-purple object-cover"
+            className="h-8 w-8 min-w-8 flex-none shrink-0 rounded-full border border-neon-cyan/40 bg-dark-purple object-cover"
             referrerPolicy="no-referrer"
           />
-          <span className="hidden max-w-36 truncate font-mono text-xs font-bold text-white xl:inline">{displayName}</span>
-          <ChevronDown size={14} className="text-yellow-400" />
+          <span className="hidden max-w-36 truncate font-mono text-xs font-bold text-white 2xl:inline">{displayName}</span>
+          <ChevronDown size={14} className="flex-none shrink-0 text-yellow-400" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-72 border-yellow-400/40 bg-black text-white shadow-[0_0_28px_rgba(250,204,21,0.18)]">
+      <DropdownMenuContent align="end" sideOffset={8} collisionPadding={12} className="w-[min(18rem,calc(100vw-1.5rem))] border-yellow-400/40 bg-black text-white shadow-[0_0_28px_rgba(250,204,21,0.18)]">
         <DropdownMenuLabel className="font-mono">
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 flex-none shrink-0 items-center gap-2 sm:gap-3">
             <img src={user.discordAvatarUrl || undefined} alt="" className="h-10 w-10 rounded-full border border-neon-cyan/40 object-cover" referrerPolicy="no-referrer" />
             <div className="min-w-0">
               <p className="truncate text-sm text-white">{displayName}</p>
@@ -73,8 +73,8 @@ export default function Navigation() {
           <Link href="/team-finder?post=1">Post Listing</Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator className="bg-yellow-400/25" />
-        <DropdownMenuItem disabled className="font-mono text-white/45">
-          <span className="flex w-full items-center justify-between">Team Management <span className="text-[10px] uppercase text-yellow-400/70">Coming soon</span></span>
+        <DropdownMenuItem asChild className="cursor-pointer font-mono text-white focus:bg-yellow-400/15 focus:text-yellow-200">
+          <Link href="/teams">Team Management</Link>
         </DropdownMenuItem>
         <DropdownMenuItem disabled className="font-mono text-white/45">
           <span className="flex w-full items-center justify-between">Tournament Signups <span className="text-[10px] uppercase text-yellow-400/70">Coming soon</span></span>
@@ -142,7 +142,7 @@ export default function Navigation() {
         </div>
 
         {/* Desktop Navigation */}
-        <div className="hidden lg:flex items-center gap-8">
+        <div className="hidden xl:flex items-center gap-8">
           {navItems.map(item => (
             <div key={item.label} className="relative group">
               {item.isDropdownOnly ? (
@@ -175,12 +175,12 @@ export default function Navigation() {
           ))}
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 flex-none shrink-0 items-center gap-2 sm:gap-3">
           {accountMenu}
         {/* Mobile Menu Button */}
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="lg:hidden text-neon-cyan hover:text-neon-magenta transition-colors"
+          className="flex h-10 w-10 flex-none shrink-0 items-center justify-center text-neon-cyan transition-colors hover:text-neon-magenta xl:hidden"
         >
           {isOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
@@ -189,7 +189,7 @@ export default function Navigation() {
 
       {/* Mobile Navigation */}
       {isOpen && (
-        <div className="lg:hidden bg-dark-purple border-t border-neon-magenta/30">
+        <div className="xl:hidden bg-dark-purple border-t border-neon-magenta/30">
           <div className="container py-4 flex flex-col gap-4">
             {navItems.map(item => (
               <div key={item.label}>

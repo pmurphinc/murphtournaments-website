@@ -1,0 +1,26 @@
+import { z } from "zod";
+import { TRPCError } from "@trpc/server";
+import { protectedProcedure, router } from "./_core/trpc";
+import { isDiscordAuthenticatedUser } from "./_core/discordOAuth";
+import { cancelManagedTeamInvite, createManagedTeam, disbandManagedTeam, inviteManagedTeamByDiscordUsername, leaveManagedTeam, listMyTeamManagement, removeManagedTeamMember, renameManagedTeam, respondToManagedTeamInvite, transferManagedTeamCaptain } from "./teamManagement";
+
+const discordProcedure = protectedProcedure.use(async ({ ctx, next }) => {
+  if (!isDiscordAuthenticatedUser(ctx.user)) throw new TRPCError({ code: "FORBIDDEN", message: "Team Management requires Discord sign-in" });
+  return next({ ctx });
+});
+
+const teamId = z.number().int().positive();
+const teamName = z.string().trim().min(2).max(64);
+
+export const teamManagementRouter = router({
+  myTeams: discordProcedure.query(({ ctx }) => listMyTeamManagement(ctx.user.id)),
+  create: discordProcedure.input(z.object({ name: teamName })).mutation(({ ctx, input }) => createManagedTeam(ctx.user.id, input.name)),
+  rename: discordProcedure.input(z.object({ teamId, name: teamName })).mutation(({ ctx, input }) => renameManagedTeam(ctx.user.id, input.teamId, input.name)),
+  disband: discordProcedure.input(z.object({ teamId, confirmation: z.literal("DISBAND") })).mutation(({ ctx, input }) => disbandManagedTeam(ctx.user.id, input.teamId, input.confirmation)),
+  inviteByDiscordUsername: discordProcedure.input(z.object({ teamId, discordUsername: z.string().trim().min(2).max(64) })).mutation(({ ctx, input }) => inviteManagedTeamByDiscordUsername(ctx.user.id, input.teamId, input.discordUsername)),
+  respondToInvite: discordProcedure.input(z.object({ inviteId: z.number().int().positive(), response: z.enum(["accept", "decline"]) })).mutation(({ ctx, input }) => respondToManagedTeamInvite(ctx.user.id, input.inviteId, input.response)),
+  cancelInvite: discordProcedure.input(z.object({ inviteId: z.number().int().positive() })).mutation(({ ctx, input }) => cancelManagedTeamInvite(ctx.user.id, input.inviteId)),
+  removeMember: discordProcedure.input(z.object({ teamId, memberUserId: z.number().int().positive() })).mutation(({ ctx, input }) => removeManagedTeamMember(ctx.user.id, input.teamId, input.memberUserId)),
+  transferCaptain: discordProcedure.input(z.object({ teamId, newCaptainUserId: z.number().int().positive() })).mutation(({ ctx, input }) => transferManagedTeamCaptain(ctx.user.id, input.teamId, input.newCaptainUserId)),
+  leaveTeam: discordProcedure.input(z.object({ teamId })).mutation(({ ctx, input }) => leaveManagedTeam(ctx.user.id, input.teamId)),
+});
