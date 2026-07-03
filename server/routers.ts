@@ -1,5 +1,4 @@
-import { getSessionCookieOptions } from "./_core/cookies";
-import { COOKIE_NAME } from "../shared/const";
+import { clearSessionCookie } from "./_core/logout";
 import { systemRouter } from "./_core/systemRouter";
 import { teamFinderRouter } from "./teamFinderRouter";
 import { ENV } from "./_core/env";
@@ -338,8 +337,7 @@ export const appRouter = router({
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
-      const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+      clearSessionCookie(ctx.req, ctx.res);
       return {
         success: true,
       } as const;

@@ -23,6 +23,9 @@ function createAuthContext(): { ctx: TrpcContext; clearedCookies: CookieCall[] }
     createdAt: new Date(),
     updatedAt: new Date(),
     lastSignedIn: new Date(),
+    discordDisplayName: null,
+    discordUsername: null,
+    discordAvatarUrl: null,
   };
 
   const ctx: TrpcContext = {

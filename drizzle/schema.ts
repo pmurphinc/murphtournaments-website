@@ -34,6 +34,7 @@ export const users = mysqlTable("users", {
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
   discordDisplayName: varchar("discordDisplayName", { length: 255 }),
   discordUsername: varchar("discordUsername", { length: 255 }),
+  discordAvatarUrl: varchar("discordAvatarUrl", { length: 512 }),
 });
 
 export type User = typeof users.$inferSelect;
