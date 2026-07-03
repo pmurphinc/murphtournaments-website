@@ -1205,6 +1205,14 @@
             "status"
           ],
           "isUnique": false
+        },
+        "managed_team_invites_team_invited_unique": {
+          "name": "managed_team_invites_team_invited_unique",
+          "columns": [
+            "teamId",
+            "invitedUserId"
+          ],
+          "isUnique": true
         }
       },
       "foreignKeys": {},

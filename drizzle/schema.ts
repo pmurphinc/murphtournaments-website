@@ -85,6 +85,7 @@ export const managedTeamInvites = mysqlTable(
   table => [
     index("managed_team_invites_invited_status_idx").on(table.invitedUserId, table.status),
     index("managed_team_invites_team_status_idx").on(table.teamId, table.status),
+    uniqueIndex("managed_team_invites_team_invited_unique").on(table.teamId, table.invitedUserId),
   ]
 );
 

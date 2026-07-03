@@ -42,9 +42,13 @@ ALTER TABLE `managed_team_invites` ADD CONSTRAINT `managed_team_invites_invitedU
 --> statement-breakpoint
 ALTER TABLE `managed_team_invites` ADD CONSTRAINT `managed_team_invites_createdByUserId_users_id_fk` FOREIGN KEY (`createdByUserId`) REFERENCES `users`(`id`) ON DELETE restrict ON UPDATE no action;
 --> statement-breakpoint
+CREATE INDEX `managed_teams_captainUserId_idx` ON `managed_teams` (`captainUserId`);
+--> statement-breakpoint
 CREATE INDEX `managed_team_members_teamId_idx` ON `managed_team_members` (`teamId`);
 --> statement-breakpoint
 CREATE INDEX `managed_team_members_userId_idx` ON `managed_team_members` (`userId`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `managed_team_invites_team_invited_unique` ON `managed_team_invites` (`teamId`,`invitedUserId`);
 --> statement-breakpoint
 CREATE INDEX `managed_team_invites_invited_status_idx` ON `managed_team_invites` (`invitedUserId`,`status`);
 --> statement-breakpoint
