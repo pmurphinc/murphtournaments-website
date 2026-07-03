@@ -21,3 +21,18 @@ describe("Discord avatar header control", () => {
     expect(source).toContain("Coming soon");
   });
 });
+
+
+describe("Mobile navigation dropdown styling", () => {
+  const source = readFileSync(new URL("./Navigation.tsx", import.meta.url), "utf8");
+
+  it("keeps the mobile menu hidden at the xl desktop breakpoint", () => {
+    expect(source).toContain("xl:hidden");
+  });
+
+  it("uses an opaque compact right-aligned panel without backdrop blur", () => {
+    expect(source).toContain("absolute right-4 top-16 w-[min(20rem,calc(100vw-2rem))]");
+    expect(source).toContain("bg-[#0a0e27]");
+    expect(source).not.toContain("backdrop-blur");
+  });
+});
