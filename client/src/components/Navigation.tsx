@@ -6,7 +6,6 @@ import { Menu, X, ChevronDown } from "lucide-react";
  * Navigation Component
  * Cyberpunk Neon Rebellion Design
  * - Asymmetric layout with neon accents
- * - Mobile-first responsive design
  * - Glowing borders on hover
  * - Primary colors: magenta, cyan, gold
  */
@@ -28,7 +27,6 @@ export default function Navigation() {
     { label: "Home", href: "/" },
     { label: "Map RNG", href: "/maprng" },
     { label: "Weapon Archive", href: "/balance-archive" },
-    { label: "Team Finder", href: "/team-finder" },
     {
       label: "Tournament",
       href: "/tournaments/june-2026",
