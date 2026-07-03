@@ -71,6 +71,13 @@
       "when": 1783039200000,
       "tag": "0009_add_team_finder",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1783125600000,
+      "tag": "0010_add_team_finder_listing_metadata",
+      "breakpoints": true
     }
   ]
 }
