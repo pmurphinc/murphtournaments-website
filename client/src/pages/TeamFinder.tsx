@@ -38,14 +38,19 @@ export default function TeamFinder() {
   const [form, setForm] = useState<FormState>(defaults);
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("discord") === "error") {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("discord") === "error") {
       toast.error("Discord sign-in failed. Please try again.");
+    }
+    if (params.get("post") === "1") {
+      setFormOpen(true);
     }
   }, []);
 
   const user = auth.data;
   const isAdmin = user?.role === "admin";
-  const isDiscordUser = user?.loginMethod === "discord" && user.openId?.startsWith("discord:");
+  const isDiscordUser = user?.loginMethod === "discord";
+  const displayName = user?.discordDisplayName || user?.name || "Discord user";
   const payload = useMemo(() => ({ ...form, notes: form.notes.trim() || null }), [form]);
 
   const afterWrite = (message: string) => { toast.success(message); setFormOpen(false); setEditingId(null); setForm(defaults); utils.teamFinder.list.invalidate(); };
@@ -65,7 +70,7 @@ export default function TeamFinder() {
       </div>
 
       <div className="mb-8 rounded-lg border border-yellow-400/25 bg-black/60 p-5">
-        {!isDiscordUser ? <div className="flex flex-wrap items-center justify-between gap-4"><p className="text-white/75">Continue with Discord to post, edit, delete, or report listings.</p><Button asChild><a href="/api/auth/discord/login">Continue with Discord</a></Button></div> : <Button onClick={() => { setEditingId(null); setForm(defaults); setFormOpen(v => !v); }}>{formOpen ? "Close form" : "Post listing"}</Button>}
+        {!isDiscordUser ? <div className="flex flex-wrap items-center justify-between gap-4"><p className="text-white/75">Continue with Discord to post, edit, delete, or report listings.</p><Button asChild><a href="/api/auth/discord/login">Continue with Discord</a></Button></div> : <div className="flex flex-wrap items-center justify-between gap-4"><p className="flex items-center gap-2 text-sm text-white/70">Signed in as {user?.discordAvatarUrl ? <img src={user.discordAvatarUrl} alt="" className="h-7 w-7 rounded-full border border-neon-cyan/40 object-cover" referrerPolicy="no-referrer" /> : null}<span className="text-white">{displayName}</span>{user?.discordUsername ? <span className="text-white/50">(@{user.discordUsername})</span> : null}</p><Button onClick={() => { setEditingId(null); setForm(defaults); setFormOpen(v => !v); }}>{formOpen ? "Close form" : "Post listing"}</Button></div>}
       </div>
 
       {formOpen && isDiscordUser && <form className="mb-8 grid gap-5 rounded-lg border border-neon-cyan/25 bg-black/70 p-5" onSubmit={e => { e.preventDefault(); editingId ? update.mutate({ id: editingId, ...payload }) : create.mutate(payload); }}>

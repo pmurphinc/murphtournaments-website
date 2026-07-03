@@ -78,6 +78,13 @@
       "when": 1783125600000,
       "tag": "0010_add_team_finder_listing_metadata",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1783129200000,
+      "tag": "0011_add_discord_avatar_url",
+      "breakpoints": true
     }
   ]
 }

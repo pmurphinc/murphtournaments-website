@@ -18,7 +18,21 @@ const discordUserSchema = z.object({
   id: z.string().regex(/^\d+$/),
   username: z.string().min(1),
   global_name: z.string().nullable().optional(),
+  avatar: z.string().nullable().optional(),
 });
+
+export function getDiscordAvatarUrl(discordUser: {
+  id: string;
+  avatar?: string | null;
+}) {
+  if (discordUser.avatar) {
+    const extension = discordUser.avatar.startsWith("a_") ? "gif" : "png";
+    return `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.${extension}?size=128`;
+  }
+
+  const fallbackIndex = BigInt(discordUser.id) % BigInt(5);
+  return `https://cdn.discordapp.com/embed/avatars/${fallbackIndex.toString()}.png`;
+}
 
 const getQueryParam = (req: Request, key: string): string | undefined => {
   const value = req.query[key];
@@ -123,6 +137,7 @@ export function registerDiscordOAuthRoutes(app: Express) {
       const discordUser = await fetchDiscordUser(accessToken);
       const openId = `discord:${discordUser.id}`;
       const displayName = discordUser.global_name || discordUser.username;
+      const discordAvatarUrl = getDiscordAvatarUrl(discordUser);
 
       await db.upsertUser({
         openId,
@@ -130,6 +145,7 @@ export function registerDiscordOAuthRoutes(app: Express) {
         loginMethod: "discord",
         discordDisplayName: displayName,
         discordUsername: discordUser.username,
+        discordAvatarUrl,
         lastSignedIn: new Date(),
       });
 

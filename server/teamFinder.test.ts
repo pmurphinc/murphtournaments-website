@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isDiscordAuthenticatedUser, validateDiscordState } from "./_core/discordOAuth";
+import { getDiscordAvatarUrl, isDiscordAuthenticatedUser, validateDiscordState } from "./_core/discordOAuth";
 import { deriveTeamFinderListingContent } from "./teamFinder";
 
 describe("Team Finder Discord gating helpers", () => {
@@ -32,5 +32,20 @@ describe("Team Finder listing content", () => {
       title: "LFP · Crossplay · EU",
       description: "Need one sub for Sunday.",
     });
+  });
+});
+
+
+describe("Discord avatar URL generation", () => {
+  it("uses the Discord CDN avatar hash when present", () => {
+    expect(getDiscordAvatarUrl({ id: "123456789", avatar: "abc123" })).toBe("https://cdn.discordapp.com/avatars/123456789/abc123.png?size=128");
+  });
+
+  it("uses animated gif avatars for animated Discord hashes", () => {
+    expect(getDiscordAvatarUrl({ id: "123456789", avatar: "a_animated" })).toBe("https://cdn.discordapp.com/avatars/123456789/a_animated.gif?size=128");
+  });
+
+  it("uses a generated Discord fallback avatar when no custom avatar exists", () => {
+    expect(getDiscordAvatarUrl({ id: "123456789", avatar: null })).toBe("https://cdn.discordapp.com/embed/avatars/4.png");
   });
 });

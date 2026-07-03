@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { Menu, X, ChevronDown } from "lucide-react";
+import { Menu, X, ChevronDown, LogOut } from "lucide-react";
+import { useAuth } from "@/_core/hooks/useAuth";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 /**
  * Navigation Component
@@ -22,6 +31,61 @@ export default function Navigation() {
   const [bracketOpen, setBracketOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [tournamentOpen, setTournamentOpen] = useState(false);
+  const { user, logout, loading } = useAuth();
+  const isDiscordUser = user?.loginMethod === "discord";
+  const displayName = user?.discordDisplayName || user?.name || "Discord user";
+  const username = user?.discordUsername;
+
+  const accountMenu = isDiscordUser && user ? (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="flex items-center gap-2 rounded-full border border-yellow-400/40 bg-black/60 px-2 py-1 text-left transition hover:border-yellow-400 hover:bg-yellow-400/10 focus:outline-none focus:ring-2 focus:ring-yellow-400/60"
+          aria-label="Open Discord account menu"
+        >
+          <img
+            src={user.discordAvatarUrl || undefined}
+            alt=""
+            className="h-8 w-8 rounded-full border border-neon-cyan/40 bg-dark-purple object-cover"
+            referrerPolicy="no-referrer"
+          />
+          <span className="hidden max-w-36 truncate font-mono text-xs font-bold text-white xl:inline">{displayName}</span>
+          <ChevronDown size={14} className="text-yellow-400" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-72 border-yellow-400/40 bg-black text-white shadow-[0_0_28px_rgba(250,204,21,0.18)]">
+        <DropdownMenuLabel className="font-mono">
+          <div className="flex items-center gap-3">
+            <img src={user.discordAvatarUrl || undefined} alt="" className="h-10 w-10 rounded-full border border-neon-cyan/40 object-cover" referrerPolicy="no-referrer" />
+            <div className="min-w-0">
+              <p className="truncate text-sm text-white">{displayName}</p>
+              {username ? <p className="truncate text-xs text-white/55">@{username}</p> : null}
+            </div>
+          </div>
+          <p className="mt-3 rounded border border-neon-cyan/25 bg-neon-cyan/10 px-2 py-1 text-[11px] uppercase tracking-widest text-neon-cyan">Signed in with Discord</p>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator className="bg-yellow-400/25" />
+        <DropdownMenuItem asChild className="cursor-pointer font-mono text-white focus:bg-yellow-400/15 focus:text-yellow-200">
+          <Link href="/team-finder">My Listings</Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild className="cursor-pointer font-mono text-white focus:bg-yellow-400/15 focus:text-yellow-200">
+          <Link href="/team-finder?post=1">Post Listing</Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator className="bg-yellow-400/25" />
+        <DropdownMenuItem disabled className="font-mono text-white/45">
+          <span className="flex w-full items-center justify-between">Team Management <span className="text-[10px] uppercase text-yellow-400/70">Coming soon</span></span>
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled className="font-mono text-white/45">
+          <span className="flex w-full items-center justify-between">Tournament Signups <span className="text-[10px] uppercase text-yellow-400/70">Coming soon</span></span>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator className="bg-yellow-400/25" />
+        <DropdownMenuItem onClick={() => void logout()} disabled={loading} className="cursor-pointer font-mono text-neon-magenta focus:bg-neon-magenta/15 focus:text-neon-magenta">
+          <LogOut size={14} /> Sign Out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  ) : null;
 
   const navItems: NavItem[] = [
     { label: "Home", href: "/" },
@@ -111,6 +175,8 @@ export default function Navigation() {
           ))}
         </div>
 
+        <div className="flex items-center gap-3">
+          {accountMenu}
         {/* Mobile Menu Button */}
         <button
           onClick={() => setIsOpen(!isOpen)}
@@ -118,6 +184,7 @@ export default function Navigation() {
         >
           {isOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
+        </div>
       </div>
 
       {/* Mobile Navigation */}
