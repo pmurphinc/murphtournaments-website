@@ -8,9 +8,24 @@ type UseAuthOptions = {
   redirectPath?: string;
 };
 
+export function resolveAuthRedirectPath({
+  redirectOnUnauthenticated,
+  redirectPath,
+}: Required<Pick<UseAuthOptions, "redirectOnUnauthenticated">> &
+  Pick<UseAuthOptions, "redirectPath">) {
+  if (redirectPath) return redirectPath;
+  if (!redirectOnUnauthenticated) return "";
+
+  return getLoginUrl();
+}
+
 export function useAuth(options?: UseAuthOptions) {
-  const { redirectOnUnauthenticated = false, redirectPath = getLoginUrl() } =
-    options ?? {};
+  const redirectOnUnauthenticated =
+    options?.redirectOnUnauthenticated ?? false;
+  const redirectPath = resolveAuthRedirectPath({
+    redirectOnUnauthenticated,
+    redirectPath: options?.redirectPath,
+  });
   const utils = trpc.useUtils();
 
   const meQuery = trpc.auth.me.useQuery(undefined, {
