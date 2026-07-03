@@ -123,7 +123,7 @@ export default function Navigation() {
   ];
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-dark-charcoal border-b border-neon-magenta/30 backdrop-blur-sm">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-dark-charcoal border-b border-neon-magenta/30">
       <div className="container flex items-center justify-between h-16">
         {/* Logo Section */}
         <div className="flex shrink-0 items-center gap-2 sm:gap-3 md:gap-4 lg:gap-6">
@@ -189,14 +189,14 @@ export default function Navigation() {
 
       {/* Mobile Navigation */}
       {isOpen && (
-        <div className="xl:hidden bg-dark-purple border-t border-neon-magenta/30">
-          <div className="container py-4 flex flex-col gap-4">
+        <div className="absolute right-4 top-16 w-[min(20rem,calc(100vw-2rem))] border border-neon-magenta/40 bg-[#0a0e27] shadow-[0_12px_28px_rgba(0,0,0,0.55)] xl:hidden sm:right-6 lg:right-8">
+          <div className="flex max-h-[calc(100vh-5rem)] flex-col gap-1 overflow-y-auto p-2">
             {navItems.map(item => (
               <div key={item.label}>
                 {item.isDropdownOnly ? (
                   // Dropdown-only item (Bracket) - not clickable
                   <div
-                    className="text-sm font-mono uppercase tracking-widest text-white/80 hover:text-neon-magenta transition-colors py-2 cursor-pointer flex items-center justify-between"
+                    className="flex cursor-pointer items-center justify-between px-3 py-2 font-mono text-sm uppercase tracking-widest text-white/80 transition-colors hover:text-neon-magenta"
                     onClick={() => setBracketOpen(!bracketOpen)}
                   >
                     {item.label}
@@ -211,7 +211,7 @@ export default function Navigation() {
                   // Regular item or item with submenu
                   <Link href={item.href}>
                     <div
-                      className="text-sm font-mono uppercase tracking-widest text-white/80 hover:text-neon-magenta transition-colors py-2 cursor-pointer flex items-center justify-between"
+                      className="flex cursor-pointer items-center justify-between px-3 py-2 font-mono text-sm uppercase tracking-widest text-white/80 transition-colors hover:text-neon-magenta"
                       onClick={() => {
                         if (!item.submenu) setIsOpen(false);
                         if (item.label === "History")
@@ -236,11 +236,11 @@ export default function Navigation() {
                   </Link>
                 )}
                 {item.submenu && item.label === "Bracket" && bracketOpen && (
-                  <div className="pl-4 flex flex-col gap-1 mt-2 border-l-2 border-neon-magenta/50">
+                  <div className="ml-3 mt-1 flex flex-col gap-0 border-l-2 border-neon-magenta/50 pl-3">
                     {item.submenu.map(subitem => (
                       <Link key={subitem.href} href={subitem.href}>
                         <div
-                          className="text-xs font-mono text-white/70 hover:text-white hover:font-bold hover:bg-neon-magenta/10 hover:glow-magenta transition-all duration-200 py-2 px-3 cursor-pointer rounded"
+                          className="cursor-pointer px-3 py-2 font-mono text-xs text-white/70 transition-all duration-200 hover:bg-neon-magenta/10 hover:font-bold hover:text-white hover:glow-magenta"
                           onClick={() => setIsOpen(false)}
                         >
                           {subitem.label}
@@ -252,11 +252,11 @@ export default function Navigation() {
                 {item.submenu &&
                   item.label === "Tournament" &&
                   tournamentOpen && (
-                    <div className="pl-4 flex flex-col gap-1 mt-2 border-l-2 border-neon-magenta/50">
+                    <div className="ml-3 mt-1 flex flex-col gap-0 border-l-2 border-neon-magenta/50 pl-3">
                       {item.submenu.map(subitem => (
                         <Link key={subitem.href} href={subitem.href}>
                           <div
-                            className="text-xs font-mono text-white/70 hover:text-white hover:font-bold hover:bg-neon-magenta/10 hover:glow-magenta transition-all duration-200 py-2 px-3 cursor-pointer rounded"
+                            className="cursor-pointer px-3 py-2 font-mono text-xs text-white/70 transition-all duration-200 hover:bg-neon-magenta/10 hover:font-bold hover:text-white hover:glow-magenta"
                             onClick={() => setIsOpen(false)}
                           >
                             {subitem.label}
@@ -266,11 +266,11 @@ export default function Navigation() {
                     </div>
                   )}
                 {item.submenu && item.label === "History" && historyOpen && (
-                  <div className="pl-4 flex flex-col gap-1 mt-2 border-l-2 border-neon-magenta/50">
+                  <div className="ml-3 mt-1 flex flex-col gap-0 border-l-2 border-neon-magenta/50 pl-3">
                     {item.submenu.map(subitem => (
                       <Link key={subitem.href} href={subitem.href}>
                         <div
-                          className="text-xs font-mono text-white/70 hover:text-white hover:font-bold hover:bg-neon-magenta/10 hover:glow-magenta transition-all duration-200 py-2 px-3 cursor-pointer rounded"
+                          className="cursor-pointer px-3 py-2 font-mono text-xs text-white/70 transition-all duration-200 hover:bg-neon-magenta/10 hover:font-bold hover:text-white hover:glow-magenta"
                           onClick={() => setIsOpen(false)}
                         >
                           {subitem.label}
