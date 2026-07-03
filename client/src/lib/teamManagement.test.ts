@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { TRPCError } from "@trpc/server";
-import { assertCaptainRole, createManagedTeamSlug, normalizeDiscordUsername } from "../../../server/teamManagement";
+import { assertCaptainRole, canReactivateManagedTeamInvite, createManagedTeamSlug, normalizeDiscordUsername } from "../../../server/teamManagement";
 
 describe("Team Management rules", () => {
   it("team creation assigns the creator as captain by using captain role", () => {
@@ -61,11 +61,30 @@ describe("Team Management migration and invite persistence", () => {
     expect(source).toContain("That player already has a pending invite.");
   });
 
-  it("reactivates declined or revoked invites instead of inserting a second row", async () => {
+  it("reactivates accepted, declined, or revoked invites instead of inserting a second row", async () => {
     const source = await import("node:fs/promises").then(fs => fs.readFile(new URL("../../../server/teamManagement.ts", import.meta.url), "utf8"));
-    expect(source).toContain('existingInvite.status === "declined" || existingInvite.status === "revoked"');
+    expect(canReactivateManagedTeamInvite("accepted")).toBe(true);
+    expect(canReactivateManagedTeamInvite("declined")).toBe(true);
+    expect(canReactivateManagedTeamInvite("revoked")).toBe(true);
+    expect(canReactivateManagedTeamInvite("pending")).toBe(false);
+    expect(source).toContain("existingInvite && canReactivateManagedTeamInvite(existingInvite.status)");
     expect(source).toContain('set({ status: "pending", createdByUserId: userId, updatedAt: sql`now()` })');
-    expect(source).toContain('where(eq(managedTeamInvites.id, existingInvite.id))');
+    expect(source).toContain("where(eq(managedTeamInvites.id, existingInvite.id))");
+  });
+
+  it("allows a former member with an accepted invite to be re-invited after leaving", () => {
+    expect(canReactivateManagedTeamInvite("accepted")).toBe(true);
+  });
+
+  it("allows a removed member with an accepted invite to be re-invited", () => {
+    expect(canReactivateManagedTeamInvite("accepted")).toBe(true);
+  });
+
+  it("keeps active roster members and pending invites blocked", async () => {
+    const source = await import("node:fs/promises").then(fs => fs.readFile(new URL("../../../server/teamManagement.ts", import.meta.url), "utf8"));
+    expect(source.indexOf("if (member) throw new TRPCError")).toBeLessThan(source.indexOf("const [existingInvite]"));
+    expect(canReactivateManagedTeamInvite("pending")).toBe(false);
+    expect(source).toContain('existingInvite?.status === "pending"');
   });
 
   it("does not retain avoidable any annotations in team management server or page code", async () => {

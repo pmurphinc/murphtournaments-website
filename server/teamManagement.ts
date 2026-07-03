@@ -22,6 +22,10 @@ export function assertCaptainRole(role: ManagedTeamMemberRole | undefined, actio
   if (role !== "captain") throw new TRPCError({ code: "FORBIDDEN", message: `Only captains can ${action}.` });
 }
 
+export function canReactivateManagedTeamInvite(status: "pending" | "accepted" | "declined" | "revoked") {
+  return status === "accepted" || status === "declined" || status === "revoked";
+}
+
 async function dbOrThrow(): Promise<TeamManagementDb> {
   const db = await getDb();
   if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
@@ -96,7 +100,7 @@ export async function inviteManagedTeamByDiscordUsername(userId: number, teamId:
   if (member) throw new TRPCError({ code: "CONFLICT", message: "That player is already on this team." });
   const [existingInvite] = await db.select().from(managedTeamInvites).where(and(eq(managedTeamInvites.teamId, teamId), eq(managedTeamInvites.invitedUserId, invited.id))).limit(1);
   if (existingInvite?.status === "pending") throw new TRPCError({ code: "CONFLICT", message: "That player already has a pending invite." });
-  if (existingInvite && (existingInvite.status === "declined" || existingInvite.status === "revoked")) {
+  if (existingInvite && canReactivateManagedTeamInvite(existingInvite.status)) {
     await db.update(managedTeamInvites).set({ status: "pending", createdByUserId: userId, updatedAt: sql`now()` }).where(eq(managedTeamInvites.id, existingInvite.id));
     return { success: true, reactivated: true } as const;
   }
