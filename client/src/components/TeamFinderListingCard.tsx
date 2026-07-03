@@ -4,19 +4,27 @@ import { Button } from "@/components/ui/button";
 type Listing = {
   id: number;
   userId: number;
+  listingType: "lft" | "lfp";
   title: string;
   description: string;
   platform: string | null;
   region: string | null;
   availability: string | null;
+  preferredRole: string | null;
   contact: string | null;
   hiddenByAdmin: number;
+  discordDisplayName: string | null;
+  discordUsername: string | null;
 };
 
 type Props = {
   listing: Listing;
   isAdmin: boolean;
   currentUserId?: number;
+  isDiscordUser: boolean;
+  onEdit: (listing: Listing) => void;
+  onDelete: (id: number) => void;
+  onReport: (id: number) => void;
   onToggleHidden: (id: number, hiddenByAdmin: boolean) => void;
   isToggling?: boolean;
 };
@@ -25,19 +33,27 @@ export default function TeamFinderListingCard({
   listing,
   isAdmin,
   currentUserId,
+  isDiscordUser,
+  onEdit,
+  onDelete,
+  onReport,
   onToggleHidden,
   isToggling,
 }: Props) {
   const isHidden = listing.hiddenByAdmin === 1;
   const isOwner = currentUserId === listing.userId;
+  const badge = listing.listingType.toUpperCase();
 
   return (
-    <article className="rounded-lg border border-neon-cyan/30 bg-black/60 p-5 shadow-lg shadow-neon-cyan/10">
-      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="font-display text-2xl text-white">{listing.title}</h2>
+    <article className="rounded-lg border border-yellow-400/30 bg-black/70 p-5 shadow-lg shadow-yellow-400/10">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded bg-yellow-400 px-2 py-1 font-mono text-xs font-black text-black">{badge}</span>
+            <h2 className="font-display text-2xl text-white">{listing.title}</h2>
+          </div>
           <p className="font-mono text-xs uppercase tracking-widest text-neon-cyan">
-            {[listing.platform, listing.region].filter(Boolean).join(" • ") || "Any platform"}
+            {[listing.platform, listing.region, listing.availability, listing.preferredRole].filter(Boolean).join(" • ")}
           </p>
         </div>
         {isHidden && (
@@ -47,29 +63,27 @@ export default function TeamFinderListingCard({
         )}
       </div>
       <p className="whitespace-pre-line text-white/80">{listing.description}</p>
-      <dl className="mt-4 grid gap-3 text-sm text-white/75 sm:grid-cols-2">
-        <div>
-          <dt className="font-mono uppercase tracking-widest text-white/50">Availability</dt>
-          <dd>{listing.availability || "Ask player"}</dd>
-        </div>
-        <div>
-          <dt className="font-mono uppercase tracking-widest text-white/50">Contact</dt>
-          <dd>{listing.contact || "Sign in to coordinate"}</dd>
-        </div>
+      <dl className="mt-4 grid gap-3 text-sm text-white/75 sm:grid-cols-2 lg:grid-cols-4">
+        <div><dt className="font-mono uppercase tracking-widest text-white/50">Platform</dt><dd>{listing.platform}</dd></div>
+        <div><dt className="font-mono uppercase tracking-widest text-white/50">Region</dt><dd>{listing.region}</dd></div>
+        <div><dt className="font-mono uppercase tracking-widest text-white/50">Availability</dt><dd>{listing.availability}</dd></div>
+        <div><dt className="font-mono uppercase tracking-widest text-white/50">Role</dt><dd>{listing.preferredRole}</dd></div>
       </dl>
-      {isAdmin && (
-        <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-white/10 pt-4">
-          <Button
-            type="button"
-            variant={isHidden ? "default" : "outline"}
-            onClick={() => onToggleHidden(listing.id, !isHidden)}
-            disabled={isToggling}
-          >
+      <p className="mt-4 text-sm text-white/70">
+        Discord: <span className="font-semibold text-white">{listing.discordDisplayName || listing.discordUsername || "Unknown"}</span>
+        {listing.discordUsername ? <span className="text-white/50"> (@{listing.discordUsername})</span> : null}
+      </p>
+      <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-white/10 pt-4">
+        {isOwner && <Button type="button" onClick={() => onEdit(listing)}>Edit</Button>}
+        {isOwner && <Button type="button" variant="destructive" onClick={() => onDelete(listing.id)}>Delete</Button>}
+        {!isOwner && isDiscordUser && <Button type="button" variant="outline" onClick={() => onReport(listing.id)}>Report</Button>}
+        {isAdmin && (
+          <Button type="button" variant={isHidden ? "default" : "outline"} onClick={() => onToggleHidden(listing.id, !isHidden)} disabled={isToggling}>
             {isHidden ? "Unhide listing" : "Hide listing"}
           </Button>
-          {isOwner && <span className="text-xs text-white/50">This is your listing.</span>}
-        </div>
-      )}
+        )}
+        {!isDiscordUser && !isOwner && <span className="text-xs text-white/50">Sign in with Discord to report or post.</span>}
+      </div>
     </article>
   );
 }

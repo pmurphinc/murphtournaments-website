@@ -46,11 +46,13 @@ export const teamFinderListings = mysqlTable(
     userId: int("userId")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    listingType: mysqlEnum("listingType", ["lft", "lfp"]).default("lft").notNull(),
     title: varchar("title", { length: 120 }).notNull(),
     description: text("description").notNull(),
     platform: varchar("platform", { length: 64 }),
     region: varchar("region", { length: 64 }),
     availability: varchar("availability", { length: 255 }),
+    preferredRole: varchar("preferredRole", { length: 64 }),
     contact: varchar("contact", { length: 255 }),
     hiddenByAdmin: int("hiddenByAdmin").default(0).notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
