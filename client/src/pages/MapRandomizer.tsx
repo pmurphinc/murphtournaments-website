@@ -375,14 +375,14 @@ export default function MapRandomizer() {
                       type="button"
                       aria-pressed={selected}
                       onClick={() => toggleMap(map.id)}
-                      className={`flex items-center justify-between gap-3 rounded-sm border px-4 py-3 text-left font-mono transition-all ${selected ? "border-neon-gold bg-neon-gold/15 text-white shadow-[0_0_18px_rgba(255,215,0,0.18)]" : "border-white/15 bg-dark-charcoal/70 text-white/65 hover:border-neon-cyan hover:text-white"}`}
+                      className={`flex items-center justify-between gap-3 rounded-sm border px-4 py-3 text-left font-mono transition-all ${selected ? "border-neon-gold bg-[rgba(255,215,0,0.15)] text-white shadow-[0_0_18px_rgba(255,215,0,0.18)]" : "border-white/15 bg-dark-charcoal/70 text-white/65 hover:border-neon-cyan hover:text-white"}`}
                     >
                       <span>{map.name}</span>
                       <span
-                        className={`flex h-6 w-6 items-center justify-center rounded-sm border ${selected ? "border-neon-gold bg-neon-gold text-black" : "border-white/25 text-white/30"}`}
+                        className={`flex h-6 w-6 items-center justify-center rounded-sm border ${selected ? "border-neon-gold bg-[#ffd700] text-black" : "border-white/25 text-white/30"}`}
                         aria-hidden="true"
                       >
-                        {selected ? <Check size={15} /> : null}
+                        {selected ? <Check size={15} strokeWidth={3} /> : null}
                       </span>
                     </button>
                   );
