@@ -67,6 +67,18 @@ describe("Navigation active state and dropdown behavior", () => {
     );
   });
 
+  it("keeps desktop dropdown visibility click-driven without hover classes", () => {
+    expect(source).toContain("const toggleDropdown = (label: string) =>");
+    expect(source).toContain('${expanded ? "block" : "hidden"}');
+    expect(source).not.toContain("group-hover:block");
+    expect(source).not.toContain("group-focus-within:block");
+    expect(source).not.toContain('className="relative group"');
+  });
+
+  it("stacks desktop submenu links as full-width rows", () => {
+    expect(source).toContain("block w-full px-4 py-3 text-sm font-mono");
+  });
+
   it("uses the mobile close handler for direct links and submenu selections", () => {
     expect(source).toContain("const closeMobileMenu = () => {");
     expect(source).toContain("setHistoryOpen(false);");

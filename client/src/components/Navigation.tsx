@@ -93,7 +93,27 @@ export default function Navigation() {
   const getSubmenuClassName = (active: boolean, mobile = false) =>
     mobile
       ? `cursor-pointer px-3 py-2 font-mono text-xs ${active ? "text-neon-magenta" : "text-white/70"} transition-all duration-200 hover:bg-neon-magenta/10 hover:font-bold hover:text-neon-magenta hover:glow-magenta`
-      : `px-4 py-3 text-sm font-mono ${active ? "text-neon-magenta" : "text-white/80"} hover:text-neon-magenta hover:font-bold hover:bg-neon-magenta/20 transition-all duration-200 cursor-pointer first:rounded-t last:rounded-b border-b border-neon-magenta/30 last:border-b-0 hover:border-b-neon-magenta/50 hover:glow-magenta`;
+      : `block w-full px-4 py-3 text-sm font-mono ${active ? "text-neon-magenta" : "text-white/80"} hover:text-neon-magenta hover:font-bold hover:bg-neon-magenta/20 transition-all duration-200 cursor-pointer first:rounded-t last:rounded-b border-b border-neon-magenta/30 last:border-b-0 hover:border-b-neon-magenta/50 hover:glow-magenta`;
+
+  const toggleDropdown = (label: string) => {
+    if (label === "Bracket") {
+      setBracketOpen(open => !open);
+      setHistoryOpen(false);
+      setTournamentOpen(false);
+    }
+
+    if (label === "History") {
+      setHistoryOpen(open => !open);
+      setBracketOpen(false);
+      setTournamentOpen(false);
+    }
+
+    if (label === "Tournament") {
+      setTournamentOpen(open => !open);
+      setBracketOpen(false);
+      setHistoryOpen(false);
+    }
+  };
 
   const accountMenu =
     isDiscordUser && user ? (
@@ -210,21 +230,14 @@ export default function Navigation() {
               (tournamentOpen && item.label === "Tournament");
 
             return (
-              <div key={item.label} className="relative group">
+              <div key={item.label} className="relative">
                 {item.submenu ? (
                   <button
                     type="button"
                     className={`${getTopLevelClassName(active)} cursor-pointer`}
                     aria-expanded={expanded}
                     aria-haspopup="true"
-                    onClick={() => {
-                      if (item.label === "Bracket")
-                        setBracketOpen(!bracketOpen);
-                      if (item.label === "History")
-                        setHistoryOpen(!historyOpen);
-                      if (item.label === "Tournament")
-                        setTournamentOpen(!tournamentOpen);
-                    }}
+                    onClick={() => toggleDropdown(item.label)}
                   >
                     {item.label}
                     <ChevronDown size={14} />
@@ -240,7 +253,7 @@ export default function Navigation() {
                 )}
                 {item.submenu && (
                   <div
-                    className={`absolute left-0 mt-0 w-56 overflow-hidden rounded border-2 border-neon-magenta bg-black shadow-lg z-50 ${expanded ? "block" : "hidden"} group-hover:block group-focus-within:block`}
+                    className={`absolute left-0 mt-0 w-56 overflow-hidden rounded border-2 border-neon-magenta bg-black shadow-lg z-50 ${expanded ? "block" : "hidden"}`}
                   >
                     {item.submenu.map(subitem => {
                       const subitemActive = isRouteActive(subitem.href);
@@ -291,14 +304,7 @@ export default function Navigation() {
                       type="button"
                       className={getMobileItemClassName(active)}
                       aria-expanded={expanded}
-                      onClick={() => {
-                        if (item.label === "Bracket")
-                          setBracketOpen(!bracketOpen);
-                        if (item.label === "History")
-                          setHistoryOpen(!historyOpen);
-                        if (item.label === "Tournament")
-                          setTournamentOpen(!tournamentOpen);
-                      }}
+                      onClick={() => toggleDropdown(item.label)}
                     >
                       {item.label}
                       <ChevronDown
