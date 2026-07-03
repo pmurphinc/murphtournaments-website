@@ -82,7 +82,7 @@ const createOAuthHttpClient = (): AxiosInstance =>
     timeout: AXIOS_TIMEOUT_MS,
   });
 
-class SDKServer {
+export class SDKServer {
   private readonly client: AxiosInstance;
   private readonly oauthService: OAuthService;
 
@@ -156,7 +156,14 @@ class SDKServer {
 
   private getSessionSecret() {
     const secret = ENV.cookieSecret;
+    if (!isNonEmptyString(secret)) {
+      throw new Error("JWT_SECRET is required for session signing");
+    }
     return new TextEncoder().encode(secret);
+  }
+
+  private getSessionAppId(appId: string | undefined): string {
+    return appId || ENV.appId || "murph-tournaments-website";
   }
 
   /**
@@ -166,12 +173,12 @@ class SDKServer {
    */
   async createSessionToken(
     openId: string,
-    options: { expiresInMs?: number; name?: string } = {}
+    options: { expiresInMs?: number; name?: string; appId?: string } = {}
   ): Promise<string> {
     return this.signSession(
       {
         openId,
-        appId: ENV.appId,
+        appId: this.getSessionAppId(options.appId),
         name: options.name || "",
       },
       options

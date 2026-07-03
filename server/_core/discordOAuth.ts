@@ -25,14 +25,24 @@ const getQueryParam = (req: Request, key: string): string | undefined => {
   return typeof value === "string" ? value : undefined;
 };
 
-export const isDiscordAuthenticatedUser = (user: { openId?: string; loginMethod?: string | null } | null | undefined) =>
-  user?.loginMethod === "discord" && typeof user.openId === "string" && user.openId.startsWith("discord:");
+export const isDiscordAuthenticatedUser = (
+  user: { openId?: string; loginMethod?: string | null } | null | undefined
+) =>
+  user?.loginMethod === "discord" &&
+  typeof user.openId === "string" &&
+  user.openId.startsWith("discord:");
 
-export function validateDiscordState(expected: string | undefined, actual: string | undefined) {
+export function validateDiscordState(
+  expected: string | undefined,
+  actual: string | undefined
+) {
   if (!expected || !actual) return false;
   const expectedBuffer = Buffer.from(expected);
   const actualBuffer = Buffer.from(actual);
-  return expectedBuffer.length === actualBuffer.length && timingSafeEqual(expectedBuffer, actualBuffer);
+  return (
+    expectedBuffer.length === actualBuffer.length &&
+    timingSafeEqual(expectedBuffer, actualBuffer)
+  );
 }
 
 async function exchangeDiscordCode(code: string) {
@@ -49,7 +59,7 @@ async function exchangeDiscordCode(code: string) {
     body,
   });
   if (!response.ok) throw new Error("Discord token exchange failed");
-  const data = await response.json() as { access_token?: string };
+  const data = (await response.json()) as { access_token?: string };
   if (!data.access_token) throw new Error("Discord access token missing");
   return data.access_token;
 }
@@ -68,7 +78,11 @@ function redirectError(res: Response) {
 
 export function registerDiscordOAuthRoutes(app: Express) {
   app.get("/api/auth/discord/login", (req: Request, res: Response) => {
-    if (!ENV.discordClientId || !ENV.discordClientSecret || !ENV.discordRedirectUri) {
+    if (
+      !ENV.discordClientId ||
+      !ENV.discordClientSecret ||
+      !ENV.discordRedirectUri
+    ) {
       redirectError(res);
       return;
     }
@@ -97,7 +111,10 @@ export function registerDiscordOAuthRoutes(app: Express) {
       const code = getQueryParam(req, "code");
       const state = getQueryParam(req, "state");
       const cookies = parseCookieHeader(req.headers.cookie || "");
-      if (!code || !validateDiscordState(cookies[DISCORD_STATE_COOKIE], state)) {
+      if (
+        !code ||
+        !validateDiscordState(cookies[DISCORD_STATE_COOKIE], state)
+      ) {
         redirectError(res);
         return;
       }
@@ -116,11 +133,22 @@ export function registerDiscordOAuthRoutes(app: Express) {
         lastSignedIn: new Date(),
       });
 
-      const sessionToken = await sdk.createSessionToken(openId, { name: displayName, expiresInMs: ONE_YEAR_MS });
-      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+      const sessionToken = await sdk.createSessionToken(openId, {
+        appId: "murph-tournaments-website",
+        name: displayName,
+        expiresInMs: ONE_YEAR_MS,
+      });
+      res.cookie(COOKIE_NAME, sessionToken, {
+        ...cookieOptions,
+        maxAge: ONE_YEAR_MS,
+      });
+      console.log(`[Discord OAuth] Signed in Discord user ${discordUser.id}`);
       res.redirect(302, "/team-finder");
     } catch (error) {
-      console.error("[Discord OAuth] Callback failed", error instanceof Error ? error.message : String(error));
+      console.error(
+        "[Discord OAuth] Callback failed",
+        error instanceof Error ? error.message : String(error)
+      );
       redirectError(res);
     }
   });
