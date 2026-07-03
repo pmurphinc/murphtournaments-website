@@ -2,7 +2,6 @@ ALTER TABLE `users` ADD `discordDisplayName` varchar(255);
 --> statement-breakpoint
 ALTER TABLE `users` ADD `discordUsername` varchar(255);
 --> statement-breakpoint
-
 CREATE TABLE `team_finder_listings` (
   `id` int AUTO_INCREMENT NOT NULL,
   `userId` int NOT NULL,
@@ -18,7 +17,6 @@ CREATE TABLE `team_finder_listings` (
   CONSTRAINT `team_finder_listings_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
-
 CREATE TABLE `team_finder_reports` (
   `id` int AUTO_INCREMENT NOT NULL,
   `listingId` int NOT NULL,
@@ -29,7 +27,6 @@ CREATE TABLE `team_finder_reports` (
   CONSTRAINT `team_finder_reports_listing_reporter_unique` UNIQUE(`listingId`,`reporterUserId`)
 );
 --> statement-breakpoint
-
 ALTER TABLE `team_finder_listings` ADD CONSTRAINT `team_finder_listings_userId_users_id_fk` FOREIGN KEY (`userId`) REFERENCES `users`(`id`) ON DELETE cascade ON UPDATE no action;
 --> statement-breakpoint
 ALTER TABLE `team_finder_reports` ADD CONSTRAINT `team_finder_reports_listingId_team_finder_listings_id_fk` FOREIGN KEY (`listingId`) REFERENCES `team_finder_listings`(`id`) ON DELETE cascade ON UPDATE no action;
