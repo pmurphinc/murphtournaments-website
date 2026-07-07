@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { TRPCError } from "@trpc/server";
 import { appRouter } from "../../../server/routers";
 import type { TrpcContext } from "../../../server/_core/context";
-import { getActiveAssignedTeamIds, validateAssignmentPlan, validateMovePlan, type ControlAssignment, type ControlGame, type ControlTeam } from "../../../server/tournamentControlRules";
+import { assertGameIsMutable, getActiveAssignedTeamIds, validateAssignmentPlan, validateMovePlan, validateReopenPlan, type ControlAssignment, type ControlGame, type ControlTeam } from "../../../server/tournamentControlRules";
 
 const teams: ControlTeam[] = [
   { id: 1, tournamentId: 10, name: "Alpha" },
@@ -73,6 +73,32 @@ describe("tournament control assignment rules", () => {
   it("lobby codes are not returned through public auth procedure", async () => {
     const caller = appRouter.createCaller(publicContext());
     await expect(caller.auth.me()).resolves.toBeNull();
+  });
+
+
+  it("allows reopening a completed game when assigned teams are not active elsewhere", () => {
+    const assignments: ControlAssignment[] = [{ gameId: 102, teamId: 1, slotIndex: 1 }];
+    expect(() => validateReopenPlan({ games, assignments, gameId: 102 })).not.toThrow();
+  });
+
+  it("rejects reopening a completed game when assigned teams are active elsewhere", () => {
+    const assignments: ControlAssignment[] = [
+      { gameId: 102, teamId: 1, slotIndex: 1 },
+      { gameId: 100, teamId: 1, slotIndex: 2 },
+    ];
+    expectTrpcCode(() => validateReopenPlan({ games, assignments, gameId: 102 }), "CONFLICT");
+  });
+
+  it("allows moving a team between slots within the same Cashout lobby", () => {
+    const assignments: ControlAssignment[] = [{ gameId: 100, teamId: 1, slotIndex: 1 }];
+    expect(validateMovePlan({ games, teams, assignments, sourceGameId: 100, targetGameId: 100, teamId: 1, slotIndex: 2 }).targetGame.id).toBe(100);
+  });
+
+  it("blocks completed game lobby-code edits and deletes through the shared mutability guard", () => {
+    const completedGame = games.find(game => game.id === 102);
+    expect(completedGame).toBeDefined();
+    expectTrpcCode(() => assertGameIsMutable(completedGame!), "CONFLICT");
+    expectTrpcCode(() => assertGameIsMutable(completedGame!), "CONFLICT");
   });
 
   it("admin Create Team duplicate rule is case-insensitive within a tournament", () => {

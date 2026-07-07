@@ -10,8 +10,10 @@ import {
   gameCapacity,
   getActiveAssignedTeamIds,
   tournamentGameStatuses,
+  assertGameIsMutable,
   validateAssignmentPlan,
   validateMovePlan,
+  validateReopenPlan,
   type ControlAssignment,
   type ControlGame,
   type ControlTeam,
@@ -114,12 +116,14 @@ export const tournamentControlRouter = router({
   renameGame: adminProcedure.input(gameIdSchema.extend({ displayLabel: labelSchema })).mutation(async ({ input }) => {
     const db = await requireDb();
     const game = await getGameOrThrow(db, input.gameId);
+    assertGameIsMutable(game);
     await db.update(tournamentGames).set({ displayLabel: input.displayLabel }).where(eq(tournamentGames.id, input.gameId));
     return fetchTournamentControlData(game.tournamentId);
   }),
   moveGame: adminProcedure.input(gameIdSchema.extend({ position: positionSchema })).mutation(async ({ input }) => {
     const db = await requireDb();
     const game = await getGameOrThrow(db, input.gameId);
+    assertGameIsMutable(game);
     const safePosition = clampCanvasPosition(input.position);
     await db.update(tournamentGames).set({ canvasX: safePosition.x, canvasY: safePosition.y }).where(eq(tournamentGames.id, input.gameId));
     return fetchTournamentControlData(game.tournamentId);
@@ -129,8 +133,12 @@ export const tournamentControlRouter = router({
     const game = await getGameOrThrow(db, input.gameId);
     if (activeTournamentGameStatuses.includes(input.status as (typeof activeTournamentGameStatuses)[number])) {
       const context = await fetchGameContext(db, game.tournamentId);
-      const assignedRows = context.assignments.filter(assignment => assignment.gameId === input.gameId);
-      for (const assignment of assignedRows) validateAssignmentPlan({ ...context, targetGameId: input.gameId, teamId: assignment.teamId, slotIndex: assignment.slotIndex });
+      if (game.status === "complete") {
+        validateReopenPlan({ ...context, gameId: input.gameId });
+      } else {
+        const assignedRows = context.assignments.filter(assignment => assignment.gameId === input.gameId);
+        for (const assignment of assignedRows) validateAssignmentPlan({ ...context, targetGameId: input.gameId, teamId: assignment.teamId, slotIndex: assignment.slotIndex });
+      }
     }
     await db.update(tournamentGames).set({ status: input.status }).where(eq(tournamentGames.id, input.gameId));
     return fetchTournamentControlData(game.tournamentId);
@@ -138,6 +146,7 @@ export const tournamentControlRouter = router({
   setLobbyCode: adminProcedure.input(gameIdSchema.extend({ lobbyCode: lobbyCodeSchema })).mutation(async ({ input }) => {
     const db = await requireDb();
     const game = await getGameOrThrow(db, input.gameId);
+    assertGameIsMutable(game);
     await db.update(tournamentGames).set({ privateLobbyCode: input.lobbyCode }).where(eq(tournamentGames.id, input.gameId));
     return fetchTournamentControlData(game.tournamentId);
   }),
@@ -170,6 +179,7 @@ export const tournamentControlRouter = router({
   deleteGame: adminProcedure.input(gameIdSchema).mutation(async ({ input }) => {
     const db = await requireDb();
     const game = await getGameOrThrow(db, input.gameId);
+    assertGameIsMutable(game);
     await db.delete(tournamentGames).where(eq(tournamentGames.id, input.gameId));
     return fetchTournamentControlData(game.tournamentId);
   }),

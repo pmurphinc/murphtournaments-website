@@ -58,6 +58,47 @@ export function assertSlotIsValid(game: ControlGame, slotIndex: number) {
   }
 }
 
+export function assertGameIsMutable(game: ControlGame) {
+  if (game.status === "complete") {
+    throw new TRPCError({
+      code: "CONFLICT",
+      message: "Completed games are historical. Reopen the game before editing it.",
+    });
+  }
+}
+
+export function validateReopenPlan(input: {
+  games: ControlGame[];
+  assignments: ControlAssignment[];
+  gameId: number;
+}) {
+  const reopeningGame = input.games.find(game => game.id === input.gameId);
+  if (!reopeningGame) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Game not found" });
+  }
+
+  const reopeningAssignments = input.assignments.filter(assignment => assignment.gameId === input.gameId);
+  for (const reopeningAssignment of reopeningAssignments) {
+    const duplicateActive = input.assignments.find(assignment => {
+      if (assignment.teamId !== reopeningAssignment.teamId) return false;
+      if (assignment.gameId === input.gameId) return false;
+      const assignedGame = input.games.find(game => game.id === assignment.gameId);
+      return Boolean(
+        assignedGame &&
+          assignedGame.tournamentId === reopeningGame.tournamentId &&
+          isActiveGameStatus(assignedGame.status)
+      );
+    });
+
+    if (duplicateActive) {
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: "Cannot reopen game because an assigned team is already in another active game.",
+      });
+    }
+  }
+}
+
 export function validateAssignmentPlan(input: {
   games: ControlGame[];
   teams: ControlTeam[];
