@@ -17,27 +17,29 @@ import {
  * Extend this file with additional tables as your product grows.
  * Columns use camelCase to match both database fields and generated types.
  */
-export const users = mysqlTable("users", {
-  /**
-   * Surrogate primary key. Auto-incremented numeric value managed by the database.
-   * Use this for relations between tables.
-   */
-  id: int("id").autoincrement().primaryKey(),
-  /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
-  openId: varchar("openId", { length: 64 }).notNull().unique(),
-  name: text("name"),
-  email: varchar("email", { length: 320 }),
-  loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
-  discordDisplayName: varchar("discordDisplayName", { length: 255 }),
-  discordUsername: varchar("discordUsername", { length: 255 }),
-  discordAvatarUrl: varchar("discordAvatarUrl", { length: 512 }),
-}, table => [
-  index("users_discordUsername_idx").on(table.discordUsername),
-]);
+export const users = mysqlTable(
+  "users",
+  {
+    /**
+     * Surrogate primary key. Auto-incremented numeric value managed by the database.
+     * Use this for relations between tables.
+     */
+    id: int("id").autoincrement().primaryKey(),
+    /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
+    openId: varchar("openId", { length: 64 }).notNull().unique(),
+    name: text("name"),
+    email: varchar("email", { length: 320 }),
+    loginMethod: varchar("loginMethod", { length: 64 }),
+    role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+    lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
+    discordDisplayName: varchar("discordDisplayName", { length: 255 }),
+    discordUsername: varchar("discordUsername", { length: 255 }),
+    discordAvatarUrl: varchar("discordAvatarUrl", { length: 512 }),
+  },
+  table => [index("users_discordUsername_idx").on(table.discordUsername)]
+);
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
@@ -48,7 +50,9 @@ export const managedTeams = mysqlTable(
     id: int("id").autoincrement().primaryKey(),
     name: varchar("name", { length: 64 }).notNull(),
     slug: varchar("slug", { length: 80 }).notNull().unique(),
-    captainUserId: int("captainUserId").notNull().references(() => users.id),
+    captainUserId: int("captainUserId")
+      .notNull()
+      .references(() => users.id),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
@@ -59,15 +63,22 @@ export const managedTeamMembers = mysqlTable(
   "managed_team_members",
   {
     id: int("id").autoincrement().primaryKey(),
-    teamId: int("teamId").notNull().references(() => managedTeams.id, { onDelete: "cascade" }),
-    userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    teamId: int("teamId")
+      .notNull()
+      .references(() => managedTeams.id, { onDelete: "cascade" }),
+    userId: int("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
     role: mysqlEnum("role", ["captain", "member"]).notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
   table => [
     index("managed_team_members_teamId_idx").on(table.teamId),
     index("managed_team_members_userId_idx").on(table.userId),
-    uniqueIndex("managed_team_members_team_user_unique").on(table.teamId, table.userId),
+    uniqueIndex("managed_team_members_team_user_unique").on(
+      table.teamId,
+      table.userId
+    ),
   ]
 );
 
@@ -75,24 +86,40 @@ export const managedTeamInvites = mysqlTable(
   "managed_team_invites",
   {
     id: int("id").autoincrement().primaryKey(),
-    teamId: int("teamId").notNull().references(() => managedTeams.id, { onDelete: "cascade" }),
-    invitedUserId: int("invitedUserId").notNull().references(() => users.id, { onDelete: "cascade" }),
-    createdByUserId: int("createdByUserId").notNull().references(() => users.id),
-    status: mysqlEnum("status", ["pending", "accepted", "declined", "revoked"]).default("pending").notNull(),
+    teamId: int("teamId")
+      .notNull()
+      .references(() => managedTeams.id, { onDelete: "cascade" }),
+    invitedUserId: int("invitedUserId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdByUserId: int("createdByUserId")
+      .notNull()
+      .references(() => users.id),
+    status: mysqlEnum("status", ["pending", "accepted", "declined", "revoked"])
+      .default("pending")
+      .notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
   table => [
-    index("managed_team_invites_invited_status_idx").on(table.invitedUserId, table.status),
-    index("managed_team_invites_team_status_idx").on(table.teamId, table.status),
-    uniqueIndex("managed_team_invites_team_invited_unique").on(table.teamId, table.invitedUserId),
+    index("managed_team_invites_invited_status_idx").on(
+      table.invitedUserId,
+      table.status
+    ),
+    index("managed_team_invites_team_status_idx").on(
+      table.teamId,
+      table.status
+    ),
+    uniqueIndex("managed_team_invites_team_invited_unique").on(
+      table.teamId,
+      table.invitedUserId
+    ),
   ]
 );
 
 export type ManagedTeam = typeof managedTeams.$inferSelect;
 export type ManagedTeamMember = typeof managedTeamMembers.$inferSelect;
 export type ManagedTeamInvite = typeof managedTeamInvites.$inferSelect;
-
 
 export const teamFinderListings = mysqlTable(
   "team_finder_listings",
@@ -101,7 +128,9 @@ export const teamFinderListings = mysqlTable(
     userId: int("userId")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    listingType: mysqlEnum("listingType", ["lft", "lfp"]).default("lft").notNull(),
+    listingType: mysqlEnum("listingType", ["lft", "lfp"])
+      .default("lft")
+      .notNull(),
     title: varchar("title", { length: 120 }).notNull(),
     description: text("description").notNull(),
     platform: varchar("platform", { length: 64 }),
@@ -189,6 +218,64 @@ export const teams = mysqlTable("teams", {
 
 export type Team = typeof teams.$inferSelect;
 export type InsertTeam = typeof teams.$inferInsert;
+
+export const tournamentGames = mysqlTable(
+  "tournament_games",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    tournamentId: int("tournamentId")
+      .notNull()
+      .references(() => tournaments.id, { onDelete: "cascade" }),
+    gameType: mysqlEnum("gameType", ["cashout", "final_round"]).notNull(),
+    displayLabel: varchar("displayLabel", { length: 80 }).notNull(),
+    status: mysqlEnum("status", ["draft", "ready", "live", "complete"])
+      .default("draft")
+      .notNull(),
+    canvasX: int("canvasX").default(120).notNull(),
+    canvasY: int("canvasY").default(120).notNull(),
+    privateLobbyCode: varchar("privateLobbyCode", { length: 64 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    index("tournament_games_tournament_idx").on(table.tournamentId),
+    index("tournament_games_status_idx").on(table.status),
+  ]
+);
+
+export const tournamentGameAssignments = mysqlTable(
+  "tournament_game_assignments",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    gameId: int("gameId")
+      .notNull()
+      .references(() => tournamentGames.id, { onDelete: "cascade" }),
+    teamId: int("teamId")
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    slotIndex: int("slotIndex").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    index("tournament_game_assignments_team_idx").on(table.teamId),
+    uniqueIndex("tournament_game_assignments_game_slot_unique").on(
+      table.gameId,
+      table.slotIndex
+    ),
+    uniqueIndex("tournament_game_assignments_game_team_unique").on(
+      table.gameId,
+      table.teamId
+    ),
+  ]
+);
+
+export type TournamentGame = typeof tournamentGames.$inferSelect;
+export type InsertTournamentGame = typeof tournamentGames.$inferInsert;
+export type TournamentGameAssignment =
+  typeof tournamentGameAssignments.$inferSelect;
+export type InsertTournamentGameAssignment =
+  typeof tournamentGameAssignments.$inferInsert;
 // Tournament history archive
 export const tournamentHistory = mysqlTable("tournament_history", {
   id: int("id").autoincrement().primaryKey(),
