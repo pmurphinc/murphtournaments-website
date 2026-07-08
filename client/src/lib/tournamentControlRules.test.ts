@@ -25,10 +25,10 @@ function expectTrpcCode(fn: () => unknown, code: string) {
   throw new Error("Expected TRPCError");
 }
 
-describe("tournament control admin guard", () => {
-  it("blocks non-admin callers before organizer data access", async () => {
+describe("tournament control Discord organizer guard", () => {
+  it("blocks unauthenticated callers before organizer data access", async () => {
     const caller = appRouter.createCaller(publicContext());
-    await expect(caller.tournamentControl.get({ tournamentId: 10 })).rejects.toThrow("required permission");
+    await expect(caller.tournamentControl.get({ tournamentId: 10 })).rejects.toThrow("Discord sign-in");
   });
 });
 
