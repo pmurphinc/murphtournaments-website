@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { getDb } from "./db";
@@ -34,6 +34,7 @@ const teamNameSchema = z.string().trim().min(2).max(80);
 const frpSchema = z.number().int().min(0).max(9999).default(0);
 const lobbyCodeSchema = z.string().trim().min(1).max(64).nullable();
 const adminNoteSchema = z.string().trim().max(1000).nullable().optional();
+const resultPlacementSchema = z.number().int().min(1).max(4).nullable();
 const createTournamentSchema = z.object({
   name: z.string().trim().min(2).max(255),
   eventStatus: z.enum(["not-live", "live", "complete"]).default("not-live"),
@@ -61,7 +62,13 @@ async function fetchTournamentRows(db: QueryExecutor, tournamentId: number) {
   const [teamRows, gameRows, assignmentRows] = await Promise.all([
     db.select().from(teams).where(eq(teams.tournamentId, tournamentId)),
     db.select().from(tournamentGames).where(eq(tournamentGames.tournamentId, tournamentId)),
-    db.select({ id: tournamentGameAssignments.id, gameId: tournamentGameAssignments.gameId, teamId: tournamentGameAssignments.teamId, slotIndex: tournamentGameAssignments.slotIndex })
+    db.select({
+      id: tournamentGameAssignments.id,
+      gameId: tournamentGameAssignments.gameId,
+      teamId: tournamentGameAssignments.teamId,
+      slotIndex: tournamentGameAssignments.slotIndex,
+      resultPlacement: sql<number | null>`resultPlacement`,
+    })
       .from(tournamentGameAssignments)
       .innerJoin(tournamentGames, eq(tournamentGameAssignments.gameId, tournamentGames.id))
       .where(eq(tournamentGames.tournamentId, tournamentId)),
@@ -167,6 +174,36 @@ export async function assignTeamToGameSlot(gameId: number, teamId: number, slotI
   return fetchTournamentControlData(game.tournamentId);
 }
 
+async function setAssignmentResultPlacement(assignmentId: number, resultPlacement: number | null) {
+  const db = await requireDb();
+  return db.transaction(async tx => {
+    const [row] = await tx.select({ assignment: tournamentGameAssignments, game: tournamentGames })
+      .from(tournamentGameAssignments)
+      .innerJoin(tournamentGames, eq(tournamentGameAssignments.gameId, tournamentGames.id))
+      .where(eq(tournamentGameAssignments.id, assignmentId))
+      .limit(1);
+
+    if (!row) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Team assignment not found" });
+    }
+
+    const capacity = gameCapacity[row.game.gameType];
+    if (resultPlacement !== null && resultPlacement > capacity) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `${row.game.gameType === "cashout" ? "Cashout lobbies" : "Final Round matches"} only support placements 1-${capacity}`,
+      });
+    }
+
+    if (resultPlacement !== null) {
+      await tx.execute(sql`UPDATE tournament_game_assignments SET resultPlacement = NULL WHERE gameId = ${row.assignment.gameId} AND resultPlacement = ${resultPlacement} AND id <> ${assignmentId}`);
+    }
+
+    await tx.execute(sql`UPDATE tournament_game_assignments SET resultPlacement = ${resultPlacement} WHERE id = ${assignmentId}`);
+    return fetchTournamentRows(tx, row.game.tournamentId);
+  });
+}
+
 export const discordTournamentStaffProcedure = publicProcedure.use(async ({ ctx, next }) => {
   await assertDiscordTournamentStaff(ctx);
   return next({ ctx: { ...ctx, user: ctx.user! } });
@@ -252,6 +289,7 @@ export const tournamentControlRouter = router({
     await db.update(tournamentGames).set({ privateLobbyCode: input.lobbyCode }).where(eq(tournamentGames.id, input.gameId));
     return fetchTournamentControlData(game.tournamentId);
   }),
+  setAssignmentResultPlacement: discordTournamentStaffProcedure.input(z.object({ assignmentId: idSchema, resultPlacement: resultPlacementSchema })).mutation(({ input }) => setAssignmentResultPlacement(input.assignmentId, input.resultPlacement)),
   assignTeam: discordTournamentStaffProcedure.input(gameIdSchema.extend({ teamId: idSchema, slotIndex: z.number().int().positive() })).mutation(({ input }) => assignTeamToGameSlot(input.gameId, input.teamId, input.slotIndex)),
   moveTeam: discordTournamentStaffProcedure.input(gameIdSchema.extend({ teamId: idSchema, toGameId: idSchema, slotIndex: z.number().int().positive() })).mutation(async ({ input }) => {
     const db = await requireDb();
