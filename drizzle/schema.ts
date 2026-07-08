@@ -189,6 +189,49 @@ export const teams = mysqlTable("teams", {
 
 export type Team = typeof teams.$inferSelect;
 export type InsertTeam = typeof teams.$inferInsert;
+
+export const tournamentGames = mysqlTable(
+  "tournament_games",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    tournamentId: int("tournamentId").notNull().references(() => tournaments.id, { onDelete: "cascade" }),
+    gameType: mysqlEnum("gameType", ["cashout", "final_round"]).notNull(),
+    displayLabel: varchar("displayLabel", { length: 80 }).notNull(),
+    status: mysqlEnum("status", ["draft", "ready", "live", "complete"]).default("draft").notNull(),
+    canvasX: int("canvasX").default(120).notNull(),
+    canvasY: int("canvasY").default(120).notNull(),
+    privateLobbyCode: varchar("privateLobbyCode", { length: 64 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    index("tournament_games_tournament_idx").on(table.tournamentId),
+    index("tournament_games_status_idx").on(table.status),
+  ]
+);
+
+export const tournamentGameAssignments = mysqlTable(
+  "tournament_game_assignments",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    gameId: int("gameId").notNull().references(() => tournamentGames.id, { onDelete: "cascade" }),
+    teamId: int("teamId").notNull().references(() => teams.id, { onDelete: "cascade" }),
+    slotIndex: int("slotIndex").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    index("tournament_game_assignments_team_idx").on(table.teamId),
+    uniqueIndex("tournament_game_assignments_game_slot_unique").on(table.gameId, table.slotIndex),
+    uniqueIndex("tournament_game_assignments_game_team_unique").on(table.gameId, table.teamId),
+  ]
+);
+
+export type TournamentGame = typeof tournamentGames.$inferSelect;
+export type InsertTournamentGame = typeof tournamentGames.$inferInsert;
+export type TournamentGameAssignment = typeof tournamentGameAssignments.$inferSelect;
+export type InsertTournamentGameAssignment = typeof tournamentGameAssignments.$inferInsert;
+
 // Tournament history archive
 export const tournamentHistory = mysqlTable("tournament_history", {
   id: int("id").autoincrement().primaryKey(),

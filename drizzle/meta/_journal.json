@@ -92,6 +92,13 @@
       "when": 1783132800000,
       "tag": "0012_add_managed_teams",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "5",
+      "when": 1783555200000,
+      "tag": "0013_add_tournament_control_room",
+      "breakpoints": true
     }
   ]
 }

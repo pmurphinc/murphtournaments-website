@@ -2,6 +2,7 @@ import { clearSessionCookie } from "./_core/logout";
 import { systemRouter } from "./_core/systemRouter";
 import { teamFinderRouter } from "./teamFinderRouter";
 import { teamManagementRouter } from "./teamManagementRouter";
+import { tournamentControlRouter } from "./tournamentControl";
 import { ENV } from "./_core/env";
 import { publicProcedure, router, adminProcedure } from "./_core/trpc";
 import { z } from "zod";
@@ -336,6 +337,7 @@ export const appRouter = router({
   system: systemRouter,
   teamFinder: teamFinderRouter,
   teamManagement: teamManagementRouter,
+  tournamentControl: tournamentControlRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
