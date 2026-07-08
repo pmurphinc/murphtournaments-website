@@ -15,6 +15,7 @@ const PROJECT_ROOT = import.meta.dirname;
 const LOG_DIR = path.join(PROJECT_ROOT, ".manus-logs");
 const MAX_LOG_SIZE_BYTES = 1 * 1024 * 1024; // 1MB per log file
 const TRIM_TARGET_BYTES = Math.floor(MAX_LOG_SIZE_BYTES * 0.6); // Trim to 60% to avoid constant re-trimming
+const CONTROL_ROOM_MIN_ZOOM = 0.1;
 
 type LogSource = "browserConsole" | "networkRequests" | "sessionReplay";
 
@@ -66,6 +67,24 @@ function writeToLogFile(source: LogSource, entries: unknown[]) {
 
   // Trim if exceeds max size
   trimLogFile(logPath, MAX_LOG_SIZE_BYTES);
+}
+
+function vitePluginControlRoomZoomFloor(): Plugin {
+  return {
+    name: "control-room-zoom-floor",
+    enforce: "pre",
+    transform(code, id) {
+      const normalizedId = id.split(path.sep).join("/");
+      if (!normalizedId.endsWith("/client/src/pages/TournamentControlRoom.tsx")) {
+        return null;
+      }
+
+      return code.replace(
+        "const minZoom = 0.55;",
+        `const minZoom = ${CONTROL_ROOM_MIN_ZOOM};`
+      );
+    },
+  };
 }
 
 /**
@@ -150,7 +169,14 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
+const plugins = [
+  vitePluginControlRoomZoomFloor(),
+  react(),
+  tailwindcss(),
+  jsxLocPlugin(),
+  vitePluginManusRuntime(),
+  vitePluginManusDebugCollector(),
+];
 
 export default defineConfig({
   plugins,
