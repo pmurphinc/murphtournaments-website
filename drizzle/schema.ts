@@ -170,6 +170,7 @@ export const tournaments = mysqlTable("tournaments", {
     "Team A vs Team B"
   ),
   eventNote: text("eventNote"),
+  registrationOpen: int("registrationOpen").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -181,6 +182,7 @@ export type InsertTournament = typeof tournaments.$inferInsert;
 export const teams = mysqlTable("teams", {
   id: int("id").autoincrement().primaryKey(),
   tournamentId: int("tournamentId").notNull(),
+  managedTeamId: int("managedTeamId").references(() => managedTeams.id),
   name: varchar("name", { length: 255 }).notNull(),
   frp: int("frp").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -189,6 +191,29 @@ export const teams = mysqlTable("teams", {
 
 export type Team = typeof teams.$inferSelect;
 export type InsertTeam = typeof teams.$inferInsert;
+
+
+export const tournamentTeamSubmissions = mysqlTable(
+  "tournament_team_submissions",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    tournamentId: int("tournamentId").notNull().references(() => tournaments.id, { onDelete: "cascade" }),
+    managedTeamId: int("managedTeamId").notNull().references(() => managedTeams.id, { onDelete: "cascade" }),
+    submittedByUserId: int("submittedByUserId").notNull().references(() => users.id),
+    status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
+    adminNote: text("adminNote"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    index("tournament_team_submissions_tournament_status_idx").on(table.tournamentId, table.status),
+    index("tournament_team_submissions_managedTeamId_idx").on(table.managedTeamId),
+    uniqueIndex("tournament_team_submissions_tournament_team_unique").on(table.tournamentId, table.managedTeamId),
+  ]
+);
+
+export type TournamentTeamSubmission = typeof tournamentTeamSubmissions.$inferSelect;
+export type InsertTournamentTeamSubmission = typeof tournamentTeamSubmissions.$inferInsert;
 
 export const tournamentGames = mysqlTable(
   "tournament_games",

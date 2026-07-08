@@ -1,7 +1,8 @@
 import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "./db";
-import { managedTeamInvites, managedTeamMembers, managedTeams, users } from "../drizzle/schema";
+import { managedTeamInvites, managedTeamMembers, managedTeams, tournamentTeamSubmissions, tournaments, users } from "../drizzle/schema";
+import { assertManagedTeamSubmissionAllowed } from "./tournamentTeamSubmissions";
 
 export type TeamManagementAction = "rename" | "invite" | "transferCaptain" | "removeMember" | "disband" | "manage this team";
 type TeamManagementDb = NonNullable<Awaited<ReturnType<typeof getDb>>>;
@@ -145,4 +146,31 @@ export async function leaveManagedTeam(userId: number, teamId: number) {
   if (!member) throw new TRPCError({ code: "NOT_FOUND", message: "Membership not found." });
   if (member.role === "captain") throw new TRPCError({ code: "FORBIDDEN", message: "Captains must transfer captaincy or disband before leaving." });
   await db.delete(managedTeamMembers).where(and(eq(managedTeamMembers.teamId, teamId), eq(managedTeamMembers.userId, userId))); return { success: true } as const;
+}
+
+export async function listAvailableTournamentsForMyTeams(userId: number) {
+  const db = await dbOrThrow();
+  const memberships = await db.select({ team: managedTeams, member: managedTeamMembers }).from(managedTeamMembers).innerJoin(managedTeams, eq(managedTeamMembers.teamId, managedTeams.id)).where(eq(managedTeamMembers.userId, userId));
+  const teamIds = memberships.map(row => row.team.id);
+  const openTournaments = await db.select().from(tournaments).where(eq(tournaments.registrationOpen, 1));
+  const submissions = teamIds.length ? await db.select({ submission: tournamentTeamSubmissions, tournament: tournaments }).from(tournamentTeamSubmissions).innerJoin(tournaments, eq(tournamentTeamSubmissions.tournamentId, tournaments.id)).where(inArray(tournamentTeamSubmissions.managedTeamId, teamIds)) : [];
+  return {
+    tournaments: openTournaments,
+    teams: memberships.map(row => ({
+      ...row.team,
+      role: row.member.role,
+      submissions: submissions.filter(submission => submission.submission.managedTeamId === row.team.id).map(submission => ({ ...submission.submission, tournament: submission.tournament })),
+    })),
+  };
+}
+
+export async function submitManagedTeamToTournament(userId: number, teamId: number, tournamentId: number) {
+  const db = await dbOrThrow();
+  await assertCaptain(db, teamId, userId);
+  const [tournament] = await db.select().from(tournaments).where(eq(tournaments.id, tournamentId)).limit(1);
+  if (!tournament) throw new TRPCError({ code: "NOT_FOUND", message: "Tournament not found." });
+  const [existing] = await db.select().from(tournamentTeamSubmissions).where(and(eq(tournamentTeamSubmissions.tournamentId, tournamentId), eq(tournamentTeamSubmissions.managedTeamId, teamId))).limit(1);
+  assertManagedTeamSubmissionAllowed({ isCaptain: true, registrationOpen: tournament.registrationOpen === 1, hasExistingSubmission: !!existing });
+  await db.insert(tournamentTeamSubmissions).values({ tournamentId, managedTeamId: teamId, submittedByUserId: userId, status: "pending" });
+  return { success: true } as const;
 }

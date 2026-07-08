@@ -1,10 +1,10 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { getDb } from "./db";
 import { publicProcedure, router } from "./_core/trpc";
 import { assertDiscordTournamentStaff } from "./discordTournamentRoles";
-import { teams, tournamentGameAssignments, tournamentGames, tournaments } from "../drizzle/schema";
+import { managedTeamMembers, managedTeams, teams, tournamentGameAssignments, tournamentGames, tournaments, tournamentTeamSubmissions, users } from "../drizzle/schema";
 import {
   activeTournamentGameStatuses,
   clampCanvasPosition,
@@ -20,6 +20,7 @@ import {
   type ControlTeam,
   type TournamentGameType,
 } from "./tournamentControlRules";
+import { shouldCreateTournamentTeamForApproval } from "./tournamentTeamSubmissions";
 
 type Database = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 type QueryExecutor = Pick<Database, "select" | "insert" | "update" | "delete">;
@@ -32,6 +33,7 @@ const labelSchema = z.string().trim().min(1).max(80);
 const teamNameSchema = z.string().trim().min(2).max(80);
 const frpSchema = z.number().int().min(0).max(9999).default(0);
 const lobbyCodeSchema = z.string().trim().min(1).max(64).nullable();
+const adminNoteSchema = z.string().trim().max(1000).nullable().optional();
 const createTournamentSchema = z.object({
   name: z.string().trim().min(2).max(255),
   eventStatus: z.enum(["not-live", "live", "complete"]).default("not-live"),
@@ -102,6 +104,60 @@ async function assertUniqueTeamName(db: QueryExecutor, tournamentId: number, nam
   }
 }
 
+
+async function listSubmissionRows(db: QueryExecutor, tournamentId?: number) {
+  const base = db.select({
+    submission: tournamentTeamSubmissions,
+    tournament: tournaments,
+    managedTeam: managedTeams,
+    captain: users,
+  })
+    .from(tournamentTeamSubmissions)
+    .innerJoin(tournaments, eq(tournamentTeamSubmissions.tournamentId, tournaments.id))
+    .innerJoin(managedTeams, eq(tournamentTeamSubmissions.managedTeamId, managedTeams.id))
+    .innerJoin(users, eq(managedTeams.captainUserId, users.id));
+  const rows = tournamentId ? await base.where(eq(tournamentTeamSubmissions.tournamentId, tournamentId)) : await base;
+  const teamIds = rows.map(row => row.managedTeam.id);
+  const roster = teamIds.length ? await db.select({ member: managedTeamMembers, user: users })
+    .from(managedTeamMembers)
+    .innerJoin(users, eq(managedTeamMembers.userId, users.id))
+    .where(inArray(managedTeamMembers.teamId, teamIds)) : [];
+  return rows.map(row => ({
+    ...row.submission,
+    tournament: row.tournament,
+    managedTeam: row.managedTeam,
+    captain: row.captain,
+    roster: roster.filter(member => member.member.teamId === row.managedTeam.id).map(member => ({ ...member.member, user: member.user })),
+  }));
+}
+
+async function approveSubmission(submissionId: number) {
+  const db = await requireDb();
+  return db.transaction(async tx => {
+    const [row] = await tx.select({ submission: tournamentTeamSubmissions, managedTeam: managedTeams })
+      .from(tournamentTeamSubmissions)
+      .innerJoin(managedTeams, eq(tournamentTeamSubmissions.managedTeamId, managedTeams.id))
+      .where(eq(tournamentTeamSubmissions.id, submissionId))
+      .limit(1);
+    if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Team submission not found" });
+    const existing = await tx.select().from(teams).where(and(eq(teams.tournamentId, row.submission.tournamentId), eq(teams.managedTeamId, row.submission.managedTeamId))).limit(1);
+    if (shouldCreateTournamentTeamForApproval({ status: row.submission.status, existingTournamentTeamCount: existing.length })) {
+      await assertUniqueTeamName(tx, row.submission.tournamentId, row.managedTeam.name);
+      await tx.insert(teams).values({ tournamentId: row.submission.tournamentId, managedTeamId: row.submission.managedTeamId, name: row.managedTeam.name, frp: 0 });
+    }
+    await tx.update(tournamentTeamSubmissions).set({ status: "approved", adminNote: null }).where(eq(tournamentTeamSubmissions.id, submissionId));
+    return fetchTournamentRows(tx, row.submission.tournamentId);
+  });
+}
+
+async function rejectSubmission(submissionId: number, adminNote: string | null | undefined) {
+  const db = await requireDb();
+  const [submission] = await db.select().from(tournamentTeamSubmissions).where(eq(tournamentTeamSubmissions.id, submissionId)).limit(1);
+  if (!submission) throw new TRPCError({ code: "NOT_FOUND", message: "Team submission not found" });
+  await db.update(tournamentTeamSubmissions).set({ status: "rejected", adminNote: adminNote ?? null }).where(eq(tournamentTeamSubmissions.id, submissionId));
+  return listSubmissionRows(db, submission.tournamentId);
+}
+
 export async function assignTeamToGameSlot(gameId: number, teamId: number, slotIndex: number) {
   const db = await requireDb();
   const game = await getGameOrThrow(db, gameId);
@@ -121,6 +177,18 @@ export const tournamentControlRouter = router({
     const db = await requireDb();
     return listTournamentRows(db);
   }),
+  setTournamentRegistrationOpen: discordTournamentStaffProcedure.input(tournamentIdSchema.extend({ registrationOpen: z.boolean() })).mutation(async ({ input }) => {
+    const db = await requireDb();
+    await fetchTournamentRows(db, input.tournamentId);
+    await db.update(tournaments).set({ registrationOpen: input.registrationOpen ? 1 : 0 }).where(eq(tournaments.id, input.tournamentId));
+    return listTournamentRows(db);
+  }),
+  listTeamSubmissions: discordTournamentStaffProcedure.input(z.object({ tournamentId: idSchema.optional() }).optional()).query(async ({ input }) => {
+    const db = await requireDb();
+    return listSubmissionRows(db, input?.tournamentId);
+  }),
+  approveTeamSubmission: discordTournamentStaffProcedure.input(z.object({ submissionId: idSchema })).mutation(({ input }) => approveSubmission(input.submissionId)),
+  rejectTeamSubmission: discordTournamentStaffProcedure.input(z.object({ submissionId: idSchema, adminNote: adminNoteSchema })).mutation(({ input }) => rejectSubmission(input.submissionId, input.adminNote)),
   createTournament: discordTournamentStaffProcedure.input(createTournamentSchema).mutation(async ({ input }) => {
     const db = await requireDb();
     const insertResult = await db.insert(tournaments).values({

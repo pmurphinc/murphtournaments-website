@@ -2,7 +2,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { protectedProcedure, router } from "./_core/trpc";
 import { isDiscordAuthenticatedUser } from "./_core/discordOAuth";
-import { cancelManagedTeamInvite, createManagedTeam, disbandManagedTeam, inviteManagedTeamByDiscordUsername, leaveManagedTeam, listMyTeamManagement, removeManagedTeamMember, renameManagedTeam, respondToManagedTeamInvite, transferManagedTeamCaptain } from "./teamManagement";
+import { cancelManagedTeamInvite, createManagedTeam, disbandManagedTeam, inviteManagedTeamByDiscordUsername, leaveManagedTeam, listMyTeamManagement, removeManagedTeamMember, renameManagedTeam, respondToManagedTeamInvite, transferManagedTeamCaptain, listAvailableTournamentsForMyTeams, submitManagedTeamToTournament } from "./teamManagement";
 
 const discordProcedure = protectedProcedure.use(async ({ ctx, next }) => {
   if (!isDiscordAuthenticatedUser(ctx.user)) throw new TRPCError({ code: "FORBIDDEN", message: "Team Management requires Discord sign-in" });
@@ -14,6 +14,8 @@ const teamName = z.string().trim().min(2).max(64);
 
 export const teamManagementRouter = router({
   myTeams: discordProcedure.query(({ ctx }) => listMyTeamManagement(ctx.user.id)),
+  listAvailableTournamentsForMyTeams: discordProcedure.query(({ ctx }) => listAvailableTournamentsForMyTeams(ctx.user.id)),
+  submitTeamToTournament: discordProcedure.input(z.object({ teamId, tournamentId: z.number().int().positive() })).mutation(({ ctx, input }) => submitManagedTeamToTournament(ctx.user.id, input.teamId, input.tournamentId)),
   create: discordProcedure.input(z.object({ name: teamName })).mutation(({ ctx, input }) => createManagedTeam(ctx.user.id, input.name)),
   rename: discordProcedure.input(z.object({ teamId, name: teamName })).mutation(({ ctx, input }) => renameManagedTeam(ctx.user.id, input.teamId, input.name)),
   disband: discordProcedure.input(z.object({ teamId, confirmation: z.literal("DISBAND") })).mutation(({ ctx, input }) => disbandManagedTeam(ctx.user.id, input.teamId, input.confirmation)),

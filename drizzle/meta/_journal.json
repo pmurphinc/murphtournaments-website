@@ -99,6 +99,13 @@
       "when": 1783555200000,
       "tag": "0013_add_tournament_control_room",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "5",
+      "when": 1783641600000,
+      "tag": "0014_add_tournament_team_submissions",
+      "breakpoints": true
     }
   ]
 }
