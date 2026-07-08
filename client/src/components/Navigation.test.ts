@@ -18,8 +18,10 @@ describe("Discord avatar header control", () => {
     expect(source).toContain("xl:hidden");
   });
 
-  it("links Team Management while keeping Tournament Signups disabled", () => {
+  it("links account menu tools while keeping Tournament Signups disabled", () => {
     expect(source).toContain('href="/teams"');
+    expect(source).toContain('href="/admin/tournaments/control"');
+    expect(source).toContain("Tournament Control");
     expect(source).toContain("Tournament Signups");
     expect(source).toContain("Coming soon");
   });
