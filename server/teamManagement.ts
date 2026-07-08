@@ -1,7 +1,8 @@
 import { and, eq, inArray, ne, sql } from "drizzle-orm";
+import { createHash, randomBytes } from "node:crypto";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "./db";
-import { managedTeamInvites, managedTeamMembers, managedTeams, tournamentTeamSubmissions, tournaments, users } from "../drizzle/schema";
+import { managedTeamInvites, managedTeamJoinLinks, managedTeamMembers, managedTeams, tournamentTeamSubmissions, tournaments, users } from "../drizzle/schema";
 import { assertManagedTeamSubmissionAllowed } from "./tournamentTeamSubmissions";
 
 export type TeamManagementAction = "rename" | "invite" | "transferCaptain" | "removeMember" | "disband" | "manage this team";
@@ -9,6 +10,23 @@ type TeamManagementDb = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 type TeamManagementTransaction = Parameters<Parameters<TeamManagementDb["transaction"]>[0]>[0];
 type TeamManagementExecutor = TeamManagementDb | TeamManagementTransaction;
 type ManagedTeamMemberRole = "captain" | "member";
+
+export const MANAGED_TEAM_JOIN_LINK_TTL_DAYS = 14;
+export const DEFAULT_MANAGED_TEAM_JOIN_LINK_MAX_USES = 3;
+
+export function hashManagedTeamJoinToken(token: string) {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+function createJoinPath(token: string) {
+  return `/teams/join/${encodeURIComponent(token)}`;
+}
+
+function getJoinLinkState(link: { status: "active" | "revoked"; expiresAt: Date | null; maxUses: number | null; useCount: number }) {
+  const expired = !!link.expiresAt && link.expiresAt.getTime() <= Date.now();
+  const full = link.maxUses !== null && link.useCount >= link.maxUses;
+  return { active: link.status === "active" && !expired && !full, expired, full, revoked: link.status === "revoked" };
+}
 
 export function normalizeDiscordUsername(username: string) {
   return username.trim().replace(/^@+/, "");
@@ -173,4 +191,59 @@ export async function submitManagedTeamToTournament(userId: number, teamId: numb
   assertManagedTeamSubmissionAllowed({ isCaptain: true, registrationOpen: tournament.registrationOpen === 1, hasExistingSubmission: !!existing });
   await db.insert(tournamentTeamSubmissions).values({ tournamentId, managedTeamId: teamId, submittedByUserId: userId, status: "pending" });
   return { success: true } as const;
+}
+
+export async function createManagedTeamJoinLink(userId: number, teamId: number) {
+  const db = await dbOrThrow();
+  await assertCaptain(db, teamId, userId);
+  const rawToken = randomBytes(32).toString("base64url");
+  const tokenHash = hashManagedTeamJoinToken(rawToken);
+  const expiresAt = new Date(Date.now() + MANAGED_TEAM_JOIN_LINK_TTL_DAYS * 24 * 60 * 60 * 1000);
+  await db.insert(managedTeamJoinLinks).values({ teamId, createdByUserId: userId, tokenHash, expiresAt, maxUses: DEFAULT_MANAGED_TEAM_JOIN_LINK_MAX_USES });
+  const [link] = await db.select({ id: managedTeamJoinLinks.id }).from(managedTeamJoinLinks).where(eq(managedTeamJoinLinks.tokenHash, tokenHash)).limit(1);
+  const path = createJoinPath(rawToken);
+  return { id: link.id, path, url: path, expiresAt, maxUses: DEFAULT_MANAGED_TEAM_JOIN_LINK_MAX_USES } as const;
+}
+
+export async function listManagedTeamJoinLinks(userId: number, teamId: number) {
+  const db = await dbOrThrow();
+  await assertCaptain(db, teamId, userId);
+  const rows = await db.select().from(managedTeamJoinLinks).where(eq(managedTeamJoinLinks.teamId, teamId));
+  return rows.map(link => ({ ...link, state: getJoinLinkState(link) }));
+}
+
+export async function revokeManagedTeamJoinLink(userId: number, linkId: number) {
+  const db = await dbOrThrow();
+  const [link] = await db.select().from(managedTeamJoinLinks).where(eq(managedTeamJoinLinks.id, linkId)).limit(1);
+  if (!link) throw new TRPCError({ code: "NOT_FOUND", message: "Invite link not found." });
+  await assertCaptain(db, link.teamId, userId);
+  await db.update(managedTeamJoinLinks).set({ status: "revoked", updatedAt: sql`now()` }).where(eq(managedTeamJoinLinks.id, linkId));
+  return { success: true } as const;
+}
+
+export async function getManagedTeamJoinLinkPreview(token: string) {
+  const db = await dbOrThrow();
+  const tokenHash = hashManagedTeamJoinToken(token);
+  const [row] = await db.select({ link: managedTeamJoinLinks, team: managedTeams, captain: users }).from(managedTeamJoinLinks).innerJoin(managedTeams, eq(managedTeamJoinLinks.teamId, managedTeams.id)).innerJoin(users, eq(managedTeams.captainUserId, users.id)).where(eq(managedTeamJoinLinks.tokenHash, tokenHash)).limit(1);
+  if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Invite link not found." });
+  const state = getJoinLinkState(row.link);
+  return { teamName: row.team.name, captainDisplayName: row.captain.discordDisplayName || row.captain.discordUsername || row.captain.name, expiresAt: row.link.expiresAt, maxUses: row.link.maxUses, useCount: row.link.useCount, ...state };
+}
+
+export async function acceptManagedTeamJoinLink(userId: number, token: string) {
+  const db = await dbOrThrow();
+  const tokenHash = hashManagedTeamJoinToken(token);
+  return db.transaction(async tx => {
+    const [link] = await tx.select().from(managedTeamJoinLinks).where(eq(managedTeamJoinLinks.tokenHash, tokenHash)).limit(1);
+    if (!link) throw new TRPCError({ code: "NOT_FOUND", message: "Invite link not found." });
+    const state = getJoinLinkState(link);
+    if (state.revoked) throw new TRPCError({ code: "FORBIDDEN", message: "This invite link has been revoked." });
+    if (state.expired) throw new TRPCError({ code: "FORBIDDEN", message: "This invite link has expired." });
+    if (state.full) throw new TRPCError({ code: "FORBIDDEN", message: "This invite link has reached its use limit." });
+    const existing = await getMember(tx, link.teamId, userId);
+    if (existing) return { success: true, alreadyMember: true, role: existing.role } as const;
+    await tx.insert(managedTeamMembers).values({ teamId: link.teamId, userId, role: "member" });
+    await tx.update(managedTeamJoinLinks).set({ useCount: sql`${managedTeamJoinLinks.useCount} + 1`, updatedAt: sql`now()` }).where(eq(managedTeamJoinLinks.id, link.id));
+    return { success: true, alreadyMember: false, role: "member" } as const;
+  });
 }
