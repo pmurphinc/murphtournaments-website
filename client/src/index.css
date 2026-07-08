@@ -355,3 +355,7 @@
     }
   }
 }
+
+header a[href="/admin/tournaments/control"] + div {
+  display: none;
+}
