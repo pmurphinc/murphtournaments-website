@@ -23,7 +23,13 @@ import {
 import { shouldCreateTournamentTeamForApproval } from "./tournamentTeamSubmissions";
 
 type Database = NonNullable<Awaited<ReturnType<typeof getDb>>>;
-type QueryExecutor = Pick<Database, "select" | "insert" | "update" | "delete">;
+type QueryExecutor = Pick<Database, "select" | "insert" | "update" | "delete" | "execute">;
+type ControlGameConnection = {
+  id: number;
+  tournamentId: number;
+  sourceGameId: number;
+  targetGameId: number;
+};
 
 const idSchema = z.number().int().positive();
 const gameIdSchema = z.object({ gameId: idSchema });
@@ -44,6 +50,21 @@ const createTournamentSchema = z.object({
   eventNote: z.string().trim().max(2000).nullable().optional(),
 });
 
+function readRows<T>(result: unknown): T[] {
+  if (Array.isArray(result)) {
+    const [first] = result;
+    if (Array.isArray(first)) return first as T[];
+    return result as T[];
+  }
+
+  if (result && typeof result === "object" && "rows" in result) {
+    const rows = (result as { rows?: unknown }).rows;
+    if (Array.isArray(rows)) return rows as T[];
+  }
+
+  return [];
+}
+
 async function requireDb() {
   const db = await getDb();
   if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
@@ -59,7 +80,7 @@ async function getGameOrThrow(db: QueryExecutor, gameId: number) {
 async function fetchTournamentRows(db: QueryExecutor, tournamentId: number) {
   const [tournament] = await db.select().from(tournaments).where(eq(tournaments.id, tournamentId)).limit(1);
   if (!tournament) throw new TRPCError({ code: "NOT_FOUND", message: "Tournament not found" });
-  const [teamRows, gameRows, assignmentRows] = await Promise.all([
+  const [teamRows, gameRows, assignmentRows, connectionResult] = await Promise.all([
     db.select().from(teams).where(eq(teams.tournamentId, tournamentId)),
     db.select().from(tournamentGames).where(eq(tournamentGames.tournamentId, tournamentId)),
     db.select({
@@ -72,8 +93,15 @@ async function fetchTournamentRows(db: QueryExecutor, tournamentId: number) {
       .from(tournamentGameAssignments)
       .innerJoin(tournamentGames, eq(tournamentGameAssignments.gameId, tournamentGames.id))
       .where(eq(tournamentGames.tournamentId, tournamentId)),
+    db.execute(sql`SELECT id, tournamentId, sourceGameId, targetGameId FROM tournament_game_connections WHERE tournamentId = ${tournamentId}`),
   ]);
-  return { tournament, teams: teamRows, games: gameRows, assignments: assignmentRows };
+  return {
+    tournament,
+    teams: teamRows,
+    games: gameRows,
+    assignments: assignmentRows,
+    connections: readRows<ControlGameConnection>(connectionResult),
+  };
 }
 
 export async function fetchTournamentControlData(tournamentId: number) {
@@ -111,6 +139,42 @@ async function assertUniqueTeamName(db: QueryExecutor, tournamentId: number, nam
   }
 }
 
+async function assertConnectionGames(db: QueryExecutor, tournamentId: number, sourceGameId: number, targetGameId: number) {
+  if (sourceGameId === targetGameId) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "A lobby cannot connect to itself" });
+  }
+
+  const [sourceGame, targetGame] = await Promise.all([
+    getGameOrThrow(db, sourceGameId),
+    getGameOrThrow(db, targetGameId),
+  ]);
+
+  if (sourceGame.tournamentId !== tournamentId || targetGame.tournamentId !== tournamentId) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Both lobbies must belong to this tournament" });
+  }
+}
+
+async function connectGames(tournamentId: number, sourceGameId: number, targetGameId: number) {
+  const db = await requireDb();
+  await assertConnectionGames(db, tournamentId, sourceGameId, targetGameId);
+  await db.execute(sql`
+    INSERT INTO tournament_game_connections (tournamentId, sourceGameId, targetGameId)
+    VALUES (${tournamentId}, ${sourceGameId}, ${targetGameId})
+    ON DUPLICATE KEY UPDATE updatedAt = CURRENT_TIMESTAMP
+  `);
+  return fetchTournamentControlData(tournamentId);
+}
+
+async function deleteGameConnection(connectionId: number) {
+  const db = await requireDb();
+  const connectionRows = readRows<ControlGameConnection>(
+    await db.execute(sql`SELECT id, tournamentId, sourceGameId, targetGameId FROM tournament_game_connections WHERE id = ${connectionId} LIMIT 1`)
+  );
+  const [connection] = connectionRows;
+  if (!connection) throw new TRPCError({ code: "NOT_FOUND", message: "Lobby connection not found" });
+  await db.execute(sql`DELETE FROM tournament_game_connections WHERE id = ${connectionId}`);
+  return fetchTournamentControlData(connection.tournamentId);
+}
 
 async function listSubmissionRows(db: QueryExecutor, tournamentId?: number) {
   const base = db.select({
@@ -262,11 +326,12 @@ export const tournamentControlRouter = router({
   moveGame: discordTournamentStaffProcedure.input(gameIdSchema.extend({ position: positionSchema })).mutation(async ({ input }) => {
     const db = await requireDb();
     const game = await getGameOrThrow(db, input.gameId);
-    assertGameIsMutable(game);
     const safePosition = clampCanvasPosition(input.position);
     await db.update(tournamentGames).set({ canvasX: safePosition.x, canvasY: safePosition.y }).where(eq(tournamentGames.id, input.gameId));
     return fetchTournamentControlData(game.tournamentId);
   }),
+  connectGames: discordTournamentStaffProcedure.input(tournamentIdSchema.extend({ sourceGameId: idSchema, targetGameId: idSchema })).mutation(({ input }) => connectGames(input.tournamentId, input.sourceGameId, input.targetGameId)),
+  deleteGameConnection: discordTournamentStaffProcedure.input(z.object({ connectionId: idSchema })).mutation(({ input }) => deleteGameConnection(input.connectionId)),
   updateStatus: discordTournamentStaffProcedure.input(gameIdSchema.extend({ status: z.enum(tournamentGameStatuses) })).mutation(async ({ input }) => {
     const db = await requireDb();
     const game = await getGameOrThrow(db, input.gameId);
