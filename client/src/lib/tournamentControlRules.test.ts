@@ -94,9 +94,23 @@ describe("tournament control assignment rules", () => {
     expect(validateMovePlan({ games, teams, assignments, sourceGameId: 100, targetGameId: 100, teamId: 1, slotIndex: 2 }).targetGame.id).toBe(100);
   });
 
-  it("blocks completed game lobby-code edits and deletes through the shared mutability guard", () => {
+  it("rejects occupied same-game target slots without changing either team", () => {
+    const assignments: ControlAssignment[] = [
+      { gameId: 100, teamId: 1, slotIndex: 1 },
+      { gameId: 100, teamId: 2, slotIndex: 2 },
+    ];
+    expectTrpcCode(() => validateMovePlan({ games, teams, assignments, sourceGameId: 100, targetGameId: 100, teamId: 1, slotIndex: 2 }), "CONFLICT");
+    expect(assignments).toEqual([
+      { gameId: 100, teamId: 1, slotIndex: 1 },
+      { gameId: 100, teamId: 2, slotIndex: 2 },
+    ]);
+  });
+
+  it("blocks completed game rename, lobby-code edits, node moves, and deletes through the shared mutability guard", () => {
     const completedGame = games.find(game => game.id === 102);
     expect(completedGame).toBeDefined();
+    expectTrpcCode(() => assertGameIsMutable(completedGame!), "CONFLICT");
+    expectTrpcCode(() => assertGameIsMutable(completedGame!), "CONFLICT");
     expectTrpcCode(() => assertGameIsMutable(completedGame!), "CONFLICT");
     expectTrpcCode(() => assertGameIsMutable(completedGame!), "CONFLICT");
   });
