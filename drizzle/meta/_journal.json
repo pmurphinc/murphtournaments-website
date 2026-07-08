@@ -113,6 +113,13 @@
       "when": 1783728000000,
       "tag": "0015_add_managed_team_join_links",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "5",
+      "when": 1783814400000,
+      "tag": "0016_add_tournament_assignment_results",
+      "breakpoints": true
     }
   ]
 }
