@@ -30,6 +30,20 @@ type ControlGameConnection = {
   sourceGameId: number;
   targetGameId: number;
 };
+type AssignmentResultRow = {
+  id: number;
+  gameId: number;
+  teamId: number;
+  slotIndex: number;
+  resultPlacement: number | null;
+};
+
+type AdvancementGame = {
+  id: number;
+  tournamentId: number;
+  gameType: TournamentGameType;
+  displayLabel: string;
+};
 
 const idSchema = z.number().int().positive();
 const gameIdSchema = z.object({ gameId: idSchema });
@@ -174,6 +188,84 @@ async function deleteGameConnection(connectionId: number) {
   if (!connection) throw new TRPCError({ code: "NOT_FOUND", message: "Lobby connection not found" });
   await db.execute(sql`DELETE FROM tournament_game_connections WHERE id = ${connectionId}`);
   return fetchTournamentControlData(connection.tournamentId);
+}
+
+function getAdvancingPlacements(gameType: TournamentGameType) {
+  return gameType === "cashout" ? [1, 2] : [1];
+}
+
+function getPlacementLabel(placements: number[]) {
+  return placements.map(formatPlacementForMessage).join(" and ");
+}
+
+function formatPlacementForMessage(value: number) {
+  if (value === 1) return "1st";
+  if (value === 2) return "2nd";
+  if (value === 3) return "3rd";
+  return `${value}th`;
+}
+
+async function getAssignmentsForGame(db: QueryExecutor, gameId: number) {
+  return db.select({
+    id: tournamentGameAssignments.id,
+    gameId: tournamentGameAssignments.gameId,
+    teamId: tournamentGameAssignments.teamId,
+    slotIndex: tournamentGameAssignments.slotIndex,
+    resultPlacement: sql<number | null>`resultPlacement`,
+  }).from(tournamentGameAssignments).where(eq(tournamentGameAssignments.gameId, gameId)) as Promise<AssignmentResultRow[]>;
+}
+
+async function advanceCompletedGameQualifiers(db: QueryExecutor, game: AdvancementGame) {
+  const outgoingConnections = readRows<ControlGameConnection>(
+    await db.execute(sql`SELECT id, tournamentId, sourceGameId, targetGameId FROM tournament_game_connections WHERE sourceGameId = ${game.id}`)
+  );
+
+  if (outgoingConnections.length === 0) return;
+
+  const placementsToAdvance = getAdvancingPlacements(game.gameType);
+  const sourceAssignments = await getAssignmentsForGame(db, game.id);
+  const qualifiers = placementsToAdvance.map(placement => {
+    const assignment = sourceAssignments.find(row => row.resultPlacement === placement);
+    if (!assignment) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `${game.displayLabel} must have ${getPlacementLabel(placementsToAdvance)} set before it can feed linked lobbies.`,
+      });
+    }
+    return assignment;
+  });
+
+  for (const connection of outgoingConnections) {
+    const targetGame = await getGameOrThrow(db, connection.targetGameId);
+    if (targetGame.tournamentId !== game.tournamentId) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Linked lobby belongs to a different tournament" });
+    }
+    if (targetGame.status === "complete") {
+      throw new TRPCError({ code: "CONFLICT", message: `${targetGame.displayLabel} is already complete and cannot receive advancing teams.` });
+    }
+
+    for (const qualifier of qualifiers) {
+      const targetAssignments = await getAssignmentsForGame(db, targetGame.id);
+      if (targetAssignments.some(assignment => assignment.teamId === qualifier.teamId)) continue;
+
+      const capacity = gameCapacity[targetGame.gameType];
+      const usedSlots = new Set(targetAssignments.map(assignment => assignment.slotIndex));
+      const nextSlot = Array.from({ length: capacity }, (_, index) => index + 1).find(slot => !usedSlots.has(slot));
+
+      if (!nextSlot) {
+        throw new TRPCError({ code: "CONFLICT", message: `${targetGame.displayLabel} has no open slots for advancing teams.` });
+      }
+
+      const context = await fetchGameContext(db, targetGame.tournamentId);
+      validateAssignmentPlan({
+        ...context,
+        targetGameId: targetGame.id,
+        teamId: qualifier.teamId,
+        slotIndex: nextSlot,
+      });
+      await db.insert(tournamentGameAssignments).values({ gameId: targetGame.id, teamId: qualifier.teamId, slotIndex: nextSlot });
+    }
+  }
 }
 
 async function listSubmissionRows(db: QueryExecutor, tournamentId?: number) {
@@ -335,6 +427,16 @@ export const tournamentControlRouter = router({
   updateStatus: discordTournamentStaffProcedure.input(gameIdSchema.extend({ status: z.enum(tournamentGameStatuses) })).mutation(async ({ input }) => {
     const db = await requireDb();
     const game = await getGameOrThrow(db, input.gameId);
+
+    if (input.status === "complete") {
+      return db.transaction(async tx => {
+        const gameInTx = await getGameOrThrow(tx, input.gameId);
+        await tx.update(tournamentGames).set({ status: input.status }).where(eq(tournamentGames.id, input.gameId));
+        await advanceCompletedGameQualifiers(tx, gameInTx);
+        return fetchTournamentRows(tx, gameInTx.tournamentId);
+      });
+    }
+
     if (activeTournamentGameStatuses.includes(input.status as (typeof activeTournamentGameStatuses)[number])) {
       const context = await fetchGameContext(db, game.tournamentId);
       if (game.status === "complete") {
