@@ -41,6 +41,14 @@ type NodeDragState = {
   x: number;
   y: number;
 };
+type ControlTeamView = { id: number; name: string };
+type AssignmentView = {
+  id: number;
+  gameId: number;
+  teamId: number;
+  slotIndex: number;
+  resultPlacement?: number | null;
+};
 type DialogState =
   | { type: "create-team" }
   | { type: "rename"; gameId: number; currentValue: string }
@@ -50,6 +58,9 @@ type DialogState =
 
 const statuses: GameStatus[] = ["draft", "ready", "live", "complete"];
 const activeStatuses = new Set<GameStatus>(["draft", "ready", "live"]);
+const minZoom = 0.55;
+const maxZoom = 1.8;
+const baseCanvasSize = { width: 2200, height: 1400 };
 
 function parseDragPayload(value: string): DragPayload | null {
   try {
@@ -76,6 +87,20 @@ function formatPlacement(value: number) {
   return `${value}th`;
 }
 
+function clampZoom(value: number) {
+  return Math.min(maxZoom, Math.max(minZoom, Number(value.toFixed(2))));
+}
+
+function isTypingTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+  return (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement ||
+    target.isContentEditable
+  );
+}
+
 export default function TournamentControlRoom() {
   const params = useParams<{ tournamentId: string }>();
   const tournamentId = Number(params.tournamentId);
@@ -87,6 +112,9 @@ export default function TournamentControlRoom() {
   const [canvasMenuPosition, setCanvasMenuPosition] = useState({ x: 160, y: 120 });
   const [dialogState, setDialogState] = useState<DialogState>(null);
   const [formName, setFormName] = useState("");
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState<number | null>(null);
+  const [minimizedGameIds, setMinimizedGameIds] = useState<Set<number>>(() => new Set());
+  const [zoom, setZoom] = useState(1);
 
   const query = trpc.tournamentControl.get.useQuery(
     { tournamentId },
@@ -127,25 +155,100 @@ export default function TournamentControlRoom() {
     );
   }, [query.data]);
   const teamsById = useMemo(
-    () => new Map(query.data?.teams.map(team => [team.id, team]) ?? []),
+    () => new Map<number, ControlTeamView>(query.data?.teams.map(team => [team.id, team]) ?? []),
     [query.data]
   );
   const unassignedTeams =
     query.data?.teams.filter(team => !activeAssignedTeamIds.has(team.id)) ?? [];
-
-  const canvasPoint = useCallback((clientX: number, clientY: number) => {
-    const rect = canvasRef.current?.getBoundingClientRect();
+  const logicalCanvasSize = useMemo(() => {
+    const games = query.data?.games ?? [];
     return {
-      x: Math.max(
-        0,
-        Math.round(clientX - (rect?.left ?? 0) + (canvasRef.current?.scrollLeft ?? 0))
-      ),
-      y: Math.max(
-        0,
-        Math.round(clientY - (rect?.top ?? 0) + (canvasRef.current?.scrollTop ?? 0))
-      ),
+      width: Math.max(baseCanvasSize.width, ...games.map(game => game.canvasX + 460)),
+      height: Math.max(baseCanvasSize.height, ...games.map(game => game.canvasY + 620)),
     };
-  }, []);
+  }, [query.data]);
+  const selectedAssignmentContext = useMemo(() => {
+    if (!query.data || selectedAssignmentId === null) return null;
+    const assignment = query.data.assignments.find(item => item.id === selectedAssignmentId);
+    if (!assignment) return null;
+    const game = query.data.games.find(item => item.id === assignment.gameId);
+    if (!game) return null;
+    const team = teamsById.get(assignment.teamId);
+    const capacity = game.gameType === "cashout" ? 4 : 2;
+    return { assignment, game, team, capacity };
+  }, [query.data, selectedAssignmentId, teamsById]);
+
+  useEffect(() => {
+    if (selectedAssignmentId === null) return;
+    const assignmentExists = query.data?.assignments.some(
+      assignment => assignment.id === selectedAssignmentId
+    );
+    if (!assignmentExists) setSelectedAssignmentId(null);
+  }, [query.data, selectedAssignmentId]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (isTypingTarget(event.target)) return;
+
+      if (event.key === "Escape") {
+        setSelectedAssignmentId(null);
+        return;
+      }
+
+      if (!selectedAssignmentContext) return;
+
+      if (["0", "Backspace", "Delete"].includes(event.key)) {
+        event.preventDefault();
+        setPlacement.mutate({
+          assignmentId: selectedAssignmentContext.assignment.id,
+          resultPlacement: null,
+        });
+        return;
+      }
+
+      if (!/^[1-4]$/.test(event.key)) return;
+
+      event.preventDefault();
+      const resultPlacement = Number(event.key);
+      if (resultPlacement > selectedAssignmentContext.capacity) {
+        toast.error(
+          selectedAssignmentContext.game.gameType === "final_round"
+            ? "Final Round matches only support 1st and 2nd."
+            : "That placement is not valid for this lobby."
+        );
+        return;
+      }
+
+      setPlacement.mutate({
+        assignmentId: selectedAssignmentContext.assignment.id,
+        resultPlacement,
+      });
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedAssignmentContext, setPlacement]);
+
+  const canvasPoint = useCallback(
+    (clientX: number, clientY: number) => {
+      const rect = canvasRef.current?.getBoundingClientRect();
+      return {
+        x: Math.max(
+          0,
+          Math.round(
+            (clientX - (rect?.left ?? 0) + (canvasRef.current?.scrollLeft ?? 0)) / zoom
+          )
+        ),
+        y: Math.max(
+          0,
+          Math.round(
+            (clientY - (rect?.top ?? 0) + (canvasRef.current?.scrollTop ?? 0)) / zoom
+          )
+        ),
+      };
+    },
+    [zoom]
+  );
 
   useEffect(() => {
     if (!nodeDrag) return;
@@ -188,6 +291,18 @@ export default function TournamentControlRoom() {
   const openDialog = (state: Exclude<DialogState, null>, defaultValue = "") => {
     setDialogState(state);
     setFormName(defaultValue);
+  };
+
+  const toggleMinimizedGame = (gameId: number) => {
+    setMinimizedGameIds(current => {
+      const next = new Set(current);
+      if (next.has(gameId)) {
+        next.delete(gameId);
+      } else {
+        next.add(gameId);
+      }
+      return next;
+    });
   };
 
   if (auth.loading) return <ControlState title="Authenticating organizer…" />;
@@ -248,9 +363,8 @@ export default function TournamentControlRoom() {
             >
               ← Tournament Rooms
             </Link>
-            <div className="rounded border border-white/10 bg-white/5 px-3 py-2 font-mono text-xs text-white/70">
-              Phase 2 Discord bot contract is documented in{" "}
-              <code>docs/tournament-control-discord-contract.md</code>.
+            <div className="rounded border border-white/10 bg-white/5 px-3 py-2 font-mono text-xs text-white/55">
+              Click a team, press 1–4 to score. Shift + scroll to zoom.
             </div>
           </div>
         </div>
@@ -291,238 +405,289 @@ export default function TournamentControlRoom() {
             <main
               ref={canvasRef}
               className="relative min-h-[720px] overflow-auto bg-[radial-gradient(circle_at_top,#4d39091a,transparent_32rem),linear-gradient(rgba(255,255,255,.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.04)_1px,transparent_1px)] bg-[size:auto,40px_40px,40px_40px]"
+              onWheel={event => {
+                if (!event.shiftKey) return;
+                event.preventDefault();
+                const zoomDelta = event.deltaY > 0 ? -0.08 : 0.08;
+                setZoom(current => clampZoom(current + zoomDelta));
+              }}
               onContextMenu={event => {
-                if (event.target === event.currentTarget) {
-                  setCanvasMenuPosition(canvasPoint(event.clientX, event.clientY));
-                }
+                setCanvasMenuPosition(canvasPoint(event.clientX, event.clientY));
               }}
             >
-              {query.data.games.length === 0 && (
-                <div className="absolute left-8 top-8 rounded border border-dashed border-neon-gold/40 bg-black/70 p-6">
-                  <h3 className="font-mono text-xl font-bold text-neon-gold">Empty board</h3>
-                  <p className="text-sm text-white/60">
-                    Right-click the canvas to create a team or lobby.
-                  </p>
-                </div>
-              )}
-              {query.data.games.map(game => {
-                const assignments = query.data.assignments.filter(
-                  assignment => assignment.gameId === game.id
-                );
-                const capacity = game.gameType === "cashout" ? 4 : 2;
-                const isComplete = game.status === "complete";
-                const visualPosition =
-                  nodeDrag?.gameId === game.id
-                    ? { x: nodeDrag.x, y: nodeDrag.y }
-                    : { x: game.canvasX, y: game.canvasY };
+              <div
+                className="relative"
+                style={{
+                  width: logicalCanvasSize.width * zoom,
+                  height: logicalCanvasSize.height * zoom,
+                }}
+              >
+                <div
+                  className="absolute left-0 top-0"
+                  style={{
+                    width: logicalCanvasSize.width,
+                    height: logicalCanvasSize.height,
+                    transform: `scale(${zoom})`,
+                    transformOrigin: "top left",
+                  }}
+                >
+                  {query.data.games.length === 0 && (
+                    <div className="absolute left-8 top-8 rounded border border-dashed border-neon-gold/40 bg-black/70 p-6">
+                      <h3 className="font-mono text-xl font-bold text-neon-gold">Empty board</h3>
+                      <p className="text-sm text-white/60">
+                        Right-click the canvas to create a team or lobby.
+                      </p>
+                    </div>
+                  )}
+                  {query.data.games.map(game => {
+                    const assignments = query.data.assignments.filter(
+                      assignment => assignment.gameId === game.id
+                    );
+                    const capacity = game.gameType === "cashout" ? 4 : 2;
+                    const isComplete = game.status === "complete";
+                    const isMinimized = minimizedGameIds.has(game.id);
+                    const visualPosition =
+                      nodeDrag?.gameId === game.id
+                        ? { x: nodeDrag.x, y: nodeDrag.y }
+                        : { x: game.canvasX, y: game.canvasY };
 
-                return (
-                  <ContextMenu key={game.id}>
-                    <ContextMenuTrigger asChild>
-                      <div
-                        onContextMenu={event => event.stopPropagation()}
-                        className={`absolute w-80 rounded-lg border bg-zinc-950/95 p-4 shadow-2xl ${
-                          game.gameType === "cashout"
-                            ? "border-neon-gold/60"
-                            : "border-neon-magenta/60"
-                        } ${nodeDrag?.gameId === game.id ? "z-50 cursor-grabbing ring-2 ring-[#FFD700]/60" : ""}`}
-                        style={{ left: visualPosition.x, top: visualPosition.y }}
-                      >
-                        <div className="mb-3 flex items-start justify-between gap-2">
-                          <div>
-                            <p className="font-mono text-xs uppercase tracking-widest text-white/45">
-                              {game.gameType === "cashout" ? "Cashout Lobby" : "Final Round"}
-                            </p>
-                            <h3 className="font-mono text-xl font-black text-white">
-                              {game.displayLabel}
-                            </h3>
-                          </div>
-                          {!isComplete && (
-                            <button
-                              type="button"
-                              className="touch-none rounded border border-white/15 bg-white/10 px-2 py-1 font-mono text-xs uppercase text-neon-gold cursor-grab active:cursor-grabbing"
-                              onPointerDown={event => {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                const point = canvasPoint(event.clientX, event.clientY);
-                                setNodeDrag({
-                                  gameId: game.id,
-                                  offsetX: point.x - game.canvasX,
-                                  offsetY: point.y - game.canvasY,
-                                  x: game.canvasX,
-                                  y: game.canvasY,
-                                });
-                              }}
-                            >
-                              Move
-                            </button>
-                          )}
-                        </div>
-                        <div className="mb-3 flex items-center justify-between gap-2">
-                          <span className="inline-block rounded bg-white/10 px-2 py-1 font-mono text-xs uppercase">
-                            {game.status}
-                          </span>
-                          <span className="font-mono text-[10px] uppercase tracking-widest text-white/35">
-                            Results: {game.gameType === "cashout" ? "1st–4th" : "1st–2nd"}
-                          </span>
-                        </div>
-                        <div className="space-y-2">
-                          {Array.from({ length: capacity }, (_, index) => {
-                            const slot = index + 1;
-                            const assignment = assignments.find(item => item.slotIndex === slot);
-                            const team = assignment ? teamsById.get(assignment.teamId) : undefined;
-                            return (
-                              <div
-                                key={slot}
-                                onDragOver={event => {
-                                  if (!isComplete) event.preventDefault();
-                                }}
-                                onDrop={event => {
-                                  if (isComplete) return;
-                                  const payload =
-                                    parseDragPayload(event.dataTransfer.getData("application/json")) ??
-                                    dragPayload;
-                                  if (!payload) return;
-                                  if (payload.fromGameId) {
-                                    moveTeam.mutate({
-                                      gameId: payload.fromGameId,
-                                      toGameId: game.id,
-                                      teamId: payload.teamId,
-                                      slotIndex: slot,
-                                    });
-                                  } else {
-                                    assignTeam.mutate({
-                                      gameId: game.id,
-                                      teamId: payload.teamId,
-                                      slotIndex: slot,
-                                    });
-                                  }
-                                }}
-                                className="min-h-12 rounded border border-white/10 bg-black/50 p-2"
-                              >
-                                <p className="mb-1 font-mono text-[10px] uppercase text-white/35">
-                                  Slot {slot}
+                    return (
+                      <ContextMenu key={game.id}>
+                        <ContextMenuTrigger asChild>
+                          <div
+                            data-control-node="true"
+                            onContextMenu={event => event.stopPropagation()}
+                            className={`absolute w-80 rounded-lg border bg-zinc-950/95 p-4 shadow-2xl ${
+                              game.gameType === "cashout"
+                                ? "border-neon-gold/60"
+                                : "border-neon-magenta/60"
+                            } ${nodeDrag?.gameId === game.id ? "z-50 cursor-grabbing ring-2 ring-[#FFD700]/60" : ""}`}
+                            style={{ left: visualPosition.x, top: visualPosition.y }}
+                          >
+                            <div className="mb-3 flex items-start justify-between gap-2">
+                              <div>
+                                <p className="font-mono text-xs uppercase tracking-widest text-white/45">
+                                  {game.gameType === "cashout" ? "Cashout Lobby" : "Final Round"}
                                 </p>
-                                {team && assignment ? (
-                                  <div className="space-y-2">
-                                    <TeamCard
-                                      team={team}
-                                      fromGameId={isComplete ? undefined : game.id}
-                                      disabled={isComplete}
-                                      placement={assignment.resultPlacement ?? null}
-                                      onDragStart={() =>
-                                        setDragPayload({ teamId: team.id, fromGameId: game.id })
-                                      }
-                                    />
-                                    <ResultPlacementControl
-                                      capacity={capacity}
-                                      placement={assignment.resultPlacement ?? null}
-                                      disabled={setPlacement.isPending}
-                                      onChange={resultPlacement =>
-                                        setPlacement.mutate({
-                                          assignmentId: assignment.id,
-                                          resultPlacement,
-                                        })
-                                      }
-                                    />
-                                  </div>
-                                ) : (
-                                  <p className="text-sm text-white/35">
-                                    {isComplete ? "Empty historical slot" : "Drop team here"}
-                                  </p>
-                                )}
+                                <h3 className="font-mono text-xl font-black text-white">
+                                  {game.displayLabel}
+                                </h3>
                               </div>
-                            );
-                          })}
-                        </div>
-                        {!isComplete && game.privateLobbyCode && (
-                          <Button
-                            className="mt-3 w-full"
-                            variant="secondary"
-                            onClick={() => navigator.clipboard.writeText(game.privateLobbyCode ?? "")}
-                          >
-                            Copy Lobby Code
-                          </Button>
-                        )}
-                      </div>
-                    </ContextMenuTrigger>
-                    <ContextMenuContent>
-                      {isComplete ? (
-                        <>
-                          {statuses
-                            .filter(status => status !== "complete")
-                            .map(status => (
-                              <ContextMenuItem
-                                key={status}
-                                onClick={() => updateStatus.mutate({ gameId: game.id, status })}
+                              <div className="flex shrink-0 items-center gap-2">
+                                {!isComplete && (
+                                  <button
+                                    type="button"
+                                    className="touch-none rounded border border-white/15 bg-white/10 px-2 py-1 font-mono text-xs uppercase text-neon-gold cursor-grab active:cursor-grabbing"
+                                    onPointerDown={event => {
+                                      event.preventDefault();
+                                      event.stopPropagation();
+                                      const point = canvasPoint(event.clientX, event.clientY);
+                                      setNodeDrag({
+                                        gameId: game.id,
+                                        offsetX: point.x - game.canvasX,
+                                        offsetY: point.y - game.canvasY,
+                                        x: game.canvasX,
+                                        y: game.canvasY,
+                                      });
+                                    }}
+                                  >
+                                    Move
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  className="rounded border border-white/15 bg-white/10 px-2 py-1 font-mono text-xs uppercase text-white/70 transition hover:border-[#FFD700]/60 hover:text-[#FFD700]"
+                                  onClick={event => {
+                                    event.stopPropagation();
+                                    toggleMinimizedGame(game.id);
+                                  }}
+                                >
+                                  {isMinimized ? "Expand" : "Min"}
+                                </button>
+                              </div>
+                            </div>
+                            <div className="mb-3 flex items-center justify-between gap-2">
+                              <span className="inline-block rounded bg-white/10 px-2 py-1 font-mono text-xs uppercase">
+                                {game.status}
+                              </span>
+                              <span className="font-mono text-[10px] uppercase tracking-widest text-white/35">
+                                Results: {game.gameType === "cashout" ? "1st–4th" : "1st–2nd"}
+                              </span>
+                            </div>
+                            {isMinimized ? (
+                              <CompactResultList
+                                assignments={assignments}
+                                selectedAssignmentId={selectedAssignmentId}
+                                teamsById={teamsById}
+                                onSelect={setSelectedAssignmentId}
+                              />
+                            ) : (
+                              <div className="space-y-2">
+                                {Array.from({ length: capacity }, (_, index) => {
+                                  const slot = index + 1;
+                                  const assignment = assignments.find(item => item.slotIndex === slot);
+                                  const team = assignment ? teamsById.get(assignment.teamId) : undefined;
+                                  return (
+                                    <div
+                                      key={slot}
+                                      onDragOver={event => {
+                                        if (!isComplete) event.preventDefault();
+                                      }}
+                                      onDrop={event => {
+                                        if (isComplete) return;
+                                        const payload =
+                                          parseDragPayload(event.dataTransfer.getData("application/json")) ??
+                                          dragPayload;
+                                        if (!payload) return;
+                                        if (payload.fromGameId) {
+                                          moveTeam.mutate({
+                                            gameId: payload.fromGameId,
+                                            toGameId: game.id,
+                                            teamId: payload.teamId,
+                                            slotIndex: slot,
+                                          });
+                                        } else {
+                                          assignTeam.mutate({
+                                            gameId: game.id,
+                                            teamId: payload.teamId,
+                                            slotIndex: slot,
+                                          });
+                                        }
+                                      }}
+                                      className="min-h-12 rounded border border-white/10 bg-black/50 p-2"
+                                    >
+                                      <p className="mb-1 font-mono text-[10px] uppercase text-white/35">
+                                        Slot {slot}
+                                      </p>
+                                      {team && assignment ? (
+                                        <div className="space-y-2">
+                                          <TeamCard
+                                            team={team}
+                                            fromGameId={isComplete ? undefined : game.id}
+                                            disabled={isComplete}
+                                            placement={assignment.resultPlacement ?? null}
+                                            selected={selectedAssignmentId === assignment.id}
+                                            onSelect={() => setSelectedAssignmentId(assignment.id)}
+                                            onDragStart={() =>
+                                              setDragPayload({ teamId: team.id, fromGameId: game.id })
+                                            }
+                                          />
+                                          <ResultPlacementControl
+                                            capacity={capacity}
+                                            placement={assignment.resultPlacement ?? null}
+                                            disabled={setPlacement.isPending}
+                                            onChange={resultPlacement =>
+                                              setPlacement.mutate({
+                                                assignmentId: assignment.id,
+                                                resultPlacement,
+                                              })
+                                            }
+                                          />
+                                        </div>
+                                      ) : (
+                                        <p className="text-sm text-white/35">
+                                          {isComplete ? "Empty historical slot" : "Drop team here"}
+                                        </p>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                            {!isComplete && !isMinimized && game.privateLobbyCode && (
+                              <Button
+                                className="mt-3 w-full"
+                                variant="secondary"
+                                onClick={() => navigator.clipboard.writeText(game.privateLobbyCode ?? "")}
                               >
-                                Reopen Game as {status}
+                                Copy Lobby Code
+                              </Button>
+                            )}
+                          </div>
+                        </ContextMenuTrigger>
+                        <ContextMenuContent>
+                          {isComplete ? (
+                            <>
+                              {statuses
+                                .filter(status => status !== "complete")
+                                .map(status => (
+                                  <ContextMenuItem
+                                    key={status}
+                                    onClick={() => updateStatus.mutate({ gameId: game.id, status })}
+                                  >
+                                    Reopen Game as {status}
+                                  </ContextMenuItem>
+                                ))}
+                            </>
+                          ) : (
+                            <>
+                              <ContextMenuItem
+                                onClick={() =>
+                                  openDialog(
+                                    {
+                                      type: "rename",
+                                      gameId: game.id,
+                                      currentValue: game.displayLabel,
+                                    },
+                                    game.displayLabel
+                                  )
+                                }
+                              >
+                                Rename Game
                               </ContextMenuItem>
-                            ))}
-                        </>
-                      ) : (
-                        <>
-                          <ContextMenuItem
-                            onClick={() =>
-                              openDialog(
-                                {
-                                  type: "rename",
-                                  gameId: game.id,
-                                  currentValue: game.displayLabel,
-                                },
-                                game.displayLabel
-                              )
-                            }
-                          >
-                            Rename Game
-                          </ContextMenuItem>
-                          <ContextMenuItem
-                            onClick={() =>
-                              openDialog(
-                                {
-                                  type: "lobby",
-                                  gameId: game.id,
-                                  currentValue: game.privateLobbyCode ?? "",
-                                },
-                                game.privateLobbyCode ?? ""
-                              )
-                            }
-                          >
-                            Set/Clear Lobby Code
-                          </ContextMenuItem>
-                          <ContextMenuSeparator />
-                          {statuses.map(status => (
-                            <ContextMenuItem
-                              key={status}
-                              onClick={() => updateStatus.mutate({ gameId: game.id, status })}
-                            >
-                              Mark {status}
-                            </ContextMenuItem>
-                          ))}
-                          <ContextMenuSeparator />
-                          <ContextMenuItem
-                            onClick={() => removeAssignedTeams.mutate({ gameId: game.id })}
-                          >
-                            Remove Assigned Teams
-                          </ContextMenuItem>
-                          <ContextMenuItem
-                            className="text-red-300"
-                            onClick={() =>
-                              setDialogState({
-                                type: "delete",
-                                gameId: game.id,
-                                label: game.displayLabel,
-                              })
-                            }
-                          >
-                            Delete Game
-                          </ContextMenuItem>
-                        </>
-                      )}
-                    </ContextMenuContent>
-                  </ContextMenu>
-                );
-              })}
+                              <ContextMenuItem
+                                onClick={() =>
+                                  openDialog(
+                                    {
+                                      type: "lobby",
+                                      gameId: game.id,
+                                      currentValue: game.privateLobbyCode ?? "",
+                                    },
+                                    game.privateLobbyCode ?? ""
+                                  )
+                                }
+                              >
+                                Set/Clear Lobby Code
+                              </ContextMenuItem>
+                              <ContextMenuSeparator />
+                              {statuses.map(status => (
+                                <ContextMenuItem
+                                  key={status}
+                                  onClick={() => updateStatus.mutate({ gameId: game.id, status })}
+                                >
+                                  Mark {status}
+                                </ContextMenuItem>
+                              ))}
+                              <ContextMenuSeparator />
+                              <ContextMenuItem
+                                onClick={() => removeAssignedTeams.mutate({ gameId: game.id })}
+                              >
+                                Remove Assigned Teams
+                              </ContextMenuItem>
+                              <ContextMenuItem
+                                className="text-red-300"
+                                onClick={() =>
+                                  setDialogState({
+                                    type: "delete",
+                                    gameId: game.id,
+                                    label: game.displayLabel,
+                                  })
+                                }
+                              >
+                                Delete Game
+                              </ContextMenuItem>
+                            </>
+                          )}
+                        </ContextMenuContent>
+                      </ContextMenu>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="pointer-events-none sticky bottom-4 left-4 z-[60] mb-4 ml-4 w-fit rounded border border-white/10 bg-black/80 px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-white/50 shadow-xl">
+                Zoom {Math.round(zoom * 100)}% · Shift + scroll
+                {selectedAssignmentContext?.team ? ` · Selected: ${selectedAssignmentContext.team.name}` : ""}
+              </div>
             </main>
           </ContextMenuTrigger>
           <ContextMenuContent>
@@ -670,22 +835,96 @@ function ResultPlacementControl({
   );
 }
 
+function CompactResultList({
+  assignments,
+  selectedAssignmentId,
+  teamsById,
+  onSelect,
+}: {
+  assignments: AssignmentView[];
+  selectedAssignmentId: number | null;
+  teamsById: Map<number, ControlTeamView>;
+  onSelect: (assignmentId: number) => void;
+}) {
+  const sortedAssignments = [...assignments].sort((a, b) => {
+    const aPlacement = a.resultPlacement ?? 99;
+    const bPlacement = b.resultPlacement ?? 99;
+    if (aPlacement !== bPlacement) return aPlacement - bPlacement;
+    return a.slotIndex - b.slotIndex;
+  });
+
+  if (sortedAssignments.length === 0) {
+    return (
+      <p className="rounded border border-dashed border-white/15 p-3 text-sm text-white/35">
+        No teams assigned.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-1.5">
+      {sortedAssignments.map(assignment => {
+        const team = teamsById.get(assignment.teamId);
+        return (
+          <button
+            key={assignment.id}
+            type="button"
+            onClick={event => {
+              event.stopPropagation();
+              onSelect(assignment.id);
+            }}
+            className={`flex w-full items-center justify-between gap-2 rounded border px-2 py-1.5 text-left transition ${
+              selectedAssignmentId === assignment.id
+                ? "border-[#FFD700] bg-[#FFD700]/15"
+                : "border-white/10 bg-black/45 hover:border-[#FFD700]/50"
+            }`}
+          >
+            <span className="min-w-0 truncate font-mono text-xs font-bold text-white">
+              {team?.name ?? "Unknown team"}
+            </span>
+            <span className="shrink-0 font-mono text-[10px] uppercase text-white/45">
+              {assignment.resultPlacement ? formatPlacement(assignment.resultPlacement) : `Slot ${assignment.slotIndex}`}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function TeamCard({
   team,
   fromGameId,
   onDragStart,
   disabled,
   placement,
+  selected,
+  onSelect,
 }: {
-  team: { id: number; name: string };
+  team: ControlTeamView;
   fromGameId?: number;
   onDragStart: () => void;
   disabled?: boolean;
   placement?: number | null;
+  selected?: boolean;
+  onSelect?: () => void;
 }) {
   return (
     <div
+      role={onSelect ? "button" : undefined}
+      tabIndex={onSelect ? 0 : undefined}
       draggable={!disabled}
+      onClick={event => {
+        event.stopPropagation();
+        onSelect?.();
+      }}
+      onKeyDown={event => {
+        if (!onSelect) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect();
+        }
+      }}
       onDragStart={event => {
         event.stopPropagation();
         if (disabled) return;
@@ -694,9 +933,11 @@ function TeamCard({
         onDragStart();
       }}
       onDragEnd={event => event.stopPropagation()}
-      className={`rounded border border-white/10 bg-white/10 px-3 py-2 shadow-lg ${
-        disabled ? "opacity-70" : "cursor-grab"
-      }`}
+      className={`rounded border bg-white/10 px-3 py-2 shadow-lg transition ${
+        selected
+          ? "border-[#FFD700] ring-2 ring-[#FFD700]/50"
+          : "border-white/10"
+      } ${disabled ? "opacity-80" : onSelect ? "cursor-pointer" : "cursor-grab"}`}
     >
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0 truncate font-mono text-sm font-bold text-white">
