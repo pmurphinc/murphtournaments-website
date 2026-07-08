@@ -7,11 +7,13 @@ import {
   getConnectorPoint,
   getGameStatusClasses,
   getMidpoint,
+  getNextPlacementValue,
   getPointerDistance,
   getNextAvailableSlot,
   getNodeHeight,
   getResolvedDropSlot,
   getViewportPreservingScroll,
+  getBoundedControlKeyPosition,
   shouldStartCanvasPan,
 } from "../pages/TournamentControlRoom";
 
@@ -58,6 +60,21 @@ describe("Tournament Control Room slot selection", () => {
       { teamId: 10, slotIndex: 1 },
       { teamId: 11, slotIndex: 2 },
     ], 2, 12)).toBeNull();
+  });
+});
+
+
+describe("Tournament Control Room placement cycling", () => {
+  it("cycles Cashout placement from empty through 1st-4th and back to empty", () => {
+    const cycle = [null, 1, 2, 3, 4].map(value => getNextPlacementValue(value, 4));
+
+    expect(cycle).toEqual([1, 2, 3, 4, null]);
+  });
+
+  it("cycles Final Round placement from empty through 1st-2nd and back to empty", () => {
+    const cycle = [null, 1, 2].map(value => getNextPlacementValue(value, 2));
+
+    expect(cycle).toEqual([1, 2, null]);
   });
 });
 
@@ -167,6 +184,20 @@ describe("Tournament Control Room pinch zoom math", () => {
       scrollLeft: 250,
       scrollTop: 150,
     });
+  });
+});
+
+
+describe("Tournament Control Room control key positioning", () => {
+  it("keeps a draggable control key inside viewport padding", () => {
+    expect(
+      getBoundedControlKeyPosition(
+        { x: 900, y: -20 },
+        { width: 800, height: 600 },
+        { width: 240, height: 180 },
+        12
+      )
+    ).toEqual({ x: 548, y: 12 });
   });
 });
 
