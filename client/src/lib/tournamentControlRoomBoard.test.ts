@@ -15,6 +15,7 @@ import {
   getViewportPreservingScroll,
   getBoundedControlKeyPosition,
   shouldStartCanvasPan,
+  shouldCancelBoardDragsForPinch,
 } from "../pages/TournamentControlRoom";
 
 const cashout = { gameType: "cashout" as const, canvasX: 100, canvasY: 200 };
@@ -159,6 +160,13 @@ describe("Tournament Control Room background pan guard", () => {
       scrollLeft: 55,
       scrollTop: 30,
     });
+  });
+
+  it("requests board drag cancellation as soon as a pinch can start", () => {
+    expect(shouldCancelBoardDragsForPinch(0)).toBe(false);
+    expect(shouldCancelBoardDragsForPinch(1)).toBe(false);
+    expect(shouldCancelBoardDragsForPinch(2)).toBe(true);
+    expect(shouldCancelBoardDragsForPinch(3)).toBe(true);
   });
 });
 

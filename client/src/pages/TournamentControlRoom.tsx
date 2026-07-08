@@ -313,6 +313,10 @@ export function getViewportPreservingScroll(
   };
 }
 
+export function shouldCancelBoardDragsForPinch(activeTouchPointerCount: number) {
+  return activeTouchPointerCount >= 2;
+}
+
 function getLobbyCodeMessage(tournamentName: string, lobbyName: string, teamName: string, code: string) {
   return `Murph Tournaments lobby code
 Tournament: ${tournamentName}
@@ -380,6 +384,7 @@ export default function TournamentControlRoom() {
   const canvasPanRef = useRef<(CanvasPanStart & { pointerId: number }) | null>(null);
   const touchPointersRef = useRef<Map<number, PointerEvent>>(new Map());
   const pinchStartRef = useRef<PinchZoomStart | null>(null);
+  const isPinchingRef = useRef(false);
   const [measuredPortCenters, setMeasuredPortCenters] = useState<Map<string, CanvasPoint>>(() => new Map());
 
   const query = trpc.tournamentControl.get.useQuery(
@@ -641,6 +646,7 @@ export default function TournamentControlRoom() {
     };
 
     const handlePointerMove = (event: PointerEvent) => {
+      if (isPinchingRef.current) return;
       const position = getPosition(event.clientX, event.clientY);
       setNodeDrag(current =>
         current?.gameId === gameId ? { ...current, ...position } : current
@@ -648,6 +654,10 @@ export default function TournamentControlRoom() {
     };
 
     const finishDrag = (event: PointerEvent) => {
+      if (isPinchingRef.current) {
+        setNodeDrag(null);
+        return;
+      }
       const position = getPosition(event.clientX, event.clientY);
       setOptimisticGamePositions(current => new Map(current).set(gameId, position));
       moveGame.mutate({ gameId, position });
@@ -716,6 +726,15 @@ export default function TournamentControlRoom() {
       window.removeEventListener("pointercancel", handlePointerUp);
     };
   }, [isPanning]);
+
+  const cancelBoardDragsForPinch = useCallback(() => {
+    isPinchingRef.current = true;
+    setNodeDrag(null);
+    setConnectionDrag(null);
+    setDragPayload(null);
+    canvasPanRef.current = null;
+    setIsPanning(false);
+  }, []);
 
   const openDialog = (state: Exclude<DialogState, null>, defaultValue = "") => {
     setDialogState(state);
@@ -858,8 +877,8 @@ export default function TournamentControlRoom() {
           </div>
         </div>
       </header>
-      <div className="grid min-h-[calc(100vh-9rem)] grid-cols-1 lg:grid-cols-[19rem_1fr]">
-        <aside className="border-r border-white/10 bg-zinc-950/95 p-4">
+      <div className="grid h-[calc(100dvh-8.5rem)] min-h-0 grid-cols-1 overflow-hidden lg:grid-cols-[19rem_1fr]">
+        <aside className="max-h-[28dvh] overflow-auto border-r border-white/10 bg-zinc-950/95 p-4 lg:max-h-none">
           <h2 className="font-mono text-lg font-bold text-neon-gold">Available Teams</h2>
           <p className="mb-4 text-xs text-white/50">
             Teams assigned only to completed games remain available for new active games.
@@ -894,7 +913,7 @@ export default function TournamentControlRoom() {
           <ContextMenuTrigger asChild>
             <main
               ref={canvasRef}
-              className={`relative min-h-[720px] touch-none overflow-auto bg-[radial-gradient(circle_at_top,#4d39091a,transparent_32rem),linear-gradient(rgba(255,255,255,.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.04)_1px,transparent_1px)] bg-[size:auto,40px_40px,40px_40px] ${isPanning ? "cursor-grabbing" : "cursor-grab"}`}
+              className={`relative min-h-0 touch-none overflow-auto overscroll-contain bg-[radial-gradient(circle_at_top,#4d39091a,transparent_32rem),linear-gradient(rgba(255,255,255,.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.04)_1px,transparent_1px)] bg-[size:auto,40px_40px,40px_40px] ${isPanning ? "cursor-grabbing" : "cursor-grab"}`}
               onWheel={event => {
                 if (!event.shiftKey) return;
                 event.preventDefault();
@@ -925,7 +944,8 @@ export default function TournamentControlRoom() {
                   if (event.currentTarget.setPointerCapture) {
                     event.currentTarget.setPointerCapture(event.pointerId);
                   }
-                  if (touchPointersRef.current.size === 2) {
+                  if (shouldCancelBoardDragsForPinch(touchPointersRef.current.size)) {
+                    cancelBoardDragsForPinch();
                     const element = canvasRef.current;
                     const rect = element?.getBoundingClientRect();
                     const pointers = Array.from(touchPointersRef.current.values());
@@ -946,6 +966,8 @@ export default function TournamentControlRoom() {
                     return;
                   }
                 }
+
+                if (event.pointerType === "touch" && isPinchingRef.current) return;
 
                 if (event.button !== 0 || !shouldStartCanvasPan(event.target)) return;
                 const element = canvasRef.current;
@@ -1003,6 +1025,7 @@ export default function TournamentControlRoom() {
                 if (event.pointerType === "touch") {
                   touchPointersRef.current.delete(event.pointerId);
                   if (touchPointersRef.current.size < 2) pinchStartRef.current = null;
+                  if (touchPointersRef.current.size === 0) isPinchingRef.current = false;
                 }
                 if (canvasPanRef.current?.pointerId === event.pointerId) {
                   canvasPanRef.current = null;
@@ -1016,6 +1039,7 @@ export default function TournamentControlRoom() {
                 if (event.pointerType === "touch") {
                   touchPointersRef.current.delete(event.pointerId);
                   if (touchPointersRef.current.size < 2) pinchStartRef.current = null;
+                  if (touchPointersRef.current.size === 0) isPinchingRef.current = false;
                 }
                 if (canvasPanRef.current?.pointerId === event.pointerId) {
                   canvasPanRef.current = null;
@@ -1027,7 +1051,7 @@ export default function TournamentControlRoom() {
               }}
             >
 
-              <div className="pointer-events-none sticky left-0 top-0 z-[55] h-0 w-0">
+              <div className="pointer-events-none sticky left-0 top-0 z-[55] hidden h-0 w-0 lg:block">
                 <div
                   ref={controlKeyRef}
                   data-no-canvas-pan="true"
@@ -1132,7 +1156,8 @@ export default function TournamentControlRoom() {
                   )}
                 </div>
               </div>
-              <div className="pointer-events-none absolute left-4 top-72 z-[54] w-[min(24rem,calc(100%-2rem))] rounded-xl border border-cyan-300/25 bg-zinc-950/90 p-4 shadow-[0_0_24px_rgba(34,211,238,0.12)] backdrop-blur lg:hidden">
+              <div className="pointer-events-none sticky left-2 top-2 z-[54] h-0 w-0 lg:hidden">
+                <div className="ml-2 mt-2 w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-cyan-300/25 bg-zinc-950/85 p-3 shadow-[0_0_24px_rgba(34,211,238,0.12)] backdrop-blur">
                 <p className="font-mono text-xs font-black uppercase tracking-[0.24em] text-cyan-100">Touch Ops</p>
                 <ul className="mt-2 space-y-1.5 font-mono text-[11px] text-white/70">
                   <li>• Long-press teams/lobbies to open options.</li>
@@ -1141,6 +1166,7 @@ export default function TournamentControlRoom() {
                   <li>• Drag the empty grid background to pan.</li>
                   <li>• Pinch with two fingers to zoom the board.</li>
                 </ul>
+                </div>
               </div>
               <div
                 className="relative"
@@ -1239,6 +1265,7 @@ export default function TournamentControlRoom() {
                             data-control-node="true"
                             onContextMenu={event => event.stopPropagation()}
                             onPointerDown={event => {
+                              if (event.pointerType === "touch" || isPinchingRef.current) return;
                               if (event.button !== 0 || shouldSkipNodeDrag(event.target)) return;
                               const handle = event.target instanceof HTMLElement ? event.target.closest("[data-node-drag-handle='true']") : null;
                               if (!handle) return;
@@ -1282,6 +1309,7 @@ export default function TournamentControlRoom() {
                               data-port="bottom"
                               className="absolute -bottom-3 left-1/2 z-20 h-6 w-6 -translate-x-1/2 rounded-full border-2 border-[#FFD700] bg-[#FFD700] shadow-[0_0_14px_rgba(255,215,0,0.45)] transition hover:scale-110"
                               onPointerDown={event => {
+                                if (event.pointerType === "touch" || isPinchingRef.current) return;
                                 if (event.button !== 0) return;
                                 event.preventDefault();
                                 event.stopPropagation();
