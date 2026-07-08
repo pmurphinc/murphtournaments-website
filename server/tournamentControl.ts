@@ -2,7 +2,8 @@ import { and, eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { getDb } from "./db";
-import { adminProcedure, router } from "./_core/trpc";
+import { publicProcedure, router } from "./_core/trpc";
+import { assertDiscordTournamentStaff } from "./discordTournamentRoles";
 import { teams, tournamentGameAssignments, tournamentGames, tournaments } from "../drizzle/schema";
 import {
   activeTournamentGameStatuses,
@@ -98,29 +99,34 @@ export async function assignTeamToGameSlot(gameId: number, teamId: number, slotI
   return fetchTournamentControlData(game.tournamentId);
 }
 
+export const discordTournamentStaffProcedure = publicProcedure.use(async ({ ctx, next }) => {
+  await assertDiscordTournamentStaff(ctx);
+  return next({ ctx: { ...ctx, user: ctx.user! } });
+});
+
 export const tournamentControlRouter = router({
-  listTournaments: adminProcedure.query(async () => {
+  listTournaments: discordTournamentStaffProcedure.query(async () => {
     const db = await requireDb();
     return db.select().from(tournaments);
   }),
-  get: adminProcedure.input(tournamentIdSchema).query(({ input }) => fetchTournamentControlData(input.tournamentId)),
-  createTeam: adminProcedure.input(tournamentIdSchema.extend({ name: teamNameSchema, frp: frpSchema })).mutation(async ({ input }) => {
+  get: discordTournamentStaffProcedure.input(tournamentIdSchema).query(({ input }) => fetchTournamentControlData(input.tournamentId)),
+  createTeam: discordTournamentStaffProcedure.input(tournamentIdSchema.extend({ name: teamNameSchema, frp: frpSchema })).mutation(async ({ input }) => {
     const db = await requireDb();
     await fetchTournamentRows(db, input.tournamentId);
     await assertUniqueTeamName(db, input.tournamentId, input.name);
     await db.insert(teams).values({ tournamentId: input.tournamentId, name: input.name, frp: input.frp });
     return fetchTournamentControlData(input.tournamentId);
   }),
-  createCashoutLobby: adminProcedure.input(tournamentIdSchema.extend({ position: positionSchema })).mutation(({ input }) => createGame(input.tournamentId, "cashout", input.position)),
-  createFinalRoundMatch: adminProcedure.input(tournamentIdSchema.extend({ position: positionSchema })).mutation(({ input }) => createGame(input.tournamentId, "final_round", input.position)),
-  renameGame: adminProcedure.input(gameIdSchema.extend({ displayLabel: labelSchema })).mutation(async ({ input }) => {
+  createCashoutLobby: discordTournamentStaffProcedure.input(tournamentIdSchema.extend({ position: positionSchema })).mutation(({ input }) => createGame(input.tournamentId, "cashout", input.position)),
+  createFinalRoundMatch: discordTournamentStaffProcedure.input(tournamentIdSchema.extend({ position: positionSchema })).mutation(({ input }) => createGame(input.tournamentId, "final_round", input.position)),
+  renameGame: discordTournamentStaffProcedure.input(gameIdSchema.extend({ displayLabel: labelSchema })).mutation(async ({ input }) => {
     const db = await requireDb();
     const game = await getGameOrThrow(db, input.gameId);
     assertGameIsMutable(game);
     await db.update(tournamentGames).set({ displayLabel: input.displayLabel }).where(eq(tournamentGames.id, input.gameId));
     return fetchTournamentControlData(game.tournamentId);
   }),
-  moveGame: adminProcedure.input(gameIdSchema.extend({ position: positionSchema })).mutation(async ({ input }) => {
+  moveGame: discordTournamentStaffProcedure.input(gameIdSchema.extend({ position: positionSchema })).mutation(async ({ input }) => {
     const db = await requireDb();
     const game = await getGameOrThrow(db, input.gameId);
     assertGameIsMutable(game);
@@ -128,7 +134,7 @@ export const tournamentControlRouter = router({
     await db.update(tournamentGames).set({ canvasX: safePosition.x, canvasY: safePosition.y }).where(eq(tournamentGames.id, input.gameId));
     return fetchTournamentControlData(game.tournamentId);
   }),
-  updateStatus: adminProcedure.input(gameIdSchema.extend({ status: z.enum(tournamentGameStatuses) })).mutation(async ({ input }) => {
+  updateStatus: discordTournamentStaffProcedure.input(gameIdSchema.extend({ status: z.enum(tournamentGameStatuses) })).mutation(async ({ input }) => {
     const db = await requireDb();
     const game = await getGameOrThrow(db, input.gameId);
     if (activeTournamentGameStatuses.includes(input.status as (typeof activeTournamentGameStatuses)[number])) {
@@ -143,15 +149,15 @@ export const tournamentControlRouter = router({
     await db.update(tournamentGames).set({ status: input.status }).where(eq(tournamentGames.id, input.gameId));
     return fetchTournamentControlData(game.tournamentId);
   }),
-  setLobbyCode: adminProcedure.input(gameIdSchema.extend({ lobbyCode: lobbyCodeSchema })).mutation(async ({ input }) => {
+  setLobbyCode: discordTournamentStaffProcedure.input(gameIdSchema.extend({ lobbyCode: lobbyCodeSchema })).mutation(async ({ input }) => {
     const db = await requireDb();
     const game = await getGameOrThrow(db, input.gameId);
     assertGameIsMutable(game);
     await db.update(tournamentGames).set({ privateLobbyCode: input.lobbyCode }).where(eq(tournamentGames.id, input.gameId));
     return fetchTournamentControlData(game.tournamentId);
   }),
-  assignTeam: adminProcedure.input(gameIdSchema.extend({ teamId: idSchema, slotIndex: z.number().int().positive() })).mutation(({ input }) => assignTeamToGameSlot(input.gameId, input.teamId, input.slotIndex)),
-  moveTeam: adminProcedure.input(gameIdSchema.extend({ teamId: idSchema, toGameId: idSchema, slotIndex: z.number().int().positive() })).mutation(async ({ input }) => {
+  assignTeam: discordTournamentStaffProcedure.input(gameIdSchema.extend({ teamId: idSchema, slotIndex: z.number().int().positive() })).mutation(({ input }) => assignTeamToGameSlot(input.gameId, input.teamId, input.slotIndex)),
+  moveTeam: discordTournamentStaffProcedure.input(gameIdSchema.extend({ teamId: idSchema, toGameId: idSchema, slotIndex: z.number().int().positive() })).mutation(async ({ input }) => {
     const db = await requireDb();
     const targetGame = await getGameOrThrow(db, input.toGameId);
     await db.transaction(async tx => {
@@ -162,21 +168,21 @@ export const tournamentControlRouter = router({
     });
     return fetchTournamentControlData(targetGame.tournamentId);
   }),
-  removeTeam: adminProcedure.input(gameIdSchema.extend({ teamId: idSchema })).mutation(async ({ input }) => {
+  removeTeam: discordTournamentStaffProcedure.input(gameIdSchema.extend({ teamId: idSchema })).mutation(async ({ input }) => {
     const db = await requireDb();
     const game = await getGameOrThrow(db, input.gameId);
     if (game.status === "complete") throw new TRPCError({ code: "CONFLICT", message: "Completed games are historical. Mark the game active before changing assignments." });
     await db.delete(tournamentGameAssignments).where(and(eq(tournamentGameAssignments.gameId, input.gameId), eq(tournamentGameAssignments.teamId, input.teamId)));
     return fetchTournamentControlData(game.tournamentId);
   }),
-  removeAssignedTeams: adminProcedure.input(gameIdSchema).mutation(async ({ input }) => {
+  removeAssignedTeams: discordTournamentStaffProcedure.input(gameIdSchema).mutation(async ({ input }) => {
     const db = await requireDb();
     const game = await getGameOrThrow(db, input.gameId);
     if (game.status === "complete") throw new TRPCError({ code: "CONFLICT", message: "Completed games are historical. Mark the game active before changing assignments." });
     await db.delete(tournamentGameAssignments).where(eq(tournamentGameAssignments.gameId, input.gameId));
     return fetchTournamentControlData(game.tournamentId);
   }),
-  deleteGame: adminProcedure.input(gameIdSchema).mutation(async ({ input }) => {
+  deleteGame: discordTournamentStaffProcedure.input(gameIdSchema).mutation(async ({ input }) => {
     const db = await requireDb();
     const game = await getGameOrThrow(db, input.gameId);
     assertGameIsMutable(game);

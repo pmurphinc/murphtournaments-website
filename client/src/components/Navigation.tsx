@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Menu, X, ChevronDown, LogOut } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { getDiscordLoginUrl } from "@/lib/discordLogin";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -202,7 +203,15 @@ export default function Navigation() {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-    ) : null;
+    ) : (
+      <a
+        href={getDiscordLoginUrl()}
+        className="inline-flex h-10 flex-none shrink-0 items-center justify-center rounded-full border border-[#5865F2]/70 bg-gradient-to-r from-[#5865F2] to-[#3b45b8] px-3 font-mono text-[11px] font-black uppercase tracking-wider text-white shadow-[0_0_18px_rgba(88,101,242,0.32)] transition hover:border-yellow-300 hover:from-[#6875ff] hover:to-[#4b55c8] hover:text-yellow-100 sm:px-4"
+      >
+        <span className="hidden sm:inline">Sign in with Discord</span>
+        <span className="sm:hidden">Discord</span>
+      </a>
+    );
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-[#0a0e27] border-b border-neon-magenta/30">

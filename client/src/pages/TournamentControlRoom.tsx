@@ -3,6 +3,7 @@ import { useParams } from "wouter";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { getDiscordLoginUrl } from "@/lib/discordLogin";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "@/components/ui/context-menu";
@@ -27,7 +28,7 @@ function parseDragPayload(value: string): DragPayload | null {
 export default function TournamentControlRoom() {
   const params = useParams<{ tournamentId: string }>();
   const tournamentId = Number(params.tournamentId);
-  const auth = useAuth({ redirectOnUnauthenticated: true });
+  const auth = useAuth();
   const utils = trpc.useUtils();
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const [dragPayload, setDragPayload] = useState<DragPayload | null>(null);
@@ -37,7 +38,7 @@ export default function TournamentControlRoom() {
   const [formName, setFormName] = useState("");
   const [formFrp, setFormFrp] = useState("0");
 
-  const query = trpc.tournamentControl.get.useQuery({ tournamentId }, { enabled: Number.isFinite(tournamentId) && auth.user?.role === "admin", retry: false });
+  const query = trpc.tournamentControl.get.useQuery({ tournamentId }, { enabled: Number.isFinite(tournamentId) && auth.user?.loginMethod === "discord", retry: false });
   const invalidate = () => utils.tournamentControl.get.invalidate({ tournamentId });
   const mutationOptions = { onSuccess: invalidate, onError: (error: { message: string }) => toast.error(error.message) };
   const createTeam = trpc.tournamentControl.createTeam.useMutation(mutationOptions);
@@ -61,9 +62,10 @@ export default function TournamentControlRoom() {
   const unassignedTeams = query.data?.teams.filter(team => !activeAssignedTeamIds.has(team.id)) ?? [];
 
   if (auth.loading) return <ControlState title="Authenticating organizer…" />;
-  if (auth.user?.role !== "admin") return <ControlState title="Admin access required" description="Tournament control rooms are private organizer tools." />;
-  if (query.isLoading) return <ControlState title="Loading control room…" />;
-  if (query.error) return <ControlState title="Could not load control room" description={query.error.message} />;
+  if (!auth.user) return <ControlState title="Organizer Discord sign-in required" description="Sign in with Discord to open Tournament Control Room tools." showDiscordSignIn />;
+  if (auth.user.loginMethod !== "discord") return <ControlState title="Organizer Discord sign-in required" description="Tournament Control uses Discord identity. Sign in with Discord to continue." showDiscordSignIn />;
+  if (query.isLoading) return <ControlState title="Verifying Discord organizer roles…" />;
+  if (query.error) return <ControlState title={query.error.message.includes("configuration") ? "Discord role configuration error" : query.error.message.includes("Unable to verify") ? "Discord service verification failed" : "Discord Admin or Staff role required"} description={query.error.message} />;
   if (!query.data) return <ControlState title="Tournament not found" />;
 
   const canvasPoint = (clientX: number, clientY: number) => {
@@ -94,6 +96,6 @@ function TeamCard({ team, fromGameId, onDragStart, disabled }: { team: { id: num
   return <div draggable={!disabled} onDragStart={e => { e.stopPropagation(); if (disabled) return; const payload: DragPayload = { teamId: team.id, fromGameId }; e.dataTransfer.setData("application/json", JSON.stringify(payload)); onDragStart(); }} onDragEnd={e => e.stopPropagation()} className={`rounded border border-white/10 bg-white/10 px-3 py-2 shadow-lg ${disabled ? "opacity-70" : "cursor-grab"}`}><div className="font-mono text-sm font-bold text-white">{team.name}</div><div className="text-xs text-neon-gold">{team.frp} FRP</div></div>;
 }
 
-function ControlState({ title, description }: { title: string; description?: string }) {
-  return <section className="min-h-screen bg-black px-6 py-20 text-white"><div className="mx-auto max-w-xl rounded border border-neon-gold/30 bg-zinc-950 p-8"><h1 className="font-mono text-2xl font-black text-neon-gold">{title}</h1>{description && <p className="mt-3 text-white/60">{description}</p>}</div></section>;
+function ControlState({ title, description, showDiscordSignIn }: { title: string; description?: string; showDiscordSignIn?: boolean }) {
+  return <section className="min-h-screen bg-black px-6 py-20 text-white"><div className="mx-auto max-w-xl rounded border border-neon-gold/30 bg-zinc-950 p-8"><h1 className="font-mono text-2xl font-black text-neon-gold">{title}</h1>{description && <p className="mt-3 text-white/60">{description}</p>}{showDiscordSignIn && <a href={getDiscordLoginUrl()} className="mt-6 inline-flex rounded border border-[#5865F2]/70 bg-[#5865F2] px-4 py-2 font-mono text-sm font-bold uppercase tracking-wider text-white hover:border-neon-gold">Sign in with Discord</a>}</div></section>;
 }

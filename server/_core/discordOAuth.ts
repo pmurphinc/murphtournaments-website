@@ -12,6 +12,7 @@ const DISCORD_AUTH_URL = "https://discord.com/oauth2/authorize";
 const DISCORD_TOKEN_URL = "https://discord.com/api/oauth2/token";
 const DISCORD_USER_URL = "https://discord.com/api/users/@me";
 const DISCORD_STATE_COOKIE = "discord_oauth_state";
+const DISCORD_RETURN_PATH_COOKIE = "discord_oauth_return_path";
 const DISCORD_STATE_MAX_AGE_MS = 10 * 60 * 1000;
 
 const discordUserSchema = z.object({
@@ -86,8 +87,22 @@ async function fetchDiscordUser(accessToken: string) {
   return discordUserSchema.parse(await response.json());
 }
 
-function redirectError(res: Response) {
-  res.redirect(302, "/team-finder?discord=error");
+export function sanitizeDiscordReturnPath(value: unknown) {
+  if (typeof value !== "string") return "/team-finder";
+  if (!value.startsWith("/") || value.startsWith("//")) return "/team-finder";
+  try {
+    const parsed = new URL(value, "https://murphtournaments.local");
+    if (parsed.origin !== "https://murphtournaments.local") return "/team-finder";
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return "/team-finder";
+  }
+}
+
+function redirectError(res: Response, returnPath = "/team-finder") {
+  const safePath = sanitizeDiscordReturnPath(returnPath);
+  const separator = safePath.includes("?") ? "&" : "?";
+  res.redirect(302, `${safePath}${separator}discord=error`);
 }
 
 export function registerDiscordOAuthRoutes(app: Express) {
@@ -102,7 +117,13 @@ export function registerDiscordOAuthRoutes(app: Express) {
     }
 
     const state = randomBytes(32).toString("base64url");
+    const returnPath = sanitizeDiscordReturnPath(getQueryParam(req, "returnTo"));
     res.cookie(DISCORD_STATE_COOKIE, state, {
+      ...getSessionCookieOptions(req),
+      httpOnly: true,
+      maxAge: DISCORD_STATE_MAX_AGE_MS,
+    });
+    res.cookie(DISCORD_RETURN_PATH_COOKIE, returnPath, {
       ...getSessionCookieOptions(req),
       httpOnly: true,
       maxAge: DISCORD_STATE_MAX_AGE_MS,
@@ -120,16 +141,19 @@ export function registerDiscordOAuthRoutes(app: Express) {
   app.get("/api/auth/discord/callback", async (req: Request, res: Response) => {
     const cookieOptions = getSessionCookieOptions(req);
     res.clearCookie(DISCORD_STATE_COOKIE, cookieOptions);
+    res.clearCookie(DISCORD_RETURN_PATH_COOKIE, cookieOptions);
+
+    const cookies = parseCookieHeader(req.headers.cookie || "");
+    const returnPath = sanitizeDiscordReturnPath(cookies[DISCORD_RETURN_PATH_COOKIE]);
 
     try {
       const code = getQueryParam(req, "code");
       const state = getQueryParam(req, "state");
-      const cookies = parseCookieHeader(req.headers.cookie || "");
       if (
         !code ||
         !validateDiscordState(cookies[DISCORD_STATE_COOKIE], state)
       ) {
-        redirectError(res);
+        redirectError(res, returnPath);
         return;
       }
 
@@ -159,13 +183,13 @@ export function registerDiscordOAuthRoutes(app: Express) {
         maxAge: ONE_YEAR_MS,
       });
       console.log(`[Discord OAuth] Signed in Discord user ${discordUser.id}`);
-      res.redirect(302, "/team-finder");
+      res.redirect(302, returnPath);
     } catch (error) {
       console.error(
         "[Discord OAuth] Callback failed",
         error instanceof Error ? error.message : String(error)
       );
-      redirectError(res);
+      redirectError(res, returnPath);
     }
   });
 }
