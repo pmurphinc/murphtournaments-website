@@ -317,6 +317,10 @@ export function shouldCancelBoardDragsForPinch(activeTouchPointerCount: number) 
   return activeTouchPointerCount >= 2;
 }
 
+export function getAvailableTeamsToggleLabel(teamCount: number) {
+  return `Available Teams (${teamCount})`;
+}
+
 function getLobbyCodeMessage(tournamentName: string, lobbyName: string, teamName: string, code: string) {
   return `Murph Tournaments lobby code
 Tournament: ${tournamentName}
@@ -379,6 +383,8 @@ export default function TournamentControlRoom() {
   const [isPanning, setIsPanning] = useState(false);
   const [controlKeyMinimized, setControlKeyMinimized] = useState(false);
   const [controlKeyLocked, setControlKeyLocked] = useState(true);
+  const [mobileTeamsOpen, setMobileTeamsOpen] = useState(false);
+  const [touchHelpOpen, setTouchHelpOpen] = useState(false);
   const [controlKeyPosition, setControlKeyPosition] = useState<CanvasPoint>({ x: 16, y: 16 });
   const controlKeyDragRef = useRef<ControlKeyDragStart | null>(null);
   const canvasPanRef = useRef<(CanvasPanStart & { pointerId: number }) | null>(null);
@@ -467,6 +473,8 @@ export default function TournamentControlRoom() {
       height: Math.max(baseCanvasSize.height, ...games.map(game => game.canvasY + 680)),
     };
   }, [games]);
+  const availableTeamsToggleLabel = getAvailableTeamsToggleLabel(unassignedTeams.length);
+
   const selectedAssignmentContext = useMemo(() => {
     if (selectedAssignmentId === null) return null;
     const assignment = assignments.find(item => item.id === selectedAssignmentId);
@@ -877,36 +885,47 @@ export default function TournamentControlRoom() {
           </div>
         </div>
       </header>
-      <div className="grid h-[calc(100dvh-8.5rem)] min-h-0 grid-cols-1 overflow-hidden lg:grid-cols-[19rem_1fr]">
-        <aside className="max-h-[28dvh] overflow-auto border-r border-white/10 bg-zinc-950/95 p-4 lg:max-h-none">
-          <h2 className="font-mono text-lg font-bold text-neon-gold">Available Teams</h2>
-          <p className="mb-4 text-xs text-white/50">
-            Teams assigned only to completed games remain available for new active games.
-          </p>
-          <div
-            className="space-y-2"
-            onDragOver={event => event.preventDefault()}
-            onDrop={event => {
-              const payload = parseDragPayload(event.dataTransfer.getData("application/json"));
-              if (payload?.fromGameId) {
-                removeTeam.mutate({ gameId: payload.fromGameId, teamId: payload.teamId });
-              }
-            }}
+      <div className="grid h-[calc(100dvh-8.5rem)] min-h-0 grid-cols-1 grid-rows-[auto_1fr] overflow-hidden lg:grid-cols-[19rem_1fr] lg:grid-rows-1">
+        <aside className="border-b border-white/10 bg-zinc-950/95 p-3 lg:min-h-0 lg:overflow-auto lg:border-b-0 lg:border-r lg:p-4">
+          <button
+            type="button"
+            className="flex w-full items-center justify-between rounded-lg border border-neon-gold/35 bg-neon-gold/10 px-3 py-2 font-mono text-sm font-black uppercase tracking-wider text-neon-gold transition hover:bg-neon-gold/15 lg:hidden"
+            aria-expanded={mobileTeamsOpen}
+            onClick={() => setMobileTeamsOpen(open => !open)}
           >
-            {unassignedTeams.length === 0 ? (
-              <p className="rounded border border-dashed border-white/15 p-4 text-sm text-white/50">
-                No available teams.
-              </p>
-            ) : (
-              unassignedTeams.map(team => (
-                <TeamCard
-                  key={team.id}
-                  team={team}
-                  onDragStart={() => setDragPayload({ teamId: team.id })}
-                  onCreateClaimLink={!team.managedTeamId ? () => createClaimLink.mutate({ teamId: team.id }) : undefined}
-                />
-              ))
-            )}
+            <span>{availableTeamsToggleLabel}</span>
+            <span className="text-lg leading-none">{mobileTeamsOpen ? "−" : "+"}</span>
+          </button>
+          <h2 className="hidden font-mono text-lg font-bold text-neon-gold lg:block">Available Teams</h2>
+          <div className={`${mobileTeamsOpen ? "block" : "hidden"} mt-3 max-h-[24dvh] overflow-auto pr-1 lg:mt-0 lg:block lg:max-h-none lg:overflow-visible lg:pr-0`}>
+            <p className="mb-3 text-xs text-white/50 lg:mb-4">
+              Teams assigned only to completed games remain available for new active games.
+            </p>
+            <div
+              className="space-y-2"
+              onDragOver={event => event.preventDefault()}
+              onDrop={event => {
+                const payload = parseDragPayload(event.dataTransfer.getData("application/json"));
+                if (payload?.fromGameId) {
+                  removeTeam.mutate({ gameId: payload.fromGameId, teamId: payload.teamId });
+                }
+              }}
+            >
+              {unassignedTeams.length === 0 ? (
+                <p className="rounded border border-dashed border-white/15 p-4 text-sm text-white/50">
+                  No available teams.
+                </p>
+              ) : (
+                unassignedTeams.map(team => (
+                  <TeamCard
+                    key={team.id}
+                    team={team}
+                    onDragStart={() => setDragPayload({ teamId: team.id })}
+                    onCreateClaimLink={!team.managedTeamId ? () => createClaimLink.mutate({ teamId: team.id }) : undefined}
+                  />
+                ))
+              )}
+            </div>
           </div>
         </aside>
         <ContextMenu>
@@ -1157,16 +1176,36 @@ export default function TournamentControlRoom() {
                 </div>
               </div>
               <div className="pointer-events-none sticky left-2 top-2 z-[54] h-0 w-0 lg:hidden">
-                <div className="ml-2 mt-2 w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-cyan-300/25 bg-zinc-950/85 p-3 shadow-[0_0_24px_rgba(34,211,238,0.12)] backdrop-blur">
-                <p className="font-mono text-xs font-black uppercase tracking-[0.24em] text-cyan-100">Touch Ops</p>
-                <ul className="mt-2 space-y-1.5 font-mono text-[11px] text-white/70">
-                  <li>• Long-press teams/lobbies to open options.</li>
-                  <li>• Drag teams into lobbies or exact slots.</li>
-                  <li>• Double-tap an assigned team to cycle placement.</li>
-                  <li>• Drag the empty grid background to pan.</li>
-                  <li>• Pinch with two fingers to zoom the board.</li>
-                </ul>
-                </div>
+                {touchHelpOpen ? (
+                  <div className="pointer-events-auto ml-2 mt-2 max-h-[38dvh] w-[min(18rem,calc(100vw-2rem))] overflow-auto rounded-xl border border-cyan-300/25 bg-zinc-950/90 p-3 shadow-[0_0_24px_rgba(34,211,238,0.12)] backdrop-blur" data-no-canvas-pan="true">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-mono text-xs font-black uppercase tracking-[0.24em] text-cyan-100">Touch Ops</p>
+                      <button
+                        type="button"
+                        className="rounded border border-white/15 bg-white/10 px-2 py-1 font-mono text-[10px] font-black uppercase text-white/70 transition hover:border-cyan-200/60 hover:text-cyan-100"
+                        onClick={() => setTouchHelpOpen(false)}
+                      >
+                        Close
+                      </button>
+                    </div>
+                    <ul className="mt-2 space-y-1.5 font-mono text-[11px] text-white/70">
+                      <li>• Long-press teams/lobbies to open options.</li>
+                      <li>• Drag teams into lobbies or exact slots.</li>
+                      <li>• Double-tap an assigned team to cycle placement.</li>
+                      <li>• Drag the empty grid background to pan.</li>
+                      <li>• Pinch with two fingers to zoom the board.</li>
+                    </ul>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    data-no-canvas-pan="true"
+                    className="pointer-events-auto ml-2 mt-2 rounded-full border border-cyan-300/40 bg-zinc-950/90 px-3 py-2 font-mono text-[11px] font-black uppercase tracking-wider text-cyan-100 shadow-[0_0_18px_rgba(34,211,238,0.16)] backdrop-blur transition hover:bg-cyan-300/10"
+                    onClick={() => setTouchHelpOpen(true)}
+                  >
+                    Touch Help
+                  </button>
+                )}
               </div>
               <div
                 className="relative"
