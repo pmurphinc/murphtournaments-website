@@ -34,6 +34,8 @@ import {
 
 type DragPayload = { teamId: number; fromGameId?: number };
 type GameStatus = "draft" | "ready" | "live" | "complete";
+type GameType = "cashout" | "final_round";
+type CanvasPoint = { x: number; y: number };
 type NodeDragState = {
   gameId: number;
   offsetX: number;
@@ -41,13 +43,34 @@ type NodeDragState = {
   x: number;
   y: number;
 };
+type ConnectionDragState = {
+  sourceGameId: number;
+  sourcePoint: CanvasPoint;
+  currentPoint: CanvasPoint;
+};
 type ControlTeamView = { id: number; name: string };
+type ControlGameView = {
+  id: number;
+  tournamentId: number;
+  gameType: GameType;
+  status: GameStatus;
+  displayLabel: string;
+  canvasX: number;
+  canvasY: number;
+  privateLobbyCode?: string | null;
+};
 type AssignmentView = {
   id: number;
   gameId: number;
   teamId: number;
   slotIndex: number;
   resultPlacement?: number | null;
+};
+type ConnectionView = {
+  id: number;
+  tournamentId: number;
+  sourceGameId: number;
+  targetGameId: number;
 };
 type DialogState =
   | { type: "create-team" }
@@ -61,6 +84,7 @@ const activeStatuses = new Set<GameStatus>(["draft", "ready", "live"]);
 const minZoom = 0.55;
 const maxZoom = 1.8;
 const baseCanvasSize = { width: 2200, height: 1400 };
+const nodeWidth = 320;
 
 function parseDragPayload(value: string): DragPayload | null {
   try {
@@ -91,6 +115,16 @@ function clampZoom(value: number) {
   return Math.min(maxZoom, Math.max(minZoom, Number(value.toFixed(2))));
 }
 
+function getNodeHeight(gameType: GameType, minimized: boolean) {
+  if (minimized) return 132;
+  return gameType === "cashout" ? 438 : 300;
+}
+
+function getConnectionPath(source: CanvasPoint, target: CanvasPoint) {
+  const distance = Math.max(80, Math.abs(target.y - source.y) * 0.55);
+  return `M ${source.x} ${source.y} C ${source.x} ${source.y + distance}, ${target.x} ${target.y - distance}, ${target.x} ${target.y}`;
+}
+
 function isTypingTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false;
   return (
@@ -98,6 +132,15 @@ function isTypingTarget(target: EventTarget | null) {
     target instanceof HTMLTextAreaElement ||
     target instanceof HTMLSelectElement ||
     target.isContentEditable
+  );
+}
+
+function shouldSkipNodeDrag(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+  return Boolean(
+    target.closest(
+      '[data-no-node-drag="true"], button, a, input, select, textarea, [role="button"], [draggable="true"]'
+    )
   );
 }
 
@@ -109,11 +152,15 @@ export default function TournamentControlRoom() {
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const [dragPayload, setDragPayload] = useState<DragPayload | null>(null);
   const [nodeDrag, setNodeDrag] = useState<NodeDragState | null>(null);
+  const [connectionDrag, setConnectionDrag] = useState<ConnectionDragState | null>(null);
   const [canvasMenuPosition, setCanvasMenuPosition] = useState({ x: 160, y: 120 });
   const [dialogState, setDialogState] = useState<DialogState>(null);
   const [formName, setFormName] = useState("");
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<number | null>(null);
   const [minimizedGameIds, setMinimizedGameIds] = useState<Set<number>>(() => new Set());
+  const [optimisticGamePositions, setOptimisticGamePositions] = useState<Map<number, CanvasPoint>>(
+    () => new Map()
+  );
   const [zoom, setZoom] = useState(1);
 
   const query = trpc.tournamentControl.get.useQuery(
@@ -132,6 +179,8 @@ export default function TournamentControlRoom() {
   const createCashout = trpc.tournamentControl.createCashoutLobby.useMutation(mutationOptions);
   const createFinal = trpc.tournamentControl.createFinalRoundMatch.useMutation(mutationOptions);
   const moveGame = trpc.tournamentControl.moveGame.useMutation(mutationOptions);
+  const connectGames = trpc.tournamentControl.connectGames.useMutation(mutationOptions);
+  const deleteGameConnection = trpc.tournamentControl.deleteGameConnection.useMutation(mutationOptions);
   const renameGame = trpc.tournamentControl.renameGame.useMutation(mutationOptions);
   const setLobbyCode = trpc.tournamentControl.setLobbyCode.useMutation(mutationOptions);
   const updateStatus = trpc.tournamentControl.updateStatus.useMutation(mutationOptions);
@@ -142,18 +191,24 @@ export default function TournamentControlRoom() {
   const removeAssignedTeams = trpc.tournamentControl.removeAssignedTeams.useMutation(mutationOptions);
   const deleteGame = trpc.tournamentControl.deleteGame.useMutation(mutationOptions);
 
+  const games = (query.data?.games ?? []) as ControlGameView[];
+  const assignments = (query.data?.assignments ?? []) as AssignmentView[];
+  const connections = (query.data?.connections ?? []) as ConnectionView[];
+
+  const gamesById = useMemo(
+    () => new Map<number, ControlGameView>(games.map(game => [game.id, game] as const)),
+    [games]
+  );
   const activeAssignedTeamIds = useMemo(() => {
     const activeGameIds = new Set(
-      query.data?.games
-        .filter(game => activeStatuses.has(game.status))
-        .map(game => game.id) ?? []
+      games.filter(game => activeStatuses.has(game.status)).map(game => game.id)
     );
     return new Set(
-      query.data?.assignments
+      assignments
         .filter(assignment => activeGameIds.has(assignment.gameId))
-        .map(assignment => assignment.teamId) ?? []
+        .map(assignment => assignment.teamId)
     );
-  }, [query.data]);
+  }, [assignments, games]);
   const teamsById = useMemo(
     () => new Map<number, ControlTeamView>(query.data?.teams.map(team => [team.id, team] as const) ?? []),
     [query.data]
@@ -161,30 +216,61 @@ export default function TournamentControlRoom() {
   const unassignedTeams =
     query.data?.teams.filter(team => !activeAssignedTeamIds.has(team.id)) ?? [];
   const logicalCanvasSize = useMemo(() => {
-    const games = query.data?.games ?? [];
     return {
-      width: Math.max(baseCanvasSize.width, ...games.map(game => game.canvasX + 460)),
-      height: Math.max(baseCanvasSize.height, ...games.map(game => game.canvasY + 620)),
+      width: Math.max(baseCanvasSize.width, ...games.map(game => game.canvasX + 520)),
+      height: Math.max(baseCanvasSize.height, ...games.map(game => game.canvasY + 680)),
     };
-  }, [query.data]);
+  }, [games]);
   const selectedAssignmentContext = useMemo(() => {
-    if (!query.data || selectedAssignmentId === null) return null;
-    const assignment = query.data.assignments.find(item => item.id === selectedAssignmentId);
+    if (selectedAssignmentId === null) return null;
+    const assignment = assignments.find(item => item.id === selectedAssignmentId);
     if (!assignment) return null;
-    const game = query.data.games.find(item => item.id === assignment.gameId);
+    const game = gamesById.get(assignment.gameId);
     if (!game) return null;
     const team = teamsById.get(assignment.teamId);
     const capacity = game.gameType === "cashout" ? 4 : 2;
     return { assignment, game, team, capacity };
-  }, [query.data, selectedAssignmentId, teamsById]);
+  }, [assignments, gamesById, selectedAssignmentId, teamsById]);
+
+  const getVisualPosition = useCallback(
+    (game: ControlGameView) => {
+      if (nodeDrag?.gameId === game.id) return { x: nodeDrag.x, y: nodeDrag.y };
+      return optimisticGamePositions.get(game.id) ?? { x: game.canvasX, y: game.canvasY };
+    },
+    [nodeDrag, optimisticGamePositions]
+  );
+
+  const getPortPoint = useCallback(
+    (game: ControlGameView, port: "top" | "bottom") => {
+      const position = getVisualPosition(game);
+      const minimized = minimizedGameIds.has(game.id);
+      return {
+        x: position.x + nodeWidth / 2,
+        y: port === "top" ? position.y : position.y + getNodeHeight(game.gameType, minimized),
+      };
+    },
+    [getVisualPosition, minimizedGameIds]
+  );
 
   useEffect(() => {
     if (selectedAssignmentId === null) return;
-    const assignmentExists = query.data?.assignments.some(
-      assignment => assignment.id === selectedAssignmentId
-    );
+    const assignmentExists = assignments.some(assignment => assignment.id === selectedAssignmentId);
     if (!assignmentExists) setSelectedAssignmentId(null);
-  }, [query.data, selectedAssignmentId]);
+  }, [assignments, selectedAssignmentId]);
+
+  useEffect(() => {
+    setOptimisticGamePositions(current => {
+      if (current.size === 0) return current;
+      const next = new Map(current);
+      for (const game of games) {
+        const optimistic = next.get(game.id);
+        if (optimistic && optimistic.x === game.canvasX && optimistic.y === game.canvasY) {
+          next.delete(game.id);
+        }
+      }
+      return next.size === current.size ? current : next;
+    });
+  }, [games]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -271,6 +357,7 @@ export default function TournamentControlRoom() {
 
     const finishDrag = (event: PointerEvent) => {
       const position = getPosition(event.clientX, event.clientY);
+      setOptimisticGamePositions(current => new Map(current).set(gameId, position));
       moveGame.mutate({ gameId, position });
       setNodeDrag(null);
     };
@@ -287,6 +374,44 @@ export default function TournamentControlRoom() {
       window.removeEventListener("pointercancel", cancelDrag);
     };
   }, [canvasPoint, moveGame, nodeDrag?.gameId, nodeDrag?.offsetX, nodeDrag?.offsetY]);
+
+  useEffect(() => {
+    if (!connectionDrag) return;
+
+    const sourceGameId = connectionDrag.sourceGameId;
+    const handlePointerMove = (event: PointerEvent) => {
+      const currentPoint = canvasPoint(event.clientX, event.clientY);
+      setConnectionDrag(current =>
+        current?.sourceGameId === sourceGameId ? { ...current, currentPoint } : current
+      );
+    };
+
+    const finishConnection = (event: PointerEvent) => {
+      const target = event.target instanceof HTMLElement
+        ? event.target.closest("[data-input-port-game-id]")
+        : null;
+      const targetGameId = target instanceof HTMLElement
+        ? Number(target.dataset.inputPortGameId)
+        : NaN;
+
+      if (Number.isInteger(targetGameId) && targetGameId > 0 && targetGameId !== sourceGameId) {
+        connectGames.mutate({ tournamentId, sourceGameId, targetGameId });
+      }
+      setConnectionDrag(null);
+    };
+
+    const cancelConnection = () => setConnectionDrag(null);
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", finishConnection, { once: true });
+    window.addEventListener("pointercancel", cancelConnection, { once: true });
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", finishConnection);
+      window.removeEventListener("pointercancel", cancelConnection);
+    };
+  }, [canvasPoint, connectGames, connectionDrag?.sourceGameId, tournamentId]);
 
   const openDialog = (state: Exclude<DialogState, null>, defaultValue = "") => {
     setDialogState(state);
@@ -364,7 +489,7 @@ export default function TournamentControlRoom() {
               ← Tournament Rooms
             </Link>
             <div className="rounded border border-white/10 bg-white/5 px-3 py-2 font-mono text-xs text-white/55">
-              Click a team, press 1–4 to score. Shift + scroll to zoom.
+              Click team + 1–4 score · drag lobby frame to move · drag bottom node to top node to connect
             </div>
           </div>
         </div>
@@ -431,7 +556,59 @@ export default function TournamentControlRoom() {
                     transformOrigin: "top left",
                   }}
                 >
-                  {query.data.games.length === 0 && (
+                  <svg
+                    className="absolute inset-0 z-0 overflow-visible"
+                    width={logicalCanvasSize.width}
+                    height={logicalCanvasSize.height}
+                  >
+                    <defs>
+                      <marker
+                        id="tournament-flow-arrow"
+                        markerHeight="8"
+                        markerWidth="8"
+                        orient="auto"
+                        refX="7"
+                        refY="4"
+                      >
+                        <path d="M 0 0 L 8 4 L 0 8 z" fill="#FFD700" />
+                      </marker>
+                    </defs>
+                    {connections.map(connection => {
+                      const sourceGame = gamesById.get(connection.sourceGameId);
+                      const targetGame = gamesById.get(connection.targetGameId);
+                      if (!sourceGame || !targetGame) return null;
+                      const source = getPortPoint(sourceGame, "bottom");
+                      const target = getPortPoint(targetGame, "top");
+                      return (
+                        <path
+                          key={connection.id}
+                          d={getConnectionPath(source, target)}
+                          fill="none"
+                          markerEnd="url(#tournament-flow-arrow)"
+                          stroke="#FFD700"
+                          strokeOpacity="0.75"
+                          strokeWidth="3"
+                          style={{ pointerEvents: "stroke" }}
+                          className="cursor-pointer transition hover:stroke-[4px]"
+                          onDoubleClick={event => {
+                            event.stopPropagation();
+                            deleteGameConnection.mutate({ connectionId: connection.id });
+                          }}
+                        />
+                      );
+                    })}
+                    {connectionDrag && (
+                      <path
+                        d={getConnectionPath(connectionDrag.sourcePoint, connectionDrag.currentPoint)}
+                        fill="none"
+                        stroke="#FFD700"
+                        strokeDasharray="8 8"
+                        strokeOpacity="0.85"
+                        strokeWidth="3"
+                      />
+                    )}
+                  </svg>
+                  {games.length === 0 && (
                     <div className="absolute left-8 top-8 rounded border border-dashed border-neon-gold/40 bg-black/70 p-6">
                       <h3 className="font-mono text-xl font-bold text-neon-gold">Empty board</h3>
                       <p className="text-sm text-white/60">
@@ -439,17 +616,14 @@ export default function TournamentControlRoom() {
                       </p>
                     </div>
                   )}
-                  {query.data.games.map(game => {
-                    const assignments = query.data.assignments.filter(
+                  {games.map(game => {
+                    const gameAssignments = assignments.filter(
                       assignment => assignment.gameId === game.id
                     );
                     const capacity = game.gameType === "cashout" ? 4 : 2;
                     const isComplete = game.status === "complete";
                     const isMinimized = minimizedGameIds.has(game.id);
-                    const visualPosition =
-                      nodeDrag?.gameId === game.id
-                        ? { x: nodeDrag.x, y: nodeDrag.y }
-                        : { x: game.canvasX, y: game.canvasY };
+                    const visualPosition = getVisualPosition(game);
 
                     return (
                       <ContextMenu key={game.id}>
@@ -457,13 +631,48 @@ export default function TournamentControlRoom() {
                           <div
                             data-control-node="true"
                             onContextMenu={event => event.stopPropagation()}
-                            className={`absolute w-80 rounded-lg border bg-zinc-950/95 p-4 shadow-2xl ${
+                            onPointerDown={event => {
+                              if (event.button !== 0 || shouldSkipNodeDrag(event.target)) return;
+                              const point = canvasPoint(event.clientX, event.clientY);
+                              setNodeDrag({
+                                gameId: game.id,
+                                offsetX: point.x - visualPosition.x,
+                                offsetY: point.y - visualPosition.y,
+                                x: visualPosition.x,
+                                y: visualPosition.y,
+                              });
+                            }}
+                            className={`absolute z-10 w-80 rounded-lg border bg-zinc-950/95 p-4 shadow-2xl ${
                               game.gameType === "cashout"
                                 ? "border-neon-gold/60"
                                 : "border-neon-magenta/60"
-                            } ${nodeDrag?.gameId === game.id ? "z-50 cursor-grabbing ring-2 ring-[#FFD700]/60" : ""}`}
+                            } ${nodeDrag?.gameId === game.id ? "z-50 cursor-grabbing ring-2 ring-[#FFD700]/60" : "cursor-grab"}`}
                             style={{ left: visualPosition.x, top: visualPosition.y }}
                           >
+                            <button
+                              type="button"
+                              data-no-node-drag="true"
+                              data-input-port-game-id={game.id}
+                              title="Receive from previous lobby"
+                              className="absolute -top-3 left-1/2 h-6 w-6 -translate-x-1/2 rounded-full border-2 border-[#FFD700] bg-black shadow-[0_0_14px_rgba(255,215,0,0.45)] transition hover:scale-110"
+                            />
+                            <button
+                              type="button"
+                              data-no-node-drag="true"
+                              title="Drag to connect this lobby to another lobby"
+                              className="absolute -bottom-3 left-1/2 h-6 w-6 -translate-x-1/2 rounded-full border-2 border-[#FFD700] bg-[#FFD700] shadow-[0_0_14px_rgba(255,215,0,0.45)] transition hover:scale-110"
+                              onPointerDown={event => {
+                                if (event.button !== 0) return;
+                                event.preventDefault();
+                                event.stopPropagation();
+                                const sourcePoint = getPortPoint(game, "bottom");
+                                setConnectionDrag({
+                                  sourceGameId: game.id,
+                                  sourcePoint,
+                                  currentPoint: sourcePoint,
+                                });
+                              }}
+                            />
                             <div className="mb-3 flex items-start justify-between gap-2">
                               <div>
                                 <p className="font-mono text-xs uppercase tracking-widest text-white/45">
@@ -474,36 +683,36 @@ export default function TournamentControlRoom() {
                                 </h3>
                               </div>
                               <div className="flex shrink-0 items-center gap-2">
-                                {!isComplete && (
-                                  <button
-                                    type="button"
-                                    className="touch-none rounded border border-white/15 bg-white/10 px-2 py-1 font-mono text-xs uppercase text-neon-gold cursor-grab active:cursor-grabbing"
-                                    onPointerDown={event => {
-                                      event.preventDefault();
-                                      event.stopPropagation();
-                                      const point = canvasPoint(event.clientX, event.clientY);
-                                      setNodeDrag({
-                                        gameId: game.id,
-                                        offsetX: point.x - game.canvasX,
-                                        offsetY: point.y - game.canvasY,
-                                        x: game.canvasX,
-                                        y: game.canvasY,
-                                      });
-                                    }}
-                                  >
-                                    Move
-                                  </button>
-                                )}
                                 <button
                                   type="button"
+                                  data-no-node-drag="true"
                                   className="rounded border border-white/15 bg-white/10 px-2 py-1 font-mono text-xs uppercase text-white/70 transition hover:border-[#FFD700]/60 hover:text-[#FFD700]"
                                   onClick={event => {
                                     event.stopPropagation();
                                     toggleMinimizedGame(game.id);
                                   }}
+                                  title={isMinimized ? "Expand lobby" : "Minimize lobby"}
                                 >
-                                  {isMinimized ? "Expand" : "Min"}
+                                  {isMinimized ? "+" : "−"}
                                 </button>
+                                {!isComplete && (
+                                  <button
+                                    type="button"
+                                    data-no-node-drag="true"
+                                    className="rounded border border-red-400/30 bg-red-950/40 px-2 py-1 font-mono text-xs uppercase text-red-200 transition hover:border-red-300 hover:bg-red-900/70"
+                                    onClick={event => {
+                                      event.stopPropagation();
+                                      setDialogState({
+                                        type: "delete",
+                                        gameId: game.id,
+                                        label: game.displayLabel,
+                                      });
+                                    }}
+                                    title="Delete lobby"
+                                  >
+                                    ×
+                                  </button>
+                                )}
                               </div>
                             </div>
                             <div className="mb-3 flex items-center justify-between gap-2">
@@ -511,12 +720,12 @@ export default function TournamentControlRoom() {
                                 {game.status}
                               </span>
                               <span className="font-mono text-[10px] uppercase tracking-widest text-white/35">
-                                Results: {game.gameType === "cashout" ? "1st–4th" : "1st–2nd"}
+                                {game.gameType === "cashout" ? "1st–4th" : "1st–2nd"}
                               </span>
                             </div>
                             {isMinimized ? (
                               <CompactResultList
-                                assignments={assignments}
+                                assignments={gameAssignments}
                                 selectedAssignmentId={selectedAssignmentId}
                                 teamsById={teamsById}
                                 onSelect={setSelectedAssignmentId}
@@ -525,11 +734,12 @@ export default function TournamentControlRoom() {
                               <div className="space-y-2">
                                 {Array.from({ length: capacity }, (_, index) => {
                                   const slot = index + 1;
-                                  const assignment = assignments.find(item => item.slotIndex === slot);
+                                  const assignment = gameAssignments.find(item => item.slotIndex === slot);
                                   const team = assignment ? teamsById.get(assignment.teamId) : undefined;
                                   return (
                                     <div
                                       key={slot}
+                                      data-no-node-drag="true"
                                       onDragOver={event => {
                                         if (!isComplete) event.preventDefault();
                                       }}
@@ -560,30 +770,17 @@ export default function TournamentControlRoom() {
                                         Slot {slot}
                                       </p>
                                       {team && assignment ? (
-                                        <div className="space-y-2">
-                                          <TeamCard
-                                            team={team}
-                                            fromGameId={isComplete ? undefined : game.id}
-                                            disabled={isComplete}
-                                            placement={assignment.resultPlacement ?? null}
-                                            selected={selectedAssignmentId === assignment.id}
-                                            onSelect={() => setSelectedAssignmentId(assignment.id)}
-                                            onDragStart={() =>
-                                              setDragPayload({ teamId: team.id, fromGameId: game.id })
-                                            }
-                                          />
-                                          <ResultPlacementControl
-                                            capacity={capacity}
-                                            placement={assignment.resultPlacement ?? null}
-                                            disabled={setPlacement.isPending}
-                                            onChange={resultPlacement =>
-                                              setPlacement.mutate({
-                                                assignmentId: assignment.id,
-                                                resultPlacement,
-                                              })
-                                            }
-                                          />
-                                        </div>
+                                        <TeamCard
+                                          team={team}
+                                          fromGameId={isComplete ? undefined : game.id}
+                                          disabled={isComplete}
+                                          placement={assignment.resultPlacement ?? null}
+                                          selected={selectedAssignmentId === assignment.id}
+                                          onSelect={() => setSelectedAssignmentId(assignment.id)}
+                                          onDragStart={() =>
+                                            setDragPayload({ teamId: team.id, fromGameId: game.id })
+                                          }
+                                        />
                                       ) : (
                                         <p className="text-sm text-white/35">
                                           {isComplete ? "Empty historical slot" : "Drop team here"}
@@ -596,6 +793,7 @@ export default function TournamentControlRoom() {
                             )}
                             {!isComplete && !isMinimized && game.privateLobbyCode && (
                               <Button
+                                data-no-node-drag="true"
                                 className="mt-3 w-full"
                                 variant="secondary"
                                 onClick={() => navigator.clipboard.writeText(game.privateLobbyCode ?? "")}
@@ -685,7 +883,7 @@ export default function TournamentControlRoom() {
                 </div>
               </div>
               <div className="pointer-events-none sticky bottom-4 left-4 z-[60] mb-4 ml-4 w-fit rounded border border-white/10 bg-black/80 px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-white/50 shadow-xl">
-                Zoom {Math.round(zoom * 100)}% · Shift + scroll
+                Zoom {Math.round(zoom * 100)}% · Shift + scroll · Double-click line to remove
                 {selectedAssignmentContext?.team ? ` · Selected: ${selectedAssignmentContext.team.name}` : ""}
               </div>
             </main>
@@ -773,9 +971,9 @@ export default function TournamentControlRoom() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete game?</AlertDialogTitle>
+            <AlertDialogTitle>Delete lobby?</AlertDialogTitle>
             <AlertDialogDescription>
-              This deletes the game node and its assignments. This cannot be undone.
+              This deletes the lobby node, its assignments, and its flow connections. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -788,50 +986,12 @@ export default function TournamentControlRoom() {
                 setDialogState(null);
               }}
             >
-              Delete {dialogState?.type === "delete" ? dialogState.label : "game"}
+              Delete {dialogState?.type === "delete" ? dialogState.label : "lobby"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </section>
-  );
-}
-
-function ResultPlacementControl({
-  capacity,
-  placement,
-  disabled,
-  onChange,
-}: {
-  capacity: number;
-  placement: number | null;
-  disabled?: boolean;
-  onChange: (placement: number | null) => void;
-}) {
-  return (
-    <label className="flex items-center justify-between gap-2 rounded border border-white/10 bg-zinc-950/80 px-2 py-1.5">
-      <span className="font-mono text-[10px] uppercase tracking-widest text-white/45">
-        Result
-      </span>
-      <select
-        value={placement ?? ""}
-        disabled={disabled}
-        onPointerDown={event => event.stopPropagation()}
-        onClick={event => event.stopPropagation()}
-        onChange={event => {
-          const value = event.target.value;
-          onChange(value ? Number(value) : null);
-        }}
-        className="rounded border border-[#FFD700]/30 bg-black px-2 py-1 font-mono text-xs font-bold text-[#FFD700] outline-none transition focus:border-[#FFD700] disabled:opacity-50"
-      >
-        <option value="">Pending</option>
-        {Array.from({ length: capacity }, (_, index) => index + 1).map(value => (
-          <option key={value} value={value}>
-            {formatPlacement(value)}
-          </option>
-        ))}
-      </select>
-    </label>
   );
 }
 
@@ -869,6 +1029,7 @@ function CompactResultList({
           <button
             key={assignment.id}
             type="button"
+            data-no-node-drag="true"
             onClick={event => {
               event.stopPropagation();
               onSelect(assignment.id);
@@ -914,6 +1075,7 @@ function TeamCard({
       role={onSelect ? "button" : undefined}
       tabIndex={onSelect ? 0 : undefined}
       draggable={!disabled}
+      data-no-node-drag="true"
       onClick={event => {
         event.stopPropagation();
         onSelect?.();
