@@ -30,6 +30,8 @@ import VodTeamInsights from "./pages/VodTeamInsights";
 import TeamFinder from "./pages/TeamFinder";
 import TeamManagement from "./pages/TeamManagement";
 import TeamJoinInvite from "./pages/TeamJoinInvite";
+import TeamClaimLink from "./pages/TeamClaimLink";
+import TournamentControlViewer from "./pages/TournamentControlViewer";
 import TournamentControlRoom from "./pages/TournamentControlRoom";
 import TournamentControlIndex from "./pages/TournamentControlIndex";
 import { useEffect } from "react";
@@ -64,6 +66,7 @@ function Router() {
             component={JuneTournament2026}
           />
           <Route path={"/tournaments"} component={TournamentHistory} />
+          <Route path={"/bracket/:viewerToken"} component={TournamentControlViewer} />
           <Route path={"/bracket"} component={LiveBracket} />
           <Route path={"/dev-division"} component={DevDivision} />
           <Route path={"/about"} component={About} />
@@ -88,6 +91,7 @@ function Router() {
           />
           <Route path={"/balance-archive"} component={BalanceArchive} />
           <Route path={"/team-finder"} component={TeamFinder} />
+          <Route path={"/teams/claim/:token"} component={TeamClaimLink} />
           <Route path={"/teams/join/:token"} component={TeamJoinInvite} />
           <Route path={"/teams"} component={TeamManagement} />
           <Route path={"/admin/tournaments/control"} component={TournamentControlIndex} />

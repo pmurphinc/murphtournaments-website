@@ -247,12 +247,98 @@ export const tournamentGames = mysqlTable(
     canvasX: int("canvasX").default(120).notNull(),
     canvasY: int("canvasY").default(120).notNull(),
     privateLobbyCode: varchar("privateLobbyCode", { length: 64 }),
+    seriesBestOf: int("seriesBestOf").default(1).notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
   table => [
     index("tournament_games_tournament_idx").on(table.tournamentId),
     index("tournament_games_status_idx").on(table.status),
+  ]
+);
+
+
+export const tournamentViewerLinks = mysqlTable(
+  "tournament_viewer_links",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    tournamentId: int("tournamentId").notNull().references(() => tournaments.id, { onDelete: "cascade" }),
+    createdByUserId: int("createdByUserId").notNull().references(() => users.id),
+    tokenHash: varchar("tokenHash", { length: 64 }).notNull(),
+    status: mysqlEnum("status", ["active", "revoked"]).default("active").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    index("tournament_viewer_links_tournament_status_idx").on(table.tournamentId, table.status),
+    uniqueIndex("tournament_viewer_links_tokenHash_unique").on(table.tokenHash),
+  ]
+);
+
+export const tournamentControlTemplates = mysqlTable(
+  "tournament_control_templates",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    name: varchar("name", { length: 120 }).notNull(),
+    visibility: mysqlEnum("visibility", ["private", "public"]).default("private").notNull(),
+    createdByUserId: int("createdByUserId").notNull().references(() => users.id),
+    sourceTournamentId: int("sourceTournamentId").references(() => tournaments.id, { onDelete: "set null" }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    index("tournament_control_templates_creator_idx").on(table.createdByUserId),
+    index("tournament_control_templates_visibility_idx").on(table.visibility),
+  ]
+);
+
+export const tournamentControlTemplateGames = mysqlTable(
+  "tournament_control_template_games",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    templateId: int("templateId").notNull().references(() => tournamentControlTemplates.id, { onDelete: "cascade" }),
+    gameType: mysqlEnum("gameType", ["cashout", "final_round"]).notNull(),
+    displayLabel: varchar("displayLabel", { length: 80 }).notNull(),
+    canvasX: int("canvasX").default(120).notNull(),
+    canvasY: int("canvasY").default(120).notNull(),
+    seriesBestOf: int("seriesBestOf").default(1).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [index("tournament_control_template_games_template_idx").on(table.templateId)]
+);
+
+export const tournamentControlTemplateConnections = mysqlTable(
+  "tournament_control_template_connections",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    templateId: int("templateId").notNull().references(() => tournamentControlTemplates.id, { onDelete: "cascade" }),
+    sourceTemplateGameId: int("sourceTemplateGameId").notNull().references(() => tournamentControlTemplateGames.id, { onDelete: "cascade" }),
+    targetTemplateGameId: int("targetTemplateGameId").notNull().references(() => tournamentControlTemplateGames.id, { onDelete: "cascade" }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [
+    index("tournament_control_template_connections_template_idx").on(table.templateId),
+    uniqueIndex("tournament_control_template_connections_unique").on(table.sourceTemplateGameId, table.targetTemplateGameId),
+  ]
+);
+
+export const tournamentTeamClaimLinks = mysqlTable(
+  "tournament_team_claim_links",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    tournamentTeamId: int("tournamentTeamId").notNull().references(() => teams.id, { onDelete: "cascade" }),
+    createdByUserId: int("createdByUserId").notNull().references(() => users.id),
+    tokenHash: varchar("tokenHash", { length: 64 }).notNull(),
+    status: mysqlEnum("status", ["active", "claimed", "revoked"]).default("active").notNull(),
+    claimedByUserId: int("claimedByUserId").references(() => users.id),
+    expiresAt: timestamp("expiresAt").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    index("tournament_team_claim_links_team_status_idx").on(table.tournamentTeamId, table.status),
+    uniqueIndex("tournament_team_claim_links_tokenHash_unique").on(table.tokenHash),
   ]
 );
 
@@ -277,6 +363,7 @@ export type TournamentGame = typeof tournamentGames.$inferSelect;
 export type InsertTournamentGame = typeof tournamentGames.$inferInsert;
 export type TournamentGameAssignment = typeof tournamentGameAssignments.$inferSelect;
 export type InsertTournamentGameAssignment = typeof tournamentGameAssignments.$inferInsert;
+export type TournamentTeamClaimLink = typeof tournamentTeamClaimLinks.$inferSelect;
 
 // Tournament history archive
 export const tournamentHistory = mysqlTable("tournament_history", {

@@ -31,10 +31,17 @@ export default function TournamentControlIndex() {
     enabled: auth.user?.loginMethod === "discord",
     retry: false,
   });
+  const templatesQuery = trpc.tournamentControl.listTemplates.useQuery(undefined, { enabled: auth.user?.loginMethod === "discord", retry: false });
   const submissionsQuery = trpc.tournamentControl.listTeamSubmissions.useQuery(undefined, { enabled: auth.user?.loginMethod === "discord", retry: false });
   const toggleRegistration = trpc.tournamentControl.setTournamentRegistrationOpen.useMutation({ onSuccess: () => utils.tournamentControl.listTournaments.invalidate() });
   const approveSubmission = trpc.tournamentControl.approveTeamSubmission.useMutation({ onSuccess: async data => { await utils.tournamentControl.listTeamSubmissions.invalidate(); await utils.tournamentControl.get.invalidate({ tournamentId: data.tournament.id }); } });
   const rejectSubmission = trpc.tournamentControl.rejectTeamSubmission.useMutation({ onSuccess: () => utils.tournamentControl.listTeamSubmissions.invalidate() });
+  const createFromTemplate = trpc.tournamentControl.createTournamentFromTemplate.useMutation({
+    onSuccess: async data => {
+      await utils.tournamentControl.listTournaments.invalidate();
+      navigate(`/admin/tournaments/${data.createdTournament.id}/control`);
+    },
+  });
   const createTournament = trpc.tournamentControl.createTournament.useMutation({
     onSuccess: async data => {
       setCreateOpen(false);
@@ -100,6 +107,20 @@ export default function TournamentControlIndex() {
           <Button className={goldButtonClass} onClick={() => setCreateOpen(true)}>
             Create Tournament
           </Button>
+        </div>
+        <div className="mt-8 rounded-lg border border-neon-gold/25 bg-zinc-950 p-5">
+          <h2 className="font-mono text-xl font-black text-neon-gold">Create from Template</h2>
+          <p className="mt-1 text-sm text-white/55">Reuse a saved control-room layout without private lobby codes or assigned teams.</p>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            {(templatesQuery.data ?? []).map(template => (
+              <div key={template.id} className="rounded border border-white/10 bg-black/50 p-4">
+                <p className="font-mono font-bold text-white">{template.name}</p>
+                <p className="mt-1 font-mono text-xs uppercase text-white/45">{template.visibility}</p>
+                <Button className={`mt-3 ${goldButtonClass}`} disabled={createFromTemplate.isPending} onClick={() => { const name = window.prompt("New tournament name", `${template.name} Tournament`); if (name) createFromTemplate.mutate({ templateId: template.id, name }); }}>Create Tournament</Button>
+              </div>
+            ))}
+            {templatesQuery.data?.length === 0 && <p className="text-sm text-white/45">No templates saved yet.</p>}
+          </div>
         </div>
         <div className="mt-8 grid gap-4 md:grid-cols-2">
           {tournaments.map(tournament => {

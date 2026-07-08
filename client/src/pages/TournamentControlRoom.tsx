@@ -66,6 +66,7 @@ type ControlGameView = {
   canvasX: number;
   canvasY: number;
   privateLobbyCode?: string | null;
+  seriesBestOf?: number;
 };
 type AssignmentView = {
   id: number;
@@ -408,6 +409,10 @@ export default function TournamentControlRoom() {
   const removeTeam = trpc.tournamentControl.removeTeam.useMutation(mutationOptions);
   const removeAssignedTeams = trpc.tournamentControl.removeAssignedTeams.useMutation(mutationOptions);
   const deleteGame = trpc.tournamentControl.deleteGame.useMutation(mutationOptions);
+  const setBestOf = trpc.tournamentControl.setFinalRoundSeriesBestOf.useMutation(mutationOptions);
+  const saveTemplate = trpc.tournamentControl.saveTemplateFromTournament.useMutation({ onSuccess: () => toast.success("Template saved"), onError: (error: { message: string }) => toast.error(error.message) });
+  const enableViewerLink = trpc.tournamentControl.enableViewerLink.useMutation({ onSuccess: async data => { await navigator.clipboard.writeText(`${window.location.origin}${data.path}`); toast.success("Viewer link copied"); }, onError: (error: { message: string }) => toast.error(error.message) });
+  const createClaimLink = trpc.tournamentControl.createTeamClaimLink.useMutation({ onSuccess: async data => { await navigator.clipboard.writeText(`${window.location.origin}${data.path}`); toast.success("Team claim link copied"); }, onError: (error: { message: string }) => toast.error(error.message) });
   const sendLobbyCodeToTeamLeader = trpc.tournamentControl.sendLobbyCodeToTeamLeader.useMutation({
     onSuccess: result => {
       for (const item of result.results) {
@@ -839,6 +844,8 @@ export default function TournamentControlRoom() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
+            <Button variant="outline" className="border-neon-gold/40 text-neon-gold hover:bg-neon-gold/10" onClick={() => enableViewerLink.mutate({ tournamentId })}>Copy Viewer Link</Button>
+            <Button variant="outline" className="border-neon-gold/40 text-neon-gold hover:bg-neon-gold/10" onClick={() => { const name = window.prompt("Template name", `${query.data.tournament.name} Template`); if (!name) return; const visibility = window.confirm("Make this template public?") ? "public" : "private"; saveTemplate.mutate({ tournamentId, name, visibility }); }}>Save Template</Button>
             <Link
               href="/admin/tournaments/control"
               className="inline-flex rounded border border-[#FFD700]/70 bg-[#FFD700] px-4 py-2 font-mono text-xs font-black uppercase tracking-wider text-black shadow-[0_0_18px_rgba(255,215,0,0.22)] transition hover:bg-[#D4AF37]"
@@ -877,6 +884,7 @@ export default function TournamentControlRoom() {
                   key={team.id}
                   team={team}
                   onDragStart={() => setDragPayload({ teamId: team.id })}
+                  onCreateClaimLink={!team.managedTeamId ? () => createClaimLink.mutate({ teamId: team.id }) : undefined}
                 />
               ))
             )}
@@ -1333,7 +1341,7 @@ export default function TournamentControlRoom() {
                                 {game.status}
                               </span>
                               <span className="font-mono text-[10px] uppercase tracking-widest text-white/35">
-                                {game.gameType === "cashout" ? "1st–4th" : "1st–2nd"}
+                                {game.gameType === "cashout" ? "1st–4th" : `1st–2nd · BO${game.seriesBestOf ?? 1}`}
                               </span>
                             </div>
                             {isMinimized ? (
@@ -1463,6 +1471,14 @@ export default function TournamentControlRoom() {
                                 Set/Clear Lobby Code
                               </ContextMenuItem>
                               <ContextMenuSeparator />
+                              {game.gameType === "final_round" && (
+                                <>
+                                  {[1, 3, 5].map(value => (
+                                    <ContextMenuItem key={value} onClick={() => setBestOf.mutate({ gameId: game.id, seriesBestOf: value as 1 | 3 | 5 })}>Set Final Round BO{value}</ContextMenuItem>
+                                  ))}
+                                  <ContextMenuSeparator />
+                                </>
+                              )}
                               {statuses.map(status => (
                                 <ContextMenuItem
                                   key={status}
@@ -1769,6 +1785,7 @@ function TeamCard({
   selected,
   onSelect,
   onCyclePlacement,
+  onCreateClaimLink,
 }: {
   team: ControlTeamView;
   fromGameId?: number;
@@ -1778,6 +1795,7 @@ function TeamCard({
   selected?: boolean;
   onSelect?: () => void;
   onCyclePlacement?: () => void;
+  onCreateClaimLink?: () => void;
 }) {
   const lastTouchTapRef = useRef<{ time: number; x: number; y: number } | null>(null);
 
@@ -1836,6 +1854,18 @@ function TeamCard({
         <div className="min-w-0 truncate font-mono text-sm font-bold text-white">
           {team.name}
         </div>
+        {onCreateClaimLink ? (
+          <button
+            type="button"
+            className="shrink-0 rounded border border-[#FFD700]/40 px-2 py-0.5 font-mono text-[10px] uppercase text-[#FFD700]"
+            onClick={event => {
+              event.stopPropagation();
+              onCreateClaimLink();
+            }}
+          >
+            Claim Link
+          </button>
+        ) : null}
         {placement ? (
           <span className="shrink-0 rounded bg-[#FFD700] px-2 py-0.5 font-mono text-[10px] font-black uppercase text-black">
             {formatPlacement(placement)}
