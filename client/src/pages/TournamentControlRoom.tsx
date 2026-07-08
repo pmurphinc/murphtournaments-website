@@ -48,7 +48,14 @@ type ConnectionDragState = {
   sourcePoint: CanvasPoint;
   currentPoint: CanvasPoint;
 };
-type ControlTeamView = { id: number; name: string };
+type ControlTeamView = {
+  id: number;
+  name: string;
+  managedTeamId?: number | null;
+  captainUserId?: number | null;
+  captainDiscordId?: string | null;
+  captainDisplayName?: string | null;
+};
 type ControlGameView = {
   id: number;
   tournamentId: number;
@@ -85,6 +92,10 @@ const minZoom = 0.55;
 const maxZoom = 1.8;
 const baseCanvasSize = { width: 2200, height: 1400 };
 const nodeWidth = 320;
+export const connectorRadius = 12;
+const expandedCashoutNodeHeight = 438;
+const expandedFinalNodeHeight = 300;
+const minimizedNodeHeight = 132;
 
 function parseDragPayload(value: string): DragPayload | null {
   try {
@@ -115,12 +126,61 @@ function clampZoom(value: number) {
   return Math.min(maxZoom, Math.max(minZoom, Number(value.toFixed(2))));
 }
 
-function getNodeHeight(gameType: GameType, minimized: boolean) {
-  if (minimized) return 132;
-  return gameType === "cashout" ? 438 : 300;
+export function getNodeHeight(gameType: GameType, minimized: boolean) {
+  if (minimized) return minimizedNodeHeight;
+  return gameType === "cashout" ? expandedCashoutNodeHeight : expandedFinalNodeHeight;
 }
 
-function getConnectionPath(source: CanvasPoint, target: CanvasPoint) {
+export function getConnectorCenter(
+  game: Pick<ControlGameView, "gameType" | "canvasX" | "canvasY">,
+  port: "top" | "bottom",
+  minimized: boolean,
+  position: CanvasPoint = { x: game.canvasX, y: game.canvasY }
+) {
+  return {
+    x: position.x + nodeWidth / 2,
+    y: port === "top" ? position.y : position.y + getNodeHeight(game.gameType, minimized),
+  };
+}
+
+export function getConnectionEndpoint(center: CanvasPoint, port: "top" | "bottom") {
+  return { x: center.x, y: center.y + (port === "top" ? -connectorRadius : connectorRadius) };
+}
+
+export function getConnectorPoint(
+  game: Pick<ControlGameView, "gameType" | "canvasX" | "canvasY">,
+  port: "top" | "bottom",
+  minimized: boolean,
+  position?: CanvasPoint
+) {
+  return getConnectionEndpoint(getConnectorCenter(game, port, minimized, position), port);
+}
+
+export function shouldStartCanvasPan(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+  return !Boolean(
+    target.closest(
+      '[data-control-node="true"], [data-team-card="true"], [data-connector-port="true"], [data-no-canvas-pan="true"], button, a, input, select, textarea, [role="menuitem"], [role="button"], [draggable="true"]'
+    )
+  );
+}
+
+function getLobbyCodeMessage(tournamentName: string, lobbyName: string, teamName: string, code: string) {
+  return `Murph Tournaments lobby code
+Tournament: ${tournamentName}
+Lobby: ${lobbyName}
+Team: ${teamName}
+Code: ${code}`;
+}
+
+function getRecipientWarning(team: ControlTeamView) {
+  if (!team.managedTeamId) return "Manual team has no managed captain recipient.";
+  if (!team.captainUserId) return "Managed team has no captain recipient.";
+  if (!team.captainDiscordId) return "Captain has no Discord ID available.";
+  return null;
+}
+
+export function getConnectionPath(source: CanvasPoint, target: CanvasPoint) {
   const distance = Math.max(80, Math.abs(target.y - source.y) * 0.55);
   return `M ${source.x} ${source.y} C ${source.x} ${source.y + distance}, ${target.x} ${target.y - distance}, ${target.x} ${target.y}`;
 }
@@ -162,6 +222,7 @@ export default function TournamentControlRoom() {
     () => new Map()
   );
   const [zoom, setZoom] = useState(1);
+  const [isPanning, setIsPanning] = useState(false);
 
   const query = trpc.tournamentControl.get.useQuery(
     { tournamentId },
@@ -190,6 +251,24 @@ export default function TournamentControlRoom() {
   const removeTeam = trpc.tournamentControl.removeTeam.useMutation(mutationOptions);
   const removeAssignedTeams = trpc.tournamentControl.removeAssignedTeams.useMutation(mutationOptions);
   const deleteGame = trpc.tournamentControl.deleteGame.useMutation(mutationOptions);
+  const sendLobbyCodeToTeamLeader = trpc.tournamentControl.sendLobbyCodeToTeamLeader.useMutation({
+    onSuccess: result => {
+      for (const item of result.results) {
+        if (item.status === "sent") toast.success(`Sent code to ${item.teamName}`);
+        else toast.error(`${item.teamName}: ${item.message}`);
+      }
+    },
+    onError: (error: { message: string }) => toast.error(error.message),
+  });
+  const sendLobbyCodeToLobbyLeaders = trpc.tournamentControl.sendLobbyCodeToLobbyLeaders.useMutation({
+    onSuccess: result => {
+      const sent = result.results.filter(item => item.status === "sent").length;
+      const failed = result.results.length - sent;
+      if (sent) toast.success(`Sent lobby code to ${sent} leader${sent === 1 ? "" : "s"}`);
+      if (failed) toast.error(`${failed} leader${failed === 1 ? "" : "s"} could not be messaged`);
+    },
+    onError: (error: { message: string }) => toast.error(error.message),
+  });
 
   const games = (query.data?.games ?? []) as ControlGameView[];
   const assignments = (query.data?.assignments ?? []) as AssignmentView[];
@@ -241,14 +320,8 @@ export default function TournamentControlRoom() {
   );
 
   const getPortPoint = useCallback(
-    (game: ControlGameView, port: "top" | "bottom") => {
-      const position = getVisualPosition(game);
-      const minimized = minimizedGameIds.has(game.id);
-      return {
-        x: position.x + nodeWidth / 2,
-        y: port === "top" ? position.y : position.y + getNodeHeight(game.gameType, minimized),
-      };
-    },
+    (game: ControlGameView, port: "top" | "bottom") =>
+      getConnectorPoint(game, port, minimizedGameIds.has(game.id), getVisualPosition(game)),
     [getVisualPosition, minimizedGameIds]
   );
 
@@ -413,6 +486,18 @@ export default function TournamentControlRoom() {
     };
   }, [canvasPoint, connectGames, connectionDrag?.sourceGameId, tournamentId]);
 
+
+  useEffect(() => {
+    if (!isPanning) return;
+    const handlePointerUp = () => setIsPanning(false);
+    window.addEventListener("pointerup", handlePointerUp, { once: true });
+    window.addEventListener("pointercancel", handlePointerUp, { once: true });
+    return () => {
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
+    };
+  }, [isPanning]);
+
   const openDialog = (state: Exclude<DialogState, null>, defaultValue = "") => {
     setDialogState(state);
     setFormName(defaultValue);
@@ -529,12 +614,34 @@ export default function TournamentControlRoom() {
           <ContextMenuTrigger asChild>
             <main
               ref={canvasRef}
-              className="relative min-h-[720px] overflow-auto bg-[radial-gradient(circle_at_top,#4d39091a,transparent_32rem),linear-gradient(rgba(255,255,255,.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.04)_1px,transparent_1px)] bg-[size:auto,40px_40px,40px_40px]"
+              className={`relative min-h-[720px] overflow-auto bg-[radial-gradient(circle_at_top,#4d39091a,transparent_32rem),linear-gradient(rgba(255,255,255,.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.04)_1px,transparent_1px)] bg-[size:auto,40px_40px,40px_40px] ${isPanning ? "cursor-grabbing" : "cursor-grab"}`}
               onWheel={event => {
                 if (!event.shiftKey) return;
                 event.preventDefault();
                 const zoomDelta = event.deltaY > 0 ? -0.08 : 0.08;
                 setZoom(current => clampZoom(current + zoomDelta));
+              }}
+              onPointerDown={event => {
+                if (event.button !== 0 || !shouldStartCanvasPan(event.target)) return;
+                const element = canvasRef.current;
+                if (!element) return;
+                event.preventDefault();
+                const startX = event.clientX;
+                const startY = event.clientY;
+                const startLeft = element.scrollLeft;
+                const startTop = element.scrollTop;
+                setIsPanning(true);
+                const handleMove = (moveEvent: PointerEvent) => {
+                  element.scrollLeft = startLeft - (moveEvent.clientX - startX);
+                  element.scrollTop = startTop - (moveEvent.clientY - startY);
+                };
+                const cleanup = () => {
+                  window.removeEventListener("pointermove", handleMove);
+                  setIsPanning(false);
+                };
+                window.addEventListener("pointermove", handleMove);
+                window.addEventListener("pointerup", cleanup, { once: true });
+                window.addEventListener("pointercancel", cleanup, { once: true });
               }}
               onContextMenu={event => {
                 setCanvasMenuPosition(canvasPoint(event.clientX, event.clientY));
@@ -654,12 +761,14 @@ export default function TournamentControlRoom() {
                               data-no-node-drag="true"
                               data-input-port-game-id={game.id}
                               title="Receive from previous lobby"
+                              data-connector-port="true"
                               className="absolute -top-3 left-1/2 h-6 w-6 -translate-x-1/2 rounded-full border-2 border-[#FFD700] bg-black shadow-[0_0_14px_rgba(255,215,0,0.45)] transition hover:scale-110"
                             />
                             <button
                               type="button"
                               data-no-node-drag="true"
                               title="Drag to connect this lobby to another lobby"
+                              data-connector-port="true"
                               className="absolute -bottom-3 left-1/2 h-6 w-6 -translate-x-1/2 rounded-full border-2 border-[#FFD700] bg-[#FFD700] shadow-[0_0_14px_rgba(255,215,0,0.45)] transition hover:scale-110"
                               onPointerDown={event => {
                                 if (event.button !== 0) return;
@@ -791,15 +900,18 @@ export default function TournamentControlRoom() {
                                 })}
                               </div>
                             )}
-                            {!isComplete && !isMinimized && game.privateLobbyCode && (
-                              <Button
-                                data-no-node-drag="true"
-                                className="mt-3 w-full"
-                                variant="secondary"
-                                onClick={() => navigator.clipboard.writeText(game.privateLobbyCode ?? "")}
-                              >
-                                Copy Lobby Code
-                              </Button>
+                            {!isMinimized && (
+                              <LobbyCodeTools
+                                tournamentName={query.data.tournament.name}
+                                game={game}
+                                assignments={gameAssignments}
+                                teamsById={teamsById}
+                                discordConfigured={Boolean(query.data.discordConfigured)}
+                                sendingTeamId={sendLobbyCodeToTeamLeader.variables?.teamId ?? null}
+                                sendingLobby={sendLobbyCodeToLobbyLeaders.isPending}
+                                onSendTeam={teamId => sendLobbyCodeToTeamLeader.mutate({ gameId: game.id, teamId })}
+                                onSendLobby={() => sendLobbyCodeToLobbyLeaders.mutate({ gameId: game.id })}
+                              />
                             )}
                           </div>
                         </ContextMenuTrigger>
@@ -995,6 +1107,98 @@ export default function TournamentControlRoom() {
   );
 }
 
+
+function LobbyCodeTools({
+  tournamentName,
+  game,
+  assignments,
+  teamsById,
+  discordConfigured,
+  sendingTeamId,
+  sendingLobby,
+  onSendTeam,
+  onSendLobby,
+}: {
+  tournamentName: string;
+  game: ControlGameView;
+  assignments: AssignmentView[];
+  teamsById: Map<number, ControlTeamView>;
+  discordConfigured: boolean;
+  sendingTeamId: number | null;
+  sendingLobby: boolean;
+  onSendTeam: (teamId: number) => void;
+  onSendLobby: () => void;
+}) {
+  const hasCode = Boolean(game.privateLobbyCode?.trim());
+  const assignedTeams = assignments
+    .map(assignment => teamsById.get(assignment.teamId))
+    .filter((team): team is ControlTeamView => Boolean(team));
+  const sendableTeams = assignedTeams.filter(team => !getRecipientWarning(team));
+  const sendDisabledReason = !hasCode
+    ? "Set a lobby code before sending."
+    : !discordConfigured
+      ? "Discord sending is not configured on the server. Use Copy Message."
+      : sendableTeams.length === 0
+        ? "No assigned captains can receive Discord DMs."
+        : null;
+  const lobbyMessage = assignedTeams
+    .map(team => getLobbyCodeMessage(tournamentName, game.displayLabel, team.name, game.privateLobbyCode ?? ""))
+    .join("\n\n---\n\n");
+  const copyText = async (text: string) => {
+    await navigator.clipboard.writeText(text);
+    toast.success("Lobby code message copied");
+  };
+
+  return (
+    <div data-no-node-drag="true" data-no-canvas-pan="true" className="mt-3 rounded border border-[#FFD700]/20 bg-black/45 p-2">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#FFD700]">Lobby code DMs</p>
+        <Button
+          size="sm"
+          variant="secondary"
+          className="h-7 px-2 font-mono text-[10px] uppercase"
+          disabled={Boolean(sendDisabledReason) || sendingLobby}
+          onClick={onSendLobby}
+          title={sendDisabledReason ?? "Send to all assigned team captains."}
+        >
+          {sendingLobby ? "Sending…" : "Send Code to Lobby"}
+        </Button>
+      </div>
+      {sendDisabledReason && <p className="mb-2 text-[11px] text-amber-200/80">{sendDisabledReason}</p>}
+      {assignedTeams.length > 0 && hasCode && (
+        <button
+          type="button"
+          className="mb-2 rounded border border-white/15 px-2 py-1 font-mono text-[10px] uppercase text-white/65 transition hover:border-[#FFD700]/60 hover:text-[#FFD700]"
+          onClick={() => copyText(lobbyMessage)}
+        >
+          Copy Lobby Messages
+        </button>
+      )}
+      <div className="space-y-1.5">
+        {assignedTeams.length === 0 ? (
+          <p className="text-[11px] text-white/40">Assign teams to send or copy lobby-code messages.</p>
+        ) : assignedTeams.map(team => {
+          const warning = getRecipientWarning(team);
+          const message = getLobbyCodeMessage(tournamentName, game.displayLabel, team.name, game.privateLobbyCode ?? "");
+          return (
+            <div key={team.id} className="rounded border border-white/10 bg-zinc-950/80 p-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="min-w-0 truncate font-mono text-[11px] text-white/80">{team.name}</span>
+                <div className="flex shrink-0 gap-1">
+                  <button type="button" className="rounded border border-white/15 px-1.5 py-0.5 font-mono text-[9px] uppercase text-white/65 hover:border-[#FFD700]/60 hover:text-[#FFD700]" disabled={!hasCode} onClick={() => copyText(message)}>Copy Message</button>
+                  <button type="button" className="rounded border border-[#FFD700]/40 bg-[#FFD700]/10 px-1.5 py-0.5 font-mono text-[9px] uppercase text-[#FFD700] disabled:cursor-not-allowed disabled:border-white/10 disabled:text-white/30" disabled={!hasCode || !discordConfigured || Boolean(warning) || sendingTeamId === team.id} onClick={() => onSendTeam(team.id)} title={!discordConfigured ? "Discord sending is not configured on the server. Use Copy Message." : warning ?? "Send code to this team's captain."}>{sendingTeamId === team.id ? "Sending…" : "Send Code"}</button>
+                </div>
+              </div>
+              {(warning || !hasCode || !discordConfigured) && <p className="mt-1 text-[10px] text-amber-200/75">{!hasCode ? "No lobby code set." : !discordConfigured ? "Discord sending not configured; use Copy Message." : warning}</p>}
+              {!warning && team.captainDisplayName && <p className="mt-1 text-[10px] text-white/35">Captain: {team.captainDisplayName}</p>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function CompactResultList({
   assignments,
   selectedAssignmentId,
@@ -1076,6 +1280,7 @@ function TeamCard({
       tabIndex={onSelect ? 0 : undefined}
       draggable={!disabled}
       data-no-node-drag="true"
+      data-team-card="true"
       onClick={event => {
         event.stopPropagation();
         onSelect?.();
