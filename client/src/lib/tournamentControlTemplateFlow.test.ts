@@ -11,9 +11,9 @@ import { extractInsertId } from "../../../server/tournamentControl";
 import { tournamentControlTemplateConnections, tournamentControlTemplateGames, tournamentControlTemplates, tournamentGames, tournaments } from "../../../drizzle/schema";
 
 type TournamentRow = { id: number; name: string; eventStatus: "not-live"; currentCycle: "1"; currentStage: "check-in"; currentMatch: null; eventNote: null };
-type GameRow = { id: number; tournamentId: number; gameType: "cashout" | "final_round"; status: "draft"; displayLabel: string; canvasX: number; canvasY: number; seriesBestOf: number; privateLobbyCode: string | null };
+type GameRow = { id: number; tournamentId: number; gameType: "cashout" | "final_round"; status: "draft"; displayLabel: string; canvasX: number; canvasY: number; seriesBestOf: number; privateLobbyCode: string | null; mapId: string | null };
 type TemplateRow = { id: number; name: string; visibility: "private" | "public"; createdByUserId: number; sourceTournamentId: number | null };
-type TemplateGameRow = { id: number; templateId: number; gameType: "cashout" | "final_round"; displayLabel: string; canvasX: number; canvasY: number; seriesBestOf: number };
+type TemplateGameRow = { id: number; templateId: number; gameType: "cashout" | "final_round"; displayLabel: string; canvasX: number; canvasY: number; seriesBestOf: number; mapId: string | null };
 type TemplateConnectionRow = { id: number; templateId: number; sourceTemplateGameId: number; targetTemplateGameId: number };
 type Insertable = Partial<TournamentRow & GameRow & TemplateRow & TemplateGameRow & TemplateConnectionRow>;
 
@@ -74,7 +74,7 @@ const db = {
         return mysql2InsertResult(row.id);
       }
       if (table === tournamentControlTemplateGames) {
-        const row: TemplateGameRow = { id: state.nextTemplateGameId++, templateId: Number(value.templateId), gameType: value.gameType === "final_round" ? "final_round" : "cashout", displayLabel: String(value.displayLabel), canvasX: Number(value.canvasX), canvasY: Number(value.canvasY), seriesBestOf: Number(value.seriesBestOf) };
+        const row: TemplateGameRow = { id: state.nextTemplateGameId++, templateId: Number(value.templateId), gameType: value.gameType === "final_round" ? "final_round" : "cashout", displayLabel: String(value.displayLabel), canvasX: Number(value.canvasX), canvasY: Number(value.canvasY), seriesBestOf: Number(value.seriesBestOf), mapId: value.mapId == null ? null : String(value.mapId) };
         state.templateGames.push(row);
         return mysql2InsertResult(row.id);
       }
@@ -98,8 +98,8 @@ describe("tournamentControl template save flow", () => {
   beforeEach(() => {
     state.tournaments = [{ id: 1, name: "Source", eventStatus: "not-live", currentCycle: "1", currentStage: "check-in", currentMatch: null, eventNote: null }];
     state.games = [
-      { id: 10, tournamentId: 1, gameType: "cashout", status: "draft", displayLabel: "Cashout A", canvasX: 100, canvasY: 100, seriesBestOf: 1, privateLobbyCode: "secret" },
-      { id: 11, tournamentId: 1, gameType: "final_round", status: "draft", displayLabel: "Final", canvasX: 200, canvasY: 100, seriesBestOf: 3, privateLobbyCode: "secret-final" },
+      { id: 10, tournamentId: 1, gameType: "cashout", status: "draft", displayLabel: "Cashout A", canvasX: 100, canvasY: 100, seriesBestOf: 1, privateLobbyCode: "secret", mapId: "monaco" },
+      { id: 11, tournamentId: 1, gameType: "final_round", status: "draft", displayLabel: "Final", canvasX: 200, canvasY: 100, seriesBestOf: 3, privateLobbyCode: "secret-final", mapId: "skyway-stadium" },
     ];
     state.templates = [];
     state.templateGames = [];
@@ -127,6 +127,7 @@ describe("tournamentControl template save flow", () => {
     expect(result).toEqual({ templateId: 100 });
     expect(state.templateGames.map(game => game.id)).toEqual([200, 201]);
     expect(state.templateConnections).toEqual([{ id: 300, templateId: 100, sourceTemplateGameId: 200, targetTemplateGameId: 201 }]);
+    expect(state.templateGames.map(game => game.mapId)).toEqual(["monaco", "skyway-stadium"]);
     expect(state.templateGameSelects).toBe(0);
   });
 });

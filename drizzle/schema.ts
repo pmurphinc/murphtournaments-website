@@ -192,6 +192,7 @@ export const tournaments = mysqlTable("tournaments", {
   ),
   eventNote: text("eventNote"),
   registrationOpen: int("registrationOpen").default(0).notNull(),
+  ownerUserId: int("ownerUserId").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -247,6 +248,7 @@ export const tournamentGames = mysqlTable(
     canvasX: int("canvasX").default(120).notNull(),
     canvasY: int("canvasY").default(120).notNull(),
     privateLobbyCode: varchar("privateLobbyCode", { length: 64 }),
+    mapId: varchar("mapId", { length: 64 }),
     seriesBestOf: int("seriesBestOf").default(1).notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -302,6 +304,7 @@ export const tournamentControlTemplateGames = mysqlTable(
     canvasX: int("canvasX").default(120).notNull(),
     canvasY: int("canvasY").default(120).notNull(),
     seriesBestOf: int("seriesBestOf").default(1).notNull(),
+    mapId: varchar("mapId", { length: 64 }),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },

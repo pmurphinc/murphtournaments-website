@@ -27,15 +27,22 @@ export default function TournamentControlIndex() {
   const [eventNote, setEventNote] = useState("");
   const [reviewTournamentId, setReviewTournamentId] = useState<number | null>(null);
   const [adminNotes, setAdminNotes] = useState<Record<number, string>>({});
+  const [renameTarget, setRenameTarget] = useState<{ id: number; name: string } | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
   const query = trpc.tournamentControl.listTournaments.useQuery(undefined, {
     enabled: auth.user?.loginMethod === "discord",
     retry: false,
   });
   const templatesQuery = trpc.tournamentControl.listTemplates.useQuery(undefined, { enabled: auth.user?.loginMethod === "discord", retry: false });
+  const ownersQuery = trpc.tournamentControl.listOwnerCandidates.useQuery(undefined, { enabled: auth.user?.loginMethod === "discord", retry: false });
   const submissionsQuery = trpc.tournamentControl.listTeamSubmissions.useQuery(undefined, { enabled: auth.user?.loginMethod === "discord", retry: false });
   const toggleRegistration = trpc.tournamentControl.setTournamentRegistrationOpen.useMutation({ onSuccess: () => utils.tournamentControl.listTournaments.invalidate() });
   const approveSubmission = trpc.tournamentControl.approveTeamSubmission.useMutation({ onSuccess: async data => { await utils.tournamentControl.listTeamSubmissions.invalidate(); await utils.tournamentControl.get.invalidate({ tournamentId: data.tournament.id }); } });
   const rejectSubmission = trpc.tournamentControl.rejectTeamSubmission.useMutation({ onSuccess: () => utils.tournamentControl.listTeamSubmissions.invalidate() });
+  const renameTournament = trpc.tournamentControl.renameTournament.useMutation({ onSuccess: async () => { setRenameTarget(null); await utils.tournamentControl.listTournaments.invalidate(); } });
+  const setTournamentOwner = trpc.tournamentControl.setTournamentOwner.useMutation({ onSuccess: () => utils.tournamentControl.listTournaments.invalidate() });
+  const deleteTournament = trpc.tournamentControl.deleteTournament.useMutation({ onSuccess: async () => { setDeleteTarget(null); await utils.tournamentControl.listTournaments.invalidate(); } });
   const createFromTemplate = trpc.tournamentControl.createTournamentFromTemplate.useMutation({
     onSuccess: async data => {
       await utils.tournamentControl.listTournaments.invalidate();
@@ -87,6 +94,7 @@ export default function TournamentControlIndex() {
 
   const tournaments = query.data ?? [];
   const canSubmit = name.trim().length >= 2 && !createTournament.isPending;
+  const ownerName = (owner?: { id: number | null; discordDisplayName?: string | null; discordUsername?: string | null; name?: string | null } | null) => owner ? (owner.discordDisplayName || owner.discordUsername || owner.name || `User #${owner.id}`) : "Unassigned";
 
   return (
     <section className="min-h-screen bg-black px-6 py-12 text-white">
@@ -137,9 +145,19 @@ export default function TournamentControlIndex() {
               <p className={`mt-3 inline-flex rounded-full border px-3 py-1 font-mono text-xs uppercase ${tournament.registrationOpen === 1 ? "border-emerald-400/40 text-emerald-200" : "border-white/15 text-white/45"}`}>Registration {tournament.registrationOpen === 1 ? "open" : "closed"}</p>
               <p className="mt-3 text-sm text-white/60">{pendingCount} pending team approval{pendingCount === 1 ? "" : "s"}</p>
               {tournament.eventNote && <p className="mt-3 line-clamp-2 text-sm text-white/45">{tournament.eventNote}</p>}
+              <div className="mt-3">
+                <label className="mb-1 block font-mono text-[10px] uppercase tracking-widest text-white/40">Owner</label>
+                <select className="w-full rounded border border-white/15 bg-black/60 px-2 py-1 text-sm text-white" value={tournament.ownerUserId ?? ""} onChange={event => setTournamentOwner.mutate({ tournamentId: tournament.id, ownerUserId: event.target.value ? Number(event.target.value) : null })}>
+                  <option value="">Clear Owner / Unassigned</option>
+                  {(ownersQuery.data ?? []).map(owner => <option key={owner.id} value={owner.id}>{ownerName(owner)}</option>)}
+                </select>
+                <p className="mt-1 text-xs text-white/45">Current: {ownerName(tournament.owner)}</p>
+              </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button variant="outline" className="border-white/20 text-white hover:bg-white/10" onClick={() => toggleRegistration.mutate({ tournamentId: tournament.id, registrationOpen: tournament.registrationOpen !== 1 })}>{tournament.registrationOpen === 1 ? "Close Registration" : "Open Registration"}</Button>
                 <Button className={goldButtonClass} onClick={() => setReviewTournamentId(tournament.id)}>Team Approvals</Button>
+                <Button variant="outline" className="border-white/20 text-white hover:bg-white/10" onClick={() => { setRenameTarget({ id: tournament.id, name: tournament.name }); setRenameValue(tournament.name); }}>Rename</Button>
+                <Button variant="destructive" onClick={() => setDeleteTarget({ id: tournament.id, name: tournament.name })}>Delete</Button>
                 <Button asChild variant="outline" className="border-neon-gold/40 text-neon-gold hover:bg-neon-gold/10"><Link href={`/admin/tournaments/${tournament.id}/control`}>Open Room</Link></Button>
               </div>
             </div>
@@ -163,6 +181,21 @@ export default function TournamentControlIndex() {
           )}
         </div>
       </div>
+
+      <Dialog open={renameTarget !== null} onOpenChange={open => !open && setRenameTarget(null)}>
+        <DialogContent className="border-neon-gold/40 bg-zinc-950 text-white">
+          <DialogHeader><DialogTitle className="font-mono text-neon-gold">Rename Tournament</DialogTitle><DialogDescription>Update the control-room display name. URLs continue to use the tournament ID.</DialogDescription></DialogHeader>
+          <Input value={renameValue} onChange={event => setRenameValue(event.target.value)} maxLength={255} className="border-white/15 bg-black/60 text-white" />
+          <DialogFooter><Button variant="outline" className="border-white/20 text-white" onClick={() => setRenameTarget(null)}>Cancel</Button><Button className={goldButtonClass} disabled={renameValue.trim().length < 2 || renameTournament.isPending || !renameTarget} onClick={() => renameTarget && renameTournament.mutate({ tournamentId: renameTarget.id, name: renameValue })}>Save Name</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={deleteTarget !== null} onOpenChange={open => !open && setDeleteTarget(null)}>
+        <DialogContent className="border-red-400/40 bg-zinc-950 text-white">
+          <DialogHeader><DialogTitle className="font-mono text-red-200">Delete Tournament</DialogTitle><DialogDescription>This removes the tournament and control-room data. Saved templates are kept.</DialogDescription></DialogHeader>
+          <p className="text-sm text-white/70">Delete <span className="font-bold text-white">{deleteTarget?.name}</span>?</p>
+          <DialogFooter><Button variant="outline" className="border-white/20 text-white" onClick={() => setDeleteTarget(null)}>Cancel</Button><Button variant="destructive" disabled={!deleteTarget || deleteTournament.isPending} onClick={() => deleteTarget && deleteTournament.mutate({ tournamentId: deleteTarget.id })}>Delete Tournament</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog open={reviewTournamentId !== null} onOpenChange={open => !open && setReviewTournamentId(null)}>
         <DialogContent className="max-w-3xl border-neon-gold/40 bg-zinc-950 text-white">
           <DialogHeader><DialogTitle className="font-mono text-neon-gold">Team Approvals</DialogTitle><DialogDescription>Approve managed team submissions into Tournament Control snapshots.</DialogDescription></DialogHeader>

@@ -5,6 +5,7 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getDiscordLoginUrl } from "@/lib/discordLogin";
 import { Button } from "@/components/ui/button";
+import { THE_FINALS_MAPS } from "@/lib/finalsMaps";
 import { Input } from "@/components/ui/input";
 import {
   ContextMenu,
@@ -67,6 +68,7 @@ type ControlGameView = {
   canvasY: number;
   privateLobbyCode?: string | null;
   seriesBestOf?: number;
+  mapId?: string | null;
 };
 type AssignmentView = {
   id: number;
@@ -178,6 +180,17 @@ export function getConnectorEndpoints(sourceCenter: CanvasPoint, targetCenter: C
     source: { x: sourceCenter.x + unitX * radius, y: sourceCenter.y + unitY * radius },
     target: { x: targetCenter.x - unitX * radius, y: targetCenter.y - unitY * radius },
   };
+}
+
+export function resolveConnectionDropTargetGameId(target: EventTarget | null, sourceGameId: number) {
+  const element = target instanceof HTMLElement
+    ? target.closest("[data-connection-target-game-id], [data-input-port-game-id]")
+    : null;
+  const raw = element instanceof HTMLElement
+    ? element.dataset.connectionTargetGameId ?? element.dataset.inputPortGameId
+    : undefined;
+  const targetGameId = raw ? Number(raw) : NaN;
+  return Number.isInteger(targetGameId) && targetGameId > 0 && targetGameId !== sourceGameId ? targetGameId : null;
 }
 
 export function getCanvasPanScroll(start: CanvasPanStart, clientX: number, clientY: number) {
@@ -413,6 +426,8 @@ export default function TournamentControlRoom() {
   const deleteGameConnection = trpc.tournamentControl.deleteGameConnection.useMutation(mutationOptions);
   const renameGame = trpc.tournamentControl.renameGame.useMutation(mutationOptions);
   const setLobbyCode = trpc.tournamentControl.setLobbyCode.useMutation(mutationOptions);
+  const setGameMap = trpc.tournamentControl.setGameMap.useMutation(mutationOptions);
+  const randomizeGameMap = trpc.tournamentControl.randomizeGameMap.useMutation(mutationOptions);
   const updateStatus = trpc.tournamentControl.updateStatus.useMutation(mutationOptions);
   const setPlacement = trpc.tournamentControl.setAssignmentResultPlacement.useMutation(mutationOptions);
   const assignTeam = trpc.tournamentControl.assignTeam.useMutation(mutationOptions);
@@ -697,14 +712,9 @@ export default function TournamentControlRoom() {
     };
 
     const finishConnection = (event: PointerEvent) => {
-      const target = event.target instanceof HTMLElement
-        ? event.target.closest("[data-input-port-game-id]")
-        : null;
-      const targetGameId = target instanceof HTMLElement
-        ? Number(target.dataset.inputPortGameId)
-        : NaN;
+      const targetGameId = resolveConnectionDropTargetGameId(event.target, sourceGameId);
 
-      if (Number.isInteger(targetGameId) && targetGameId > 0 && targetGameId !== sourceGameId) {
+      if (targetGameId !== null) {
         connectGames.mutate({ tournamentId, sourceGameId, targetGameId });
       }
       setConnectionDrag(null);
@@ -880,7 +890,7 @@ export default function TournamentControlRoom() {
               ← Tournament Rooms
             </Link>
             <div className="rounded border border-white/10 bg-white/5 px-3 py-2 font-mono text-xs text-white/55">
-              Click team + 1–4 score · drag lobby frame to move · drag bottom node to top node to connect
+              Click team + 1–4 score · drag lobby frame to move · drag bottom node onto a lobby to connect
             </div>
           </div>
         </div>
@@ -1326,6 +1336,7 @@ export default function TournamentControlRoom() {
                               if (!payload) return;
                               assignDroppedTeam(game, gameAssignments, payload);
                             }}
+                            data-connection-target-game-id={game.id}
                             className={`absolute z-10 w-80 cursor-default rounded-lg border bg-zinc-950/95 p-4 shadow-2xl ${statusClasses.nodeBorder} ${statusClasses.accent} ${nodeDrag?.gameId === game.id ? "z-50 ring-2 ring-[#FFD700]/60" : ""}`}
                             style={{ left: visualPosition.x, top: visualPosition.y }}
                           >
@@ -1404,9 +1415,32 @@ export default function TournamentControlRoom() {
                               </div>
                             </div>
                             <div className="mb-3 flex items-center justify-between gap-2">
-                              <span className={`inline-block rounded border px-2 py-1 font-mono text-xs uppercase ${statusClasses.statusPill}`}>
-                                {game.status}
-                              </span>
+                              <div className="flex min-w-0 items-center gap-2">
+                                <span className={`inline-block rounded border px-2 py-1 font-mono text-xs uppercase ${statusClasses.statusPill}`}>
+                                  {game.status}
+                                </span>
+                                <select
+                                  data-no-node-drag="true"
+                                  className="max-w-[8rem] rounded border border-[#FFD700]/30 bg-black px-2 py-1 font-mono text-[10px] uppercase text-yellow-100 outline-none hover:border-[#FFD700]"
+                                  value={game.mapId ?? ""}
+                                  title="Select map"
+                                  onChange={event => {
+                                    event.stopPropagation();
+                                    const value = event.target.value;
+                                    if (value === "__random") {
+                                      randomizeGameMap.mutate({ gameId: game.id });
+                                      return;
+                                    }
+                                    setGameMap.mutate({ gameId: game.id, mapId: value || null });
+                                  }}
+                                >
+                                  <option value="">Map: TBD</option>
+                                  <option value="__random">Randomize Map</option>
+                                  {THE_FINALS_MAPS.map(map => (
+                                    <option key={map.id} value={map.id}>{map.name}</option>
+                                  ))}
+                                </select>
+                              </div>
                               <span className="font-mono text-[10px] uppercase tracking-widest text-white/35">
                                 {game.gameType === "cashout" ? "1st–4th" : `1st–2nd · BO${game.seriesBestOf ?? 1}`}
                               </span>
