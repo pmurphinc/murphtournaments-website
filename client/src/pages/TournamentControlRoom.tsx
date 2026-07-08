@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "wouter";
+import { Link, useParams } from "wouter";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -69,6 +69,13 @@ function parseDragPayload(value: string): DragPayload | null {
   }
 }
 
+function formatPlacement(value: number) {
+  if (value === 1) return "1st";
+  if (value === 2) return "2nd";
+  if (value === 3) return "3rd";
+  return `${value}th`;
+}
+
 export default function TournamentControlRoom() {
   const params = useParams<{ tournamentId: string }>();
   const tournamentId = Number(params.tournamentId);
@@ -100,6 +107,7 @@ export default function TournamentControlRoom() {
   const renameGame = trpc.tournamentControl.renameGame.useMutation(mutationOptions);
   const setLobbyCode = trpc.tournamentControl.setLobbyCode.useMutation(mutationOptions);
   const updateStatus = trpc.tournamentControl.updateStatus.useMutation(mutationOptions);
+  const setPlacement = trpc.tournamentControl.setAssignmentResultPlacement.useMutation(mutationOptions);
   const assignTeam = trpc.tournamentControl.assignTeam.useMutation(mutationOptions);
   const moveTeam = trpc.tournamentControl.moveTeam.useMutation(mutationOptions);
   const removeTeam = trpc.tournamentControl.removeTeam.useMutation(mutationOptions);
@@ -221,21 +229,29 @@ export default function TournamentControlRoom() {
   return (
     <section className="min-h-screen bg-black text-white">
       <header className="border-b border-neon-gold/30 bg-zinc-950 px-6 py-5">
-        <p className="font-mono text-xs uppercase tracking-[0.35em] text-neon-gold">
-          Admin Tournament Control Room
-        </p>
-        <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="font-mono text-3xl font-black uppercase">
+            <p className="font-mono text-xs uppercase tracking-[0.35em] text-neon-gold">
+              Admin Tournament Control Room
+            </p>
+            <h1 className="mt-2 font-mono text-3xl font-black uppercase">
               {query.data.tournament.name}
             </h1>
             <p className="text-sm text-white/60">
               {query.data.tournament.eventStatus} · {query.data.tournament.currentStage}
             </p>
           </div>
-          <div className="rounded border border-white/10 bg-white/5 px-3 py-2 font-mono text-xs text-white/70">
-            Phase 2 Discord bot contract is documented in{" "}
-            <code>docs/tournament-control-discord-contract.md</code>.
+          <div className="flex flex-wrap items-center gap-3">
+            <Link
+              href="/admin/tournaments/control"
+              className="inline-flex rounded border border-[#FFD700]/70 bg-[#FFD700] px-4 py-2 font-mono text-xs font-black uppercase tracking-wider text-black shadow-[0_0_18px_rgba(255,215,0,0.22)] transition hover:bg-[#D4AF37]"
+            >
+              ← Tournament Rooms
+            </Link>
+            <div className="rounded border border-white/10 bg-white/5 px-3 py-2 font-mono text-xs text-white/70">
+              Phase 2 Discord bot contract is documented in{" "}
+              <code>docs/tournament-control-discord-contract.md</code>.
+            </div>
           </div>
         </div>
       </header>
@@ -342,9 +358,14 @@ export default function TournamentControlRoom() {
                             </button>
                           )}
                         </div>
-                        <span className="mb-3 inline-block rounded bg-white/10 px-2 py-1 font-mono text-xs uppercase">
-                          {game.status}
-                        </span>
+                        <div className="mb-3 flex items-center justify-between gap-2">
+                          <span className="inline-block rounded bg-white/10 px-2 py-1 font-mono text-xs uppercase">
+                            {game.status}
+                          </span>
+                          <span className="font-mono text-[10px] uppercase tracking-widest text-white/35">
+                            Results: {game.gameType === "cashout" ? "1st–4th" : "1st–2nd"}
+                          </span>
+                        </div>
                         <div className="space-y-2">
                           {Array.from({ length: capacity }, (_, index) => {
                             const slot = index + 1;
@@ -382,15 +403,29 @@ export default function TournamentControlRoom() {
                                 <p className="mb-1 font-mono text-[10px] uppercase text-white/35">
                                   Slot {slot}
                                 </p>
-                                {team ? (
-                                  <TeamCard
-                                    team={team}
-                                    fromGameId={isComplete ? undefined : game.id}
-                                    disabled={isComplete}
-                                    onDragStart={() =>
-                                      setDragPayload({ teamId: team.id, fromGameId: game.id })
-                                    }
-                                  />
+                                {team && assignment ? (
+                                  <div className="space-y-2">
+                                    <TeamCard
+                                      team={team}
+                                      fromGameId={isComplete ? undefined : game.id}
+                                      disabled={isComplete}
+                                      placement={assignment.resultPlacement ?? null}
+                                      onDragStart={() =>
+                                        setDragPayload({ teamId: team.id, fromGameId: game.id })
+                                      }
+                                    />
+                                    <ResultPlacementControl
+                                      capacity={capacity}
+                                      placement={assignment.resultPlacement ?? null}
+                                      disabled={setPlacement.isPending}
+                                      onChange={resultPlacement =>
+                                        setPlacement.mutate({
+                                          assignmentId: assignment.id,
+                                          resultPlacement,
+                                        })
+                                      }
+                                    />
+                                  </div>
                                 ) : (
                                   <p className="text-sm text-white/35">
                                     {isComplete ? "Empty historical slot" : "Drop team here"}
@@ -597,16 +632,56 @@ export default function TournamentControlRoom() {
   );
 }
 
+function ResultPlacementControl({
+  capacity,
+  placement,
+  disabled,
+  onChange,
+}: {
+  capacity: number;
+  placement: number | null;
+  disabled?: boolean;
+  onChange: (placement: number | null) => void;
+}) {
+  return (
+    <label className="flex items-center justify-between gap-2 rounded border border-white/10 bg-zinc-950/80 px-2 py-1.5">
+      <span className="font-mono text-[10px] uppercase tracking-widest text-white/45">
+        Result
+      </span>
+      <select
+        value={placement ?? ""}
+        disabled={disabled}
+        onPointerDown={event => event.stopPropagation()}
+        onClick={event => event.stopPropagation()}
+        onChange={event => {
+          const value = event.target.value;
+          onChange(value ? Number(value) : null);
+        }}
+        className="rounded border border-[#FFD700]/30 bg-black px-2 py-1 font-mono text-xs font-bold text-[#FFD700] outline-none transition focus:border-[#FFD700] disabled:opacity-50"
+      >
+        <option value="">Pending</option>
+        {Array.from({ length: capacity }, (_, index) => index + 1).map(value => (
+          <option key={value} value={value}>
+            {formatPlacement(value)}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function TeamCard({
   team,
   fromGameId,
   onDragStart,
   disabled,
+  placement,
 }: {
   team: { id: number; name: string };
   fromGameId?: number;
   onDragStart: () => void;
   disabled?: boolean;
+  placement?: number | null;
 }) {
   return (
     <div
@@ -623,7 +698,16 @@ function TeamCard({
         disabled ? "opacity-70" : "cursor-grab"
       }`}
     >
-      <div className="font-mono text-sm font-bold text-white">{team.name}</div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0 truncate font-mono text-sm font-bold text-white">
+          {team.name}
+        </div>
+        {placement ? (
+          <span className="shrink-0 rounded bg-[#FFD700] px-2 py-0.5 font-mono text-[10px] font-black uppercase text-black">
+            {formatPlacement(placement)}
+          </span>
+        ) : null}
+      </div>
     </div>
   );
 }
