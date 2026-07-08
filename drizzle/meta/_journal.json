@@ -134,6 +134,13 @@
       "when": 1783987200000,
       "tag": "0018_tournament_control_room_improvements",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "5",
+      "when": 1784073600000,
+      "tag": "0019_tournament_maps_and_owners",
+      "breakpoints": true
     }
   ]
 }
