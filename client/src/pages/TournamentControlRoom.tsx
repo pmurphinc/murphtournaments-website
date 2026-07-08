@@ -79,6 +79,9 @@ type ConnectionView = {
   sourceGameId: number;
   targetGameId: number;
 };
+type GameStatusClasses = { nodeBorder: string; statusPill: string; accent: string };
+type CanvasPanStart = { clientX: number; clientY: number; scrollLeft: number; scrollTop: number };
+
 type DialogState =
   | { type: "create-team" }
   | { type: "rename"; gameId: number; currentValue: string }
@@ -160,6 +163,42 @@ export function getConnectorEndpoints(sourceCenter: CanvasPoint, targetCenter: C
   };
 }
 
+export function getCanvasPanScroll(start: CanvasPanStart, clientX: number, clientY: number) {
+  return {
+    scrollLeft: start.scrollLeft - (clientX - start.clientX),
+    scrollTop: start.scrollTop - (clientY - start.clientY),
+  };
+}
+
+export function getGameStatusClasses(status: GameStatus): GameStatusClasses {
+  switch (status) {
+    case "draft":
+      return {
+        nodeBorder: "border-zinc-500/70",
+        statusPill: "border-zinc-400/40 bg-zinc-500/15 text-zinc-200",
+        accent: "shadow-[0_0_24px_rgba(113,113,122,0.14)]",
+      };
+    case "ready":
+      return {
+        nodeBorder: "border-yellow-300/80",
+        statusPill: "border-yellow-300/50 bg-yellow-300/15 text-yellow-100",
+        accent: "shadow-[0_0_26px_rgba(250,204,21,0.18)]",
+      };
+    case "live":
+      return {
+        nodeBorder: "border-emerald-400/80",
+        statusPill: "border-emerald-400/50 bg-emerald-400/15 text-emerald-100",
+        accent: "shadow-[0_0_26px_rgba(52,211,153,0.18)]",
+      };
+    case "complete":
+      return {
+        nodeBorder: "border-red-400/75",
+        statusPill: "border-red-400/50 bg-red-500/15 text-red-100",
+        accent: "shadow-[0_0_24px_rgba(248,113,113,0.14)]",
+      };
+  }
+}
+
 export function getNextAvailableSlot(
   assignments: Pick<AssignmentView, "slotIndex" | "teamId">[],
   capacity: number,
@@ -173,6 +212,17 @@ export function getNextAvailableSlot(
     ? [preferredSlotIndex, ...candidates.filter(slot => slot !== preferredSlotIndex)]
     : candidates;
   return orderedCandidates.find(slot => slot >= 1 && slot <= capacity && !occupiedSlots.has(slot)) ?? null;
+}
+
+export function getResolvedDropSlot(
+  status: GameStatus,
+  assignments: Pick<AssignmentView, "slotIndex" | "teamId">[],
+  capacity: number,
+  teamId: number,
+  preferredSlotIndex?: number
+) {
+  if (status === "complete") return null;
+  return getNextAvailableSlot(assignments, capacity, preferredSlotIndex, teamId);
 }
 
 export function getConnectorPoint(
@@ -365,7 +415,7 @@ export default function TournamentControlRoom() {
         return;
       }
       const capacity = game.gameType === "cashout" ? 4 : 2;
-      const slotIndex = getNextAvailableSlot(gameAssignments, capacity, preferredSlotIndex, payload.teamId);
+      const slotIndex = getResolvedDropSlot(game.status, gameAssignments, capacity, payload.teamId, preferredSlotIndex);
       if (slotIndex === null) {
         toast.error("This lobby has no open slots.");
         return;
@@ -713,23 +763,35 @@ export default function TournamentControlRoom() {
                 const element = canvasRef.current;
                 if (!element) return;
                 event.preventDefault();
-                const startX = event.clientX;
-                const startY = event.clientY;
-                const startLeft = element.scrollLeft;
-                const startTop = element.scrollTop;
-                event.currentTarget.setPointerCapture(event.pointerId);
+                const panStart = {
+                  clientX: event.clientX,
+                  clientY: event.clientY,
+                  scrollLeft: element.scrollLeft,
+                  scrollTop: element.scrollTop,
+                };
+                if (event.currentTarget.setPointerCapture) {
+                  event.currentTarget.setPointerCapture(event.pointerId);
+                }
                 setIsPanning(true);
                 const handleMove = (moveEvent: PointerEvent) => {
-                  element.scrollLeft = startLeft - (moveEvent.clientX - startX);
-                  element.scrollTop = startTop - (moveEvent.clientY - startY);
+                  if (moveEvent.pointerId !== event.pointerId) return;
+                  const nextScroll = getCanvasPanScroll(panStart, moveEvent.clientX, moveEvent.clientY);
+                  element.scrollLeft = nextScroll.scrollLeft;
+                  element.scrollTop = nextScroll.scrollTop;
                 };
-                const cleanup = () => {
+                const cleanup = (endEvent: PointerEvent) => {
+                  if (endEvent.pointerId !== event.pointerId) return;
                   window.removeEventListener("pointermove", handleMove);
+                  window.removeEventListener("pointerup", cleanup);
+                  window.removeEventListener("pointercancel", cleanup);
+                  if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+                    event.currentTarget.releasePointerCapture(event.pointerId);
+                  }
                   setIsPanning(false);
                 };
                 window.addEventListener("pointermove", handleMove);
-                window.addEventListener("pointerup", cleanup, { once: true });
-                window.addEventListener("pointercancel", cleanup, { once: true });
+                window.addEventListener("pointerup", cleanup);
+                window.addEventListener("pointercancel", cleanup);
               }}
               onContextMenu={event => {
                 setCanvasMenuPosition(canvasPoint(event.clientX, event.clientY));
@@ -823,6 +885,7 @@ export default function TournamentControlRoom() {
                     const isComplete = game.status === "complete";
                     const isMinimized = minimizedGameIds.has(game.id);
                     const visualPosition = getVisualPosition(game);
+                    const statusClasses = getGameStatusClasses(game.status);
 
                     return (
                       <ContextMenu key={game.id}>
@@ -843,11 +906,16 @@ export default function TournamentControlRoom() {
                                 y: visualPosition.y,
                               });
                             }}
-                            className={`absolute z-10 w-80 cursor-default rounded-lg border bg-zinc-950/95 p-4 shadow-2xl ${
-                              game.gameType === "cashout"
-                                ? "border-neon-gold/60"
-                                : "border-neon-magenta/60"
-                            } ${nodeDrag?.gameId === game.id ? "z-50 ring-2 ring-[#FFD700]/60" : ""}`}
+                            onDragOver={event => {
+                              if (!isComplete) event.preventDefault();
+                            }}
+                            onDrop={event => {
+                              if (isComplete) return;
+                              const payload = parseDragPayload(event.dataTransfer.getData("application/json")) ?? dragPayload;
+                              if (!payload) return;
+                              assignDroppedTeam(game, gameAssignments, payload);
+                            }}
+                            className={`absolute z-10 w-80 cursor-default rounded-lg border bg-zinc-950/95 p-4 shadow-2xl ${statusClasses.nodeBorder} ${statusClasses.accent} ${nodeDrag?.gameId === game.id ? "z-50 ring-2 ring-[#FFD700]/60" : ""}`}
                             style={{ left: visualPosition.x, top: visualPosition.y }}
                           >
                             <button
@@ -924,7 +992,7 @@ export default function TournamentControlRoom() {
                               </div>
                             </div>
                             <div className="mb-3 flex items-center justify-between gap-2">
-                              <span className="inline-block rounded bg-white/10 px-2 py-1 font-mono text-xs uppercase">
+                              <span className={`inline-block rounded border px-2 py-1 font-mono text-xs uppercase ${statusClasses.statusPill}`}>
                                 {game.status}
                               </span>
                               <span className="font-mono text-[10px] uppercase tracking-widest text-white/35">

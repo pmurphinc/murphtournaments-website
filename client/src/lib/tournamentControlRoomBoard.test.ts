@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   connectorRadius,
+  getCanvasPanScroll,
   getConnectionEndpoint,
   getConnectorEndpoints,
   getConnectorPoint,
+  getGameStatusClasses,
   getNextAvailableSlot,
   getNodeHeight,
+  getResolvedDropSlot,
   shouldStartCanvasPan,
 } from "../pages/TournamentControlRoom";
 
@@ -18,23 +21,40 @@ describe("Tournament Control Room slot selection", () => {
     { teamId: 11, slotIndex: 3 },
   ];
 
+  it("dropping onto an empty slot resolves that slot", () => {
+    expect(getResolvedDropSlot("draft", assignments, 4, 12, 2)).toBe(2);
+  });
+
   it("dropping onto an occupied slot selects the next available slot", () => {
+    expect(getResolvedDropSlot("draft", assignments, 4, 12, 1)).toBe(2);
     expect(getNextAvailableSlot(assignments, 4, 1, 12)).toBe(2);
   });
 
-  it("dropping onto the lobby body selects the next available slot", () => {
-    expect(getNextAvailableSlot(assignments, 4, undefined, 12)).toBe(2);
+  it("dropping onto the lobby body selects the first available slot", () => {
+    expect(getResolvedDropSlot("ready", assignments, 4, 12)).toBe(2);
   });
 
   it("returns null when the lobby is full", () => {
-    expect(getNextAvailableSlot([
+    expect(getResolvedDropSlot("live", [
       { teamId: 10, slotIndex: 1 },
       { teamId: 11, slotIndex: 2 },
-    ], 2, 1, 12)).toBeNull();
+    ], 2, 12, 1)).toBeNull();
+  });
+
+  it("ignores completed lobby drops", () => {
+    expect(getResolvedDropSlot("complete", assignments, 4, 12, 2)).toBeNull();
   });
 
   it("does not duplicate a team in the same target lobby", () => {
-    expect(getNextAvailableSlot(assignments, 4, 2, 10)).toBeNull();
+    expect(getResolvedDropSlot("draft", assignments, 4, 10, 2)).toBeNull();
+  });
+
+  it("resolves a cross-lobby move only when the target slot is available", () => {
+    expect(getResolvedDropSlot("live", assignments, 4, 12, 4)).toBe(4);
+    expect(getResolvedDropSlot("live", [
+      { teamId: 10, slotIndex: 1 },
+      { teamId: 11, slotIndex: 2 },
+    ], 2, 12)).toBeNull();
   });
 });
 
@@ -69,26 +89,65 @@ describe("Tournament Control Room connector math", () => {
 
 describe("Tournament Control Room background pan guard", () => {
   class FakeElement {
-    constructor(private match: boolean) {}
-    closest() { return this.match ? this : null; }
+    public lastSelector = "";
+    constructor(private readonly matchesSelector: boolean) {}
+    closest(selector: string) {
+      this.lastSelector = selector;
+      return this.matchesSelector ? this : null;
+    }
+  }
+
+  function withFakeHTMLElement<T>(callback: () => T) {
+    const previous = globalThis.HTMLElement;
+    globalThis.HTMLElement = FakeElement as unknown as typeof HTMLElement;
+    try {
+      return callback();
+    } finally {
+      globalThis.HTMLElement = previous;
+    }
   }
 
   it("allows panning from plain canvas background", () => {
-    const previous = globalThis.HTMLElement;
-    // @ts-expect-error test shim for node environment
-    globalThis.HTMLElement = FakeElement;
-    expect(shouldStartCanvasPan(new FakeElement(false) as unknown as HTMLElement)).toBe(true);
-    globalThis.HTMLElement = previous;
+    withFakeHTMLElement(() => {
+      expect(shouldStartCanvasPan(new FakeElement(false) as unknown as HTMLElement)).toBe(true);
+    });
   });
 
-  it.each(["lobby node", "team card", "connector port", "button", "input/select/textarea", "menu item"])(
-    "does not pan from %s",
-    () => {
-      const previous = globalThis.HTMLElement;
-      // @ts-expect-error test shim for node environment
-      globalThis.HTMLElement = FakeElement;
-      expect(shouldStartCanvasPan(new FakeElement(true) as unknown as HTMLElement)).toBe(false);
-      globalThis.HTMLElement = previous;
-    }
-  );
+  it.each([
+    ["lobby nodes", '[data-control-node="true"]'],
+    ["team cards", '[data-team-card="true"]'],
+    ["connector ports", '[data-connector-port="true"]'],
+    ["buttons", "button"],
+    ["inputs", "input"],
+    ["selects", "select"],
+    ["textareas", "textarea"],
+    ["menu items", '[role="menuitem"]'],
+    ["draggable elements", '[draggable="true"]'],
+  ])("does not pan from %s", (_label, selectorFragment) => {
+    withFakeHTMLElement(() => {
+      const element = new FakeElement(true);
+      expect(shouldStartCanvasPan(element as unknown as HTMLElement)).toBe(false);
+      expect(element.lastSelector).toContain(selectorFragment);
+    });
+  });
+
+  it("calculates scroll offsets from pointer deltas", () => {
+    expect(getCanvasPanScroll({ clientX: 100, clientY: 200, scrollLeft: 40, scrollTop: 90 }, 85, 260)).toEqual({
+      scrollLeft: 55,
+      scrollTop: 30,
+    });
+  });
+});
+
+describe("Tournament Control Room status colors", () => {
+  it.each([
+    ["draft" as const, "zinc"],
+    ["ready" as const, "yellow"],
+    ["live" as const, "emerald"],
+    ["complete" as const, "red"],
+  ])("maps %s to stoplight classes", (status, expectedColor) => {
+    const classes = getGameStatusClasses(status);
+    expect(classes.nodeBorder).toContain(expectedColor);
+    expect(classes.statusPill).toContain(expectedColor);
+  });
 });
