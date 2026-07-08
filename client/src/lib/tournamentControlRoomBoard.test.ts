@@ -14,6 +14,7 @@ import {
   getResolvedDropSlot,
   getViewportPreservingScroll,
   getBoundedControlKeyPosition,
+  getAvailableTeamsToggleLabel,
   shouldStartCanvasPan,
   shouldCancelBoardDragsForPinch,
 } from "../pages/TournamentControlRoom";
@@ -219,5 +220,13 @@ describe("Tournament Control Room status colors", () => {
     const classes = getGameStatusClasses(status);
     expect(classes.nodeBorder).toContain(expectedColor);
     expect(classes.statusPill).toContain(expectedColor);
+  });
+});
+
+
+describe("Tournament Control Room mobile team panel labels", () => {
+  it("formats the compact available-team toggle with a count", () => {
+    expect(getAvailableTeamsToggleLabel(12)).toBe("Available Teams (12)");
+    expect(getAvailableTeamsToggleLabel(0)).toBe("Available Teams (0)");
   });
 });
