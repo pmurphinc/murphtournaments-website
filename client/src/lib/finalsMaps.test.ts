@@ -51,3 +51,11 @@ describe("drawUniqueMaps", () => {
     vi.restoreAllMocks();
   });
 });
+
+describe("default competitive tournament map randomization", () => {
+  it("draws from the same default competitive pool used by control-room randomize", () => {
+    const [mapId] = drawUniqueMaps(DEFAULT_COMPETITIVE_MAP_IDS, 1);
+    expect(DEFAULT_COMPETITIVE_MAP_IDS).toContain(mapId);
+    expect(THE_FINALS_MAPS.some(map => map.id === mapId)).toBe(true);
+  });
+});

@@ -9,13 +9,14 @@ const rows: Array<{
   currentStage: "check-in" | "cashout" | "final-round" | "finished";
   currentMatch: string | null;
   eventNote: string | null;
+  ownerUserId: number | null;
 }> = [];
 let nextId = 1;
 const insertedValues: unknown[] = [];
 
 vi.mock("../../../server/db", () => ({
   getDb: vi.fn(async () => ({
-    select: () => ({ from: async () => rows }),
+    select: () => ({ from: () => ({ leftJoin: async () => rows, then: Promise.resolve(rows).then.bind(Promise.resolve(rows)) }) }),
     insert: () => ({
       values: async (value: any) => {
         insertedValues.push(value);
@@ -27,6 +28,7 @@ vi.mock("../../../server/db", () => ({
           currentStage: value.currentStage ?? "check-in",
           currentMatch: value.currentMatch ?? null,
           eventNote: value.eventNote ?? null,
+          ownerUserId: value.ownerUserId ?? null,
         };
         rows.push(row);
         return { insertId: row.id };
@@ -92,6 +94,7 @@ describe("tournamentControl.createTournament", () => {
       currentStage: "check-in",
       currentMatch: null,
       eventNote: null,
+      ownerUserId: 1,
     });
     expect(result.tournaments).toHaveLength(1);
   });
@@ -101,6 +104,7 @@ describe("tournamentControl.createTournament", () => {
     const created = await caller.tournamentControl.createTournament({
       name: "July Invitational",
       eventNote: "Awaiting check-in",
+      ownerUserId: 1,
     });
     const listed = await caller.tournamentControl.listTournaments();
 
@@ -111,6 +115,7 @@ describe("tournamentControl.createTournament", () => {
     expect(listed[0]).toMatchObject({
       id: created.createdTournament.id,
       eventNote: "Awaiting check-in",
+      ownerUserId: 1,
     });
   });
 });

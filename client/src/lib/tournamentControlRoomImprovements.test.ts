@@ -30,6 +30,7 @@ describe("Tournament Control Room improvements", () => {
     const viewerCode = server.slice(viewerStart, viewerEnd);
     expect(viewerCode).toContain("teams: data.teams.map(team => ({ id: team.id, name: team.name, frp: team.frp }))");
     expect(viewerCode).toContain("seriesBestOf");
+    expect(viewerCode).toContain("mapId");
     expect(viewerCode).not.toContain("privateLobbyCode");
     expect(viewerCode).not.toContain("captainDiscordId");
     expect(viewerCode).not.toContain("captainUserId");
@@ -48,5 +49,27 @@ describe("Tournament Control Room improvements", () => {
     expect(server).toContain("await tx.insert(managedTeams).values");
     expect(server).toContain("await tx.insert(managedTeamMembers).values");
     expect(server).toContain("managedTeamId: managedTeam.id");
+  });
+
+  it("persists and validates map ids through viewers and templates", async () => {
+    const schema = await readFile(new URL("../../../drizzle/schema.ts", import.meta.url), "utf8");
+    const server = await readFile(new URL("../../../server/tournamentControl.ts", import.meta.url), "utf8");
+    expect(schema).toContain('mapId: varchar("mapId", { length: 64 })');
+    expect(server).toContain("validMapIds");
+    expect(server).toContain("setGameMap");
+    expect(server).toContain("randomizeGameMap");
+    expect(server).toContain("DEFAULT_COMPETITIVE_MAP_IDS");
+    expect(server).toContain("mapId: game.mapId");
+  });
+
+  it("supports tournament owners, rename, and safe delete without deleting templates", async () => {
+    const schema = await readFile(new URL("../../../drizzle/schema.ts", import.meta.url), "utf8");
+    const server = await readFile(new URL("../../../server/tournamentControl.ts", import.meta.url), "utf8");
+    expect(schema).toContain('ownerUserId: int("ownerUserId").references');
+    expect(server).toContain("ownerUserId: ctx.user.id");
+    expect(server).toContain("setTournamentOwner");
+    expect(server).toContain("renameTournament");
+    expect(server).toContain("deleteTournament");
+    expect(server).toContain("UPDATE tournament_control_templates SET sourceTournamentId = NULL");
   });
 });
