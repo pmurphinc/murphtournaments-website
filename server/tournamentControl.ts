@@ -64,6 +64,32 @@ const templateVisibilitySchema = z.enum(["private", "public"]);
 const tokenSchema = z.string().trim().min(16).max(256);
 const adminNoteSchema = z.string().trim().max(1000).nullable().optional();
 const resultPlacementSchema = z.number().int().min(1).max(4).nullable();
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object";
+}
+
+export function extractInsertId(result: unknown): number | null {
+  if (Array.isArray(result)) {
+    for (const item of result) {
+      const insertId = extractInsertId(item);
+      if (insertId !== null) return insertId;
+    }
+    return null;
+  }
+
+  if (!isRecord(result) || !("insertId" in result)) return null;
+  const rawInsertId = result.insertId;
+  const insertId = typeof rawInsertId === "bigint" ? Number(rawInsertId) : Number(rawInsertId);
+  return Number.isSafeInteger(insertId) && insertId > 0 ? insertId : null;
+}
+
+function requireInsertId(result: unknown, message: string): number {
+  const insertId = extractInsertId(result);
+  if (insertId === null) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message });
+  return insertId;
+}
+
 const createTournamentSchema = z.object({
   name: z.string().trim().min(2).max(255),
   eventStatus: z.enum(["not-live", "live", "complete"]).default("not-live"),
@@ -278,15 +304,15 @@ async function saveTemplateFromTournament(input: { tournamentId: number; name: s
   return db.transaction(async tx => {
     const data = await fetchTournamentRows(tx, input.tournamentId);
     const insertResult = await tx.insert(tournamentControlTemplates).values({ name: input.name, visibility: input.visibility, createdByUserId: userId, sourceTournamentId: input.tournamentId });
-    const templateId = Number((insertResult as { insertId?: unknown } | undefined)?.insertId ?? 0);
+    const templateId = requireInsertId(insertResult, "Template creation failed: database did not return the created template id.");
     const [template] = await tx.select().from(tournamentControlTemplates).where(eq(tournamentControlTemplates.id, templateId)).limit(1);
     if (!template) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Template creation failed." });
     const gameIdMap = new Map<number, number>();
     for (const game of data.games) {
       assertSeriesBestOf(game.gameType, game.seriesBestOf as 1 | 3 | 5);
-      await tx.insert(tournamentControlTemplateGames).values({ templateId: template.id, gameType: game.gameType, displayLabel: game.displayLabel, canvasX: game.canvasX, canvasY: game.canvasY, seriesBestOf: game.gameType === "final_round" ? game.seriesBestOf : 1 });
-      const rows = await tx.select().from(tournamentControlTemplateGames).where(eq(tournamentControlTemplateGames.templateId, template.id));
-      gameIdMap.set(game.id, rows[rows.length - 1].id);
+      const gameInsertResult = await tx.insert(tournamentControlTemplateGames).values({ templateId: template.id, gameType: game.gameType, displayLabel: game.displayLabel, canvasX: game.canvasX, canvasY: game.canvasY, seriesBestOf: game.gameType === "final_round" ? game.seriesBestOf : 1 });
+      const templateGameId = requireInsertId(gameInsertResult, "Template creation failed: database did not return the created template game id.");
+      gameIdMap.set(game.id, templateGameId);
     }
     for (const connection of data.connections) {
       const sourceTemplateGameId = gameIdMap.get(connection.sourceGameId);
@@ -305,13 +331,13 @@ async function createTournamentFromTemplate(input: { templateId: number; name: s
     const templateGames = await tx.select().from(tournamentControlTemplateGames).where(eq(tournamentControlTemplateGames.templateId, template.id));
     const templateConnections = await tx.select().from(tournamentControlTemplateConnections).where(eq(tournamentControlTemplateConnections.templateId, template.id));
     const insertResult = await tx.insert(tournaments).values({ name: input.name });
-    const tournamentId = Number((insertResult as { insertId?: unknown } | undefined)?.insertId ?? 0);
+    const tournamentId = requireInsertId(insertResult, "Tournament creation failed: database did not return the created tournament id.");
     const gameIdMap = new Map<number, number>();
     for (const game of templateGames) {
       assertSeriesBestOf(game.gameType, game.seriesBestOf as 1 | 3 | 5);
-      await tx.insert(tournamentGames).values({ tournamentId, gameType: game.gameType, displayLabel: game.displayLabel, canvasX: game.canvasX, canvasY: game.canvasY, seriesBestOf: game.gameType === "final_round" ? game.seriesBestOf : 1 });
-      const rows = await tx.select().from(tournamentGames).where(eq(tournamentGames.tournamentId, tournamentId));
-      gameIdMap.set(game.id, rows[rows.length - 1].id);
+      const gameInsertResult = await tx.insert(tournamentGames).values({ tournamentId, gameType: game.gameType, displayLabel: game.displayLabel, canvasX: game.canvasX, canvasY: game.canvasY, seriesBestOf: game.gameType === "final_round" ? game.seriesBestOf : 1 });
+      const tournamentGameId = requireInsertId(gameInsertResult, "Tournament creation failed: database did not return the created tournament game id.");
+      gameIdMap.set(game.id, tournamentGameId);
     }
     for (const connection of templateConnections) {
       const sourceGameId = gameIdMap.get(connection.sourceTemplateGameId);
