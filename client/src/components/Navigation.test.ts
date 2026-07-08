@@ -25,6 +25,11 @@ describe("Discord avatar header control", () => {
     expect(source).toContain("Tournament Signups");
     expect(source).toContain("Coming soon");
   });
+
+  it("only shows the Tournament Control menu link to admin users", () => {
+    expect(source).toContain('const canSeeTournamentControl = user?.role === "admin";');
+    expect(source).toContain("{canSeeTournamentControl && (");
+  });
 });
 
 describe("Navigation active state and dropdown behavior", () => {
@@ -50,7 +55,7 @@ describe("Navigation active state and dropdown behavior", () => {
       "absolute right-4 top-16 w-[min(20rem,calc(100vw-2rem))]"
     );
     expect(source).toContain("bg-[#0a0e27]");
-    expect(source).not.toMatch(/<nav[^>]*bg-[^\s"]+\/\d+/);
+    expect(source).not.toMatch(/<nav[^>]*bg[^\s"]+\/\d+/);
     expect(source).not.toMatch(/<nav[^>]*opacity-/);
     expect(source).not.toContain("backdrop-blur");
     expect(source).not.toContain("backdrop-filter");
