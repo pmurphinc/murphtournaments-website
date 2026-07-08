@@ -1,10 +1,11 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
+import { createHash, randomBytes } from "node:crypto";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { getDb } from "./db";
-import { publicProcedure, router } from "./_core/trpc";
+import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { getDiscordUserId, assertDiscordTournamentStaff } from "./discordTournamentRoles";
-import { managedTeamMembers, managedTeams, teams, tournamentGameAssignments, tournamentGames, tournaments, tournamentTeamSubmissions, users } from "../drizzle/schema";
+import { managedTeamMembers, managedTeams, teams, tournamentControlTemplateConnections, tournamentControlTemplateGames, tournamentControlTemplates, tournamentGameAssignments, tournamentGames, tournaments, tournamentTeamClaimLinks, tournamentTeamSubmissions, tournamentViewerLinks, users } from "../drizzle/schema";
 import {
   activeTournamentGameStatuses,
   clampCanvasPosition,
@@ -25,6 +26,9 @@ import { shouldCreateTournamentTeamForApproval } from "./tournamentTeamSubmissio
 
 type Database = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 type QueryExecutor = Pick<Database, "select" | "insert" | "update" | "delete" | "execute">;
+const CLAIM_LINK_TTL_DAYS = 14;
+function hashToken(token: string) { return createHash("sha256").update(token).digest("hex"); }
+function createTokenPath(prefix: string, token: string) { return `${prefix}/${encodeURIComponent(token)}`; }
 const DISCORD_API_BASE = "https://discord.com/api/v10";
 type ControlGameConnection = {
   id: number;
@@ -55,6 +59,9 @@ const labelSchema = z.string().trim().min(1).max(80);
 const teamNameSchema = z.string().trim().min(2).max(80);
 const frpSchema = z.number().int().min(0).max(9999).default(0);
 const lobbyCodeSchema = z.string().trim().min(1).max(64).nullable();
+const seriesBestOfSchema = z.union([z.literal(1), z.literal(3), z.literal(5)]);
+const templateVisibilitySchema = z.enum(["private", "public"]);
+const tokenSchema = z.string().trim().min(16).max(256);
 const adminNoteSchema = z.string().trim().max(1000).nullable().optional();
 const resultPlacementSchema = z.number().int().min(1).max(4).nullable();
 const createTournamentSchema = z.object({
@@ -209,6 +216,116 @@ async function deleteGameConnection(connectionId: number) {
   if (!connection) throw new TRPCError({ code: "NOT_FOUND", message: "Lobby connection not found" });
   await db.execute(sql`DELETE FROM tournament_game_connections WHERE id = ${connectionId}`);
   return fetchTournamentControlData(connection.tournamentId);
+}
+
+
+
+function assertSeriesBestOf(gameType: TournamentGameType, seriesBestOf: 1 | 3 | 5) {
+  if (gameType === "cashout" && seriesBestOf !== 1) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Cashout lobbies cannot use BO3 or BO5." });
+  }
+}
+
+function createManagedTeamSlug(name: string) {
+  const base = name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 64);
+  return base || "team";
+}
+
+async function listTemplates(db: QueryExecutor, userId: number) {
+  const rows = await db.select().from(tournamentControlTemplates);
+  return rows.filter(template => template.visibility === "public" || template.createdByUserId === userId);
+}
+
+async function getActiveViewerLink(db: QueryExecutor, tournamentId: number) {
+  const rows = await db.select().from(tournamentViewerLinks).where(and(eq(tournamentViewerLinks.tournamentId, tournamentId), eq(tournamentViewerLinks.status, "active")));
+  return rows[0] ?? null;
+}
+
+async function createViewerLink(tournamentId: number, userId: number) {
+  const db = await requireDb();
+  await fetchTournamentRows(db, tournamentId);
+  const existing = await getActiveViewerLink(db, tournamentId);
+  if (existing) await db.update(tournamentViewerLinks).set({ status: "revoked", updatedAt: sql`now()` }).where(eq(tournamentViewerLinks.id, existing.id));
+  const token = randomBytes(32).toString("base64url");
+  await db.insert(tournamentViewerLinks).values({ tournamentId, createdByUserId: userId, tokenHash: hashToken(token) });
+  return { path: createTokenPath("/bracket", token), url: createTokenPath("/bracket", token), enabled: true } as const;
+}
+
+async function getViewerDataByToken(token: string) {
+  const db = await requireDb();
+  const tokenHash = hashToken(token);
+  const [link] = await db.select().from(tournamentViewerLinks).where(and(eq(tournamentViewerLinks.tokenHash, tokenHash), eq(tournamentViewerLinks.status, "active"))).limit(1);
+  if (!link) throw new TRPCError({ code: "NOT_FOUND", message: "Viewer link not found." });
+  const data = await fetchTournamentRows(db, link.tournamentId);
+  return {
+    tournament: {
+      id: data.tournament.id,
+      name: data.tournament.name,
+      eventStatus: data.tournament.eventStatus,
+      currentStage: data.tournament.currentStage,
+      currentCycle: data.tournament.currentCycle,
+      currentMatch: data.tournament.currentMatch,
+    },
+    teams: data.teams.map(team => ({ id: team.id, name: team.name, frp: team.frp })),
+    games: data.games.map(game => ({ id: game.id, tournamentId: game.tournamentId, gameType: game.gameType, status: game.status, displayLabel: game.displayLabel, canvasX: game.canvasX, canvasY: game.canvasY, seriesBestOf: game.seriesBestOf })),
+    assignments: data.assignments,
+    connections: data.connections,
+  };
+}
+
+async function saveTemplateFromTournament(input: { tournamentId: number; name: string; visibility: "private" | "public" }, userId: number) {
+  const db = await requireDb();
+  return db.transaction(async tx => {
+    const data = await fetchTournamentRows(tx, input.tournamentId);
+    const insertResult = await tx.insert(tournamentControlTemplates).values({ name: input.name, visibility: input.visibility, createdByUserId: userId, sourceTournamentId: input.tournamentId });
+    const templateId = Number((insertResult as { insertId?: unknown } | undefined)?.insertId ?? 0);
+    const [template] = await tx.select().from(tournamentControlTemplates).where(eq(tournamentControlTemplates.id, templateId)).limit(1);
+    if (!template) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Template creation failed." });
+    const gameIdMap = new Map<number, number>();
+    for (const game of data.games) {
+      assertSeriesBestOf(game.gameType, game.seriesBestOf as 1 | 3 | 5);
+      await tx.insert(tournamentControlTemplateGames).values({ templateId: template.id, gameType: game.gameType, displayLabel: game.displayLabel, canvasX: game.canvasX, canvasY: game.canvasY, seriesBestOf: game.gameType === "final_round" ? game.seriesBestOf : 1 });
+      const rows = await tx.select().from(tournamentControlTemplateGames).where(eq(tournamentControlTemplateGames.templateId, template.id));
+      gameIdMap.set(game.id, rows[rows.length - 1].id);
+    }
+    for (const connection of data.connections) {
+      const sourceTemplateGameId = gameIdMap.get(connection.sourceGameId);
+      const targetTemplateGameId = gameIdMap.get(connection.targetGameId);
+      if (sourceTemplateGameId && targetTemplateGameId) await tx.insert(tournamentControlTemplateConnections).values({ templateId: template.id, sourceTemplateGameId, targetTemplateGameId });
+    }
+    return { templateId: template.id };
+  });
+}
+
+async function createTournamentFromTemplate(input: { templateId: number; name: string }, userId: number) {
+  const db = await requireDb();
+  return db.transaction(async tx => {
+    const [template] = await tx.select().from(tournamentControlTemplates).where(eq(tournamentControlTemplates.id, input.templateId)).limit(1);
+    if (!template || (template.visibility !== "public" && template.createdByUserId !== userId)) throw new TRPCError({ code: "NOT_FOUND", message: "Template not found." });
+    const templateGames = await tx.select().from(tournamentControlTemplateGames).where(eq(tournamentControlTemplateGames.templateId, template.id));
+    const templateConnections = await tx.select().from(tournamentControlTemplateConnections).where(eq(tournamentControlTemplateConnections.templateId, template.id));
+    const insertResult = await tx.insert(tournaments).values({ name: input.name });
+    const tournamentId = Number((insertResult as { insertId?: unknown } | undefined)?.insertId ?? 0);
+    const gameIdMap = new Map<number, number>();
+    for (const game of templateGames) {
+      assertSeriesBestOf(game.gameType, game.seriesBestOf as 1 | 3 | 5);
+      await tx.insert(tournamentGames).values({ tournamentId, gameType: game.gameType, displayLabel: game.displayLabel, canvasX: game.canvasX, canvasY: game.canvasY, seriesBestOf: game.gameType === "final_round" ? game.seriesBestOf : 1 });
+      const rows = await tx.select().from(tournamentGames).where(eq(tournamentGames.tournamentId, tournamentId));
+      gameIdMap.set(game.id, rows[rows.length - 1].id);
+    }
+    for (const connection of templateConnections) {
+      const sourceGameId = gameIdMap.get(connection.sourceTemplateGameId);
+      const targetGameId = gameIdMap.get(connection.targetTemplateGameId);
+      if (sourceGameId && targetGameId) await tx.execute(sql`INSERT INTO tournament_game_connections (tournamentId, sourceGameId, targetGameId) VALUES (${tournamentId}, ${sourceGameId}, ${targetGameId})`);
+    }
+    const [createdTournament] = await tx.select().from(tournaments).where(eq(tournaments.id, tournamentId)).limit(1);
+    return { createdTournament };
+  });
+}
+
+function getClaimLinkState(link: { status: "active" | "claimed" | "revoked"; expiresAt: Date }) {
+  const expired = link.expiresAt.getTime() <= Date.now();
+  return { active: link.status === "active" && !expired, expired, claimed: link.status === "claimed", revoked: link.status === "revoked" };
 }
 
 function getAdvancingPlacements(gameType: TournamentGameType) {
@@ -500,6 +617,47 @@ export const discordTournamentStaffProcedure = publicProcedure.use(async ({ ctx,
 });
 
 export const tournamentControlRouter = router({
+
+  listTemplates: discordTournamentStaffProcedure.query(async ({ ctx }) => {
+    const db = await requireDb();
+    return listTemplates(db, ctx.user.id);
+  }),
+  saveTemplateFromTournament: discordTournamentStaffProcedure.input(tournamentIdSchema.extend({ name: z.string().trim().min(2).max(120), visibility: templateVisibilitySchema })).mutation(({ input, ctx }) => saveTemplateFromTournament(input, ctx.user.id)),
+  createTournamentFromTemplate: discordTournamentStaffProcedure.input(z.object({ templateId: idSchema, name: z.string().trim().min(2).max(255) })).mutation(({ input, ctx }) => createTournamentFromTemplate(input, ctx.user.id)),
+  enableViewerLink: discordTournamentStaffProcedure.input(tournamentIdSchema).mutation(({ input, ctx }) => createViewerLink(input.tournamentId, ctx.user.id)),
+  getViewer: publicProcedure.input(z.object({ token: tokenSchema })).query(({ input }) => getViewerDataByToken(input.token)),
+  getTeamClaimLinkPreview: publicProcedure.input(z.object({ token: tokenSchema })).query(async ({ input }) => {
+    const db = await requireDb();
+    const [row] = await db.select({ link: tournamentTeamClaimLinks, team: teams, tournament: tournaments }).from(tournamentTeamClaimLinks).innerJoin(teams, eq(tournamentTeamClaimLinks.tournamentTeamId, teams.id)).innerJoin(tournaments, eq(teams.tournamentId, tournaments.id)).where(eq(tournamentTeamClaimLinks.tokenHash, hashToken(input.token))).limit(1);
+    if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Claim link not found." });
+    const state = getClaimLinkState(row.link);
+    return { teamName: row.team.name, tournamentName: row.tournament.name, expiresAt: row.link.expiresAt, ...state };
+  }),
+  acceptTeamClaimLink: protectedProcedure.input(z.object({ token: tokenSchema })).mutation(async ({ input, ctx }) => {
+    const db = await requireDb();
+    return db.transaction(async tx => {
+      const [row] = await tx.select({ link: tournamentTeamClaimLinks, team: teams }).from(tournamentTeamClaimLinks).innerJoin(teams, eq(tournamentTeamClaimLinks.tournamentTeamId, teams.id)).where(eq(tournamentTeamClaimLinks.tokenHash, hashToken(input.token))).limit(1);
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Claim link not found." });
+      const state = getClaimLinkState(row.link);
+      if (state.revoked) throw new TRPCError({ code: "FORBIDDEN", message: "This claim link has been revoked." });
+      if (state.claimed) throw new TRPCError({ code: "FORBIDDEN", message: "This claim link has already been used." });
+      if (state.expired) throw new TRPCError({ code: "FORBIDDEN", message: "This claim link has expired." });
+      if (row.team.managedTeamId) throw new TRPCError({ code: "CONFLICT", message: "This team is already managed." });
+      const baseSlug = createManagedTeamSlug(row.team.name);
+      let slug = baseSlug;
+      for (let i = 2; ; i++) {
+        const existing = await tx.select({ id: managedTeams.id }).from(managedTeams).where(eq(managedTeams.slug, slug)).limit(1);
+        if (!existing.length) break;
+        slug = `${baseSlug}-${i}`.slice(0, 80);
+      }
+      await tx.insert(managedTeams).values({ name: row.team.name, slug, captainUserId: ctx.user.id });
+      const [managedTeam] = await tx.select().from(managedTeams).where(eq(managedTeams.slug, slug)).limit(1);
+      await tx.insert(managedTeamMembers).values({ teamId: managedTeam.id, userId: ctx.user.id, role: "captain" });
+      await tx.update(teams).set({ managedTeamId: managedTeam.id }).where(eq(teams.id, row.team.id));
+      await tx.update(tournamentTeamClaimLinks).set({ status: "claimed", claimedByUserId: ctx.user.id, updatedAt: sql`now()` }).where(eq(tournamentTeamClaimLinks.id, row.link.id));
+      return { success: true, managedTeamId: managedTeam.id, tournamentId: row.team.tournamentId };
+    });
+  }),
   listTournaments: discordTournamentStaffProcedure.query(async () => {
     const db = await requireDb();
     return listTournamentRows(db);
@@ -553,6 +711,14 @@ export const tournamentControlRouter = router({
     const game = await getGameOrThrow(db, input.gameId);
     assertGameIsMutable(game);
     await db.update(tournamentGames).set({ displayLabel: input.displayLabel }).where(eq(tournamentGames.id, input.gameId));
+    return fetchTournamentControlData(game.tournamentId);
+  }),
+  setFinalRoundSeriesBestOf: discordTournamentStaffProcedure.input(gameIdSchema.extend({ seriesBestOf: seriesBestOfSchema })).mutation(async ({ input }) => {
+    const db = await requireDb();
+    const game = await getGameOrThrow(db, input.gameId);
+    if (game.gameType !== "final_round") throw new TRPCError({ code: "BAD_REQUEST", message: "Only Final Round matches can use BO3 or BO5." });
+    assertGameIsMutable(game);
+    await db.update(tournamentGames).set({ seriesBestOf: input.seriesBestOf }).where(eq(tournamentGames.id, input.gameId));
     return fetchTournamentControlData(game.tournamentId);
   }),
   moveGame: discordTournamentStaffProcedure.input(gameIdSchema.extend({ position: positionSchema })).mutation(async ({ input }) => {
@@ -617,6 +783,26 @@ export const tournamentControlRouter = router({
       await tx.insert(tournamentGameAssignments).values({ gameId: input.toGameId, teamId: input.teamId, slotIndex });
     });
     return fetchTournamentControlData(targetGame.tournamentId);
+  }),
+  createTeamClaimLink: discordTournamentStaffProcedure.input(z.object({ teamId: idSchema })).mutation(async ({ input, ctx }) => {
+    const db = await requireDb();
+    const [team] = await db.select().from(teams).where(eq(teams.id, input.teamId)).limit(1);
+    if (!team) throw new TRPCError({ code: "NOT_FOUND", message: "Team not found." });
+    if (team.managedTeamId) throw new TRPCError({ code: "CONFLICT", message: "This team is already managed." });
+    const token = randomBytes(32).toString("base64url");
+    const expiresAt = new Date(Date.now() + CLAIM_LINK_TTL_DAYS * 24 * 60 * 60 * 1000);
+    await db.insert(tournamentTeamClaimLinks).values({ tournamentTeamId: team.id, createdByUserId: ctx.user.id, tokenHash: hashToken(token), expiresAt });
+    return { path: createTokenPath("/teams/claim", token), url: createTokenPath("/teams/claim", token), expiresAt };
+  }),
+  listTeamClaimLinks: discordTournamentStaffProcedure.input(z.object({ teamId: idSchema })).query(async ({ input }) => {
+    const db = await requireDb();
+    const rows = await db.select().from(tournamentTeamClaimLinks).where(eq(tournamentTeamClaimLinks.tournamentTeamId, input.teamId));
+    return rows.map(link => ({ ...link, state: getClaimLinkState(link) }));
+  }),
+  revokeTeamClaimLink: discordTournamentStaffProcedure.input(z.object({ linkId: idSchema })).mutation(async ({ input }) => {
+    const db = await requireDb();
+    await db.update(tournamentTeamClaimLinks).set({ status: "revoked", updatedAt: sql`now()` }).where(eq(tournamentTeamClaimLinks.id, input.linkId));
+    return { success: true } as const;
   }),
   removeTeam: discordTournamentStaffProcedure.input(gameIdSchema.extend({ teamId: idSchema })).mutation(async ({ input }) => {
     const db = await requireDb();

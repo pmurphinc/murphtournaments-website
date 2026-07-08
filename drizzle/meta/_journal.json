@@ -127,6 +127,13 @@
       "when": 1783900800000,
       "tag": "0017_add_tournament_game_connections",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "5",
+      "when": 1783987200000,
+      "tag": "0018_tournament_control_room_improvements",
+      "breakpoints": true
     }
   ]
 }
