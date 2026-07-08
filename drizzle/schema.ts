@@ -71,6 +71,26 @@ export const managedTeamMembers = mysqlTable(
   ]
 );
 
+export const managedTeamJoinLinks = mysqlTable(
+  "managed_team_join_links",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    teamId: int("teamId").notNull().references(() => managedTeams.id, { onDelete: "cascade" }),
+    createdByUserId: int("createdByUserId").notNull().references(() => users.id),
+    tokenHash: varchar("tokenHash", { length: 64 }).notNull(),
+    status: mysqlEnum("status", ["active", "revoked"]).default("active").notNull(),
+    expiresAt: timestamp("expiresAt"),
+    maxUses: int("maxUses"),
+    useCount: int("useCount").default(0).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    index("managed_team_join_links_team_status_idx").on(table.teamId, table.status),
+    uniqueIndex("managed_team_join_links_tokenHash_unique").on(table.tokenHash),
+  ]
+);
+
 export const managedTeamInvites = mysqlTable(
   "managed_team_invites",
   {
@@ -92,6 +112,7 @@ export const managedTeamInvites = mysqlTable(
 export type ManagedTeam = typeof managedTeams.$inferSelect;
 export type ManagedTeamMember = typeof managedTeamMembers.$inferSelect;
 export type ManagedTeamInvite = typeof managedTeamInvites.$inferSelect;
+export type ManagedTeamJoinLink = typeof managedTeamJoinLinks.$inferSelect;
 
 
 export const teamFinderListings = mysqlTable(

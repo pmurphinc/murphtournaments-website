@@ -96,3 +96,65 @@ describe("Team Management migration and invite persistence", () => {
     expect(pageSource).not.toMatch(/:\s*any\b/);
   });
 });
+
+describe("Team Management join links", () => {
+  it("captain-only procedures are exposed for creating, listing, and revoking invite links", async () => {
+    const router = await import("node:fs/promises").then(fs => fs.readFile(new URL("../../../server/teamManagementRouter.ts", import.meta.url), "utf8"));
+    expect(router).toContain("createJoinLink: discordProcedure");
+    expect(router).toContain("listJoinLinks: discordProcedure");
+    expect(router).toContain("revokeJoinLink: discordProcedure");
+    expect(router).toContain("getJoinLinkPreview: publicProcedure");
+    expect(router).toContain("acceptJoinLink: discordProcedure");
+  });
+
+  it("stores only a SHA-256 token hash for generated invite links", async () => {
+    const source = await import("node:fs/promises").then(fs => fs.readFile(new URL("../../../server/teamManagement.ts", import.meta.url), "utf8"));
+    expect(source).toContain('randomBytes(32).toString("base64url")');
+    expect(source).toContain('createHash("sha256").update(token).digest("hex")');
+    expect(source).toContain("tokenHash");
+    expect(source).not.toContain("rawToken:");
+  });
+
+  it("non-captains cannot create or revoke invite links because service calls assertCaptain", async () => {
+    const source = await import("node:fs/promises").then(fs => fs.readFile(new URL("../../../server/teamManagement.ts", import.meta.url), "utf8"));
+    expect(source).toContain("export async function createManagedTeamJoinLink");
+    expect(source).toContain("await assertCaptain(db, teamId, userId)");
+    expect(source).toContain("export async function revokeManagedTeamJoinLink");
+    expect(source).toContain("await assertCaptain(db, link.teamId, userId)");
+  });
+
+  it("preview reports active, expired, full, and revoked invite states", async () => {
+    const source = await import("node:fs/promises").then(fs => fs.readFile(new URL("../../../server/teamManagement.ts", import.meta.url), "utf8"));
+    expect(source).toContain("function getJoinLinkState");
+    expect(source).toContain("expired");
+    expect(source).toContain("full");
+    expect(source).toContain("revoked");
+    expect(source).toContain("teamName: row.team.name");
+  });
+
+  it("revoked, expired, and full invite links cannot be accepted", async () => {
+    const source = await import("node:fs/promises").then(fs => fs.readFile(new URL("../../../server/teamManagement.ts", import.meta.url), "utf8"));
+    expect(source).toContain("This invite link has been revoked.");
+    expect(source).toContain("This invite link has expired.");
+    expect(source).toContain("This invite link has reached its use limit.");
+  });
+
+  it("signed-in Discord users accept valid links as members without duplicate membership", async () => {
+    const source = await import("node:fs/promises").then(fs => fs.readFile(new URL("../../../server/teamManagement.ts", import.meta.url), "utf8"));
+    expect(source).toContain('tx.insert(managedTeamMembers).values({ teamId: link.teamId, userId, role: "member" })');
+    expect(source).toContain("if (existing) return { success: true, alreadyMember: true, role: existing.role } as const");
+    expect(source).toContain("useCount: sql`${managedTeamJoinLinks.useCount} + 1`");
+  });
+
+  it("adds managed_team_join_links schema and migration without raw token storage", async () => {
+    const [schema, migration] = await Promise.all([
+      import("node:fs/promises").then(fs => fs.readFile(new URL("../../../drizzle/schema.ts", import.meta.url), "utf8")),
+      import("node:fs/promises").then(fs => fs.readFile(new URL("../../../drizzle/0015_add_managed_team_join_links.sql", import.meta.url), "utf8")),
+    ]);
+    expect(schema).toContain('"managed_team_join_links"');
+    expect(schema).toContain('tokenHash: varchar("tokenHash", { length: 64 }).notNull()');
+    expect(migration).toContain("CREATE TABLE `managed_team_join_links`");
+    expect(migration).toContain("CONSTRAINT `managed_team_join_links_tokenHash_unique` UNIQUE(`tokenHash`)");
+    expect(migration).not.toContain("rawToken");
+  });
+});

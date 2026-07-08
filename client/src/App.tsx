@@ -29,6 +29,7 @@ import VodAnalysisDetail from "./pages/VodAnalysisDetail";
 import VodTeamInsights from "./pages/VodTeamInsights";
 import TeamFinder from "./pages/TeamFinder";
 import TeamManagement from "./pages/TeamManagement";
+import TeamJoinInvite from "./pages/TeamJoinInvite";
 import TournamentControlRoom from "./pages/TournamentControlRoom";
 import TournamentControlIndex from "./pages/TournamentControlIndex";
 import { useEffect } from "react";
@@ -87,6 +88,7 @@ function Router() {
           />
           <Route path={"/balance-archive"} component={BalanceArchive} />
           <Route path={"/team-finder"} component={TeamFinder} />
+          <Route path={"/teams/join/:token"} component={TeamJoinInvite} />
           <Route path={"/teams"} component={TeamManagement} />
           <Route path={"/admin/tournaments/control"} component={TournamentControlIndex} />
           <Route
