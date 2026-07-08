@@ -15,6 +15,7 @@ import {
   validateAssignmentPlan,
   validateMovePlan,
   validateReopenPlan,
+  resolveAssignmentSlot,
   type ControlAssignment,
   type ControlGame,
   type ControlTeam,
@@ -453,10 +454,11 @@ async function rejectSubmission(submissionId: number, adminNote: string | null |
   return listSubmissionRows(db, submission.tournamentId);
 }
 
-export async function assignTeamToGameSlot(gameId: number, teamId: number, slotIndex: number) {
+export async function assignTeamToGameSlot(gameId: number, teamId: number, preferredSlotIndex?: number) {
   const db = await requireDb();
   const game = await getGameOrThrow(db, gameId);
   const context = await fetchGameContext(db, game.tournamentId);
+  const slotIndex = resolveAssignmentSlot({ game, assignments: context.assignments, preferredSlotIndex, teamId });
   validateAssignmentPlan({ ...context, targetGameId: gameId, teamId, slotIndex });
   await db.insert(tournamentGameAssignments).values({ gameId, teamId, slotIndex });
   return fetchTournamentControlData(game.tournamentId);
@@ -595,15 +597,24 @@ export const tournamentControlRouter = router({
     return fetchTournamentControlData(game.tournamentId);
   }),
   setAssignmentResultPlacement: discordTournamentStaffProcedure.input(z.object({ assignmentId: idSchema, resultPlacement: resultPlacementSchema })).mutation(({ input }) => setAssignmentResultPlacement(input.assignmentId, input.resultPlacement)),
-  assignTeam: discordTournamentStaffProcedure.input(gameIdSchema.extend({ teamId: idSchema, slotIndex: z.number().int().positive() })).mutation(({ input }) => assignTeamToGameSlot(input.gameId, input.teamId, input.slotIndex)),
-  moveTeam: discordTournamentStaffProcedure.input(gameIdSchema.extend({ teamId: idSchema, toGameId: idSchema, slotIndex: z.number().int().positive() })).mutation(async ({ input }) => {
+  assignTeam: discordTournamentStaffProcedure.input(gameIdSchema.extend({ teamId: idSchema, slotIndex: z.number().int().positive().optional(), preferredSlotIndex: z.number().int().positive().optional() })).mutation(({ input }) => assignTeamToGameSlot(input.gameId, input.teamId, input.preferredSlotIndex ?? input.slotIndex)),
+  moveTeam: discordTournamentStaffProcedure.input(gameIdSchema.extend({ teamId: idSchema, toGameId: idSchema, slotIndex: z.number().int().positive().optional(), preferredSlotIndex: z.number().int().positive().optional() })).mutation(async ({ input }) => {
     const db = await requireDb();
     const targetGame = await getGameOrThrow(db, input.toGameId);
     await db.transaction(async tx => {
       const context = await fetchGameContext(tx, targetGame.tournamentId);
-      validateMovePlan({ ...context, sourceGameId: input.gameId, targetGameId: input.toGameId, teamId: input.teamId, slotIndex: input.slotIndex });
+      const assignmentsForSlotResolution = context.assignments.filter(
+        assignment => !(assignment.gameId === input.gameId && assignment.teamId === input.teamId)
+      );
+      const slotIndex = resolveAssignmentSlot({
+        game: targetGame,
+        assignments: assignmentsForSlotResolution,
+        preferredSlotIndex: input.preferredSlotIndex ?? input.slotIndex,
+        teamId: input.teamId,
+      });
+      validateMovePlan({ ...context, sourceGameId: input.gameId, targetGameId: input.toGameId, teamId: input.teamId, slotIndex });
       await tx.delete(tournamentGameAssignments).where(and(eq(tournamentGameAssignments.gameId, input.gameId), eq(tournamentGameAssignments.teamId, input.teamId)));
-      await tx.insert(tournamentGameAssignments).values({ gameId: input.toGameId, teamId: input.teamId, slotIndex: input.slotIndex });
+      await tx.insert(tournamentGameAssignments).values({ gameId: input.toGameId, teamId: input.teamId, slotIndex });
     });
     return fetchTournamentControlData(targetGame.tournamentId);
   }),
