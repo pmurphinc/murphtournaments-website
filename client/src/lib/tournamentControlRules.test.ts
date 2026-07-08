@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { TRPCError } from "@trpc/server";
 import { appRouter } from "../../../server/routers";
 import type { TrpcContext } from "../../../server/_core/context";
-import { assertGameIsMutable, getActiveAssignedTeamIds, validateAssignmentPlan, validateMovePlan, validateReopenPlan, type ControlAssignment, type ControlGame, type ControlTeam } from "../../../server/tournamentControlRules";
+import { assertGameIsMutable, getActiveAssignedTeamIds, getNextAvailableSlot, resolveAssignmentSlot, validateAssignmentPlan, validateMovePlan, validateReopenPlan, type ControlAssignment, type ControlGame, type ControlTeam } from "../../../server/tournamentControlRules";
 
 const teams: ControlTeam[] = [
   { id: 1, tournamentId: 10, name: "Alpha" },
@@ -50,6 +50,30 @@ describe("tournament control assignment rules", () => {
 
   it("rejects teams from a different tournament", () => {
     expectTrpcCode(() => validateAssignmentPlan({ games, teams, assignments: [], targetGameId: 100, teamId: 3, slotIndex: 1 }), "BAD_REQUEST");
+  });
+
+  it("resolves an occupied preferred slot to the next available slot server-side", () => {
+    const assignments: ControlAssignment[] = [{ gameId: 100, teamId: 1, slotIndex: 1 }];
+    const game = games.find(item => item.id === 100)!;
+    expect(resolveAssignmentSlot({ game, assignments, preferredSlotIndex: 1, teamId: 2 })).toBe(2);
+    expect(getNextAvailableSlot(assignments, 4, undefined, 2)).toBe(2);
+  });
+
+  it("returns a clear failure state when a target lobby is full server-side", () => {
+    const assignments: ControlAssignment[] = [
+      { gameId: 101, teamId: 1, slotIndex: 1 },
+      { gameId: 101, teamId: 2, slotIndex: 2 },
+    ];
+    const game = games.find(item => item.id === 101)!;
+    expect(getNextAvailableSlot(assignments, 2, 1, 3)).toBeNull();
+    expectTrpcCode(() => resolveAssignmentSlot({ game, assignments, preferredSlotIndex: 1, teamId: 3 }), "CONFLICT");
+  });
+
+  it("server-side assignment slot resolution does not duplicate teams", () => {
+    const assignments: ControlAssignment[] = [{ gameId: 100, teamId: 1, slotIndex: 1 }];
+    const game = games.find(item => item.id === 100)!;
+    expect(getNextAvailableSlot(assignments, 4, 2, 1)).toBeNull();
+    expectTrpcCode(() => resolveAssignmentSlot({ game, assignments, preferredSlotIndex: 2, teamId: 1 }), "CONFLICT");
   });
 
   it("rejects occupied slots without displacing the current occupant", () => {

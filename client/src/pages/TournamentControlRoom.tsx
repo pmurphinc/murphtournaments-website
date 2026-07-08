@@ -147,6 +147,34 @@ export function getConnectionEndpoint(center: CanvasPoint, port: "top" | "bottom
   return { x: center.x, y: center.y + (port === "top" ? -connectorRadius : connectorRadius) };
 }
 
+export function getConnectorEndpoints(sourceCenter: CanvasPoint, targetCenter: CanvasPoint, radius = connectorRadius) {
+  const dx = targetCenter.x - sourceCenter.x;
+  const dy = targetCenter.y - sourceCenter.y;
+  const length = Math.hypot(dx, dy);
+  if (length === 0) return { source: sourceCenter, target: targetCenter };
+  const unitX = dx / length;
+  const unitY = dy / length;
+  return {
+    source: { x: sourceCenter.x + unitX * radius, y: sourceCenter.y + unitY * radius },
+    target: { x: targetCenter.x - unitX * radius, y: targetCenter.y - unitY * radius },
+  };
+}
+
+export function getNextAvailableSlot(
+  assignments: Pick<AssignmentView, "slotIndex" | "teamId">[],
+  capacity: number,
+  preferredSlotIndex?: number,
+  teamId?: number
+) {
+  if (teamId !== undefined && assignments.some(assignment => assignment.teamId === teamId)) return null;
+  const occupiedSlots = new Set(assignments.map(assignment => assignment.slotIndex));
+  const candidates = Array.from({ length: capacity }, (_, index) => index + 1);
+  const orderedCandidates = preferredSlotIndex
+    ? [preferredSlotIndex, ...candidates.filter(slot => slot !== preferredSlotIndex)]
+    : candidates;
+  return orderedCandidates.find(slot => slot >= 1 && slot <= capacity && !occupiedSlots.has(slot)) ?? null;
+}
+
 export function getConnectorPoint(
   game: Pick<ControlGameView, "gameType" | "canvasX" | "canvasY">,
   port: "top" | "bottom",
@@ -210,6 +238,7 @@ export default function TournamentControlRoom() {
   const auth = useAuth();
   const utils = trpc.useUtils();
   const canvasRef = useRef<HTMLDivElement | null>(null);
+  const boardRef = useRef<HTMLDivElement | null>(null);
   const [dragPayload, setDragPayload] = useState<DragPayload | null>(null);
   const [nodeDrag, setNodeDrag] = useState<NodeDragState | null>(null);
   const [connectionDrag, setConnectionDrag] = useState<ConnectionDragState | null>(null);
@@ -223,6 +252,7 @@ export default function TournamentControlRoom() {
   );
   const [zoom, setZoom] = useState(1);
   const [isPanning, setIsPanning] = useState(false);
+  const [measuredPortCenters, setMeasuredPortCenters] = useState<Map<string, CanvasPoint>>(() => new Map());
 
   const query = trpc.tournamentControl.get.useQuery(
     { tournamentId },
@@ -319,11 +349,68 @@ export default function TournamentControlRoom() {
     [nodeDrag, optimisticGamePositions]
   );
 
-  const getPortPoint = useCallback(
+  const getPortCenter = useCallback(
     (game: ControlGameView, port: "top" | "bottom") =>
-      getConnectorPoint(game, port, minimizedGameIds.has(game.id), getVisualPosition(game)),
-    [getVisualPosition, minimizedGameIds]
+      measuredPortCenters.get(`${game.id}:${port}`) ??
+      getConnectorCenter(game, port, minimizedGameIds.has(game.id), getVisualPosition(game)),
+    [getVisualPosition, measuredPortCenters, minimizedGameIds]
   );
+
+
+  const assignDroppedTeam = useCallback(
+    (game: ControlGameView, gameAssignments: AssignmentView[], payload: DragPayload, preferredSlotIndex?: number) => {
+      if (game.status === "complete") return;
+      if (payload.fromGameId === game.id && gameAssignments.some(assignment => assignment.teamId === payload.teamId)) {
+        toast.error("That team is already assigned to this lobby.");
+        return;
+      }
+      const capacity = game.gameType === "cashout" ? 4 : 2;
+      const slotIndex = getNextAvailableSlot(gameAssignments, capacity, preferredSlotIndex, payload.teamId);
+      if (slotIndex === null) {
+        toast.error("This lobby has no open slots.");
+        return;
+      }
+      if (payload.fromGameId) {
+        moveTeam.mutate({ gameId: payload.fromGameId, toGameId: game.id, teamId: payload.teamId, slotIndex });
+      } else {
+        assignTeam.mutate({ gameId: game.id, teamId: payload.teamId, slotIndex });
+      }
+    },
+    [assignTeam, moveTeam]
+  );
+
+  useEffect(() => {
+    const measurePorts = () => {
+      const canvas = canvasRef.current;
+      const board = boardRef.current;
+      if (!canvas || !board) return;
+      const canvasRect = canvas.getBoundingClientRect();
+      const next = new Map<string, CanvasPoint>();
+      board.querySelectorAll<HTMLElement>("[data-connector-port='true'][data-game-id][data-port]").forEach(port => {
+        const gameId = port.dataset.gameId;
+        const portName = port.dataset.port;
+        if (!gameId || (portName !== "top" && portName !== "bottom")) return;
+        const rect = port.getBoundingClientRect();
+        next.set(`${gameId}:${portName}`, {
+          x: (rect.left + rect.width / 2 - canvasRect.left + canvas.scrollLeft) / zoom,
+          y: (rect.top + rect.height / 2 - canvasRect.top + canvas.scrollTop) / zoom,
+        });
+      });
+      setMeasuredPortCenters(current => {
+        if (current.size === next.size && Array.from(next).every(([key, value]) => {
+          const previous = current.get(key);
+          return previous && Math.abs(previous.x - value.x) < 0.5 && Math.abs(previous.y - value.y) < 0.5;
+        })) return current;
+        return next;
+      });
+    };
+    measurePorts();
+    const observer = new ResizeObserver(measurePorts);
+    if (boardRef.current) observer.observe(boardRef.current);
+    boardRef.current?.querySelectorAll("[data-control-node='true']").forEach(node => observer.observe(node));
+    window.addEventListener("resize", measurePorts);
+    return () => { observer.disconnect(); window.removeEventListener("resize", measurePorts); };
+  }, [assignments, games, minimizedGameIds, nodeDrag, query.data, zoom]);
 
   useEffect(() => {
     if (selectedAssignmentId === null) return;
@@ -630,6 +717,7 @@ export default function TournamentControlRoom() {
                 const startY = event.clientY;
                 const startLeft = element.scrollLeft;
                 const startTop = element.scrollTop;
+                event.currentTarget.setPointerCapture(event.pointerId);
                 setIsPanning(true);
                 const handleMove = (moveEvent: PointerEvent) => {
                   element.scrollLeft = startLeft - (moveEvent.clientX - startX);
@@ -662,6 +750,7 @@ export default function TournamentControlRoom() {
                     transform: `scale(${zoom})`,
                     transformOrigin: "top left",
                   }}
+                  ref={boardRef}
                 >
                   <svg
                     className="absolute inset-0 z-0 overflow-visible"
@@ -684,8 +773,9 @@ export default function TournamentControlRoom() {
                       const sourceGame = gamesById.get(connection.sourceGameId);
                       const targetGame = gamesById.get(connection.targetGameId);
                       if (!sourceGame || !targetGame) return null;
-                      const source = getPortPoint(sourceGame, "bottom");
-                      const target = getPortPoint(targetGame, "top");
+                      const endpoints = getConnectorEndpoints(getPortCenter(sourceGame, "bottom"), getPortCenter(targetGame, "top"));
+                      const source = endpoints.source;
+                      const target = endpoints.target;
                       return (
                         <path
                           key={connection.id}
@@ -695,6 +785,8 @@ export default function TournamentControlRoom() {
                           stroke="#FFD700"
                           strokeOpacity="0.75"
                           strokeWidth="3"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
                           style={{ pointerEvents: "stroke" }}
                           className="cursor-pointer transition hover:stroke-[4px]"
                           onDoubleClick={event => {
@@ -740,6 +832,8 @@ export default function TournamentControlRoom() {
                             onContextMenu={event => event.stopPropagation()}
                             onPointerDown={event => {
                               if (event.button !== 0 || shouldSkipNodeDrag(event.target)) return;
+                              const handle = event.target instanceof HTMLElement ? event.target.closest("[data-node-drag-handle='true']") : null;
+                              if (!handle) return;
                               const point = canvasPoint(event.clientX, event.clientY);
                               setNodeDrag({
                                 gameId: game.id,
@@ -749,11 +843,11 @@ export default function TournamentControlRoom() {
                                 y: visualPosition.y,
                               });
                             }}
-                            className={`absolute z-10 w-80 rounded-lg border bg-zinc-950/95 p-4 shadow-2xl ${
+                            className={`absolute z-10 w-80 cursor-default rounded-lg border bg-zinc-950/95 p-4 shadow-2xl ${
                               game.gameType === "cashout"
                                 ? "border-neon-gold/60"
                                 : "border-neon-magenta/60"
-                            } ${nodeDrag?.gameId === game.id ? "z-50 cursor-grabbing ring-2 ring-[#FFD700]/60" : "cursor-grab"}`}
+                            } ${nodeDrag?.gameId === game.id ? "z-50 ring-2 ring-[#FFD700]/60" : ""}`}
                             style={{ left: visualPosition.x, top: visualPosition.y }}
                           >
                             <button
@@ -762,19 +856,24 @@ export default function TournamentControlRoom() {
                               data-input-port-game-id={game.id}
                               title="Receive from previous lobby"
                               data-connector-port="true"
-                              className="absolute -top-3 left-1/2 h-6 w-6 -translate-x-1/2 rounded-full border-2 border-[#FFD700] bg-black shadow-[0_0_14px_rgba(255,215,0,0.45)] transition hover:scale-110"
+                              data-game-id={game.id}
+                              data-port="top"
+                              className="absolute -top-3 left-1/2 z-20 h-6 w-6 -translate-x-1/2 rounded-full border-2 border-[#FFD700] bg-black shadow-[0_0_14px_rgba(255,215,0,0.45)] transition hover:scale-110"
                             />
                             <button
                               type="button"
                               data-no-node-drag="true"
                               title="Drag to connect this lobby to another lobby"
                               data-connector-port="true"
-                              className="absolute -bottom-3 left-1/2 h-6 w-6 -translate-x-1/2 rounded-full border-2 border-[#FFD700] bg-[#FFD700] shadow-[0_0_14px_rgba(255,215,0,0.45)] transition hover:scale-110"
+                              data-game-id={game.id}
+                              data-port="bottom"
+                              className="absolute -bottom-3 left-1/2 z-20 h-6 w-6 -translate-x-1/2 rounded-full border-2 border-[#FFD700] bg-[#FFD700] shadow-[0_0_14px_rgba(255,215,0,0.45)] transition hover:scale-110"
                               onPointerDown={event => {
                                 if (event.button !== 0) return;
                                 event.preventDefault();
                                 event.stopPropagation();
-                                const sourcePoint = getPortPoint(game, "bottom");
+                                const sourceCenter = getPortCenter(game, "bottom");
+                                const sourcePoint = getConnectionEndpoint(sourceCenter, "bottom");
                                 setConnectionDrag({
                                   sourceGameId: game.id,
                                   sourcePoint,
@@ -782,7 +881,7 @@ export default function TournamentControlRoom() {
                                 });
                               }}
                             />
-                            <div className="mb-3 flex items-start justify-between gap-2">
+                            <div data-node-drag-handle="true" className="mb-3 flex cursor-grab items-start justify-between gap-2 active:cursor-grabbing">
                               <div>
                                 <p className="font-mono text-xs uppercase tracking-widest text-white/45">
                                   {game.gameType === "cashout" ? "Cashout Lobby" : "Final Round"}
@@ -840,7 +939,17 @@ export default function TournamentControlRoom() {
                                 onSelect={setSelectedAssignmentId}
                               />
                             ) : (
-                              <div className="space-y-2">
+                              <div
+                                className="space-y-2"
+                                data-no-node-drag="true"
+                                onDragOver={event => { if (!isComplete) event.preventDefault(); }}
+                                onDrop={event => {
+                                  if (isComplete) return;
+                                  const payload = parseDragPayload(event.dataTransfer.getData("application/json")) ?? dragPayload;
+                                  if (!payload) return;
+                                  assignDroppedTeam(game, gameAssignments, payload);
+                                }}
+                              >
                                 {Array.from({ length: capacity }, (_, index) => {
                                   const slot = index + 1;
                                   const assignment = gameAssignments.find(item => item.slotIndex === slot);
@@ -854,24 +963,12 @@ export default function TournamentControlRoom() {
                                       }}
                                       onDrop={event => {
                                         if (isComplete) return;
+                                        event.stopPropagation();
                                         const payload =
                                           parseDragPayload(event.dataTransfer.getData("application/json")) ??
                                           dragPayload;
                                         if (!payload) return;
-                                        if (payload.fromGameId) {
-                                          moveTeam.mutate({
-                                            gameId: payload.fromGameId,
-                                            toGameId: game.id,
-                                            teamId: payload.teamId,
-                                            slotIndex: slot,
-                                          });
-                                        } else {
-                                          assignTeam.mutate({
-                                            gameId: game.id,
-                                            teamId: payload.teamId,
-                                            slotIndex: slot,
-                                          });
-                                        }
+                                        assignDroppedTeam(game, gameAssignments, payload, slot);
                                       }}
                                       className="min-h-12 rounded border border-white/10 bg-black/50 p-2"
                                     >

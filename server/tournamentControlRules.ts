@@ -48,6 +48,39 @@ export function getActiveAssignedTeamIds(
   );
 }
 
+export function getNextAvailableSlot(
+  assignments: Pick<ControlAssignment, "slotIndex" | "teamId">[],
+  capacity: number,
+  preferredSlotIndex?: number,
+  teamId?: number
+) {
+  if (teamId !== undefined && assignments.some(assignment => assignment.teamId === teamId)) return null;
+  const occupiedSlots = new Set(assignments.map(assignment => assignment.slotIndex));
+  const slots = Array.from({ length: capacity }, (_, index) => index + 1);
+  const orderedSlots = preferredSlotIndex
+    ? [preferredSlotIndex, ...slots.filter(slot => slot !== preferredSlotIndex)]
+    : slots;
+  return orderedSlots.find(slot => slot >= 1 && slot <= capacity && !occupiedSlots.has(slot)) ?? null;
+}
+
+export function resolveAssignmentSlot(input: {
+  game: ControlGame;
+  assignments: ControlAssignment[];
+  preferredSlotIndex?: number;
+  teamId?: number;
+}) {
+  const slotIndex = getNextAvailableSlot(
+    input.assignments.filter(assignment => assignment.gameId === input.game.id),
+    gameCapacity[input.game.gameType],
+    input.preferredSlotIndex,
+    input.teamId
+  );
+  if (slotIndex === null) {
+    throw new TRPCError({ code: "CONFLICT", message: "This lobby has no open slots." });
+  }
+  return slotIndex;
+}
+
 export function assertSlotIsValid(game: ControlGame, slotIndex: number) {
   const capacity = gameCapacity[game.gameType];
   if (slotIndex < 1 || slotIndex > capacity) {
