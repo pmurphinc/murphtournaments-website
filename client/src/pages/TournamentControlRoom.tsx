@@ -155,7 +155,7 @@ export default function TournamentControlRoom() {
     );
   }, [query.data]);
   const teamsById = useMemo(
-    () => new Map<number, ControlTeamView>(query.data?.teams.map(team => [team.id, team]) ?? []),
+    () => new Map<number, ControlTeamView>(query.data?.teams.map(team => [team.id, team] as const) ?? []),
     [query.data]
   );
   const unassignedTeams =
