@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Link, useParams } from "wouter";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -36,6 +36,7 @@ type DragPayload = { teamId: number; fromGameId?: number };
 type GameStatus = "draft" | "ready" | "live" | "complete";
 type GameType = "cashout" | "final_round";
 type CanvasPoint = { x: number; y: number };
+type ViewportSize = { width: number; height: number };
 type NodeDragState = {
   gameId: number;
   offsetX: number;
@@ -81,6 +82,21 @@ type ConnectionView = {
 };
 type GameStatusClasses = { nodeBorder: string; statusPill: string; accent: string };
 type CanvasPanStart = { clientX: number; clientY: number; scrollLeft: number; scrollTop: number };
+type PinchZoomStart = {
+  distance: number;
+  zoom: number;
+  focalClientX: number;
+  focalClientY: number;
+  focalCanvasX: number;
+  focalCanvasY: number;
+};
+type ControlKeyDragStart = {
+  pointerId: number;
+  clientX: number;
+  clientY: number;
+  startX: number;
+  startY: number;
+};
 
 type DialogState =
   | { type: "create-team" }
@@ -234,13 +250,66 @@ export function getConnectorPoint(
   return getConnectionEndpoint(getConnectorCenter(game, port, minimized, position), port);
 }
 
+const canvasPanBlockedSelector = '[data-control-node="true"], [data-team-card="true"], [data-connector-port="true"], [data-no-canvas-pan="true"], button, a, input, select, textarea, [role="menuitem"], [role="button"], [draggable="true"]';
+
 export function shouldStartCanvasPan(target: EventTarget | null) {
-  if (!(target instanceof HTMLElement)) return false;
-  return !Boolean(
-    target.closest(
-      '[data-control-node="true"], [data-team-card="true"], [data-connector-port="true"], [data-no-canvas-pan="true"], button, a, input, select, textarea, [role="menuitem"], [role="button"], [draggable="true"]'
-    )
-  );
+  if (!(target instanceof Element)) return false;
+  return !Boolean(target.closest(canvasPanBlockedSelector));
+}
+
+export function getPointerDistance(
+  first: Pick<PointerEvent, "clientX" | "clientY"> | CanvasPoint,
+  second: Pick<PointerEvent, "clientX" | "clientY"> | CanvasPoint
+) {
+  const firstX = "clientX" in first ? first.clientX : first.x;
+  const firstY = "clientY" in first ? first.clientY : first.y;
+  const secondX = "clientX" in second ? second.clientX : second.x;
+  const secondY = "clientY" in second ? second.clientY : second.y;
+  return Math.hypot(secondX - firstX, secondY - firstY);
+}
+
+export function getMidpoint(
+  first: Pick<PointerEvent, "clientX" | "clientY"> | CanvasPoint,
+  second: Pick<PointerEvent, "clientX" | "clientY"> | CanvasPoint
+) {
+  const firstX = "clientX" in first ? first.clientX : first.x;
+  const firstY = "clientY" in first ? first.clientY : first.y;
+  const secondX = "clientX" in second ? second.clientX : second.x;
+  const secondY = "clientY" in second ? second.clientY : second.y;
+  return { x: (firstX + secondX) / 2, y: (firstY + secondY) / 2 };
+}
+
+
+export function getNextPlacementValue(currentPlacement: number | null | undefined, capacity: number) {
+  const current = currentPlacement ?? 0;
+  if (current < 0 || current >= capacity) return null;
+  return current + 1;
+}
+
+export function getBoundedControlKeyPosition(
+  position: CanvasPoint,
+  viewport: ViewportSize,
+  overlay: ViewportSize,
+  padding = 8
+) {
+  const maxX = Math.max(padding, viewport.width - overlay.width - padding);
+  const maxY = Math.max(padding, viewport.height - overlay.height - padding);
+  return {
+    x: Math.min(maxX, Math.max(padding, position.x)),
+    y: Math.min(maxY, Math.max(padding, position.y)),
+  };
+}
+
+export function getViewportPreservingScroll(
+  focalCanvasPoint: CanvasPoint,
+  focalClientPoint: CanvasPoint,
+  canvasRect: Pick<DOMRect, "left" | "top">,
+  nextZoom: number
+) {
+  return {
+    scrollLeft: focalCanvasPoint.x * nextZoom - (focalClientPoint.x - canvasRect.left),
+    scrollTop: focalCanvasPoint.y * nextZoom - (focalClientPoint.y - canvasRect.top),
+  };
 }
 
 function getLobbyCodeMessage(tournamentName: string, lobbyName: string, teamName: string, code: string) {
@@ -289,6 +358,7 @@ export default function TournamentControlRoom() {
   const utils = trpc.useUtils();
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const boardRef = useRef<HTMLDivElement | null>(null);
+  const controlKeyRef = useRef<HTMLDivElement | null>(null);
   const [dragPayload, setDragPayload] = useState<DragPayload | null>(null);
   const [nodeDrag, setNodeDrag] = useState<NodeDragState | null>(null);
   const [connectionDrag, setConnectionDrag] = useState<ConnectionDragState | null>(null);
@@ -302,6 +372,13 @@ export default function TournamentControlRoom() {
   );
   const [zoom, setZoom] = useState(1);
   const [isPanning, setIsPanning] = useState(false);
+  const [controlKeyMinimized, setControlKeyMinimized] = useState(false);
+  const [controlKeyLocked, setControlKeyLocked] = useState(true);
+  const [controlKeyPosition, setControlKeyPosition] = useState<CanvasPoint>({ x: 16, y: 16 });
+  const controlKeyDragRef = useRef<ControlKeyDragStart | null>(null);
+  const canvasPanRef = useRef<(CanvasPanStart & { pointerId: number }) | null>(null);
+  const touchPointersRef = useRef<Map<number, PointerEvent>>(new Map());
+  const pinchStartRef = useRef<PinchZoomStart | null>(null);
   const [measuredPortCenters, setMeasuredPortCenters] = useState<Map<string, CanvasPoint>>(() => new Map());
 
   const query = trpc.tournamentControl.get.useQuery(
@@ -640,6 +717,64 @@ export default function TournamentControlRoom() {
     setFormName(defaultValue);
   };
 
+  const cycleAssignmentPlacement = useCallback(
+    (assignment: AssignmentView, capacity: number) => {
+      setPlacement.mutate({
+        assignmentId: assignment.id,
+        resultPlacement: getNextPlacementValue(assignment.resultPlacement ?? null, capacity),
+      });
+    },
+    [setPlacement]
+  );
+
+  const startControlKeyDrag = useCallback(
+    (event: ReactPointerEvent<HTMLElement>) => {
+      if (controlKeyLocked || event.button !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      controlKeyDragRef.current = {
+        pointerId: event.pointerId,
+        clientX: event.clientX,
+        clientY: event.clientY,
+        startX: controlKeyPosition.x,
+        startY: controlKeyPosition.y,
+      };
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+    },
+    [controlKeyLocked, controlKeyPosition.x, controlKeyPosition.y]
+  );
+
+  const dragControlKey = useCallback((event: ReactPointerEvent<HTMLElement>) => {
+    const dragStart = controlKeyDragRef.current;
+    if (!dragStart || dragStart.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const canvasRect = canvasRef.current?.getBoundingClientRect();
+    const keyRect = controlKeyRef.current?.getBoundingClientRect();
+    const nextPosition = {
+      x: dragStart.startX + event.clientX - dragStart.clientX,
+      y: dragStart.startY + event.clientY - dragStart.clientY,
+    };
+    setControlKeyPosition(
+      canvasRect && keyRect
+        ? getBoundedControlKeyPosition(
+            nextPosition,
+            { width: canvasRect.width, height: canvasRect.height },
+            { width: keyRect.width, height: keyRect.height }
+          )
+        : nextPosition
+    );
+  }, []);
+
+  const finishControlKeyDrag = useCallback((event: ReactPointerEvent<HTMLElement>) => {
+    if (controlKeyDragRef.current?.pointerId !== event.pointerId) return;
+    controlKeyDragRef.current = null;
+    event.stopPropagation();
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }, []);
+
   const toggleMinimizedGame = (gameId: number) => {
     setMinimizedGameIds(current => {
       const next = new Set(current);
@@ -751,19 +886,65 @@ export default function TournamentControlRoom() {
           <ContextMenuTrigger asChild>
             <main
               ref={canvasRef}
-              className={`relative min-h-[720px] overflow-auto bg-[radial-gradient(circle_at_top,#4d39091a,transparent_32rem),linear-gradient(rgba(255,255,255,.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.04)_1px,transparent_1px)] bg-[size:auto,40px_40px,40px_40px] ${isPanning ? "cursor-grabbing" : "cursor-grab"}`}
+              className={`relative min-h-[720px] touch-none overflow-auto bg-[radial-gradient(circle_at_top,#4d39091a,transparent_32rem),linear-gradient(rgba(255,255,255,.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.04)_1px,transparent_1px)] bg-[size:auto,40px_40px,40px_40px] ${isPanning ? "cursor-grabbing" : "cursor-grab"}`}
               onWheel={event => {
                 if (!event.shiftKey) return;
                 event.preventDefault();
+                const element = canvasRef.current;
+                const rect = element?.getBoundingClientRect();
+                if (!element || !rect) return;
+                const focalCanvasPoint = {
+                  x: (event.clientX - rect.left + element.scrollLeft) / zoom,
+                  y: (event.clientY - rect.top + element.scrollTop) / zoom,
+                };
                 const zoomDelta = event.deltaY > 0 ? -0.08 : 0.08;
-                setZoom(current => clampZoom(current + zoomDelta));
+                const nextZoom = clampZoom(zoom + zoomDelta);
+                const nextScroll = getViewportPreservingScroll(
+                  focalCanvasPoint,
+                  { x: event.clientX, y: event.clientY },
+                  rect,
+                  nextZoom
+                );
+                setZoom(nextZoom);
+                requestAnimationFrame(() => {
+                  element.scrollLeft = nextScroll.scrollLeft;
+                  element.scrollTop = nextScroll.scrollTop;
+                });
               }}
               onPointerDown={event => {
+                if (event.pointerType === "touch") {
+                  touchPointersRef.current.set(event.pointerId, event.nativeEvent);
+                  if (event.currentTarget.setPointerCapture) {
+                    event.currentTarget.setPointerCapture(event.pointerId);
+                  }
+                  if (touchPointersRef.current.size === 2) {
+                    const element = canvasRef.current;
+                    const rect = element?.getBoundingClientRect();
+                    const pointers = Array.from(touchPointersRef.current.values());
+                    if (element && rect && pointers[0] && pointers[1]) {
+                      const midpoint = getMidpoint(pointers[0], pointers[1]);
+                      pinchStartRef.current = {
+                        distance: getPointerDistance(pointers[0], pointers[1]),
+                        zoom,
+                        focalClientX: midpoint.x,
+                        focalClientY: midpoint.y,
+                        focalCanvasX: (midpoint.x - rect.left + element.scrollLeft) / zoom,
+                        focalCanvasY: (midpoint.y - rect.top + element.scrollTop) / zoom,
+                      };
+                      canvasPanRef.current = null;
+                      setIsPanning(false);
+                    }
+                    event.preventDefault();
+                    return;
+                  }
+                }
+
                 if (event.button !== 0 || !shouldStartCanvasPan(event.target)) return;
                 const element = canvasRef.current;
                 if (!element) return;
                 event.preventDefault();
-                const panStart = {
+                canvasPanRef.current = {
+                  pointerId: event.pointerId,
                   clientX: event.clientX,
                   clientY: event.clientY,
                   scrollLeft: element.scrollLeft,
@@ -773,30 +954,178 @@ export default function TournamentControlRoom() {
                   event.currentTarget.setPointerCapture(event.pointerId);
                 }
                 setIsPanning(true);
-                const handleMove = (moveEvent: PointerEvent) => {
-                  if (moveEvent.pointerId !== event.pointerId) return;
-                  const nextScroll = getCanvasPanScroll(panStart, moveEvent.clientX, moveEvent.clientY);
-                  element.scrollLeft = nextScroll.scrollLeft;
-                  element.scrollTop = nextScroll.scrollTop;
-                };
-                const cleanup = (endEvent: PointerEvent) => {
-                  if (endEvent.pointerId !== event.pointerId) return;
-                  window.removeEventListener("pointermove", handleMove);
-                  window.removeEventListener("pointerup", cleanup);
-                  window.removeEventListener("pointercancel", cleanup);
-                  if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
-                    event.currentTarget.releasePointerCapture(event.pointerId);
+              }}
+              onPointerMove={event => {
+                if (event.pointerType === "touch" && touchPointersRef.current.has(event.pointerId)) {
+                  touchPointersRef.current.set(event.pointerId, event.nativeEvent);
+                  if (touchPointersRef.current.size >= 2 && pinchStartRef.current) {
+                    const element = canvasRef.current;
+                    const rect = element?.getBoundingClientRect();
+                    const pointers = Array.from(touchPointersRef.current.values());
+                    if (!element || !rect || !pointers[0] || !pointers[1]) return;
+                    event.preventDefault();
+                    const nextDistance = getPointerDistance(pointers[0], pointers[1]);
+                    if (pinchStartRef.current.distance <= 0) return;
+                    const nextZoom = clampZoom(
+                      pinchStartRef.current.zoom * (nextDistance / pinchStartRef.current.distance)
+                    );
+                    const nextScroll = getViewportPreservingScroll(
+                      { x: pinchStartRef.current.focalCanvasX, y: pinchStartRef.current.focalCanvasY },
+                      { x: pinchStartRef.current.focalClientX, y: pinchStartRef.current.focalClientY },
+                      rect,
+                      nextZoom
+                    );
+                    setZoom(nextZoom);
+                    element.scrollLeft = nextScroll.scrollLeft;
+                    element.scrollTop = nextScroll.scrollTop;
+                    return;
                   }
+                }
+
+                const panStart = canvasPanRef.current;
+                if (!panStart || panStart.pointerId !== event.pointerId) return;
+                const element = canvasRef.current;
+                if (!element) return;
+                event.preventDefault();
+                const nextScroll = getCanvasPanScroll(panStart, event.clientX, event.clientY);
+                element.scrollLeft = nextScroll.scrollLeft;
+                element.scrollTop = nextScroll.scrollTop;
+              }}
+              onPointerUp={event => {
+                if (event.pointerType === "touch") {
+                  touchPointersRef.current.delete(event.pointerId);
+                  if (touchPointersRef.current.size < 2) pinchStartRef.current = null;
+                }
+                if (canvasPanRef.current?.pointerId === event.pointerId) {
+                  canvasPanRef.current = null;
                   setIsPanning(false);
-                };
-                window.addEventListener("pointermove", handleMove);
-                window.addEventListener("pointerup", cleanup);
-                window.addEventListener("pointercancel", cleanup);
+                }
+                if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+                  event.currentTarget.releasePointerCapture(event.pointerId);
+                }
+              }}
+              onPointerCancel={event => {
+                if (event.pointerType === "touch") {
+                  touchPointersRef.current.delete(event.pointerId);
+                  if (touchPointersRef.current.size < 2) pinchStartRef.current = null;
+                }
+                if (canvasPanRef.current?.pointerId === event.pointerId) {
+                  canvasPanRef.current = null;
+                  setIsPanning(false);
+                }
               }}
               onContextMenu={event => {
                 setCanvasMenuPosition(canvasPoint(event.clientX, event.clientY));
               }}
             >
+
+              <div className="pointer-events-none sticky left-0 top-0 z-[55] h-0 w-0">
+                <div
+                  ref={controlKeyRef}
+                  data-no-canvas-pan="true"
+                  className={`pointer-events-none absolute rounded-xl border bg-black/90 font-mono shadow-[0_0_28px_rgba(255,215,0,0.16)] backdrop-blur ${
+                    controlKeyMinimized
+                      ? "w-max border-[#FFD700]/50"
+                      : "w-[min(26rem,calc(100vw-2rem))] border-[#FFD700]/35 p-4"
+                  }`}
+                  style={{ transform: `translate(${controlKeyPosition.x}px, ${controlKeyPosition.y}px)` }}
+                  onContextMenu={event => event.stopPropagation()}
+                >
+                  {controlKeyMinimized ? (
+                    <button
+                      type="button"
+                      data-no-canvas-pan="true"
+                      className="pointer-events-auto flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-black uppercase tracking-[0.2em] text-[#FFD700] transition hover:bg-[#FFD700]/10"
+                      onClick={event => {
+                        event.stopPropagation();
+                        setControlKeyMinimized(false);
+                      }}
+                    >
+                      <span className="h-2 w-2 rounded-full bg-[#FFD700] shadow-[0_0_12px_#FFD700]" />
+                      Controls · {Math.round(zoom * 100)}%
+                    </button>
+                  ) : (
+                    <>
+                      <div
+                        data-no-canvas-pan="true"
+                        className={`pointer-events-auto mb-3 flex items-center justify-between gap-3 rounded border border-white/10 bg-white/5 px-2 py-2 ${
+                          controlKeyLocked ? "cursor-default" : "cursor-grab active:cursor-grabbing"
+                        }`}
+                        onPointerDown={startControlKeyDrag}
+                        onPointerMove={dragControlKey}
+                        onPointerUp={finishControlKeyDrag}
+                        onPointerCancel={finishControlKeyDrag}
+                      >
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span className="h-2 w-2 rounded-full bg-[#FFD700] shadow-[0_0_12px_#FFD700]" />
+                          <div>
+                            <p className="text-xs font-black uppercase tracking-[0.28em] text-[#FFD700]">PC Control Key</p>
+                            <p className="text-[10px] uppercase tracking-wider text-white/45">
+                              {controlKeyLocked ? "Locked in place" : "Unlocked · drag this header"}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <button
+                            type="button"
+                            data-no-canvas-pan="true"
+                            className={`rounded border px-2 py-1 text-[10px] font-black uppercase transition ${
+                              controlKeyLocked
+                                ? "border-[#FFD700]/50 bg-[#FFD700]/15 text-[#FFD700]"
+                                : "border-cyan-300/40 bg-cyan-300/10 text-cyan-100"
+                            }`}
+                            onClick={event => {
+                              event.stopPropagation();
+                              setControlKeyLocked(current => !current);
+                            }}
+                          >
+                            {controlKeyLocked ? "Unlock" : "Lock"}
+                          </button>
+                          <button
+                            type="button"
+                            data-no-canvas-pan="true"
+                            className="rounded border border-white/15 bg-white/10 px-2 py-1 text-[10px] font-black uppercase text-white/70 transition hover:border-[#FFD700]/60 hover:text-[#FFD700]"
+                            onClick={event => {
+                              event.stopPropagation();
+                              setControlKeyMinimized(true);
+                            }}
+                          >
+                            Min
+                          </button>
+                        </div>
+                      </div>
+                      <div className="grid gap-2 text-[11px] text-white/75 sm:grid-cols-2">
+                        {[
+                          ["bg-cyan-400/15 text-cyan-100 border-cyan-300/30", "Drag empty grid", "Pan board"],
+                          ["bg-fuchsia-400/15 text-fuchsia-100 border-fuchsia-300/30", "Shift + scroll", "Zoom board"],
+                          ["bg-emerald-400/15 text-emerald-100 border-emerald-300/30", "Right-click grid", "Create teams/lobbies"],
+                          ["bg-orange-400/15 text-orange-100 border-orange-300/30", "Drag lobby frame", "Move lobby"],
+                          ["bg-sky-400/15 text-sky-100 border-sky-300/30", "Drag teams", "Drop into slots"],
+                          ["bg-lime-400/15 text-lime-100 border-lime-300/30", "Team + 1–4", "Score placement"],
+                          ["bg-purple-400/15 text-purple-100 border-purple-300/30", "Mobile double-tap", "Cycle score"],
+                          ["bg-yellow-300/15 text-yellow-100 border-yellow-200/40", "Gold connector", "Link to top port"],
+                          ["bg-red-400/15 text-red-100 border-red-300/30", "Double-click line", "Remove link"],
+                        ].map(([classes, action, detail]) => (
+                          <div key={action} className={`rounded border px-2.5 py-2 ${classes}`}>
+                            <span className="block text-[10px] font-black uppercase tracking-wider">{action}</span>
+                            <span className="text-white/65">{detail}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+              <div className="pointer-events-none absolute left-4 top-72 z-[54] w-[min(24rem,calc(100%-2rem))] rounded-xl border border-cyan-300/25 bg-zinc-950/90 p-4 shadow-[0_0_24px_rgba(34,211,238,0.12)] backdrop-blur lg:hidden">
+                <p className="font-mono text-xs font-black uppercase tracking-[0.24em] text-cyan-100">Touch Ops</p>
+                <ul className="mt-2 space-y-1.5 font-mono text-[11px] text-white/70">
+                  <li>• Long-press teams/lobbies to open options.</li>
+                  <li>• Drag teams into lobbies or exact slots.</li>
+                  <li>• Double-tap an assigned team to cycle placement.</li>
+                  <li>• Drag the empty grid background to pan.</li>
+                  <li>• Pinch with two fingers to zoom the board.</li>
+                </ul>
+              </div>
               <div
                 className="relative"
                 style={{
@@ -1051,6 +1380,7 @@ export default function TournamentControlRoom() {
                                           placement={assignment.resultPlacement ?? null}
                                           selected={selectedAssignmentId === assignment.id}
                                           onSelect={() => setSelectedAssignmentId(assignment.id)}
+                                          onCyclePlacement={() => cycleAssignmentPlacement(assignment, capacity)}
                                           onDragStart={() =>
                                             setDragPayload({ teamId: team.id, fromGameId: game.id })
                                           }
@@ -1430,6 +1760,7 @@ function TeamCard({
   placement,
   selected,
   onSelect,
+  onCyclePlacement,
 }: {
   team: ControlTeamView;
   fromGameId?: number;
@@ -1438,7 +1769,10 @@ function TeamCard({
   placement?: number | null;
   selected?: boolean;
   onSelect?: () => void;
+  onCyclePlacement?: () => void;
 }) {
+  const lastTouchTapRef = useRef<{ time: number; x: number; y: number } | null>(null);
+
   return (
     <div
       role={onSelect ? "button" : undefined}
@@ -1449,6 +1783,25 @@ function TeamCard({
       onClick={event => {
         event.stopPropagation();
         onSelect?.();
+      }}
+      onTouchEnd={event => {
+        if (!onCyclePlacement || disabled) return;
+        const touch = event.changedTouches.item(0);
+        if (!touch) return;
+        const now = window.performance.now();
+        const previous = lastTouchTapRef.current;
+        lastTouchTapRef.current = { time: now, x: touch.clientX, y: touch.clientY };
+        if (
+          previous &&
+          now - previous.time <= 320 &&
+          Math.hypot(touch.clientX - previous.x, touch.clientY - previous.y) <= 24
+        ) {
+          event.preventDefault();
+          event.stopPropagation();
+          lastTouchTapRef.current = null;
+          onSelect?.();
+          onCyclePlacement();
+        }
       }}
       onKeyDown={event => {
         if (!onSelect) return;

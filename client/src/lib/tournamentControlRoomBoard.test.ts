@@ -6,9 +6,14 @@ import {
   getConnectorEndpoints,
   getConnectorPoint,
   getGameStatusClasses,
+  getMidpoint,
+  getNextPlacementValue,
+  getPointerDistance,
   getNextAvailableSlot,
   getNodeHeight,
   getResolvedDropSlot,
+  getViewportPreservingScroll,
+  getBoundedControlKeyPosition,
   shouldStartCanvasPan,
 } from "../pages/TournamentControlRoom";
 
@@ -58,6 +63,21 @@ describe("Tournament Control Room slot selection", () => {
   });
 });
 
+
+describe("Tournament Control Room placement cycling", () => {
+  it("cycles Cashout placement from empty through 1st-4th and back to empty", () => {
+    const cycle = [null, 1, 2, 3, 4].map(value => getNextPlacementValue(value, 4));
+
+    expect(cycle).toEqual([1, 2, 3, 4, null]);
+  });
+
+  it("cycles Final Round placement from empty through 1st-2nd and back to empty", () => {
+    const cycle = [null, 1, 2].map(value => getNextPlacementValue(value, 2));
+
+    expect(cycle).toEqual([1, 2, null]);
+  });
+});
+
 describe("Tournament Control Room connector math", () => {
   it("anchors expanded source and target paths to connector circle perimeters", () => {
     expect(getConnectorPoint(cashout, "bottom", false)).toEqual({ x: 260, y: 200 + getNodeHeight("cashout", false) + connectorRadius });
@@ -98,12 +118,15 @@ describe("Tournament Control Room background pan guard", () => {
   }
 
   function withFakeHTMLElement<T>(callback: () => T) {
-    const previous = globalThis.HTMLElement;
+    const previousHTMLElement = globalThis.HTMLElement;
+    const previousElement = globalThis.Element;
     globalThis.HTMLElement = FakeElement as unknown as typeof HTMLElement;
+    globalThis.Element = FakeElement as unknown as typeof Element;
     try {
       return callback();
     } finally {
-      globalThis.HTMLElement = previous;
+      globalThis.HTMLElement = previousHTMLElement;
+      globalThis.Element = previousElement;
     }
   }
 
@@ -136,6 +159,45 @@ describe("Tournament Control Room background pan guard", () => {
       scrollLeft: 55,
       scrollTop: 30,
     });
+  });
+});
+
+
+describe("Tournament Control Room pinch zoom math", () => {
+  it("calculates two-pointer distance and midpoint", () => {
+    const first = { clientX: 10, clientY: 20 };
+    const second = { clientX: 40, clientY: 60 };
+
+    expect(getPointerDistance(first, second)).toBe(50);
+    expect(getMidpoint(first, second)).toEqual({ x: 25, y: 40 });
+  });
+
+  it("keeps the focal canvas point under the same viewport point while zooming", () => {
+    expect(
+      getViewportPreservingScroll(
+        { x: 300, y: 200 },
+        { x: 250, y: 180 },
+        { left: 50, top: 30 },
+        1.5
+      )
+    ).toEqual({
+      scrollLeft: 250,
+      scrollTop: 150,
+    });
+  });
+});
+
+
+describe("Tournament Control Room control key positioning", () => {
+  it("keeps a draggable control key inside viewport padding", () => {
+    expect(
+      getBoundedControlKeyPosition(
+        { x: 900, y: -20 },
+        { width: 800, height: 600 },
+        { width: 240, height: 180 },
+        12
+      )
+    ).toEqual({ x: 548, y: 12 });
   });
 });
 
