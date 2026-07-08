@@ -17,6 +17,14 @@ function configureRoles() {
   process.env.DISCORD_TOURNAMENT_STAFF_ROLE_ID = "300";
 }
 
+function configureControlRolesOnly() {
+  process.env.DISCORD_BOT_TOKEN = "bot-token";
+  process.env.DISCORD_GUILD_ID = "100";
+  process.env.DISCORD_TOURNAMENT_CONTROL_ROLE_IDS = "400, 500,600";
+  delete process.env.DISCORD_TOURNAMENT_ADMIN_ROLE_ID;
+  delete process.env.DISCORD_TOURNAMENT_STAFF_ROLE_ID;
+}
+
 function mockMember(roles: string[], ok = true, status = 200) {
   vi.stubGlobal("fetch", vi.fn(async () => ({ ok, status, json: async () => ({ roles }) })));
 }
@@ -38,13 +46,19 @@ describe("Discord Tournament Control role authorization", () => {
     await expect(assertDiscordTournamentStaff(ctx({ openId: "user:1", loginMethod: "google", role: "admin" }))).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
-  it("allows a user with the configured Discord Admin role", async () => {
+  it("allows a user with a role listed in DISCORD_TOURNAMENT_CONTROL_ROLE_IDS", async () => {
+    configureControlRolesOnly();
+    mockMember(["500"]);
+    await expect(assertDiscordTournamentStaff(ctx({ openId: "discord:123", loginMethod: "discord" }))).resolves.toBeUndefined();
+  });
+
+  it("allows a user with the configured legacy Discord Admin role", async () => {
     configureRoles();
     mockMember(["200"]);
     await expect(assertDiscordTournamentStaff(ctx({ openId: "discord:123", loginMethod: "discord" }))).resolves.toBeUndefined();
   });
 
-  it("allows a user with the configured Discord Staff role", async () => {
+  it("allows a user with the configured legacy Discord Staff role", async () => {
     configureRoles();
     mockMember(["300"]);
     await expect(assertDiscordTournamentStaff(ctx({ openId: "discord:123", loginMethod: "discord" }))).resolves.toBeUndefined();
@@ -64,6 +78,16 @@ describe("Discord Tournament Control role authorization", () => {
 
   it("fails closed when required Discord guild configuration is missing", async () => {
     process.env.DISCORD_BOT_TOKEN = "bot-token";
+    await expect(assertDiscordTournamentStaff(ctx({ openId: "discord:123", loginMethod: "discord" }))).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("fails closed when no role configuration exists", async () => {
+    process.env.DISCORD_BOT_TOKEN = "bot-token";
+    process.env.DISCORD_GUILD_ID = "100";
+    delete process.env.DISCORD_TOURNAMENT_CONTROL_ROLE_IDS;
+    delete process.env.DISCORD_TOURNAMENT_ADMIN_ROLE_ID;
+    delete process.env.DISCORD_TOURNAMENT_STAFF_ROLE_ID;
+    mockMember(["200"]);
     await expect(assertDiscordTournamentStaff(ctx({ openId: "discord:123", loginMethod: "discord" }))).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 

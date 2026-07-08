@@ -7,17 +7,35 @@ const guildMemberSchema = z.object({ roles: z.array(z.string().regex(/^\d+$/)) }
 const DISCORD_API_BASE = "https://discord.com/api/v10";
 const CACHE_MS = 60_000;
 
+type DiscordTournamentRoleConfig = {
+  botToken: string;
+  guildId: string;
+  allowedRoleIds: string[];
+};
+
 type CacheEntry = { allowed: boolean; expiresAt: number };
 const cache = new Map<string, CacheEntry>();
 
+function parseDiscordRoleIds(value: string | undefined): string[] {
+  return (value ?? "")
+    .split(",")
+    .map(roleId => roleId.trim())
+    .filter(roleId => /^\d+$/.test(roleId));
+}
+
 export function clearDiscordTournamentStaffCache() { cache.clear(); }
 
-export function getDiscordTournamentRoleConfig() {
+export function getDiscordTournamentRoleConfig(): DiscordTournamentRoleConfig {
+  const allowedRoleIds = new Set<string>([
+    ...parseDiscordRoleIds(process.env.DISCORD_TOURNAMENT_CONTROL_ROLE_IDS),
+    ...parseDiscordRoleIds(process.env.DISCORD_TOURNAMENT_ADMIN_ROLE_ID),
+    ...parseDiscordRoleIds(process.env.DISCORD_TOURNAMENT_STAFF_ROLE_ID),
+  ]);
+
   return {
     botToken: process.env.DISCORD_BOT_TOKEN ?? "",
     guildId: process.env.DISCORD_GUILD_ID ?? "",
-    adminRoleId: process.env.DISCORD_TOURNAMENT_ADMIN_ROLE_ID ?? "",
-    staffRoleId: process.env.DISCORD_TOURNAMENT_STAFF_ROLE_ID ?? "",
+    allowedRoleIds: Array.from(allowedRoleIds),
   };
 }
 
@@ -34,15 +52,15 @@ export async function assertDiscordTournamentStaff(ctx: TrpcContext) {
   if (!discordUserId) throw new TRPCError({ code: "FORBIDDEN", message: "Tournament Control requires Discord sign-in." });
 
   const config = getDiscordTournamentRoleConfig();
-  if (!config.botToken || !config.guildId || !config.adminRoleId || !config.staffRoleId) {
+  if (!config.botToken || !config.guildId || config.allowedRoleIds.length === 0) {
     throw new TRPCError({ code: "FORBIDDEN", message: "Discord Tournament Control role configuration is missing." });
   }
 
-  const cacheKey = `${config.guildId}:${discordUserId}:${config.adminRoleId}:${config.staffRoleId}`;
+  const cacheKey = `${config.guildId}:${discordUserId}:${config.allowedRoleIds.join(",")}`;
   const cached = cache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     if (cached.allowed) return;
-    throw new TRPCError({ code: "FORBIDDEN", message: "Discord Admin or Staff role required." });
+    throw new TRPCError({ code: "FORBIDDEN", message: "Tournament Control role required." });
   }
 
   try {
@@ -51,9 +69,10 @@ export async function assertDiscordTournamentStaff(ctx: TrpcContext) {
     });
     if (!response.ok) throw new Error(`Discord member lookup failed with ${response.status}`);
     const member = guildMemberSchema.parse(await response.json());
-    const allowed = member.roles.includes(config.adminRoleId) || member.roles.includes(config.staffRoleId);
+    const allowedRoles = new Set(config.allowedRoleIds);
+    const allowed = member.roles.some(roleId => allowedRoles.has(roleId));
     cache.set(cacheKey, { allowed, expiresAt: Date.now() + CACHE_MS });
-    if (!allowed) throw new TRPCError({ code: "FORBIDDEN", message: "Discord Admin or Staff role required." });
+    if (!allowed) throw new TRPCError({ code: "FORBIDDEN", message: "Tournament Control role required." });
   } catch (error) {
     if (error instanceof TRPCError) throw error;
     throw new TRPCError({ code: "FORBIDDEN", message: "Unable to verify Discord server membership or roles." });
