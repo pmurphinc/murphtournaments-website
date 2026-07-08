@@ -15,6 +15,9 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getDiscordLoginUrl } from "@/lib/discordLogin";
 
+const goldButtonClass =
+  "border border-[#FFD700] bg-[#FFD700] px-5 font-mono font-black uppercase tracking-wider text-black shadow-[0_0_18px_rgba(255,215,0,0.28)] hover:bg-[#D4AF37] hover:text-black";
+
 export default function TournamentControlIndex() {
   const auth = useAuth();
   const [, navigate] = useLocation();
@@ -88,10 +91,7 @@ export default function TournamentControlIndex() {
               tournament operations.
             </p>
           </div>
-          <Button
-            className="border border-neon-gold/70 bg-neon-gold px-5 font-mono font-black uppercase tracking-wider text-black hover:bg-neon-gold/90"
-            onClick={() => setCreateOpen(true)}
-          >
+          <Button className={goldButtonClass} onClick={() => setCreateOpen(true)}>
             Create Tournament
           </Button>
         </div>
@@ -125,7 +125,7 @@ export default function TournamentControlIndex() {
                 control room canvas for teams, lobbies, and final-round matches.
               </p>
               <Button
-                className="mt-6 border border-neon-gold/70 bg-neon-gold font-mono font-black uppercase tracking-wider text-black hover:bg-neon-gold/90"
+                className={`mt-6 ${goldButtonClass}`}
                 onClick={() => setCreateOpen(true)}
               >
                 Create Tournament
@@ -186,7 +186,7 @@ export default function TournamentControlIndex() {
             </Button>
             <Button
               disabled={!canSubmit}
-              className="bg-neon-gold font-mono font-black uppercase tracking-wider text-black hover:bg-neon-gold/90"
+              className={goldButtonClass}
               onClick={() =>
                 createTournament.mutate({
                   name,
