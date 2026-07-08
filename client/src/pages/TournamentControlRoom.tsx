@@ -65,7 +65,7 @@ export default function TournamentControlRoom() {
   if (!auth.user) return <ControlState title="Organizer Discord sign-in required" description="Sign in with Discord to open Tournament Control Room tools." showDiscordSignIn />;
   if (auth.user.loginMethod !== "discord") return <ControlState title="Organizer Discord sign-in required" description="Tournament Control uses Discord identity. Sign in with Discord to continue." showDiscordSignIn />;
   if (query.isLoading) return <ControlState title="Verifying Discord organizer roles…" />;
-  if (query.error) return <ControlState title={query.error.message.includes("configuration") ? "Discord role configuration error" : query.error.message.includes("Unable to verify") ? "Discord service verification failed" : "Discord Admin or Staff role required"} description={query.error.message} />;
+  if (query.error) return <ControlState title={query.error.message.includes("configuration") ? "Discord role configuration error" : query.error.message.includes("Unable to verify") ? "Discord service verification failed" : "Tournament Control role required"} description={query.error.message} />;
   if (!query.data) return <ControlState title="Tournament not found" />;
 
   const canvasPoint = (clientX: number, clientY: number) => {
