@@ -1,9 +1,77 @@
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, users, tournaments, teams, Tournament, Team, patchNotes, InsertPatchNote, PatchNote } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
-let _db: ReturnType<typeof drizzle> | null = null;
+type AppDb = ReturnType<typeof drizzle>;
+
+let _db: AppDb | null = null;
+let _schemaEnsurePromise: Promise<void> | null = null;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object";
+}
+
+function readExecutionRows(result: unknown): Array<Record<string, unknown>> {
+  if (Array.isArray(result)) {
+    const [first] = result;
+    if (Array.isArray(first)) return first.filter(isRecord);
+    return result.filter(isRecord);
+  }
+
+  if (isRecord(result) && Array.isArray(result.rows)) {
+    return result.rows.filter(isRecord);
+  }
+
+  return [];
+}
+
+function isDuplicateColumnError(error: unknown) {
+  return error instanceof Error && error.message.toLowerCase().includes("duplicate column");
+}
+
+async function columnExists(db: AppDb, tableName: string, columnName: string) {
+  const rows = readExecutionRows(
+    await db.execute(sql`
+      SELECT COLUMN_NAME
+      FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = ${tableName}
+        AND COLUMN_NAME = ${columnName}
+      LIMIT 1
+    `)
+  );
+  return rows.length > 0;
+}
+
+async function addColumnIfMissing(db: AppDb, tableName: string, columnName: string, definition: string) {
+  if (await columnExists(db, tableName, columnName)) return;
+
+  try {
+    await db.execute(sql.raw(`ALTER TABLE \`${tableName}\` ADD COLUMN \`${columnName}\` ${definition}`));
+  } catch (error) {
+    if (isDuplicateColumnError(error)) return;
+    throw error;
+  }
+}
+
+async function ensureTournamentControlColumns(db: AppDb) {
+  await addColumnIfMissing(db, "tournaments", "ownerUserId", "int");
+  await addColumnIfMissing(db, "tournament_games", "mapId", "varchar(64)");
+  await addColumnIfMissing(db, "tournament_control_template_games", "mapId", "varchar(64)");
+}
+
+async function ensureDatabaseSchema(db: AppDb) {
+  if (!_schemaEnsurePromise) {
+    _schemaEnsurePromise = ensureTournamentControlColumns(db).catch(error => {
+      _schemaEnsurePromise = null;
+      console.error("[Database] Failed to ensure tournament control columns:", error);
+      throw error;
+    });
+  }
+
+  await _schemaEnsurePromise;
+}
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
@@ -15,6 +83,11 @@ export async function getDb() {
       _db = null;
     }
   }
+
+  if (_db) {
+    await ensureDatabaseSchema(_db);
+  }
+
   return _db;
 }
 
@@ -304,7 +377,7 @@ export async function getAllPatchNotes() {
 export async function addPatchNote(patch: InsertPatchNote) {
   const db = await getDb();
   if (!db) {
-    console.warn("[Database] Cannot add patch note: database not available");
+    console.warn("[Database] Cannot add patch note:", "database not available");
     return undefined;
   }
 
