@@ -32,6 +32,14 @@ const labelSchema = z.string().trim().min(1).max(80);
 const teamNameSchema = z.string().trim().min(2).max(80);
 const frpSchema = z.number().int().min(0).max(9999).default(0);
 const lobbyCodeSchema = z.string().trim().min(1).max(64).nullable();
+const createTournamentSchema = z.object({
+  name: z.string().trim().min(2).max(255),
+  eventStatus: z.enum(["not-live", "live", "complete"]).default("not-live"),
+  currentCycle: z.enum(["1", "2", "3"]).default("1"),
+  currentStage: z.enum(["check-in", "cashout", "final-round", "finished"]).default("check-in"),
+  currentMatch: z.string().trim().max(255).optional(),
+  eventNote: z.string().trim().max(2000).nullable().optional(),
+});
 
 async function requireDb() {
   const db = await getDb();
@@ -83,6 +91,10 @@ async function createGame(tournamentId: number, gameType: TournamentGameType, po
   return fetchTournamentControlData(tournamentId);
 }
 
+async function listTournamentRows(db: QueryExecutor) {
+  return db.select().from(tournaments);
+}
+
 async function assertUniqueTeamName(db: QueryExecutor, tournamentId: number, name: string) {
   const tournamentTeams = await db.select().from(teams).where(eq(teams.tournamentId, tournamentId));
   if (tournamentTeams.some(team => team.name.trim().toLowerCase() === name.trim().toLowerCase())) {
@@ -107,7 +119,23 @@ export const discordTournamentStaffProcedure = publicProcedure.use(async ({ ctx,
 export const tournamentControlRouter = router({
   listTournaments: discordTournamentStaffProcedure.query(async () => {
     const db = await requireDb();
-    return db.select().from(tournaments);
+    return listTournamentRows(db);
+  }),
+  createTournament: discordTournamentStaffProcedure.input(createTournamentSchema).mutation(async ({ input }) => {
+    const db = await requireDb();
+    const insertResult = await db.insert(tournaments).values({
+      name: input.name,
+      eventStatus: input.eventStatus,
+      currentCycle: input.currentCycle,
+      currentStage: input.currentStage,
+      currentMatch: input.currentMatch,
+      eventNote: input.eventNote ?? null,
+    });
+    const rows = await listTournamentRows(db);
+    const insertId = Number((insertResult as { insertId?: unknown } | undefined)?.insertId ?? 0);
+    const createdTournament = rows.find(tournament => tournament.id === insertId) ?? rows.filter(tournament => tournament.name === input.name).sort((a, b) => b.id - a.id)[0] ?? rows.sort((a, b) => b.id - a.id)[0];
+    if (!createdTournament) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Tournament creation failed" });
+    return { createdTournament, tournaments: rows };
   }),
   get: discordTournamentStaffProcedure.input(tournamentIdSchema).query(({ input }) => fetchTournamentControlData(input.tournamentId)),
   createTeam: discordTournamentStaffProcedure.input(tournamentIdSchema.extend({ name: teamNameSchema, frp: frpSchema })).mutation(async ({ input }) => {
