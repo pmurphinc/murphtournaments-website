@@ -6,9 +6,12 @@ import {
   getConnectorEndpoints,
   getConnectorPoint,
   getGameStatusClasses,
+  getMidpoint,
+  getPointerDistance,
   getNextAvailableSlot,
   getNodeHeight,
   getResolvedDropSlot,
+  getViewportPreservingScroll,
   shouldStartCanvasPan,
 } from "../pages/TournamentControlRoom";
 
@@ -98,12 +101,15 @@ describe("Tournament Control Room background pan guard", () => {
   }
 
   function withFakeHTMLElement<T>(callback: () => T) {
-    const previous = globalThis.HTMLElement;
+    const previousHTMLElement = globalThis.HTMLElement;
+    const previousElement = globalThis.Element;
     globalThis.HTMLElement = FakeElement as unknown as typeof HTMLElement;
+    globalThis.Element = FakeElement as unknown as typeof Element;
     try {
       return callback();
     } finally {
-      globalThis.HTMLElement = previous;
+      globalThis.HTMLElement = previousHTMLElement;
+      globalThis.Element = previousElement;
     }
   }
 
@@ -135,6 +141,31 @@ describe("Tournament Control Room background pan guard", () => {
     expect(getCanvasPanScroll({ clientX: 100, clientY: 200, scrollLeft: 40, scrollTop: 90 }, 85, 260)).toEqual({
       scrollLeft: 55,
       scrollTop: 30,
+    });
+  });
+});
+
+
+describe("Tournament Control Room pinch zoom math", () => {
+  it("calculates two-pointer distance and midpoint", () => {
+    const first = { clientX: 10, clientY: 20 };
+    const second = { clientX: 40, clientY: 60 };
+
+    expect(getPointerDistance(first, second)).toBe(50);
+    expect(getMidpoint(first, second)).toEqual({ x: 25, y: 40 });
+  });
+
+  it("keeps the focal canvas point under the same viewport point while zooming", () => {
+    expect(
+      getViewportPreservingScroll(
+        { x: 300, y: 200 },
+        { x: 250, y: 180 },
+        { left: 50, top: 30 },
+        1.5
+      )
+    ).toEqual({
+      scrollLeft: 250,
+      scrollTop: 150,
     });
   });
 });
