@@ -35,6 +35,7 @@ export default function Navigation() {
   const [location] = useLocation();
   const { user, logout, loading } = useAuth();
   const isDiscordUser = user?.loginMethod === "discord";
+  const canSeeTournamentControl = user?.role === "admin";
   const displayName = user?.discordDisplayName || user?.name || "Discord user";
   const username = user?.discordUsername;
 
@@ -185,12 +186,14 @@ export default function Navigation() {
           >
             <Link href="/teams">Team Management</Link>
           </DropdownMenuItem>
-          <DropdownMenuItem
-            asChild
-            className="cursor-pointer font-mono text-white focus:bg-yellow-400/15 focus:text-yellow-200"
-          >
-            <Link href="/admin/tournaments/control">Tournament Control</Link>
-          </DropdownMenuItem>
+          {canSeeTournamentControl && (
+            <DropdownMenuItem
+              asChild
+              className="cursor-pointer font-mono text-white focus:bg-yellow-400/15 focus:text-yellow-200"
+            >
+              <Link href="/admin/tournaments/control">Tournament Control</Link>
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem disabled className="font-mono text-white/45">
             <span className="flex w-full items-center justify-between">
               Tournament Signups{" "}
