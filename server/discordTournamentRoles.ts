@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { isDiscordAuthenticatedUser } from "./_core/discordOAuth";
+import { ENV } from "./_core/env";
 import type { TrpcContext } from "./_core/context";
 
 const guildMemberSchema = z.object({ roles: z.array(z.string().regex(/^\d+$/)) });
@@ -47,9 +48,16 @@ export function getDiscordUserId(user: { openId?: string; loginMethod?: string |
   return /^\d+$/.test(id) ? id : null;
 }
 
+function isSiteOwnerOrAdmin(ctx: TrpcContext) {
+  if (!ctx.user) return false;
+  return ctx.user.role === "admin" || Boolean(ENV.ownerOpenId && ctx.user.openId === ENV.ownerOpenId);
+}
+
 export async function assertDiscordTournamentStaff(ctx: TrpcContext) {
   const discordUserId = getDiscordUserId(ctx.user);
   if (!discordUserId) throw new TRPCError({ code: "FORBIDDEN", message: "Tournament Control requires Discord sign-in." });
+
+  if (isSiteOwnerOrAdmin(ctx)) return;
 
   const config = getDiscordTournamentRoleConfig();
   if (!config.botToken || !config.guildId || config.allowedRoleIds.length === 0) {
