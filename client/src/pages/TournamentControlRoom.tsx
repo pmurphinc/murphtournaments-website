@@ -1048,20 +1048,24 @@ export default function TournamentControlRoom() {
                     <>
                       <div
                         data-no-canvas-pan="true"
-                        className={`pointer-events-auto mb-3 flex items-center justify-between gap-3 rounded border border-white/10 bg-white/5 px-2 py-2 ${
-                          controlKeyLocked ? "cursor-default" : "cursor-grab active:cursor-grabbing"
-                        }`}
-                        onPointerDown={startControlKeyDrag}
-                        onPointerMove={dragControlKey}
-                        onPointerUp={finishControlKeyDrag}
-                        onPointerCancel={finishControlKeyDrag}
+                        className="pointer-events-auto mb-3 flex items-center justify-between gap-3 rounded border border-white/10 bg-white/5 px-2 py-2"
                       >
-                        <div className="flex min-w-0 items-center gap-2">
+                        <div
+                          data-no-canvas-pan="true"
+                          data-control-key-drag-handle="true"
+                          className={`flex min-w-0 flex-1 items-center gap-2 ${
+                            controlKeyLocked ? "cursor-default" : "cursor-grab active:cursor-grabbing"
+                          }`}
+                          onPointerDown={startControlKeyDrag}
+                          onPointerMove={dragControlKey}
+                          onPointerUp={finishControlKeyDrag}
+                          onPointerCancel={finishControlKeyDrag}
+                        >
                           <span className="h-2 w-2 rounded-full bg-[#FFD700] shadow-[0_0_12px_#FFD700]" />
                           <div>
                             <p className="text-xs font-black uppercase tracking-[0.28em] text-[#FFD700]">PC Control Key</p>
                             <p className="text-[10px] uppercase tracking-wider text-white/45">
-                              {controlKeyLocked ? "Locked in place" : "Unlocked · drag this header"}
+                              {controlKeyLocked ? "Locked in place" : "Unlocked · drag the handle"}
                             </p>
                           </div>
                         </div>
@@ -1069,11 +1073,13 @@ export default function TournamentControlRoom() {
                           <button
                             type="button"
                             data-no-canvas-pan="true"
+                            data-control-key-action="true"
                             className={`rounded border px-2 py-1 text-[10px] font-black uppercase transition ${
                               controlKeyLocked
                                 ? "border-[#FFD700]/50 bg-[#FFD700]/15 text-[#FFD700]"
                                 : "border-cyan-300/40 bg-cyan-300/10 text-cyan-100"
                             }`}
+                            onPointerDown={event => event.stopPropagation()}
                             onClick={event => {
                               event.stopPropagation();
                               setControlKeyLocked(current => !current);
@@ -1084,7 +1090,9 @@ export default function TournamentControlRoom() {
                           <button
                             type="button"
                             data-no-canvas-pan="true"
+                            data-control-key-action="true"
                             className="rounded border border-white/15 bg-white/10 px-2 py-1 text-[10px] font-black uppercase text-white/70 transition hover:border-[#FFD700]/60 hover:text-[#FFD700]"
+                            onPointerDown={event => event.stopPropagation()}
                             onClick={event => {
                               event.stopPropagation();
                               setControlKeyMinimized(true);
