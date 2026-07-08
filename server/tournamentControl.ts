@@ -3,7 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { getDb } from "./db";
 import { publicProcedure, router } from "./_core/trpc";
-import { assertDiscordTournamentStaff } from "./discordTournamentRoles";
+import { getDiscordUserId, assertDiscordTournamentStaff } from "./discordTournamentRoles";
 import { managedTeamMembers, managedTeams, teams, tournamentGameAssignments, tournamentGames, tournaments, tournamentTeamSubmissions, users } from "../drizzle/schema";
 import {
   activeTournamentGameStatuses,
@@ -24,6 +24,7 @@ import { shouldCreateTournamentTeamForApproval } from "./tournamentTeamSubmissio
 
 type Database = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 type QueryExecutor = Pick<Database, "select" | "insert" | "update" | "delete" | "execute">;
+const DISCORD_API_BASE = "https://discord.com/api/v10";
 type ControlGameConnection = {
   id: number;
   tournamentId: number;
@@ -95,7 +96,22 @@ async function fetchTournamentRows(db: QueryExecutor, tournamentId: number) {
   const [tournament] = await db.select().from(tournaments).where(eq(tournaments.id, tournamentId)).limit(1);
   if (!tournament) throw new TRPCError({ code: "NOT_FOUND", message: "Tournament not found" });
   const [teamRows, gameRows, assignmentRows, connectionResult] = await Promise.all([
-    db.select().from(teams).where(eq(teams.tournamentId, tournamentId)),
+    db.select({
+      id: teams.id,
+      tournamentId: teams.tournamentId,
+      managedTeamId: teams.managedTeamId,
+      name: teams.name,
+      frp: teams.frp,
+      createdAt: teams.createdAt,
+      updatedAt: teams.updatedAt,
+      captainUserId: managedTeams.captainUserId,
+      captainDiscordOpenId: users.openId,
+      captainDisplayName: sql<string | null>`COALESCE(${users.discordDisplayName}, ${users.discordUsername}, ${users.name})`,
+    })
+      .from(teams)
+      .leftJoin(managedTeams, eq(teams.managedTeamId, managedTeams.id))
+      .leftJoin(users, eq(managedTeams.captainUserId, users.id))
+      .where(eq(teams.tournamentId, tournamentId)),
     db.select().from(tournamentGames).where(eq(tournamentGames.tournamentId, tournamentId)),
     db.select({
       id: tournamentGameAssignments.id,
@@ -111,7 +127,11 @@ async function fetchTournamentRows(db: QueryExecutor, tournamentId: number) {
   ]);
   return {
     tournament,
-    teams: teamRows,
+    discordConfigured: Boolean(process.env.DISCORD_BOT_TOKEN),
+    teams: teamRows.map(team => ({
+      ...team,
+      captainDiscordId: getDiscordUserId({ openId: team.captainDiscordOpenId ?? undefined, loginMethod: team.captainDiscordOpenId ? "discord" : null }),
+    })),
     games: gameRows,
     assignments: assignmentRows,
     connections: readRows<ControlGameConnection>(connectionResult),
@@ -268,6 +288,118 @@ async function advanceCompletedGameQualifiers(db: QueryExecutor, game: Advanceme
   }
 }
 
+function buildLobbyCodeMessage(tournamentName: string, lobbyName: string, teamName: string, code: string) {
+  return `Murph Tournaments lobby code
+Tournament: ${tournamentName}
+Lobby: ${lobbyName}
+Team: ${teamName}
+Code: ${code}`;
+}
+
+type LobbyCodeRecipient = {
+  teamId: number;
+  teamName: string;
+  managedTeamId: number | null;
+  recipientUserId: number | null;
+  recipientDiscordId: string | null;
+  recipientDisplayName: string | null;
+  message: string;
+  canSend: boolean;
+  reason: string | null;
+};
+
+async function getLobbyCodeRecipients(db: QueryExecutor, gameId: number, teamId?: number) {
+  const [game] = await db.select({ game: tournamentGames, tournament: tournaments })
+    .from(tournamentGames)
+    .innerJoin(tournaments, eq(tournamentGames.tournamentId, tournaments.id))
+    .where(eq(tournamentGames.id, gameId))
+    .limit(1);
+  if (!game) throw new TRPCError({ code: "NOT_FOUND", message: "Game not found" });
+
+  const rows = await db.select({
+    assignment: tournamentGameAssignments,
+    team: teams,
+    managedTeam: managedTeams,
+    captain: users,
+  })
+    .from(tournamentGameAssignments)
+    .innerJoin(teams, eq(tournamentGameAssignments.teamId, teams.id))
+    .leftJoin(managedTeams, eq(teams.managedTeamId, managedTeams.id))
+    .leftJoin(users, eq(managedTeams.captainUserId, users.id))
+    .where(eq(tournamentGameAssignments.gameId, gameId));
+
+  const filtered = teamId ? rows.filter(row => row.team.id === teamId) : rows;
+  if (teamId && filtered.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Team is not assigned to this lobby" });
+
+  const recipients: LobbyCodeRecipient[] = filtered.map(row => {
+    const discordId = getDiscordUserId(row.captain);
+    const reason = !row.team.managedTeamId
+      ? "Manual team has no captain recipient. Use Copy Message to send manually."
+      : !row.managedTeam?.captainUserId
+        ? "Managed team has no captain recipient."
+        : !discordId
+          ? "Captain has no Discord ID available."
+          : null;
+    return {
+      teamId: row.team.id,
+      teamName: row.team.name,
+      managedTeamId: row.team.managedTeamId,
+      recipientUserId: row.managedTeam?.captainUserId ?? null,
+      recipientDiscordId: discordId,
+      recipientDisplayName: row.captain?.discordDisplayName ?? row.captain?.discordUsername ?? row.captain?.name ?? null,
+      message: game.game.privateLobbyCode ? buildLobbyCodeMessage(game.tournament.name, game.game.displayLabel, row.team.name, game.game.privateLobbyCode) : "",
+      canSend: Boolean(game.game.privateLobbyCode && discordId),
+      reason: game.game.privateLobbyCode ? reason : "Lobby has no private code set.",
+    };
+  });
+
+  return { tournament: game.tournament, game: game.game, discordConfigured: Boolean(process.env.DISCORD_BOT_TOKEN), recipients };
+}
+
+async function sendDiscordDm(discordUserId: string, content: string) {
+  const token = process.env.DISCORD_BOT_TOKEN;
+  if (!token) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Discord sending not configured: DISCORD_BOT_TOKEN is missing." });
+
+  const channelResponse = await fetch(`${DISCORD_API_BASE}/users/@me/channels`, {
+    method: "POST",
+    headers: { authorization: `Bot ${token}`, "content-type": "application/json" },
+    body: JSON.stringify({ recipient_id: discordUserId }),
+  });
+  if (!channelResponse.ok) throw new Error(`Discord DM channel failed (${channelResponse.status})`);
+  const channel = await channelResponse.json() as { id?: string };
+  if (!channel.id) throw new Error("Discord DM channel response was missing an id");
+
+  const messageResponse = await fetch(`${DISCORD_API_BASE}/channels/${channel.id}/messages`, {
+    method: "POST",
+    headers: { authorization: `Bot ${token}`, "content-type": "application/json" },
+    body: JSON.stringify({ content }),
+  });
+  if (!messageResponse.ok) throw new Error(`Discord DM failed (${messageResponse.status})`);
+}
+
+async function sendLobbyCode(gameId: number, teamId?: number) {
+  const db = await requireDb();
+  const preview = await getLobbyCodeRecipients(db, gameId, teamId);
+  const results = [];
+  for (const recipient of preview.recipients) {
+    if (!preview.discordConfigured) {
+      results.push({ ...recipient, status: "failed" as const, message: "Discord sending not configured: DISCORD_BOT_TOKEN is missing." });
+      continue;
+    }
+    if (!recipient.canSend || !recipient.recipientDiscordId) {
+      results.push({ ...recipient, status: "failed" as const, message: recipient.reason ?? "Recipient cannot receive lobby code." });
+      continue;
+    }
+    try {
+      await sendDiscordDm(recipient.recipientDiscordId, recipient.message);
+      results.push({ ...recipient, status: "sent" as const, message: "Lobby code sent." });
+    } catch (error) {
+      results.push({ ...recipient, status: "failed" as const, message: error instanceof Error ? error.message : "Discord DM failed. The captain may block bot DMs." });
+    }
+  }
+  return { gameId, results };
+}
+
 async function listSubmissionRows(db: QueryExecutor, tournamentId?: number) {
   const base = db.select({
     submission: tournamentTeamSubmissions,
@@ -399,6 +531,12 @@ export const tournamentControlRouter = router({
     return { createdTournament, tournaments: rows };
   }),
   get: discordTournamentStaffProcedure.input(tournamentIdSchema).query(({ input }) => fetchTournamentControlData(input.tournamentId)),
+  previewLobbyCodeRecipients: discordTournamentStaffProcedure.input(gameIdSchema).query(async ({ input }) => {
+    const db = await requireDb();
+    return getLobbyCodeRecipients(db, input.gameId);
+  }),
+  sendLobbyCodeToTeamLeader: discordTournamentStaffProcedure.input(gameIdSchema.extend({ teamId: idSchema })).mutation(({ input }) => sendLobbyCode(input.gameId, input.teamId)),
+  sendLobbyCodeToLobbyLeaders: discordTournamentStaffProcedure.input(gameIdSchema).mutation(({ input }) => sendLobbyCode(input.gameId)),
   createTeam: discordTournamentStaffProcedure.input(tournamentIdSchema.extend({ name: teamNameSchema, frp: frpSchema })).mutation(async ({ input }) => {
     const db = await requireDb();
     await fetchTournamentRows(db, input.tournamentId);
