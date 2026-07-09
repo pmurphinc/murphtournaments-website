@@ -16,6 +16,7 @@ import {
   getViewportPreservingScroll,
   getBoundedControlKeyPosition,
   getAvailableTeamsToggleLabel,
+  getAdvancingPlacements,
   shouldStartCanvasPan,
   shouldCancelBoardDragsForPinch,
   snapCanvasPointToGrid,
@@ -101,7 +102,7 @@ describe("Tournament Control Room placement cycling", () => {
 describe("Tournament Control Room connector math", () => {
   it("anchors expanded source and target paths to connector circle perimeters", () => {
     expect(getConnectorPoint(cashout, "bottom", false)).toEqual({
-      x: 260,
+      x: 216,
       y: 200 + getNodeHeight("cashout", false) + connectorRadius,
     });
     expect(getConnectorPoint(final, "top", false)).toEqual({
@@ -110,9 +111,28 @@ describe("Tournament Control Room connector math", () => {
     });
   });
 
+  it("separates winner and loser bottom source positions while keeping the receiver centered", () => {
+    expect(getConnectorPoint(cashout, "top", false)).toEqual({
+      x: 260,
+      y: 200 - connectorRadius,
+    });
+    expect(
+      getConnectorPoint(cashout, "bottom", false, undefined, "winner")
+    ).toEqual({
+      x: 216,
+      y: 200 + getNodeHeight("cashout", false) + connectorRadius,
+    });
+    expect(
+      getConnectorPoint(cashout, "bottom", false, undefined, "loser")
+    ).toEqual({
+      x: 304,
+      y: 200 + getNodeHeight("cashout", false) + connectorRadius,
+    });
+  });
+
   it("anchors minimized source paths to the bottom connector perimeter", () => {
     expect(getConnectorPoint(cashout, "bottom", true)).toEqual({
-      x: 260,
+      x: 216,
       y: 200 + getNodeHeight("cashout", true) + connectorRadius,
     });
   });
@@ -158,6 +178,24 @@ describe("Tournament Control Room connector math", () => {
     }
   );
 });
+
+describe("Tournament Control Room advancement placement flow", () => {
+  it("keeps winner flow placements as the default", () => {
+    expect(getAdvancingPlacements("cashout")).toEqual([1, 2]);
+    expect(getAdvancingPlacements("final_round")).toEqual([1]);
+  });
+
+  it("returns winner flow placements", () => {
+    expect(getAdvancingPlacements("cashout", "winner")).toEqual([1, 2]);
+    expect(getAdvancingPlacements("final_round", "winner")).toEqual([1]);
+  });
+
+  it("returns loser flow placements", () => {
+    expect(getAdvancingPlacements("cashout", "loser")).toEqual([3, 4]);
+    expect(getAdvancingPlacements("final_round", "loser")).toEqual([2]);
+  });
+});
+
 describe("Tournament Control Room grid snapping", () => {
   it("uses the exported 40px board grid by default", () => {
     expect(controlRoomGridSize).toBe(40);
