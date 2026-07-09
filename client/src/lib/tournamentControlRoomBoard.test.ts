@@ -14,6 +14,11 @@ import {
   getNodeHeight,
   getResolvedDropSlot,
   getViewportPreservingScroll,
+  getCenterZoomView,
+  getEmptyBoardResetView,
+  getFitToContentView,
+  minZoom,
+  maxZoom,
   getBoundedControlKeyPosition,
   getAvailableTeamsToggleLabel,
   getAdvancingPlacements,
@@ -316,6 +321,66 @@ describe("Tournament Control Room pinch zoom math", () => {
       scrollLeft: 250,
       scrollTop: 150,
     });
+  });
+});
+
+describe("Tournament Control Room zoom controls", () => {
+  it("zooms button clicks around the viewport center while preserving scroll focus", () => {
+    expect(
+      getCenterZoomView(
+        { width: 800, height: 600 },
+        { scrollLeft: 200, scrollTop: 100 },
+        1,
+        1.25
+      )
+    ).toEqual({
+      zoom: 1.25,
+      scrollLeft: 350,
+      scrollTop: 200,
+    });
+  });
+
+  it("clamps fit-to-view zoom between the board zoom limits", () => {
+    const fitted = getFitToContentView(
+      [
+        { id: 1, gameType: "cashout", canvasX: 100, canvasY: 120 },
+        { id: 2, gameType: "final_round", canvasX: 1200, canvasY: 900 },
+      ],
+      new Set<number>(),
+      { width: 640, height: 480 },
+      64
+    );
+
+    expect(fitted.zoom).toBeGreaterThanOrEqual(minZoom);
+    expect(fitted.zoom).toBeLessThanOrEqual(maxZoom);
+  });
+
+  it("uses minimized node heights for fit-to-view content bounds", () => {
+    const expanded = getFitToContentView(
+      [{ id: 1, gameType: "cashout", canvasX: 100, canvasY: 100 }],
+      new Set<number>(),
+      { width: 900, height: 700 },
+      80
+    );
+    const minimized = getFitToContentView(
+      [{ id: 1, gameType: "cashout", canvasX: 100, canvasY: 100 }],
+      new Set([1]),
+      { width: 900, height: 700 },
+      80
+    );
+
+    expect(minimized.zoom).toBeGreaterThanOrEqual(expanded.zoom);
+  });
+
+  it("resets empty boards to 100 percent near the usable top-left", () => {
+    expect(getEmptyBoardResetView()).toEqual({
+      zoom: 1,
+      scrollLeft: 0,
+      scrollTop: 0,
+    });
+    expect(
+      getFitToContentView([], new Set<number>(), { width: 800, height: 600 })
+    ).toEqual(getEmptyBoardResetView());
   });
 });
 

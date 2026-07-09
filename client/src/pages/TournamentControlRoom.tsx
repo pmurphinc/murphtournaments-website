@@ -7,6 +7,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { Link, useParams } from "wouter";
+import { Grip, Maximize2 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -129,8 +130,8 @@ type DialogState =
 
 const statuses: GameStatus[] = ["draft", "ready", "live", "complete"];
 const activeStatuses = new Set<GameStatus>(["draft", "ready", "live"]);
-const minZoom = 0.55;
-const maxZoom = 1.8;
+export const minZoom = 0.55;
+export const maxZoom = 1.8;
 const baseCanvasSize = { width: 2200, height: 1400 };
 const nodeWidth = 320;
 const connectorHorizontalOffset = 44;
@@ -432,6 +433,80 @@ export function shouldCancelBoardDragsForPinch(
   activeTouchPointerCount: number
 ) {
   return activeTouchPointerCount >= 2;
+}
+
+export function getCenterZoomView(
+  viewport: ViewportSize,
+  scroll: Pick<HTMLElement, "scrollLeft" | "scrollTop">,
+  currentZoom: number,
+  requestedZoom: number
+) {
+  const nextZoom = clampZoom(requestedZoom);
+  const focalClientPoint = { x: viewport.width / 2, y: viewport.height / 2 };
+  const focalCanvasPoint = {
+    x: (scroll.scrollLeft + focalClientPoint.x) / currentZoom,
+    y: (scroll.scrollTop + focalClientPoint.y) / currentZoom,
+  };
+  return {
+    zoom: nextZoom,
+    ...getViewportPreservingScroll(
+      focalCanvasPoint,
+      focalClientPoint,
+      { left: 0, top: 0 },
+      nextZoom
+    ),
+  };
+}
+
+export function getEmptyBoardResetView() {
+  return { zoom: 1, scrollLeft: 0, scrollTop: 0 };
+}
+
+export function getFitToContentView(
+  games: Pick<ControlGameView, "gameType" | "canvasX" | "canvasY" | "id">[],
+  minimizedGameIds: ReadonlySet<number>,
+  viewport: ViewportSize,
+  padding = 96
+) {
+  if (games.length === 0) return getEmptyBoardResetView();
+
+  const bounds = games.reduce(
+    (accumulator, game) => {
+      const nodeHeight = getNodeHeight(
+        game.gameType,
+        minimizedGameIds.has(game.id)
+      );
+      return {
+        minX: Math.min(accumulator.minX, game.canvasX),
+        minY: Math.min(accumulator.minY, game.canvasY),
+        maxX: Math.max(accumulator.maxX, game.canvasX + nodeWidth),
+        maxY: Math.max(accumulator.maxY, game.canvasY + nodeHeight),
+      };
+    },
+    {
+      minX: Number.POSITIVE_INFINITY,
+      minY: Number.POSITIVE_INFINITY,
+      maxX: Number.NEGATIVE_INFINITY,
+      maxY: Number.NEGATIVE_INFINITY,
+    }
+  );
+  const contentWidth = Math.max(1, bounds.maxX - bounds.minX);
+  const contentHeight = Math.max(1, bounds.maxY - bounds.minY);
+  const usableWidth = Math.max(1, viewport.width - padding * 2);
+  const usableHeight = Math.max(1, viewport.height - padding * 2);
+  const nextZoom = clampZoom(
+    Math.min(usableWidth / contentWidth, usableHeight / contentHeight)
+  );
+  const centeredScrollLeft =
+    (bounds.minX + contentWidth / 2) * nextZoom - viewport.width / 2;
+  const centeredScrollTop =
+    (bounds.minY + contentHeight / 2) * nextZoom - viewport.height / 2;
+
+  return {
+    zoom: nextZoom,
+    scrollLeft: Math.max(0, centeredScrollLeft),
+    scrollTop: Math.max(0, centeredScrollTop),
+  };
 }
 
 export function getAvailableTeamsToggleLabel(teamCount: number) {
@@ -1090,6 +1165,45 @@ export default function TournamentControlRoom() {
     setIsPanning(false);
   }, []);
 
+  const applyBoardView = useCallback(
+    (view: { zoom: number; scrollLeft: number; scrollTop: number }) => {
+      const element = canvasRef.current;
+      if (!element) return;
+      setZoom(view.zoom);
+      requestAnimationFrame(() => {
+        element.scrollLeft = view.scrollLeft;
+        element.scrollTop = view.scrollTop;
+      });
+    },
+    []
+  );
+
+  const zoomBoardFromCenter = useCallback(
+    (zoomDelta: number) => {
+      const element = canvasRef.current;
+      if (!element) return;
+      const nextView = getCenterZoomView(
+        { width: element.clientWidth, height: element.clientHeight },
+        { scrollLeft: element.scrollLeft, scrollTop: element.scrollTop },
+        zoom,
+        zoom + zoomDelta
+      );
+      applyBoardView(nextView);
+    },
+    [applyBoardView, zoom]
+  );
+
+  const fitOrResetBoardView = useCallback(() => {
+    const element = canvasRef.current;
+    if (!element) return;
+    applyBoardView(
+      getFitToContentView(games, minimizedGameIds, {
+        width: element.clientWidth,
+        height: element.clientHeight,
+      })
+    );
+  }, [applyBoardView, games, minimizedGameIds]);
+
   const openDialog = (state: Exclude<DialogState, null>, defaultValue = "") => {
     setDialogState(state);
     setFormName(defaultValue);
@@ -1510,6 +1624,79 @@ export default function TournamentControlRoom() {
                 );
               }}
             >
+              <div className="pointer-events-none sticky left-3 top-1/2 z-[65] h-0 w-0 -translate-y-1/2 sm:left-4">
+                <div
+                  data-no-canvas-pan="true"
+                  className="pointer-events-auto flex w-11 flex-col items-center overflow-hidden rounded-xl border border-[#FFD700]/35 bg-zinc-950/95 font-mono text-white shadow-[0_0_24px_rgba(255,215,0,0.14)] backdrop-blur"
+                  onContextMenu={event => event.stopPropagation()}
+                >
+                  <button
+                    type="button"
+                    data-no-canvas-pan="true"
+                    className="flex h-10 w-full items-center justify-center border-b border-white/10 text-white/45"
+                    title={`Board zoom controls · ${Math.round(zoom * 100)}%`}
+                    aria-label={`Board zoom controls, current zoom ${Math.round(zoom * 100)}%`}
+                    onPointerDown={event => event.stopPropagation()}
+                  >
+                    <Grip className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    data-no-canvas-pan="true"
+                    disabled={zoom >= maxZoom}
+                    className="flex h-10 w-full items-center justify-center border-b border-white/10 text-lg font-black leading-none text-white/80 transition hover:bg-[#FFD700]/10 hover:text-[#FFD700] disabled:cursor-not-allowed disabled:text-white/25 disabled:hover:bg-transparent"
+                    title={`Zoom in · ${Math.round(zoom * 100)}%`}
+                    aria-label="Zoom in"
+                    onPointerDown={event => event.stopPropagation()}
+                    onClick={event => {
+                      event.stopPropagation();
+                      zoomBoardFromCenter(0.1);
+                    }}
+                  >
+                    +
+                  </button>
+                  <button
+                    type="button"
+                    data-no-canvas-pan="true"
+                    disabled={zoom <= minZoom}
+                    className="flex h-10 w-full items-center justify-center border-b border-white/10 text-xl font-black leading-none text-white/80 transition hover:bg-[#FFD700]/10 hover:text-[#FFD700] disabled:cursor-not-allowed disabled:text-white/25 disabled:hover:bg-transparent"
+                    title={`Zoom out · ${Math.round(zoom * 100)}%`}
+                    aria-label="Zoom out"
+                    onPointerDown={event => event.stopPropagation()}
+                    onClick={event => {
+                      event.stopPropagation();
+                      zoomBoardFromCenter(-0.1);
+                    }}
+                  >
+                    −
+                  </button>
+                  <button
+                    type="button"
+                    data-no-canvas-pan="true"
+                    className="flex h-10 w-full items-center justify-center border-b border-white/10 text-white/70 transition hover:bg-[#FFD700]/10 hover:text-[#FFD700]"
+                    title={
+                      games.length > 0
+                        ? "Fit lobbies to view"
+                        : "Reset board view"
+                    }
+                    aria-label={
+                      games.length > 0
+                        ? "Fit lobbies to view"
+                        : "Reset board view"
+                    }
+                    onPointerDown={event => event.stopPropagation()}
+                    onClick={event => {
+                      event.stopPropagation();
+                      fitOrResetBoardView();
+                    }}
+                  >
+                    <Maximize2 className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                  <div className="w-full bg-black/70 px-1 py-1.5 text-center text-[10px] font-black leading-none tracking-tight text-[#FFD700]">
+                    {Math.round(zoom * 100)}%
+                  </div>
+                </div>
+              </div>
               <div className="pointer-events-none sticky left-0 top-0 z-[55] hidden h-0 w-0 lg:block">
                 <div
                   ref={controlKeyRef}
@@ -1640,7 +1827,7 @@ export default function TournamentControlRoom() {
                           ],
                           [
                             "bg-fuchsia-400/15 text-fuchsia-100 border-fuchsia-300/30",
-                            "Shift + scroll",
+                            "Buttons / Shift + scroll",
                             "Zoom board",
                           ],
                           [
@@ -2376,8 +2563,8 @@ export default function TournamentControlRoom() {
                 </div>
               </div>
               <div className="pointer-events-none sticky bottom-4 left-4 z-[60] mb-4 ml-4 w-fit rounded border border-white/10 bg-black/80 px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-white/50 shadow-xl">
-                Zoom {Math.round(zoom * 100)}% · Shift + scroll · Select line +
-                Delete or double-click line to remove
+                Zoom {Math.round(zoom * 100)}% · Use rail buttons or Shift +
+                scroll · Select line + Delete or double-click line to remove
                 {selectedAssignmentContext?.team
                   ? ` · Selected: ${selectedAssignmentContext.team.name}`
                   : ""}
