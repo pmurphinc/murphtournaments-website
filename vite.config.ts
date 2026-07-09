@@ -69,9 +69,30 @@ function writeToLogFile(source: LogSource, entries: unknown[]) {
   trimLogFile(logPath, MAX_LOG_SIZE_BYTES);
 }
 
-function vitePluginControlRoomZoomFloor(): Plugin {
+function patchTournamentControlRoomSource(code: string) {
+  let transformed = code.replace(
+    "const minZoom = 0.55;",
+    `const minZoom = ${CONTROL_ROOM_MIN_ZOOM};`
+  );
+
+  transformed = transformed.replace(
+    `data-no-node-drag="true"
+                                  className="max-w-[8rem] rounded border border-[#FFD700]/30 bg-black px-2 py-1 font-mono text-[10px] uppercase text-yellow-100 outline-none hover:border-[#FFD700]"`,
+    `data-no-node-drag="true"
+                                  onPointerDown={event => event.stopPropagation()}
+                                  onPointerUp={event => event.stopPropagation()}
+                                  onTouchStart={event => event.stopPropagation()}
+                                  onClick={event => event.stopPropagation()}
+                                  onContextMenu={event => event.stopPropagation()}
+                                  className="max-w-[8rem] rounded border border-[#FFD700]/30 bg-black px-2 py-1 font-mono text-[10px] uppercase text-yellow-100 outline-none hover:border-[#FFD700]"`
+  );
+
+  return transformed;
+}
+
+function vitePluginControlRoomFixes(): Plugin {
   return {
-    name: "control-room-zoom-floor",
+    name: "control-room-fixes",
     enforce: "pre",
     transform(code, id) {
       const normalizedId = id.split(path.sep).join("/");
@@ -79,10 +100,7 @@ function vitePluginControlRoomZoomFloor(): Plugin {
         return null;
       }
 
-      return code.replace(
-        "const minZoom = 0.55;",
-        `const minZoom = ${CONTROL_ROOM_MIN_ZOOM};`
-      );
+      return patchTournamentControlRoomSource(code);
     },
   };
 }
@@ -170,7 +188,7 @@ function vitePluginManusDebugCollector(): Plugin {
 }
 
 const plugins = [
-  vitePluginControlRoomZoomFloor(),
+  vitePluginControlRoomFixes(),
   react(),
   tailwindcss(),
   jsxLocPlugin(),
