@@ -31,11 +31,15 @@ const CLAIM_LINK_TTL_DAYS = 14;
 function hashToken(token: string) { return createHash("sha256").update(token).digest("hex"); }
 function createTokenPath(prefix: string, token: string) { return `${prefix}/${encodeURIComponent(token)}`; }
 const DISCORD_API_BASE = "https://discord.com/api/v10";
+export type ConnectionFlowType = "winner" | "loser";
+const connectionFlowTypeSchema = z.enum(["winner", "loser"]);
+
 type ControlGameConnection = {
   id: number;
   tournamentId: number;
   sourceGameId: number;
   targetGameId: number;
+  flowType: ConnectionFlowType;
 };
 type AssignmentResultRow = {
   id: number;
@@ -160,7 +164,7 @@ async function fetchTournamentRows(db: QueryExecutor, tournamentId: number) {
       .from(tournamentGameAssignments)
       .innerJoin(tournamentGames, eq(tournamentGameAssignments.gameId, tournamentGames.id))
       .where(eq(tournamentGames.tournamentId, tournamentId)),
-    db.execute(sql`SELECT id, tournamentId, sourceGameId, targetGameId FROM tournament_game_connections WHERE tournamentId = ${tournamentId}`),
+    db.execute(sql`SELECT id, tournamentId, sourceGameId, targetGameId, COALESCE(flowType, 'winner') AS flowType FROM tournament_game_connections WHERE tournamentId = ${tournamentId}`),
   ]);
   return {
     tournament,
@@ -276,12 +280,12 @@ async function assertConnectionGames(db: QueryExecutor, tournamentId: number, so
   }
 }
 
-async function connectGames(tournamentId: number, sourceGameId: number, targetGameId: number) {
+async function connectGames(tournamentId: number, sourceGameId: number, targetGameId: number, flowType: ConnectionFlowType = "winner") {
   const db = await requireDb();
   await assertConnectionGames(db, tournamentId, sourceGameId, targetGameId);
   await db.execute(sql`
-    INSERT INTO tournament_game_connections (tournamentId, sourceGameId, targetGameId)
-    VALUES (${tournamentId}, ${sourceGameId}, ${targetGameId})
+    INSERT INTO tournament_game_connections (tournamentId, sourceGameId, targetGameId, flowType)
+    VALUES (${tournamentId}, ${sourceGameId}, ${targetGameId}, ${flowType})
     ON DUPLICATE KEY UPDATE updatedAt = CURRENT_TIMESTAMP
   `);
   return fetchTournamentControlData(tournamentId);
@@ -290,7 +294,7 @@ async function connectGames(tournamentId: number, sourceGameId: number, targetGa
 async function deleteGameConnection(connectionId: number) {
   const db = await requireDb();
   const connectionRows = readRows<ControlGameConnection>(
-    await db.execute(sql`SELECT id, tournamentId, sourceGameId, targetGameId FROM tournament_game_connections WHERE id = ${connectionId} LIMIT 1`)
+    await db.execute(sql`SELECT id, tournamentId, sourceGameId, targetGameId, COALESCE(flowType, 'winner') AS flowType FROM tournament_game_connections WHERE id = ${connectionId} LIMIT 1`)
   );
   const [connection] = connectionRows;
   if (!connection) throw new TRPCError({ code: "NOT_FOUND", message: "Lobby connection not found" });
@@ -371,7 +375,7 @@ async function saveTemplateFromTournament(input: { tournamentId: number; name: s
     for (const connection of data.connections) {
       const sourceTemplateGameId = gameIdMap.get(connection.sourceGameId);
       const targetTemplateGameId = gameIdMap.get(connection.targetGameId);
-      if (sourceTemplateGameId && targetTemplateGameId) await tx.insert(tournamentControlTemplateConnections).values({ templateId: template.id, sourceTemplateGameId, targetTemplateGameId });
+      if (sourceTemplateGameId && targetTemplateGameId) await tx.insert(tournamentControlTemplateConnections).values({ templateId: template.id, sourceTemplateGameId, targetTemplateGameId, flowType: connection.flowType });
     }
     return { templateId: template.id };
   });
@@ -396,7 +400,7 @@ async function createTournamentFromTemplate(input: { templateId: number; name: s
     for (const connection of templateConnections) {
       const sourceGameId = gameIdMap.get(connection.sourceTemplateGameId);
       const targetGameId = gameIdMap.get(connection.targetTemplateGameId);
-      if (sourceGameId && targetGameId) await tx.execute(sql`INSERT INTO tournament_game_connections (tournamentId, sourceGameId, targetGameId) VALUES (${tournamentId}, ${sourceGameId}, ${targetGameId})`);
+      if (sourceGameId && targetGameId) await tx.execute(sql`INSERT INTO tournament_game_connections (tournamentId, sourceGameId, targetGameId, flowType) VALUES (${tournamentId}, ${sourceGameId}, ${targetGameId}, ${connection.flowType})`);
     }
     const [createdTournament] = await tx.select().from(tournaments).where(eq(tournaments.id, tournamentId)).limit(1);
     return { createdTournament };
@@ -408,8 +412,13 @@ function getClaimLinkState(link: { status: "active" | "claimed" | "revoked"; exp
   return { active: link.status === "active" && !expired, expired, claimed: link.status === "claimed", revoked: link.status === "revoked" };
 }
 
-function getAdvancingPlacements(gameType: TournamentGameType) {
-  return gameType === "cashout" ? [1, 2] : [1];
+export function getAdvancingPlacements(gameType: TournamentGameType, flowType: ConnectionFlowType = "winner") {
+  if (gameType === "cashout") return flowType === "winner" ? [1, 2] : [3, 4];
+  return flowType === "winner" ? [1] : [2];
+}
+
+function getFlowLabel(flowType: ConnectionFlowType) {
+  return flowType === "winner" ? "winner" : "loser";
 }
 
 function getPlacementLabel(placements: number[]) {
@@ -435,25 +444,25 @@ async function getAssignmentsForGame(db: QueryExecutor, gameId: number) {
 
 async function advanceCompletedGameQualifiers(db: QueryExecutor, game: AdvancementGame) {
   const outgoingConnections = readRows<ControlGameConnection>(
-    await db.execute(sql`SELECT id, tournamentId, sourceGameId, targetGameId FROM tournament_game_connections WHERE sourceGameId = ${game.id}`)
+    await db.execute(sql`SELECT id, tournamentId, sourceGameId, targetGameId, COALESCE(flowType, 'winner') AS flowType FROM tournament_game_connections WHERE sourceGameId = ${game.id}`)
   );
 
   if (outgoingConnections.length === 0) return;
 
-  const placementsToAdvance = getAdvancingPlacements(game.gameType);
   const sourceAssignments = await getAssignmentsForGame(db, game.id);
-  const qualifiers = placementsToAdvance.map(placement => {
-    const assignment = sourceAssignments.find(row => row.resultPlacement === placement);
-    if (!assignment) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: `${game.displayLabel} must have ${getPlacementLabel(placementsToAdvance)} set before it can feed linked lobbies.`,
-      });
-    }
-    return assignment;
-  });
 
   for (const connection of outgoingConnections) {
+    const placementsToAdvance = getAdvancingPlacements(game.gameType, connection.flowType);
+    const qualifiers = placementsToAdvance.map(placement => {
+      const assignment = sourceAssignments.find(row => row.resultPlacement === placement);
+      if (!assignment) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `${game.displayLabel} must have ${getFlowLabel(connection.flowType)} placements (${getPlacementLabel(placementsToAdvance)}) set before it can feed linked lobbies.`,
+        });
+      }
+      return assignment;
+    });
     const targetGame = await getGameOrThrow(db, connection.targetGameId);
     if (targetGame.tournamentId !== game.tournamentId) {
       throw new TRPCError({ code: "BAD_REQUEST", message: "Linked lobby belongs to a different tournament" });
@@ -816,7 +825,7 @@ export const tournamentControlRouter = router({
     await db.update(tournamentGames).set({ canvasX: safePosition.x, canvasY: safePosition.y }).where(eq(tournamentGames.id, input.gameId));
     return fetchTournamentControlData(game.tournamentId);
   }),
-  connectGames: discordTournamentStaffProcedure.input(tournamentIdSchema.extend({ sourceGameId: idSchema, targetGameId: idSchema })).mutation(({ input }) => connectGames(input.tournamentId, input.sourceGameId, input.targetGameId)),
+  connectGames: discordTournamentStaffProcedure.input(tournamentIdSchema.extend({ sourceGameId: idSchema, targetGameId: idSchema, flowType: connectionFlowTypeSchema.default("winner") })).mutation(({ input }) => connectGames(input.tournamentId, input.sourceGameId, input.targetGameId, input.flowType)),
   deleteGameConnection: discordTournamentStaffProcedure.input(z.object({ connectionId: idSchema })).mutation(({ input }) => deleteGameConnection(input.connectionId)),
   updateStatus: discordTournamentStaffProcedure.input(gameIdSchema.extend({ status: z.enum(tournamentGameStatuses) })).mutation(async ({ input }) => {
     const db = await requireDb();

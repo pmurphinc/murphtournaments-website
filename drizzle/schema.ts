@@ -260,6 +260,28 @@ export const tournamentGames = mysqlTable(
 );
 
 
+export const tournamentGameConnections = mysqlTable(
+  "tournament_game_connections",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    tournamentId: int("tournamentId").notNull().references(() => tournaments.id, { onDelete: "cascade" }),
+    sourceGameId: int("sourceGameId").notNull().references(() => tournamentGames.id, { onDelete: "cascade" }),
+    targetGameId: int("targetGameId").notNull().references(() => tournamentGames.id, { onDelete: "cascade" }),
+    flowType: mysqlEnum("flowType", ["winner", "loser"]).default("winner").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    index("tournament_game_connections_tournament_idx").on(table.tournamentId),
+    index("tournament_game_connections_source_idx").on(table.sourceGameId),
+    index("tournament_game_connections_target_idx").on(table.targetGameId),
+    uniqueIndex("tournament_game_connections_source_target_flow_unique").on(table.sourceGameId, table.targetGameId, table.flowType),
+  ]
+);
+
+export type TournamentGameConnection = typeof tournamentGameConnections.$inferSelect;
+export type InsertTournamentGameConnection = typeof tournamentGameConnections.$inferInsert;
+
 export const tournamentViewerLinks = mysqlTable(
   "tournament_viewer_links",
   {
@@ -318,11 +340,12 @@ export const tournamentControlTemplateConnections = mysqlTable(
     templateId: int("templateId").notNull().references(() => tournamentControlTemplates.id, { onDelete: "cascade" }),
     sourceTemplateGameId: int("sourceTemplateGameId").notNull().references(() => tournamentControlTemplateGames.id, { onDelete: "cascade" }),
     targetTemplateGameId: int("targetTemplateGameId").notNull().references(() => tournamentControlTemplateGames.id, { onDelete: "cascade" }),
+    flowType: mysqlEnum("flowType", ["winner", "loser"]).default("winner").notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
   table => [
     index("tournament_control_template_connections_template_idx").on(table.templateId),
-    uniqueIndex("tournament_control_template_connections_unique").on(table.sourceTemplateGameId, table.targetTemplateGameId),
+    uniqueIndex("tournament_control_template_connections_unique").on(table.sourceTemplateGameId, table.targetTemplateGameId, table.flowType),
   ]
 );
 

@@ -44,6 +44,7 @@ type DragPayload = { teamId: number; fromGameId?: number };
 type GameStatus = "draft" | "ready" | "live" | "complete";
 type GameType = "cashout" | "final_round";
 type CanvasPoint = { x: number; y: number };
+type ConnectionFlowType = "winner" | "loser";
 type ViewportSize = { width: number; height: number };
 type NodeDragState = {
   gameId: number;
@@ -54,6 +55,7 @@ type NodeDragState = {
 };
 type ConnectionDragState = {
   sourceGameId: number;
+  flowType: ConnectionFlowType;
   sourcePoint: CanvasPoint;
   currentPoint: CanvasPoint;
 };
@@ -89,6 +91,7 @@ type ConnectionView = {
   tournamentId: number;
   sourceGameId: number;
   targetGameId: number;
+  flowType: ConnectionFlowType;
 };
 type GameStatusClasses = {
   nodeBorder: string;
@@ -130,6 +133,7 @@ const minZoom = 0.55;
 const maxZoom = 1.8;
 const baseCanvasSize = { width: 2200, height: 1400 };
 const nodeWidth = 320;
+const connectorHorizontalOffset = 44;
 export const controlRoomGridSize = 40;
 export const connectorRadius = 12;
 const expandedCashoutNodeHeight = 438;
@@ -177,10 +181,15 @@ export function getConnectorCenter(
   game: Pick<ControlGameView, "gameType" | "canvasX" | "canvasY">,
   port: "top" | "bottom",
   minimized: boolean,
-  position: CanvasPoint = { x: game.canvasX, y: game.canvasY }
+  position: CanvasPoint = { x: game.canvasX, y: game.canvasY },
+  flowType: ConnectionFlowType = "winner"
 ) {
+  const bottomOffset =
+    flowType === "winner"
+      ? -connectorHorizontalOffset
+      : connectorHorizontalOffset;
   return {
-    x: position.x + nodeWidth / 2,
+    x: position.x + nodeWidth / 2 + (port === "bottom" ? bottomOffset : 0),
     y:
       port === "top"
         ? position.y
@@ -343,10 +352,11 @@ export function getConnectorPoint(
   game: Pick<ControlGameView, "gameType" | "canvasX" | "canvasY">,
   port: "top" | "bottom",
   minimized: boolean,
-  position?: CanvasPoint
+  position?: CanvasPoint,
+  flowType: ConnectionFlowType = "winner"
 ) {
   return getConnectionEndpoint(
-    getConnectorCenter(game, port, minimized, position),
+    getConnectorCenter(game, port, minimized, position, flowType),
     port
   );
 }
@@ -426,6 +436,14 @@ export function shouldCancelBoardDragsForPinch(
 
 export function getAvailableTeamsToggleLabel(teamCount: number) {
   return `Available Teams (${teamCount})`;
+}
+
+export function getAdvancingPlacements(
+  gameType: GameType,
+  flowType: ConnectionFlowType = "winner"
+) {
+  if (gameType === "cashout") return flowType === "winner" ? [1, 2] : [3, 4];
+  return flowType === "winner" ? [1] : [2];
 }
 
 function getLobbyCodeMessage(
@@ -704,13 +722,20 @@ export default function TournamentControlRoom() {
   );
 
   const getPortCenter = useCallback(
-    (game: ControlGameView, port: "top" | "bottom") =>
-      measuredPortCenters.get(`${game.id}:${port}`) ??
+    (
+      game: ControlGameView,
+      port: "top" | "bottom",
+      flowType: ConnectionFlowType = "winner"
+    ) =>
+      measuredPortCenters.get(
+        `${game.id}:${port}${port === "bottom" ? `:${flowType}` : ""}`
+      ) ??
       getConnectorCenter(
         game,
         port,
         minimizedGameIds.has(game.id),
-        getVisualPosition(game)
+        getVisualPosition(game),
+        flowType
       ),
     [getVisualPosition, measuredPortCenters, minimizedGameIds]
   );
@@ -774,19 +799,26 @@ export default function TournamentControlRoom() {
         .forEach(port => {
           const gameId = port.dataset.gameId;
           const portName = port.dataset.port;
+          const flowType = port.dataset.flowType;
           if (!gameId || (portName !== "top" && portName !== "bottom")) return;
           const rect = port.getBoundingClientRect();
-          next.set(`${gameId}:${portName}`, {
-            x:
-              (rect.left +
-                rect.width / 2 -
-                canvasRect.left +
-                canvas.scrollLeft) /
-              zoom,
-            y:
-              (rect.top + rect.height / 2 - canvasRect.top + canvas.scrollTop) /
-              zoom,
-          });
+          next.set(
+            `${gameId}:${portName}${portName === "bottom" ? `:${flowType === "loser" ? "loser" : "winner"}` : ""}`,
+            {
+              x:
+                (rect.left +
+                  rect.width / 2 -
+                  canvasRect.left +
+                  canvas.scrollLeft) /
+                zoom,
+              y:
+                (rect.top +
+                  rect.height / 2 -
+                  canvasRect.top +
+                  canvas.scrollTop) /
+                zoom,
+            }
+          );
         });
       setMeasuredPortCenters(current => {
         if (
@@ -1009,7 +1041,12 @@ export default function TournamentControlRoom() {
       );
 
       if (targetGameId !== null) {
-        connectGames.mutate({ tournamentId, sourceGameId, targetGameId });
+        connectGames.mutate({
+          tournamentId,
+          sourceGameId,
+          targetGameId,
+          flowType: connectionDrag.flowType,
+        });
       }
       setConnectionDrag(null);
     };
@@ -1025,7 +1062,13 @@ export default function TournamentControlRoom() {
       window.removeEventListener("pointerup", finishConnection);
       window.removeEventListener("pointercancel", cancelConnection);
     };
-  }, [canvasPoint, connectGames, connectionDrag?.sourceGameId, tournamentId]);
+  }, [
+    canvasPoint,
+    connectGames,
+    connectionDrag?.sourceGameId,
+    connectionDrag?.flowType,
+    tournamentId,
+  ]);
 
   useEffect(() => {
     if (!isPanning) return;
@@ -1627,8 +1670,8 @@ export default function TournamentControlRoom() {
                           ],
                           [
                             "bg-yellow-300/15 text-yellow-100 border-yellow-200/40",
-                            "Gold connector",
-                            "Link to top port",
+                            "W / L connectors",
+                            "W winners · L losers",
                           ],
                           [
                             "bg-red-400/15 text-red-100 border-red-300/30",
@@ -1710,24 +1753,16 @@ export default function TournamentControlRoom() {
                     width={logicalCanvasSize.width}
                     height={logicalCanvasSize.height}
                   >
-                    <defs>
-                      <marker
-                        id="tournament-flow-arrow"
-                        markerHeight="12"
-                        markerWidth="12"
-                        orient="auto"
-                        refX="11"
-                        refY="6"
-                      >
-                        <path d="M 0 0 L 12 6 L 0 12 z" fill="#FFD700" />
-                      </marker>
-                    </defs>
                     {connections.map(connection => {
                       const sourceGame = gamesById.get(connection.sourceGameId);
                       const targetGame = gamesById.get(connection.targetGameId);
                       if (!sourceGame || !targetGame) return null;
                       const endpoints = getConnectorEndpoints(
-                        getPortCenter(sourceGame, "bottom"),
+                        getPortCenter(
+                          sourceGame,
+                          "bottom",
+                          connection.flowType
+                        ),
                         getPortCenter(targetGame, "top")
                       );
                       const source = endpoints.source;
@@ -1735,6 +1770,19 @@ export default function TournamentControlRoom() {
                       const isSelectedConnection =
                         selectedConnectionId === connection.id;
                       const connectionPath = getConnectionPath(source, target);
+                      const isLoserConnection = connection.flowType === "loser";
+                      const baseStroke = isLoserConnection
+                        ? "#F8FAFC"
+                        : "#FFD700";
+                      const selectedStroke = isLoserConnection
+                        ? "#FFFFFF"
+                        : "#FFF3A3";
+                      const selectedGlow = isLoserConnection
+                        ? "#CBD5E1"
+                        : "#FFF3A3";
+                      const connectionLabel = isLoserConnection
+                        ? "Loser"
+                        : "Winner";
                       const selectConnection = () => {
                         setSelectedConnectionId(connection.id);
                         setSelectedAssignmentId(null);
@@ -1782,8 +1830,10 @@ export default function TournamentControlRoom() {
                                 <path
                                   d={connectionPath}
                                   fill="none"
-                                  stroke="#FFF3A3"
-                                  strokeOpacity="0.55"
+                                  stroke={selectedGlow}
+                                  strokeOpacity={
+                                    isLoserConnection ? "0.5" : "0.55"
+                                  }
                                   strokeWidth="12"
                                   strokeLinecap="round"
                                   strokeLinejoin="round"
@@ -1793,9 +1843,10 @@ export default function TournamentControlRoom() {
                               <path
                                 d={connectionPath}
                                 fill="none"
-                                markerEnd="url(#tournament-flow-arrow)"
                                 stroke={
-                                  isSelectedConnection ? "#FFF3A3" : "#FFD700"
+                                  isSelectedConnection
+                                    ? selectedStroke
+                                    : baseStroke
                                 }
                                 strokeOpacity={
                                   isSelectedConnection ? "1" : "0.82"
@@ -1809,7 +1860,7 @@ export default function TournamentControlRoom() {
                           </ContextMenuTrigger>
                           <ContextMenuContent>
                             <ContextMenuItem onClick={selectConnection}>
-                              Select Connection
+                              Select {connectionLabel} Connection
                             </ContextMenuItem>
                             <ContextMenuItem
                               className="text-red-300"
@@ -1828,7 +1879,11 @@ export default function TournamentControlRoom() {
                           connectionDrag.currentPoint
                         )}
                         fill="none"
-                        stroke="#FFD700"
+                        stroke={
+                          connectionDrag.flowType === "loser"
+                            ? "#F8FAFC"
+                            : "#FFD700"
+                        }
                         strokeDasharray="8 8"
                         strokeOpacity="0.85"
                         strokeWidth="6"
@@ -1920,38 +1975,50 @@ export default function TournamentControlRoom() {
                               data-port="top"
                               className="absolute -top-3 left-1/2 z-20 h-6 w-6 -translate-x-1/2 rounded-full border-2 border-[#FFD700] bg-black shadow-[0_0_14px_rgba(255,215,0,0.45)] transition hover:scale-110"
                             />
-                            <button
-                              type="button"
-                              data-no-node-drag="true"
-                              title="Drag to connect this lobby to another lobby"
-                              data-connector-port="true"
-                              data-game-id={game.id}
-                              data-port="bottom"
-                              className="absolute -bottom-3 left-1/2 z-20 h-6 w-6 -translate-x-1/2 rounded-full border-2 border-[#FFD700] bg-[#FFD700] shadow-[0_0_14px_rgba(255,215,0,0.45)] transition hover:scale-110"
-                              onPointerDown={event => {
-                                if (
-                                  event.pointerType === "touch" ||
-                                  isPinchingRef.current
-                                )
-                                  return;
-                                if (event.button !== 0) return;
-                                event.preventDefault();
-                                event.stopPropagation();
-                                const sourceCenter = getPortCenter(
-                                  game,
-                                  "bottom"
-                                );
-                                const sourcePoint = getConnectionEndpoint(
-                                  sourceCenter,
-                                  "bottom"
-                                );
-                                setConnectionDrag({
-                                  sourceGameId: game.id,
-                                  sourcePoint,
-                                  currentPoint: sourcePoint,
-                                });
-                              }}
-                            />
+                            {(["winner", "loser"] as const).map(flowType => (
+                              <button
+                                key={flowType}
+                                type="button"
+                                data-no-node-drag="true"
+                                title={`Drag to connect ${flowType === "winner" ? "winners" : "losers"} from this lobby`}
+                                data-connector-port="true"
+                                data-game-id={game.id}
+                                data-port="bottom"
+                                data-flow-type={flowType}
+                                className={`absolute -bottom-3 z-20 flex h-6 w-6 items-center justify-center rounded-full border-2 font-mono text-[11px] font-black leading-none transition hover:scale-110 ${
+                                  flowType === "winner"
+                                    ? "left-[calc(50%-44px)] -translate-x-1/2 border-[#FFD700] bg-[#FFD700] text-black shadow-[0_0_14px_rgba(255,215,0,0.45)]"
+                                    : "left-[calc(50%+44px)] -translate-x-1/2 border-slate-100 bg-slate-100 text-black shadow-[0_0_14px_rgba(226,232,240,0.45)]"
+                                }`}
+                                onPointerDown={event => {
+                                  if (
+                                    event.pointerType === "touch" ||
+                                    isPinchingRef.current
+                                  )
+                                    return;
+                                  if (event.button !== 0) return;
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  const sourceCenter = getPortCenter(
+                                    game,
+                                    "bottom",
+                                    flowType
+                                  );
+                                  const sourcePoint = getConnectionEndpoint(
+                                    sourceCenter,
+                                    "bottom"
+                                  );
+                                  setConnectionDrag({
+                                    sourceGameId: game.id,
+                                    flowType,
+                                    sourcePoint,
+                                    currentPoint: sourcePoint,
+                                  });
+                                }}
+                              >
+                                {flowType === "winner" ? "W" : "L"}
+                              </button>
+                            ))}
                             <div
                               data-node-drag-handle="true"
                               className="mb-3 flex cursor-grab items-start justify-between gap-2 active:cursor-grabbing"
