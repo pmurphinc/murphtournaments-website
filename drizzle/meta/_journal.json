@@ -141,6 +141,13 @@
       "when": 1784073600000,
       "tag": "0019_tournament_maps_and_owners",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "5",
+      "when": 1784160000000,
+      "tag": "0020_add_tournament_connection_flow_type",
+      "breakpoints": true
     }
   ]
 }
