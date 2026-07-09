@@ -60,6 +60,102 @@ export const cleanPatchNoteContent = (content: string) => {
 
 export const WEBSITE_PATCH_NOTES: WebsitePatchNote[] = [
   {
+    id: -1100,
+    title: "Season 11 | Galaxy Masters",
+    date: "2026.07.09",
+    version: "11.0.0",
+    url: "https://www.reachthefinals.com/patchnotes/11-00",
+    sourceUrl: "https://www.reachthefinals.com/patchnotes/11-00",
+    isGameUpdate: 1,
+    content: `THE FINALS — Season 11 | Galaxy Masters
+
+Season 11 launches Galaxy Masters with the Galaxy Estates arena, a broad melee-system rework, bot matches, Ranked updates, Cashout objective-variety tuning, progression updates, and a large balance and bug-fix pass.
+
+New Arena: Galaxy Estates
+
+• Galaxy Estates joins Cashout, Ranked Cashout, Quick Cash, Team Deathmatch, Head 2 Head, and Final Round Private Matches.
+• The arena is set inside a COMETA space habitat with residential zones, a botanical garden, a sports center, a spaceport, speed tunnels, anti-gravity columns, oxygen pods, trampolines, and destructible towers.
+• A dedicated Galaxy Estates Cashout queue is available during launch week.
+
+Battle Pass / Season 11 Launch Notes
+
+• Season 11 adds Free, Premium, and Ultimate Battle Pass tracks with new retro-futuristic cosmetics.
+• Premium includes up to 106 rewards and earnable Multibucks; Ultimate adds extra rewards, 20 unlocked levels, a Match XP boost, and upfront Multibucks.
+• The Season 8 Battle Pass moves into the legacy roster.
+
+Revamped Tutorial and Early Talent Program
+
+• New players get a refreshed tutorial that introduces Cashout objectives alongside Dede and bot opponents.
+• Rookie Contracts are replaced by the Early Talent Program in the Academy, with mode tutorials and direct Practice Range Challenge access.
+
+Bot Matches
+
+• Cashout (Bots) lets players queue solo, in parties, or through matchmaking for a three-round Cashout tournament against bots.
+• Bot matches grant reduced progression toward World Tour, Battle Pass, and other systems.
+• Bots launch in beta on Monaco, Bernal, Kyoto, Las Vegas, and SYS$Horizon.
+
+Melee Rework
+
+• Melee weapons now use Stamina for lunge access and Precision zones for precise versus glancing damage.
+• Dagger, Dual Blades, Riot Shield, Sledgehammer, Spear, and Sword received detailed damage, lunge, stamina, and secondary-function updates.
+• Quick Melee damage was reduced, and a contextual Kick attack can push targets back when used at full stamina.
+
+Ping System Improvements
+
+• Ping wheels were consolidated, ping input responsiveness improved, response tallies were added, and ping hints now provide clearer interaction information.
+• Emotes fit on one wheel, and players may need to re-equip customizations or keybindings affected by the reorganization.
+
+Ranked Tournament Season 11 Changes
+
+• Ranked adds personal performance bonuses based on match grade and current tier.
+• End-of-match Ranked Score breakdowns were updated for clarity.
+• Placement calibration was updated, and Season 11 adds a second Diamond reward token.
+
+Cashout Spawning / Objective Variety Changes
+
+• Cashout and Ranked Tournament objective spawning was updated to make Cashout Station locations more varied and less predictable.
+
+Player Card Improvements
+
+• Player Cards can now be individually edited and saved per Contestant.
+• Players can choose the pose shown on each Player Card instead of relying only on the intro Emote pose.
+
+More Arenas for Modes
+
+• Point Break comes to Las Vegas Stadium.
+• Team Deathmatch comes to Monaco.
+
+Sponsor Progression Changes
+
+• Sponsor reward requirements were reduced for Season 11, with total Fans needed for a Sponsor reward track reduced by roughly half.
+
+World Tour Reward Changes
+
+• World Tour rewards are now granted when reaching a league rather than climbing to the top of that league.
+• Diamond rewards are guaranteed on reaching Diamond 4; Emerald coin rewards continue at Emerald 3, Emerald 2, and Emerald 1.
+
+Twitch Drops / Support a Streamer
+
+• Season 11 Twitch Drops include the Trip Report Sticker, Launch Paperwork Charm, and Sonia The Sonar Grenade.
+• Support a Streamer rewards include the Charmalure Set and Approach Vector Helmet for qualifying Twitch gift-sub support.
+
+Esports Note
+
+• Season 11 opens with new competitive broadcasts and Cycle 3 qualifier sign-ups for APAC, AMERICAS, and EMEA.
+
+Balance Changes
+
+• Gadgets: APS Turret, Breach Charge, Data Reshaper, and Hover Pad received buffs or adjustments.
+• Melee: Stamina and Precision were added across melee weapons, with major per-weapon tuning and new contextual melee behavior.
+• Specializations: Cloaking Device, Evasive Dash, and Winch Claw received nerfs or adjustments.
+• Weapons: .50 Akimbo, 93R, FCAR, KS-23, M134 Minigun, Model 1887, and Pike-556 were updated.
+• Item XP earn rates were increased for several specializations and gadgets.
+
+Bug Fixes
+
+• The update includes fixes and improvements across animation, audio, cosmetics, gadgets, gameplay, maps, performance, rendering, social features, spectator, stability, UI, and weapons.`,
+  },
+  {
     id: -900,
     title: "Season 9 | Dragon Rising",
     date: "2025.12.10",
