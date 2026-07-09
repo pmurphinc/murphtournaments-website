@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   connectorRadius,
+  controlRoomGridSize,
   getCanvasPanScroll,
   getConnectionEndpoint,
   getConnectorEndpoints,
@@ -17,6 +18,7 @@ import {
   getAvailableTeamsToggleLabel,
   shouldStartCanvasPan,
   shouldCancelBoardDragsForPinch,
+  snapCanvasPointToGrid,
 } from "../pages/TournamentControlRoom";
 
 const cashout = { gameType: "cashout" as const, canvasX: 100, canvasY: 200 };
@@ -42,10 +44,18 @@ describe("Tournament Control Room slot selection", () => {
   });
 
   it("returns null when the lobby is full", () => {
-    expect(getResolvedDropSlot("live", [
-      { teamId: 10, slotIndex: 1 },
-      { teamId: 11, slotIndex: 2 },
-    ], 2, 12, 1)).toBeNull();
+    expect(
+      getResolvedDropSlot(
+        "live",
+        [
+          { teamId: 10, slotIndex: 1 },
+          { teamId: 11, slotIndex: 2 },
+        ],
+        2,
+        12,
+        1
+      )
+    ).toBeNull();
   });
 
   it("ignores completed lobby drops", () => {
@@ -58,17 +68,25 @@ describe("Tournament Control Room slot selection", () => {
 
   it("resolves a cross-lobby move only when the target slot is available", () => {
     expect(getResolvedDropSlot("live", assignments, 4, 12, 4)).toBe(4);
-    expect(getResolvedDropSlot("live", [
-      { teamId: 10, slotIndex: 1 },
-      { teamId: 11, slotIndex: 2 },
-    ], 2, 12)).toBeNull();
+    expect(
+      getResolvedDropSlot(
+        "live",
+        [
+          { teamId: 10, slotIndex: 1 },
+          { teamId: 11, slotIndex: 2 },
+        ],
+        2,
+        12
+      )
+    ).toBeNull();
   });
 });
 
-
 describe("Tournament Control Room placement cycling", () => {
   it("cycles Cashout placement from empty through 1st-4th and back to empty", () => {
-    const cycle = [null, 1, 2, 3, 4].map(value => getNextPlacementValue(value, 4));
+    const cycle = [null, 1, 2, 3, 4].map(value =>
+      getNextPlacementValue(value, 4)
+    );
 
     expect(cycle).toEqual([1, 2, 3, 4, null]);
   });
@@ -82,30 +100,87 @@ describe("Tournament Control Room placement cycling", () => {
 
 describe("Tournament Control Room connector math", () => {
   it("anchors expanded source and target paths to connector circle perimeters", () => {
-    expect(getConnectorPoint(cashout, "bottom", false)).toEqual({ x: 260, y: 200 + getNodeHeight("cashout", false) + connectorRadius });
-    expect(getConnectorPoint(final, "top", false)).toEqual({ x: 660, y: 75 - connectorRadius });
+    expect(getConnectorPoint(cashout, "bottom", false)).toEqual({
+      x: 260,
+      y: 200 + getNodeHeight("cashout", false) + connectorRadius,
+    });
+    expect(getConnectorPoint(final, "top", false)).toEqual({
+      x: 660,
+      y: 75 - connectorRadius,
+    });
   });
 
   it("anchors minimized source paths to the bottom connector perimeter", () => {
-    expect(getConnectorPoint(cashout, "bottom", true)).toEqual({ x: 260, y: 200 + getNodeHeight("cashout", true) + connectorRadius });
+    expect(getConnectorPoint(cashout, "bottom", true)).toEqual({
+      x: 260,
+      y: 200 + getNodeHeight("cashout", true) + connectorRadius,
+    });
   });
 
   it("uses the same radius for minimized-to-minimized endpoint offsets", () => {
-    expect(getConnectionEndpoint({ x: 10, y: 20 }, "bottom")).toEqual({ x: 10, y: 32 });
-    expect(getConnectionEndpoint({ x: 10, y: 20 }, "top")).toEqual({ x: 10, y: 8 });
+    expect(getConnectionEndpoint({ x: 10, y: 20 }, "bottom")).toEqual({
+      x: 10,
+      y: 32,
+    });
+    expect(getConnectionEndpoint({ x: 10, y: 20 }, "top")).toEqual({
+      x: 10,
+      y: 8,
+    });
   });
 
   it.each([
     ["expanded empty lobby", { x: 100, y: 100 }, { x: 100, y: 538 }],
     ["expanded full lobby", { x: 120, y: 140 }, { x: 120, y: 620 }],
-    ["lobby with code DM panel height increased", { x: 250, y: 100 }, { x: 250, y: 760 }],
+    [
+      "lobby with code DM panel height increased",
+      { x: 250, y: 100 },
+      { x: 250, y: 760 },
+    ],
     ["minimized lobby", { x: 320, y: 80 }, { x: 320, y: 212 }],
     ["source above target", { x: 0, y: 0 }, { x: 0, y: 100 }],
     ["source beside target", { x: 0, y: 0 }, { x: 100, y: 0 }],
-  ])("attaches endpoint math to circle perimeters for %s", (_label, sourceCenter, targetCenter) => {
-    const endpoints = getConnectorEndpoints(sourceCenter, targetCenter);
-    expect(Math.hypot(endpoints.source.x - sourceCenter.x, endpoints.source.y - sourceCenter.y)).toBeCloseTo(connectorRadius);
-    expect(Math.hypot(endpoints.target.x - targetCenter.x, endpoints.target.y - targetCenter.y)).toBeCloseTo(connectorRadius);
+  ])(
+    "attaches endpoint math to circle perimeters for %s",
+    (_label, sourceCenter, targetCenter) => {
+      const endpoints = getConnectorEndpoints(sourceCenter, targetCenter);
+      expect(
+        Math.hypot(
+          endpoints.source.x - sourceCenter.x,
+          endpoints.source.y - sourceCenter.y
+        )
+      ).toBeCloseTo(connectorRadius);
+      expect(
+        Math.hypot(
+          endpoints.target.x - targetCenter.x,
+          endpoints.target.y - targetCenter.y
+        )
+      ).toBeCloseTo(connectorRadius);
+    }
+  );
+});
+describe("Tournament Control Room grid snapping", () => {
+  it("uses the exported 40px board grid by default", () => {
+    expect(controlRoomGridSize).toBe(40);
+    expect(snapCanvasPointToGrid({ x: 61, y: 79 })).toEqual({ x: 80, y: 80 });
+  });
+
+  it("rounds positions to the nearest grid line", () => {
+    expect(snapCanvasPointToGrid({ x: 19, y: 20 })).toEqual({ x: 0, y: 40 });
+    expect(snapCanvasPointToGrid({ x: 101, y: 119 })).toEqual({
+      x: 120,
+      y: 120,
+    });
+  });
+
+  it("clamps snapped coordinates to non-negative values", () => {
+    expect(snapCanvasPointToGrid({ x: -21, y: -1 })).toEqual({ x: 0, y: 0 });
+  });
+
+  it("supports a custom grid size for helper reuse", () => {
+    expect(snapCanvasPointToGrid({ x: 26, y: 74 }, 25)).toEqual({
+      x: 25,
+      y: 75,
+    });
   });
 });
 
@@ -134,7 +209,9 @@ describe("Tournament Control Room background pan guard", () => {
 
   it("allows panning from plain canvas background", () => {
     withFakeHTMLElement(() => {
-      expect(shouldStartCanvasPan(new FakeElement(false) as unknown as HTMLElement)).toBe(true);
+      expect(
+        shouldStartCanvasPan(new FakeElement(false) as unknown as HTMLElement)
+      ).toBe(true);
     });
   });
 
@@ -142,6 +219,7 @@ describe("Tournament Control Room background pan guard", () => {
     ["lobby nodes", '[data-control-node="true"]'],
     ["team cards", '[data-team-card="true"]'],
     ["connector ports", '[data-connector-port="true"]'],
+    ["connection lines", '[data-connection-line="true"]'],
     ["buttons", "button"],
     ["inputs", "input"],
     ["selects", "select"],
@@ -151,13 +229,21 @@ describe("Tournament Control Room background pan guard", () => {
   ])("does not pan from %s", (_label, selectorFragment) => {
     withFakeHTMLElement(() => {
       const element = new FakeElement(true);
-      expect(shouldStartCanvasPan(element as unknown as HTMLElement)).toBe(false);
+      expect(shouldStartCanvasPan(element as unknown as HTMLElement)).toBe(
+        false
+      );
       expect(element.lastSelector).toContain(selectorFragment);
     });
   });
 
   it("calculates scroll offsets from pointer deltas", () => {
-    expect(getCanvasPanScroll({ clientX: 100, clientY: 200, scrollLeft: 40, scrollTop: 90 }, 85, 260)).toEqual({
+    expect(
+      getCanvasPanScroll(
+        { clientX: 100, clientY: 200, scrollLeft: 40, scrollTop: 90 },
+        85,
+        260
+      )
+    ).toEqual({
       scrollLeft: 55,
       scrollTop: 30,
     });
@@ -170,7 +256,6 @@ describe("Tournament Control Room background pan guard", () => {
     expect(shouldCancelBoardDragsForPinch(3)).toBe(true);
   });
 });
-
 
 describe("Tournament Control Room pinch zoom math", () => {
   it("calculates two-pointer distance and midpoint", () => {
@@ -195,7 +280,6 @@ describe("Tournament Control Room pinch zoom math", () => {
     });
   });
 });
-
 
 describe("Tournament Control Room control key positioning", () => {
   it("keeps a draggable control key inside viewport padding", () => {
@@ -222,7 +306,6 @@ describe("Tournament Control Room status colors", () => {
     expect(classes.statusPill).toContain(expectedColor);
   });
 });
-
 
 describe("Tournament Control Room mobile team panel labels", () => {
   it("formats the compact available-team toggle with a count", () => {

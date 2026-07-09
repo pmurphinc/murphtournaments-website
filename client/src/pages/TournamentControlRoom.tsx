@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { Link, useParams } from "wouter";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -83,8 +90,17 @@ type ConnectionView = {
   sourceGameId: number;
   targetGameId: number;
 };
-type GameStatusClasses = { nodeBorder: string; statusPill: string; accent: string };
-type CanvasPanStart = { clientX: number; clientY: number; scrollLeft: number; scrollTop: number };
+type GameStatusClasses = {
+  nodeBorder: string;
+  statusPill: string;
+  accent: string;
+};
+type CanvasPanStart = {
+  clientX: number;
+  clientY: number;
+  scrollLeft: number;
+  scrollTop: number;
+};
 type PinchZoomStart = {
   distance: number;
   zoom: number;
@@ -114,6 +130,7 @@ const minZoom = 0.55;
 const maxZoom = 1.8;
 const baseCanvasSize = { width: 2200, height: 1400 };
 const nodeWidth = 320;
+export const controlRoomGridSize = 40;
 export const connectorRadius = 12;
 const expandedCashoutNodeHeight = 438;
 const expandedFinalNodeHeight = 300;
@@ -127,7 +144,8 @@ function parseDragPayload(value: string): DragPayload | null {
     }
     if (
       parsed.fromGameId !== undefined &&
-      (typeof parsed.fromGameId !== "number" || !Number.isInteger(parsed.fromGameId))
+      (typeof parsed.fromGameId !== "number" ||
+        !Number.isInteger(parsed.fromGameId))
     ) {
       return null;
     }
@@ -150,7 +168,9 @@ function clampZoom(value: number) {
 
 export function getNodeHeight(gameType: GameType, minimized: boolean) {
   if (minimized) return minimizedNodeHeight;
-  return gameType === "cashout" ? expandedCashoutNodeHeight : expandedFinalNodeHeight;
+  return gameType === "cashout"
+    ? expandedCashoutNodeHeight
+    : expandedFinalNodeHeight;
 }
 
 export function getConnectorCenter(
@@ -161,15 +181,28 @@ export function getConnectorCenter(
 ) {
   return {
     x: position.x + nodeWidth / 2,
-    y: port === "top" ? position.y : position.y + getNodeHeight(game.gameType, minimized),
+    y:
+      port === "top"
+        ? position.y
+        : position.y + getNodeHeight(game.gameType, minimized),
   };
 }
 
-export function getConnectionEndpoint(center: CanvasPoint, port: "top" | "bottom") {
-  return { x: center.x, y: center.y + (port === "top" ? -connectorRadius : connectorRadius) };
+export function getConnectionEndpoint(
+  center: CanvasPoint,
+  port: "top" | "bottom"
+) {
+  return {
+    x: center.x,
+    y: center.y + (port === "top" ? -connectorRadius : connectorRadius),
+  };
 }
 
-export function getConnectorEndpoints(sourceCenter: CanvasPoint, targetCenter: CanvasPoint, radius = connectorRadius) {
+export function getConnectorEndpoints(
+  sourceCenter: CanvasPoint,
+  targetCenter: CanvasPoint,
+  radius = connectorRadius
+) {
   const dx = targetCenter.x - sourceCenter.x;
   const dy = targetCenter.y - sourceCenter.y;
   const length = Math.hypot(dx, dy);
@@ -177,23 +210,45 @@ export function getConnectorEndpoints(sourceCenter: CanvasPoint, targetCenter: C
   const unitX = dx / length;
   const unitY = dy / length;
   return {
-    source: { x: sourceCenter.x + unitX * radius, y: sourceCenter.y + unitY * radius },
-    target: { x: targetCenter.x - unitX * radius, y: targetCenter.y - unitY * radius },
+    source: {
+      x: sourceCenter.x + unitX * radius,
+      y: sourceCenter.y + unitY * radius,
+    },
+    target: {
+      x: targetCenter.x - unitX * radius,
+      y: targetCenter.y - unitY * radius,
+    },
   };
 }
 
-export function resolveConnectionDropTargetGameId(target: EventTarget | null, sourceGameId: number) {
-  const element = target instanceof HTMLElement
-    ? target.closest("[data-connection-target-game-id], [data-input-port-game-id]")
-    : null;
-  const raw = element instanceof HTMLElement
-    ? element.dataset.connectionTargetGameId ?? element.dataset.inputPortGameId
-    : undefined;
+export function resolveConnectionDropTargetGameId(
+  target: EventTarget | null,
+  sourceGameId: number
+) {
+  const element =
+    target instanceof HTMLElement
+      ? target.closest(
+          "[data-connection-target-game-id], [data-input-port-game-id]"
+        )
+      : null;
+  const raw =
+    element instanceof HTMLElement
+      ? (element.dataset.connectionTargetGameId ??
+        element.dataset.inputPortGameId)
+      : undefined;
   const targetGameId = raw ? Number(raw) : NaN;
-  return Number.isInteger(targetGameId) && targetGameId > 0 && targetGameId !== sourceGameId ? targetGameId : null;
+  return Number.isInteger(targetGameId) &&
+    targetGameId > 0 &&
+    targetGameId !== sourceGameId
+    ? targetGameId
+    : null;
 }
 
-export function getCanvasPanScroll(start: CanvasPanStart, clientX: number, clientY: number) {
+export function getCanvasPanScroll(
+  start: CanvasPanStart,
+  clientX: number,
+  clientY: number
+) {
   return {
     scrollLeft: start.scrollLeft - (clientX - start.clientX),
     scrollTop: start.scrollTop - (clientY - start.clientY),
@@ -235,13 +290,26 @@ export function getNextAvailableSlot(
   preferredSlotIndex?: number,
   teamId?: number
 ) {
-  if (teamId !== undefined && assignments.some(assignment => assignment.teamId === teamId)) return null;
-  const occupiedSlots = new Set(assignments.map(assignment => assignment.slotIndex));
+  if (
+    teamId !== undefined &&
+    assignments.some(assignment => assignment.teamId === teamId)
+  )
+    return null;
+  const occupiedSlots = new Set(
+    assignments.map(assignment => assignment.slotIndex)
+  );
   const candidates = Array.from({ length: capacity }, (_, index) => index + 1);
   const orderedCandidates = preferredSlotIndex
-    ? [preferredSlotIndex, ...candidates.filter(slot => slot !== preferredSlotIndex)]
+    ? [
+        preferredSlotIndex,
+        ...candidates.filter(slot => slot !== preferredSlotIndex),
+      ]
     : candidates;
-  return orderedCandidates.find(slot => slot >= 1 && slot <= capacity && !occupiedSlots.has(slot)) ?? null;
+  return (
+    orderedCandidates.find(
+      slot => slot >= 1 && slot <= capacity && !occupiedSlots.has(slot)
+    ) ?? null
+  );
 }
 
 export function getResolvedDropSlot(
@@ -252,7 +320,23 @@ export function getResolvedDropSlot(
   preferredSlotIndex?: number
 ) {
   if (status === "complete") return null;
-  return getNextAvailableSlot(assignments, capacity, preferredSlotIndex, teamId);
+  return getNextAvailableSlot(
+    assignments,
+    capacity,
+    preferredSlotIndex,
+    teamId
+  );
+}
+
+export function snapCanvasPointToGrid(
+  position: CanvasPoint,
+  gridSize = controlRoomGridSize
+): CanvasPoint {
+  const safeGridSize = gridSize > 0 ? gridSize : controlRoomGridSize;
+  return {
+    x: Math.max(0, Math.round(position.x / safeGridSize) * safeGridSize),
+    y: Math.max(0, Math.round(position.y / safeGridSize) * safeGridSize),
+  };
 }
 
 export function getConnectorPoint(
@@ -261,10 +345,14 @@ export function getConnectorPoint(
   minimized: boolean,
   position?: CanvasPoint
 ) {
-  return getConnectionEndpoint(getConnectorCenter(game, port, minimized, position), port);
+  return getConnectionEndpoint(
+    getConnectorCenter(game, port, minimized, position),
+    port
+  );
 }
 
-const canvasPanBlockedSelector = '[data-control-node="true"], [data-team-card="true"], [data-connector-port="true"], [data-no-canvas-pan="true"], button, a, input, select, textarea, [role="menuitem"], [role="button"], [draggable="true"]';
+const canvasPanBlockedSelector =
+  '[data-control-node="true"], [data-team-card="true"], [data-connector-port="true"], [data-connection-line="true"], [data-no-canvas-pan="true"], button, a, input, select, textarea, [role="menuitem"], [role="button"], [draggable="true"]';
 
 export function shouldStartCanvasPan(target: EventTarget | null) {
   if (!(target instanceof Element)) return false;
@@ -293,8 +381,10 @@ export function getMidpoint(
   return { x: (firstX + secondX) / 2, y: (firstY + secondY) / 2 };
 }
 
-
-export function getNextPlacementValue(currentPlacement: number | null | undefined, capacity: number) {
+export function getNextPlacementValue(
+  currentPlacement: number | null | undefined,
+  capacity: number
+) {
   const current = currentPlacement ?? 0;
   if (current < 0 || current >= capacity) return null;
   return current + 1;
@@ -321,12 +411,16 @@ export function getViewportPreservingScroll(
   nextZoom: number
 ) {
   return {
-    scrollLeft: focalCanvasPoint.x * nextZoom - (focalClientPoint.x - canvasRect.left),
-    scrollTop: focalCanvasPoint.y * nextZoom - (focalClientPoint.y - canvasRect.top),
+    scrollLeft:
+      focalCanvasPoint.x * nextZoom - (focalClientPoint.x - canvasRect.left),
+    scrollTop:
+      focalCanvasPoint.y * nextZoom - (focalClientPoint.y - canvasRect.top),
   };
 }
 
-export function shouldCancelBoardDragsForPinch(activeTouchPointerCount: number) {
+export function shouldCancelBoardDragsForPinch(
+  activeTouchPointerCount: number
+) {
   return activeTouchPointerCount >= 2;
 }
 
@@ -334,7 +428,12 @@ export function getAvailableTeamsToggleLabel(teamCount: number) {
   return `Available Teams (${teamCount})`;
 }
 
-function getLobbyCodeMessage(tournamentName: string, lobbyName: string, teamName: string, code: string) {
+function getLobbyCodeMessage(
+  tournamentName: string,
+  lobbyName: string,
+  teamName: string,
+  code: string
+) {
   return `Murph Tournaments lobby code
 Tournament: ${tournamentName}
 Lobby: ${lobbyName}
@@ -343,7 +442,8 @@ Code: ${code}`;
 }
 
 function getRecipientWarning(team: ControlTeamView) {
-  if (!team.managedTeamId) return "Manual team has no managed captain recipient.";
+  if (!team.managedTeamId)
+    return "Manual team has no managed captain recipient.";
   if (!team.captainUserId) return "Managed team has no captain recipient.";
   if (!team.captainDiscordId) return "Captain has no Discord ID available.";
   return null;
@@ -383,87 +483,163 @@ export default function TournamentControlRoom() {
   const controlKeyRef = useRef<HTMLDivElement | null>(null);
   const [dragPayload, setDragPayload] = useState<DragPayload | null>(null);
   const [nodeDrag, setNodeDrag] = useState<NodeDragState | null>(null);
-  const [connectionDrag, setConnectionDrag] = useState<ConnectionDragState | null>(null);
-  const [canvasMenuPosition, setCanvasMenuPosition] = useState({ x: 160, y: 120 });
+  const [connectionDrag, setConnectionDrag] =
+    useState<ConnectionDragState | null>(null);
+  const [canvasMenuPosition, setCanvasMenuPosition] = useState({
+    x: 160,
+    y: 120,
+  });
   const [dialogState, setDialogState] = useState<DialogState>(null);
   const [formName, setFormName] = useState("");
-  const [selectedAssignmentId, setSelectedAssignmentId] = useState<number | null>(null);
-  const [minimizedGameIds, setMinimizedGameIds] = useState<Set<number>>(() => new Set());
-  const [optimisticGamePositions, setOptimisticGamePositions] = useState<Map<number, CanvasPoint>>(
-    () => new Map()
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState<
+    number | null
+  >(null);
+  const [selectedConnectionId, setSelectedConnectionId] = useState<
+    number | null
+  >(null);
+  const [snapWindowsToGrid, setSnapWindowsToGrid] = useState(false);
+  const [minimizedGameIds, setMinimizedGameIds] = useState<Set<number>>(
+    () => new Set()
   );
+  const [optimisticGamePositions, setOptimisticGamePositions] = useState<
+    Map<number, CanvasPoint>
+  >(() => new Map());
   const [zoom, setZoom] = useState(1);
   const [isPanning, setIsPanning] = useState(false);
   const [controlKeyMinimized, setControlKeyMinimized] = useState(false);
   const [controlKeyLocked, setControlKeyLocked] = useState(true);
   const [mobileTeamsOpen, setMobileTeamsOpen] = useState(false);
   const [touchHelpOpen, setTouchHelpOpen] = useState(false);
-  const [controlKeyPosition, setControlKeyPosition] = useState<CanvasPoint>({ x: 16, y: 16 });
+  const [controlKeyPosition, setControlKeyPosition] = useState<CanvasPoint>({
+    x: 16,
+    y: 16,
+  });
   const controlKeyDragRef = useRef<ControlKeyDragStart | null>(null);
-  const canvasPanRef = useRef<(CanvasPanStart & { pointerId: number }) | null>(null);
+  const canvasPanRef = useRef<(CanvasPanStart & { pointerId: number }) | null>(
+    null
+  );
   const touchPointersRef = useRef<Map<number, PointerEvent>>(new Map());
   const pinchStartRef = useRef<PinchZoomStart | null>(null);
   const isPinchingRef = useRef(false);
-  const [measuredPortCenters, setMeasuredPortCenters] = useState<Map<string, CanvasPoint>>(() => new Map());
+  const [measuredPortCenters, setMeasuredPortCenters] = useState<
+    Map<string, CanvasPoint>
+  >(() => new Map());
 
   const query = trpc.tournamentControl.get.useQuery(
     { tournamentId },
     {
-      enabled: Number.isFinite(tournamentId) && auth.user?.loginMethod === "discord",
+      enabled:
+        Number.isFinite(tournamentId) && auth.user?.loginMethod === "discord",
       retry: false,
     }
   );
-  const invalidate = () => utils.tournamentControl.get.invalidate({ tournamentId });
+  const invalidate = () =>
+    utils.tournamentControl.get.invalidate({ tournamentId });
   const mutationOptions = {
     onSuccess: invalidate,
     onError: (error: { message: string }) => toast.error(error.message),
   };
-  const createTeam = trpc.tournamentControl.createTeam.useMutation(mutationOptions);
-  const createCashout = trpc.tournamentControl.createCashoutLobby.useMutation(mutationOptions);
-  const createFinal = trpc.tournamentControl.createFinalRoundMatch.useMutation(mutationOptions);
+  const createTeam =
+    trpc.tournamentControl.createTeam.useMutation(mutationOptions);
+  const createCashout =
+    trpc.tournamentControl.createCashoutLobby.useMutation(mutationOptions);
+  const createFinal =
+    trpc.tournamentControl.createFinalRoundMatch.useMutation(mutationOptions);
   const moveGame = trpc.tournamentControl.moveGame.useMutation(mutationOptions);
-  const connectGames = trpc.tournamentControl.connectGames.useMutation(mutationOptions);
-  const deleteGameConnection = trpc.tournamentControl.deleteGameConnection.useMutation(mutationOptions);
-  const renameGame = trpc.tournamentControl.renameGame.useMutation(mutationOptions);
-  const setLobbyCode = trpc.tournamentControl.setLobbyCode.useMutation(mutationOptions);
-  const setGameMap = trpc.tournamentControl.setGameMap.useMutation(mutationOptions);
-  const randomizeGameMap = trpc.tournamentControl.randomizeGameMap.useMutation(mutationOptions);
-  const updateStatus = trpc.tournamentControl.updateStatus.useMutation(mutationOptions);
-  const setPlacement = trpc.tournamentControl.setAssignmentResultPlacement.useMutation(mutationOptions);
-  const assignTeam = trpc.tournamentControl.assignTeam.useMutation(mutationOptions);
+  const connectGames =
+    trpc.tournamentControl.connectGames.useMutation(mutationOptions);
+  const deleteGameConnection =
+    trpc.tournamentControl.deleteGameConnection.useMutation(mutationOptions);
+  const renameGame =
+    trpc.tournamentControl.renameGame.useMutation(mutationOptions);
+  const setLobbyCode =
+    trpc.tournamentControl.setLobbyCode.useMutation(mutationOptions);
+  const setGameMap =
+    trpc.tournamentControl.setGameMap.useMutation(mutationOptions);
+  const randomizeGameMap =
+    trpc.tournamentControl.randomizeGameMap.useMutation(mutationOptions);
+  const updateStatus =
+    trpc.tournamentControl.updateStatus.useMutation(mutationOptions);
+  const setPlacement =
+    trpc.tournamentControl.setAssignmentResultPlacement.useMutation(
+      mutationOptions
+    );
+  const assignTeam =
+    trpc.tournamentControl.assignTeam.useMutation(mutationOptions);
   const moveTeam = trpc.tournamentControl.moveTeam.useMutation(mutationOptions);
-  const removeTeam = trpc.tournamentControl.removeTeam.useMutation(mutationOptions);
-  const removeAssignedTeams = trpc.tournamentControl.removeAssignedTeams.useMutation(mutationOptions);
-  const deleteGame = trpc.tournamentControl.deleteGame.useMutation(mutationOptions);
-  const setBestOf = trpc.tournamentControl.setFinalRoundSeriesBestOf.useMutation(mutationOptions);
-  const saveTemplate = trpc.tournamentControl.saveTemplateFromTournament.useMutation({ onSuccess: () => toast.success("Template saved"), onError: (error: { message: string }) => toast.error(error.message) });
-  const enableViewerLink = trpc.tournamentControl.enableViewerLink.useMutation({ onSuccess: async data => { await navigator.clipboard.writeText(`${window.location.origin}${data.path}`); toast.success("Viewer link copied"); }, onError: (error: { message: string }) => toast.error(error.message) });
-  const createClaimLink = trpc.tournamentControl.createTeamClaimLink.useMutation({ onSuccess: async data => { await navigator.clipboard.writeText(`${window.location.origin}${data.path}`); toast.success("Team claim link copied"); }, onError: (error: { message: string }) => toast.error(error.message) });
-  const sendLobbyCodeToTeamLeader = trpc.tournamentControl.sendLobbyCodeToTeamLeader.useMutation({
-    onSuccess: result => {
-      for (const item of result.results) {
-        if (item.status === "sent") toast.success(`Sent code to ${item.teamName}`);
-        else toast.error(`${item.teamName}: ${item.message}`);
-      }
+  const removeTeam =
+    trpc.tournamentControl.removeTeam.useMutation(mutationOptions);
+  const removeAssignedTeams =
+    trpc.tournamentControl.removeAssignedTeams.useMutation(mutationOptions);
+  const deleteGame =
+    trpc.tournamentControl.deleteGame.useMutation(mutationOptions);
+  const setBestOf =
+    trpc.tournamentControl.setFinalRoundSeriesBestOf.useMutation(
+      mutationOptions
+    );
+  const saveTemplate =
+    trpc.tournamentControl.saveTemplateFromTournament.useMutation({
+      onSuccess: () => toast.success("Template saved"),
+      onError: (error: { message: string }) => toast.error(error.message),
+    });
+  const enableViewerLink = trpc.tournamentControl.enableViewerLink.useMutation({
+    onSuccess: async data => {
+      await navigator.clipboard.writeText(
+        `${window.location.origin}${data.path}`
+      );
+      toast.success("Viewer link copied");
     },
     onError: (error: { message: string }) => toast.error(error.message),
   });
-  const sendLobbyCodeToLobbyLeaders = trpc.tournamentControl.sendLobbyCodeToLobbyLeaders.useMutation({
-    onSuccess: result => {
-      const sent = result.results.filter(item => item.status === "sent").length;
-      const failed = result.results.length - sent;
-      if (sent) toast.success(`Sent lobby code to ${sent} leader${sent === 1 ? "" : "s"}`);
-      if (failed) toast.error(`${failed} leader${failed === 1 ? "" : "s"} could not be messaged`);
-    },
-    onError: (error: { message: string }) => toast.error(error.message),
-  });
+  const createClaimLink =
+    trpc.tournamentControl.createTeamClaimLink.useMutation({
+      onSuccess: async data => {
+        await navigator.clipboard.writeText(
+          `${window.location.origin}${data.path}`
+        );
+        toast.success("Team claim link copied");
+      },
+      onError: (error: { message: string }) => toast.error(error.message),
+    });
+  const sendLobbyCodeToTeamLeader =
+    trpc.tournamentControl.sendLobbyCodeToTeamLeader.useMutation({
+      onSuccess: result => {
+        for (const item of result.results) {
+          if (item.status === "sent")
+            toast.success(`Sent code to ${item.teamName}`);
+          else toast.error(`${item.teamName}: ${item.message}`);
+        }
+      },
+      onError: (error: { message: string }) => toast.error(error.message),
+    });
+  const sendLobbyCodeToLobbyLeaders =
+    trpc.tournamentControl.sendLobbyCodeToLobbyLeaders.useMutation({
+      onSuccess: result => {
+        const sent = result.results.filter(
+          item => item.status === "sent"
+        ).length;
+        const failed = result.results.length - sent;
+        if (sent)
+          toast.success(
+            `Sent lobby code to ${sent} leader${sent === 1 ? "" : "s"}`
+          );
+        if (failed)
+          toast.error(
+            `${failed} leader${failed === 1 ? "" : "s"} could not be messaged`
+          );
+      },
+      onError: (error: { message: string }) => toast.error(error.message),
+    });
 
   const games = (query.data?.games ?? []) as ControlGameView[];
   const assignments = (query.data?.assignments ?? []) as AssignmentView[];
   const connections = (query.data?.connections ?? []) as ConnectionView[];
 
   const gamesById = useMemo(
-    () => new Map<number, ControlGameView>(games.map(game => [game.id, game] as const)),
+    () =>
+      new Map<number, ControlGameView>(
+        games.map(game => [game.id, game] as const)
+      ),
     [games]
   );
   const activeAssignedTeamIds = useMemo(() => {
@@ -477,22 +653,35 @@ export default function TournamentControlRoom() {
     );
   }, [assignments, games]);
   const teamsById = useMemo(
-    () => new Map<number, ControlTeamView>(query.data?.teams.map(team => [team.id, team] as const) ?? []),
+    () =>
+      new Map<number, ControlTeamView>(
+        query.data?.teams.map(team => [team.id, team] as const) ?? []
+      ),
     [query.data]
   );
   const unassignedTeams =
     query.data?.teams.filter(team => !activeAssignedTeamIds.has(team.id)) ?? [];
   const logicalCanvasSize = useMemo(() => {
     return {
-      width: Math.max(baseCanvasSize.width, ...games.map(game => game.canvasX + 520)),
-      height: Math.max(baseCanvasSize.height, ...games.map(game => game.canvasY + 680)),
+      width: Math.max(
+        baseCanvasSize.width,
+        ...games.map(game => game.canvasX + 520)
+      ),
+      height: Math.max(
+        baseCanvasSize.height,
+        ...games.map(game => game.canvasY + 680)
+      ),
     };
   }, [games]);
-  const availableTeamsToggleLabel = getAvailableTeamsToggleLabel(unassignedTeams.length);
+  const availableTeamsToggleLabel = getAvailableTeamsToggleLabel(
+    unassignedTeams.length
+  );
 
   const selectedAssignmentContext = useMemo(() => {
     if (selectedAssignmentId === null) return null;
-    const assignment = assignments.find(item => item.id === selectedAssignmentId);
+    const assignment = assignments.find(
+      item => item.id === selectedAssignmentId
+    );
     if (!assignment) return null;
     const game = gamesById.get(assignment.gameId);
     if (!game) return null;
@@ -504,7 +693,12 @@ export default function TournamentControlRoom() {
   const getVisualPosition = useCallback(
     (game: ControlGameView) => {
       if (nodeDrag?.gameId === game.id) return { x: nodeDrag.x, y: nodeDrag.y };
-      return optimisticGamePositions.get(game.id) ?? { x: game.canvasX, y: game.canvasY };
+      return (
+        optimisticGamePositions.get(game.id) ?? {
+          x: game.canvasX,
+          y: game.canvasY,
+        }
+      );
     },
     [nodeDrag, optimisticGamePositions]
   );
@@ -512,28 +706,55 @@ export default function TournamentControlRoom() {
   const getPortCenter = useCallback(
     (game: ControlGameView, port: "top" | "bottom") =>
       measuredPortCenters.get(`${game.id}:${port}`) ??
-      getConnectorCenter(game, port, minimizedGameIds.has(game.id), getVisualPosition(game)),
+      getConnectorCenter(
+        game,
+        port,
+        minimizedGameIds.has(game.id),
+        getVisualPosition(game)
+      ),
     [getVisualPosition, measuredPortCenters, minimizedGameIds]
   );
 
-
   const assignDroppedTeam = useCallback(
-    (game: ControlGameView, gameAssignments: AssignmentView[], payload: DragPayload, preferredSlotIndex?: number) => {
+    (
+      game: ControlGameView,
+      gameAssignments: AssignmentView[],
+      payload: DragPayload,
+      preferredSlotIndex?: number
+    ) => {
       if (game.status === "complete") return;
-      if (payload.fromGameId === game.id && gameAssignments.some(assignment => assignment.teamId === payload.teamId)) {
+      if (
+        payload.fromGameId === game.id &&
+        gameAssignments.some(assignment => assignment.teamId === payload.teamId)
+      ) {
         toast.error("That team is already assigned to this lobby.");
         return;
       }
       const capacity = game.gameType === "cashout" ? 4 : 2;
-      const slotIndex = getResolvedDropSlot(game.status, gameAssignments, capacity, payload.teamId, preferredSlotIndex);
+      const slotIndex = getResolvedDropSlot(
+        game.status,
+        gameAssignments,
+        capacity,
+        payload.teamId,
+        preferredSlotIndex
+      );
       if (slotIndex === null) {
         toast.error("This lobby has no open slots.");
         return;
       }
       if (payload.fromGameId) {
-        moveTeam.mutate({ gameId: payload.fromGameId, toGameId: game.id, teamId: payload.teamId, slotIndex });
+        moveTeam.mutate({
+          gameId: payload.fromGameId,
+          toGameId: game.id,
+          teamId: payload.teamId,
+          slotIndex,
+        });
       } else {
-        assignTeam.mutate({ gameId: game.id, teamId: payload.teamId, slotIndex });
+        assignTeam.mutate({
+          gameId: game.id,
+          teamId: payload.teamId,
+          slotIndex,
+        });
       }
     },
     [assignTeam, moveTeam]
@@ -546,37 +767,71 @@ export default function TournamentControlRoom() {
       if (!canvas || !board) return;
       const canvasRect = canvas.getBoundingClientRect();
       const next = new Map<string, CanvasPoint>();
-      board.querySelectorAll<HTMLElement>("[data-connector-port='true'][data-game-id][data-port]").forEach(port => {
-        const gameId = port.dataset.gameId;
-        const portName = port.dataset.port;
-        if (!gameId || (portName !== "top" && portName !== "bottom")) return;
-        const rect = port.getBoundingClientRect();
-        next.set(`${gameId}:${portName}`, {
-          x: (rect.left + rect.width / 2 - canvasRect.left + canvas.scrollLeft) / zoom,
-          y: (rect.top + rect.height / 2 - canvasRect.top + canvas.scrollTop) / zoom,
+      board
+        .querySelectorAll<HTMLElement>(
+          "[data-connector-port='true'][data-game-id][data-port]"
+        )
+        .forEach(port => {
+          const gameId = port.dataset.gameId;
+          const portName = port.dataset.port;
+          if (!gameId || (portName !== "top" && portName !== "bottom")) return;
+          const rect = port.getBoundingClientRect();
+          next.set(`${gameId}:${portName}`, {
+            x:
+              (rect.left +
+                rect.width / 2 -
+                canvasRect.left +
+                canvas.scrollLeft) /
+              zoom,
+            y:
+              (rect.top + rect.height / 2 - canvasRect.top + canvas.scrollTop) /
+              zoom,
+          });
         });
-      });
       setMeasuredPortCenters(current => {
-        if (current.size === next.size && Array.from(next).every(([key, value]) => {
-          const previous = current.get(key);
-          return previous && Math.abs(previous.x - value.x) < 0.5 && Math.abs(previous.y - value.y) < 0.5;
-        })) return current;
+        if (
+          current.size === next.size &&
+          Array.from(next).every(([key, value]) => {
+            const previous = current.get(key);
+            return (
+              previous &&
+              Math.abs(previous.x - value.x) < 0.5 &&
+              Math.abs(previous.y - value.y) < 0.5
+            );
+          })
+        )
+          return current;
         return next;
       });
     };
     measurePorts();
     const observer = new ResizeObserver(measurePorts);
     if (boardRef.current) observer.observe(boardRef.current);
-    boardRef.current?.querySelectorAll("[data-control-node='true']").forEach(node => observer.observe(node));
+    boardRef.current
+      ?.querySelectorAll("[data-control-node='true']")
+      .forEach(node => observer.observe(node));
     window.addEventListener("resize", measurePorts);
-    return () => { observer.disconnect(); window.removeEventListener("resize", measurePorts); };
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measurePorts);
+    };
   }, [assignments, games, minimizedGameIds, nodeDrag, query.data, zoom]);
 
   useEffect(() => {
     if (selectedAssignmentId === null) return;
-    const assignmentExists = assignments.some(assignment => assignment.id === selectedAssignmentId);
+    const assignmentExists = assignments.some(
+      assignment => assignment.id === selectedAssignmentId
+    );
     if (!assignmentExists) setSelectedAssignmentId(null);
   }, [assignments, selectedAssignmentId]);
+
+  useEffect(() => {
+    if (selectedConnectionId === null) return;
+    const connectionExists = connections.some(
+      connection => connection.id === selectedConnectionId
+    );
+    if (!connectionExists) setSelectedConnectionId(null);
+  }, [connections, selectedConnectionId]);
 
   useEffect(() => {
     setOptimisticGamePositions(current => {
@@ -584,7 +839,11 @@ export default function TournamentControlRoom() {
       const next = new Map(current);
       for (const game of games) {
         const optimistic = next.get(game.id);
-        if (optimistic && optimistic.x === game.canvasX && optimistic.y === game.canvasY) {
+        if (
+          optimistic &&
+          optimistic.x === game.canvasX &&
+          optimistic.y === game.canvasY
+        ) {
           next.delete(game.id);
         }
       }
@@ -598,6 +857,17 @@ export default function TournamentControlRoom() {
 
       if (event.key === "Escape") {
         setSelectedAssignmentId(null);
+        setSelectedConnectionId(null);
+        return;
+      }
+
+      if (
+        selectedConnectionId !== null &&
+        ["Backspace", "Delete"].includes(event.key)
+      ) {
+        event.preventDefault();
+        deleteGameConnection.mutate({ connectionId: selectedConnectionId });
+        setSelectedConnectionId(null);
         return;
       }
 
@@ -633,7 +903,12 @@ export default function TournamentControlRoom() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedAssignmentContext, setPlacement]);
+  }, [
+    deleteGameConnection,
+    selectedAssignmentContext,
+    selectedConnectionId,
+    setPlacement,
+  ]);
 
   const canvasPoint = useCallback(
     (clientX: number, clientY: number) => {
@@ -642,13 +917,17 @@ export default function TournamentControlRoom() {
         x: Math.max(
           0,
           Math.round(
-            (clientX - (rect?.left ?? 0) + (canvasRef.current?.scrollLeft ?? 0)) / zoom
+            (clientX -
+              (rect?.left ?? 0) +
+              (canvasRef.current?.scrollLeft ?? 0)) /
+              zoom
           )
         ),
         y: Math.max(
           0,
           Math.round(
-            (clientY - (rect?.top ?? 0) + (canvasRef.current?.scrollTop ?? 0)) / zoom
+            (clientY - (rect?.top ?? 0) + (canvasRef.current?.scrollTop ?? 0)) /
+              zoom
           )
         ),
       };
@@ -662,10 +941,11 @@ export default function TournamentControlRoom() {
     const { gameId, offsetX, offsetY } = nodeDrag;
     const getPosition = (clientX: number, clientY: number) => {
       const point = canvasPoint(clientX, clientY);
-      return {
+      const position = {
         x: Math.max(0, Math.round(point.x - offsetX)),
         y: Math.max(0, Math.round(point.y - offsetY)),
       };
+      return snapWindowsToGrid ? snapCanvasPointToGrid(position) : position;
     };
 
     const handlePointerMove = (event: PointerEvent) => {
@@ -682,7 +962,9 @@ export default function TournamentControlRoom() {
         return;
       }
       const position = getPosition(event.clientX, event.clientY);
-      setOptimisticGamePositions(current => new Map(current).set(gameId, position));
+      setOptimisticGamePositions(current =>
+        new Map(current).set(gameId, position)
+      );
       moveGame.mutate({ gameId, position });
       setNodeDrag(null);
     };
@@ -698,7 +980,14 @@ export default function TournamentControlRoom() {
       window.removeEventListener("pointerup", finishDrag);
       window.removeEventListener("pointercancel", cancelDrag);
     };
-  }, [canvasPoint, moveGame, nodeDrag?.gameId, nodeDrag?.offsetX, nodeDrag?.offsetY]);
+  }, [
+    canvasPoint,
+    moveGame,
+    nodeDrag?.gameId,
+    nodeDrag?.offsetX,
+    nodeDrag?.offsetY,
+    snapWindowsToGrid,
+  ]);
 
   useEffect(() => {
     if (!connectionDrag) return;
@@ -707,12 +996,17 @@ export default function TournamentControlRoom() {
     const handlePointerMove = (event: PointerEvent) => {
       const currentPoint = canvasPoint(event.clientX, event.clientY);
       setConnectionDrag(current =>
-        current?.sourceGameId === sourceGameId ? { ...current, currentPoint } : current
+        current?.sourceGameId === sourceGameId
+          ? { ...current, currentPoint }
+          : current
       );
     };
 
     const finishConnection = (event: PointerEvent) => {
-      const targetGameId = resolveConnectionDropTargetGameId(event.target, sourceGameId);
+      const targetGameId = resolveConnectionDropTargetGameId(
+        event.target,
+        sourceGameId
+      );
 
       if (targetGameId !== null) {
         connectGames.mutate({ tournamentId, sourceGameId, targetGameId });
@@ -732,7 +1026,6 @@ export default function TournamentControlRoom() {
       window.removeEventListener("pointercancel", cancelConnection);
     };
   }, [canvasPoint, connectGames, connectionDrag?.sourceGameId, tournamentId]);
-
 
   useEffect(() => {
     if (!isPanning) return;
@@ -763,7 +1056,10 @@ export default function TournamentControlRoom() {
     (assignment: AssignmentView, capacity: number) => {
       setPlacement.mutate({
         assignmentId: assignment.id,
-        resultPlacement: getNextPlacementValue(assignment.resultPlacement ?? null, capacity),
+        resultPlacement: getNextPlacementValue(
+          assignment.resultPlacement ?? null,
+          capacity
+        ),
       });
     },
     [setPlacement]
@@ -786,36 +1082,42 @@ export default function TournamentControlRoom() {
     [controlKeyLocked, controlKeyPosition.x, controlKeyPosition.y]
   );
 
-  const dragControlKey = useCallback((event: ReactPointerEvent<HTMLElement>) => {
-    const dragStart = controlKeyDragRef.current;
-    if (!dragStart || dragStart.pointerId !== event.pointerId) return;
-    event.preventDefault();
-    event.stopPropagation();
-    const canvasRect = canvasRef.current?.getBoundingClientRect();
-    const keyRect = controlKeyRef.current?.getBoundingClientRect();
-    const nextPosition = {
-      x: dragStart.startX + event.clientX - dragStart.clientX,
-      y: dragStart.startY + event.clientY - dragStart.clientY,
-    };
-    setControlKeyPosition(
-      canvasRect && keyRect
-        ? getBoundedControlKeyPosition(
-            nextPosition,
-            { width: canvasRect.width, height: canvasRect.height },
-            { width: keyRect.width, height: keyRect.height }
-          )
-        : nextPosition
-    );
-  }, []);
+  const dragControlKey = useCallback(
+    (event: ReactPointerEvent<HTMLElement>) => {
+      const dragStart = controlKeyDragRef.current;
+      if (!dragStart || dragStart.pointerId !== event.pointerId) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const canvasRect = canvasRef.current?.getBoundingClientRect();
+      const keyRect = controlKeyRef.current?.getBoundingClientRect();
+      const nextPosition = {
+        x: dragStart.startX + event.clientX - dragStart.clientX,
+        y: dragStart.startY + event.clientY - dragStart.clientY,
+      };
+      setControlKeyPosition(
+        canvasRect && keyRect
+          ? getBoundedControlKeyPosition(
+              nextPosition,
+              { width: canvasRect.width, height: canvasRect.height },
+              { width: keyRect.width, height: keyRect.height }
+            )
+          : nextPosition
+      );
+    },
+    []
+  );
 
-  const finishControlKeyDrag = useCallback((event: ReactPointerEvent<HTMLElement>) => {
-    if (controlKeyDragRef.current?.pointerId !== event.pointerId) return;
-    controlKeyDragRef.current = null;
-    event.stopPropagation();
-    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-  }, []);
+  const finishControlKeyDrag = useCallback(
+    (event: ReactPointerEvent<HTMLElement>) => {
+      if (controlKeyDragRef.current?.pointerId !== event.pointerId) return;
+      controlKeyDragRef.current = null;
+      event.stopPropagation();
+      if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+    },
+    []
+  );
 
   const toggleMinimizedGame = (gameId: number) => {
     setMinimizedGameIds(current => {
@@ -848,7 +1150,8 @@ export default function TournamentControlRoom() {
       />
     );
   }
-  if (query.isLoading) return <ControlState title="Verifying Discord organizer roles…" />;
+  if (query.isLoading)
+    return <ControlState title="Verifying Discord organizer roles…" />;
   if (query.error) {
     return (
       <ControlState
@@ -877,12 +1180,35 @@ export default function TournamentControlRoom() {
               {query.data.tournament.name}
             </h1>
             <p className="text-sm text-white/60">
-              {query.data.tournament.eventStatus} · {query.data.tournament.currentStage}
+              {query.data.tournament.eventStatus} ·{" "}
+              {query.data.tournament.currentStage}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <Button variant="outline" className="border-neon-gold/40 text-neon-gold hover:bg-neon-gold/10" onClick={() => enableViewerLink.mutate({ tournamentId })}>Copy Viewer Link</Button>
-            <Button variant="outline" className="border-neon-gold/40 text-neon-gold hover:bg-neon-gold/10" onClick={() => { const name = window.prompt("Template name", `${query.data.tournament.name} Template`); if (!name) return; const visibility = window.confirm("Make this template public?") ? "public" : "private"; saveTemplate.mutate({ tournamentId, name, visibility }); }}>Save Template</Button>
+            <Button
+              variant="outline"
+              className="border-neon-gold/40 text-neon-gold hover:bg-neon-gold/10"
+              onClick={() => enableViewerLink.mutate({ tournamentId })}
+            >
+              Copy Viewer Link
+            </Button>
+            <Button
+              variant="outline"
+              className="border-neon-gold/40 text-neon-gold hover:bg-neon-gold/10"
+              onClick={() => {
+                const name = window.prompt(
+                  "Template name",
+                  `${query.data.tournament.name} Template`
+                );
+                if (!name) return;
+                const visibility = window.confirm("Make this template public?")
+                  ? "public"
+                  : "private";
+                saveTemplate.mutate({ tournamentId, name, visibility });
+              }}
+            >
+              Save Template
+            </Button>
             <Link
               href="/admin/tournaments/control"
               className="inline-flex rounded border border-[#FFD700]/70 bg-[#FFD700] px-4 py-2 font-mono text-xs font-black uppercase tracking-wider text-black shadow-[0_0_18px_rgba(255,215,0,0.22)] transition hover:bg-[#D4AF37]"
@@ -890,7 +1216,8 @@ export default function TournamentControlRoom() {
               ← Tournament Rooms
             </Link>
             <div className="rounded border border-white/10 bg-white/5 px-3 py-2 font-mono text-xs text-white/55">
-              Click team + 1–4 score · drag lobby frame to move · drag bottom node onto a lobby to connect
+              Click team + 1–4 score · drag lobby frame to move · drag bottom
+              node onto a lobby to connect
             </div>
           </div>
         </div>
@@ -904,20 +1231,32 @@ export default function TournamentControlRoom() {
             onClick={() => setMobileTeamsOpen(open => !open)}
           >
             <span>{availableTeamsToggleLabel}</span>
-            <span className="text-lg leading-none">{mobileTeamsOpen ? "−" : "+"}</span>
+            <span className="text-lg leading-none">
+              {mobileTeamsOpen ? "−" : "+"}
+            </span>
           </button>
-          <h2 className="hidden font-mono text-lg font-bold text-neon-gold lg:block">Available Teams</h2>
-          <div className={`${mobileTeamsOpen ? "block" : "hidden"} mt-3 max-h-[24dvh] overflow-auto pr-1 lg:mt-0 lg:block lg:max-h-none lg:overflow-visible lg:pr-0`}>
+          <h2 className="hidden font-mono text-lg font-bold text-neon-gold lg:block">
+            Available Teams
+          </h2>
+          <div
+            className={`${mobileTeamsOpen ? "block" : "hidden"} mt-3 max-h-[24dvh] overflow-auto pr-1 lg:mt-0 lg:block lg:max-h-none lg:overflow-visible lg:pr-0`}
+          >
             <p className="mb-3 text-xs text-white/50 lg:mb-4">
-              Teams assigned only to completed games remain available for new active games.
+              Teams assigned only to completed games remain available for new
+              active games.
             </p>
             <div
               className="space-y-2"
               onDragOver={event => event.preventDefault()}
               onDrop={event => {
-                const payload = parseDragPayload(event.dataTransfer.getData("application/json"));
+                const payload = parseDragPayload(
+                  event.dataTransfer.getData("application/json")
+                );
                 if (payload?.fromGameId) {
-                  removeTeam.mutate({ gameId: payload.fromGameId, teamId: payload.teamId });
+                  removeTeam.mutate({
+                    gameId: payload.fromGameId,
+                    teamId: payload.teamId,
+                  });
                 }
               }}
             >
@@ -931,7 +1270,11 @@ export default function TournamentControlRoom() {
                     key={team.id}
                     team={team}
                     onDragStart={() => setDragPayload({ teamId: team.id })}
-                    onCreateClaimLink={!team.managedTeamId ? () => createClaimLink.mutate({ teamId: team.id }) : undefined}
+                    onCreateClaimLink={
+                      !team.managedTeamId
+                        ? () => createClaimLink.mutate({ teamId: team.id })
+                        : undefined
+                    }
                   />
                 ))
               )}
@@ -969,15 +1312,24 @@ export default function TournamentControlRoom() {
               }}
               onPointerDown={event => {
                 if (event.pointerType === "touch") {
-                  touchPointersRef.current.set(event.pointerId, event.nativeEvent);
+                  touchPointersRef.current.set(
+                    event.pointerId,
+                    event.nativeEvent
+                  );
                   if (event.currentTarget.setPointerCapture) {
                     event.currentTarget.setPointerCapture(event.pointerId);
                   }
-                  if (shouldCancelBoardDragsForPinch(touchPointersRef.current.size)) {
+                  if (
+                    shouldCancelBoardDragsForPinch(
+                      touchPointersRef.current.size
+                    )
+                  ) {
                     cancelBoardDragsForPinch();
                     const element = canvasRef.current;
                     const rect = element?.getBoundingClientRect();
-                    const pointers = Array.from(touchPointersRef.current.values());
+                    const pointers = Array.from(
+                      touchPointersRef.current.values()
+                    );
                     if (element && rect && pointers[0] && pointers[1]) {
                       const midpoint = getMidpoint(pointers[0], pointers[1]);
                       pinchStartRef.current = {
@@ -985,8 +1337,10 @@ export default function TournamentControlRoom() {
                         zoom,
                         focalClientX: midpoint.x,
                         focalClientY: midpoint.y,
-                        focalCanvasX: (midpoint.x - rect.left + element.scrollLeft) / zoom,
-                        focalCanvasY: (midpoint.y - rect.top + element.scrollTop) / zoom,
+                        focalCanvasX:
+                          (midpoint.x - rect.left + element.scrollLeft) / zoom,
+                        focalCanvasY:
+                          (midpoint.y - rect.top + element.scrollTop) / zoom,
                       };
                       canvasPanRef.current = null;
                       setIsPanning(false);
@@ -996,9 +1350,11 @@ export default function TournamentControlRoom() {
                   }
                 }
 
-                if (event.pointerType === "touch" && isPinchingRef.current) return;
+                if (event.pointerType === "touch" && isPinchingRef.current)
+                  return;
 
-                if (event.button !== 0 || !shouldStartCanvasPan(event.target)) return;
+                if (event.button !== 0 || !shouldStartCanvasPan(event.target))
+                  return;
                 const element = canvasRef.current;
                 if (!element) return;
                 event.preventDefault();
@@ -1015,22 +1371,44 @@ export default function TournamentControlRoom() {
                 setIsPanning(true);
               }}
               onPointerMove={event => {
-                if (event.pointerType === "touch" && touchPointersRef.current.has(event.pointerId)) {
-                  touchPointersRef.current.set(event.pointerId, event.nativeEvent);
-                  if (touchPointersRef.current.size >= 2 && pinchStartRef.current) {
+                if (
+                  event.pointerType === "touch" &&
+                  touchPointersRef.current.has(event.pointerId)
+                ) {
+                  touchPointersRef.current.set(
+                    event.pointerId,
+                    event.nativeEvent
+                  );
+                  if (
+                    touchPointersRef.current.size >= 2 &&
+                    pinchStartRef.current
+                  ) {
                     const element = canvasRef.current;
                     const rect = element?.getBoundingClientRect();
-                    const pointers = Array.from(touchPointersRef.current.values());
-                    if (!element || !rect || !pointers[0] || !pointers[1]) return;
+                    const pointers = Array.from(
+                      touchPointersRef.current.values()
+                    );
+                    if (!element || !rect || !pointers[0] || !pointers[1])
+                      return;
                     event.preventDefault();
-                    const nextDistance = getPointerDistance(pointers[0], pointers[1]);
+                    const nextDistance = getPointerDistance(
+                      pointers[0],
+                      pointers[1]
+                    );
                     if (pinchStartRef.current.distance <= 0) return;
                     const nextZoom = clampZoom(
-                      pinchStartRef.current.zoom * (nextDistance / pinchStartRef.current.distance)
+                      pinchStartRef.current.zoom *
+                        (nextDistance / pinchStartRef.current.distance)
                     );
                     const nextScroll = getViewportPreservingScroll(
-                      { x: pinchStartRef.current.focalCanvasX, y: pinchStartRef.current.focalCanvasY },
-                      { x: pinchStartRef.current.focalClientX, y: pinchStartRef.current.focalClientY },
+                      {
+                        x: pinchStartRef.current.focalCanvasX,
+                        y: pinchStartRef.current.focalCanvasY,
+                      },
+                      {
+                        x: pinchStartRef.current.focalClientX,
+                        y: pinchStartRef.current.focalClientY,
+                      },
                       rect,
                       nextZoom
                     );
@@ -1046,15 +1424,21 @@ export default function TournamentControlRoom() {
                 const element = canvasRef.current;
                 if (!element) return;
                 event.preventDefault();
-                const nextScroll = getCanvasPanScroll(panStart, event.clientX, event.clientY);
+                const nextScroll = getCanvasPanScroll(
+                  panStart,
+                  event.clientX,
+                  event.clientY
+                );
                 element.scrollLeft = nextScroll.scrollLeft;
                 element.scrollTop = nextScroll.scrollTop;
               }}
               onPointerUp={event => {
                 if (event.pointerType === "touch") {
                   touchPointersRef.current.delete(event.pointerId);
-                  if (touchPointersRef.current.size < 2) pinchStartRef.current = null;
-                  if (touchPointersRef.current.size === 0) isPinchingRef.current = false;
+                  if (touchPointersRef.current.size < 2)
+                    pinchStartRef.current = null;
+                  if (touchPointersRef.current.size === 0)
+                    isPinchingRef.current = false;
                 }
                 if (canvasPanRef.current?.pointerId === event.pointerId) {
                   canvasPanRef.current = null;
@@ -1067,8 +1451,10 @@ export default function TournamentControlRoom() {
               onPointerCancel={event => {
                 if (event.pointerType === "touch") {
                   touchPointersRef.current.delete(event.pointerId);
-                  if (touchPointersRef.current.size < 2) pinchStartRef.current = null;
-                  if (touchPointersRef.current.size === 0) isPinchingRef.current = false;
+                  if (touchPointersRef.current.size < 2)
+                    pinchStartRef.current = null;
+                  if (touchPointersRef.current.size === 0)
+                    isPinchingRef.current = false;
                 }
                 if (canvasPanRef.current?.pointerId === event.pointerId) {
                   canvasPanRef.current = null;
@@ -1076,10 +1462,11 @@ export default function TournamentControlRoom() {
                 }
               }}
               onContextMenu={event => {
-                setCanvasMenuPosition(canvasPoint(event.clientX, event.clientY));
+                setCanvasMenuPosition(
+                  canvasPoint(event.clientX, event.clientY)
+                );
               }}
             >
-
               <div className="pointer-events-none sticky left-0 top-0 z-[55] hidden h-0 w-0 lg:block">
                 <div
                   ref={controlKeyRef}
@@ -1089,7 +1476,9 @@ export default function TournamentControlRoom() {
                       ? "w-max border-[#FFD700]/50"
                       : "w-[min(26rem,calc(100vw-2rem))] border-[#FFD700]/35 p-4"
                   }`}
-                  style={{ transform: `translate(${controlKeyPosition.x}px, ${controlKeyPosition.y}px)` }}
+                  style={{
+                    transform: `translate(${controlKeyPosition.x}px, ${controlKeyPosition.y}px)`,
+                  }}
                   onContextMenu={event => event.stopPropagation()}
                 >
                   {controlKeyMinimized ? (
@@ -1115,7 +1504,9 @@ export default function TournamentControlRoom() {
                           data-no-canvas-pan="true"
                           data-control-key-drag-handle="true"
                           className={`flex min-w-0 flex-1 items-center gap-2 ${
-                            controlKeyLocked ? "cursor-default" : "cursor-grab active:cursor-grabbing"
+                            controlKeyLocked
+                              ? "cursor-default"
+                              : "cursor-grab active:cursor-grabbing"
                           }`}
                           onPointerDown={startControlKeyDrag}
                           onPointerMove={dragControlKey}
@@ -1124,9 +1515,13 @@ export default function TournamentControlRoom() {
                         >
                           <span className="h-2 w-2 rounded-full bg-[#FFD700] shadow-[0_0_12px_#FFD700]" />
                           <div>
-                            <p className="text-xs font-black uppercase tracking-[0.28em] text-[#FFD700]">PC Control Key</p>
+                            <p className="text-xs font-black uppercase tracking-[0.28em] text-[#FFD700]">
+                              PC Control Key
+                            </p>
                             <p className="text-[10px] uppercase tracking-wider text-white/45">
-                              {controlKeyLocked ? "Locked in place" : "Unlocked · drag the handle"}
+                              {controlKeyLocked
+                                ? "Locked in place"
+                                : "Unlocked · drag the handle"}
                             </p>
                           </div>
                         </div>
@@ -1163,20 +1558,91 @@ export default function TournamentControlRoom() {
                           </button>
                         </div>
                       </div>
+                      <div
+                        data-no-canvas-pan="true"
+                        className="pointer-events-auto mb-3 flex items-center justify-between gap-3 rounded border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-2"
+                      >
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#FFD700]">
+                            Snap to Grid
+                          </p>
+                          <p className="text-[10px] uppercase tracking-wider text-white/45">
+                            40px lobby magnet
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          data-no-canvas-pan="true"
+                          className={`rounded border px-3 py-1 text-[10px] font-black uppercase transition ${
+                            snapWindowsToGrid
+                              ? "border-[#FFD700] bg-[#FFD700] text-black shadow-[0_0_14px_rgba(255,215,0,0.24)]"
+                              : "border-white/15 bg-black/50 text-white/65 hover:border-[#FFD700]/60 hover:text-[#FFD700]"
+                          }`}
+                          aria-pressed={snapWindowsToGrid}
+                          onPointerDown={event => event.stopPropagation()}
+                          onClick={event => {
+                            event.stopPropagation();
+                            setSnapWindowsToGrid(current => !current);
+                          }}
+                        >
+                          {snapWindowsToGrid ? "On" : "Off"}
+                        </button>
+                      </div>
                       <div className="grid gap-2 text-[11px] text-white/75 sm:grid-cols-2">
                         {[
-                          ["bg-cyan-400/15 text-cyan-100 border-cyan-300/30", "Drag empty grid", "Pan board"],
-                          ["bg-fuchsia-400/15 text-fuchsia-100 border-fuchsia-300/30", "Shift + scroll", "Zoom board"],
-                          ["bg-emerald-400/15 text-emerald-100 border-emerald-300/30", "Right-click grid", "Create teams/lobbies"],
-                          ["bg-orange-400/15 text-orange-100 border-orange-300/30", "Drag lobby frame", "Move lobby"],
-                          ["bg-sky-400/15 text-sky-100 border-sky-300/30", "Drag teams", "Drop into slots"],
-                          ["bg-lime-400/15 text-lime-100 border-lime-300/30", "Team + 1–4", "Score placement"],
-                          ["bg-purple-400/15 text-purple-100 border-purple-300/30", "Mobile double-tap", "Cycle score"],
-                          ["bg-yellow-300/15 text-yellow-100 border-yellow-200/40", "Gold connector", "Link to top port"],
-                          ["bg-red-400/15 text-red-100 border-red-300/30", "Double-click line", "Remove link"],
+                          [
+                            "bg-cyan-400/15 text-cyan-100 border-cyan-300/30",
+                            "Drag empty grid",
+                            "Pan board",
+                          ],
+                          [
+                            "bg-fuchsia-400/15 text-fuchsia-100 border-fuchsia-300/30",
+                            "Shift + scroll",
+                            "Zoom board",
+                          ],
+                          [
+                            "bg-emerald-400/15 text-emerald-100 border-emerald-300/30",
+                            "Right-click grid",
+                            "Create teams/lobbies",
+                          ],
+                          [
+                            "bg-orange-400/15 text-orange-100 border-orange-300/30",
+                            "Drag lobby frame",
+                            "Move lobby",
+                          ],
+                          [
+                            "bg-sky-400/15 text-sky-100 border-sky-300/30",
+                            "Drag teams",
+                            "Drop into slots",
+                          ],
+                          [
+                            "bg-lime-400/15 text-lime-100 border-lime-300/30",
+                            "Team + 1–4",
+                            "Score placement",
+                          ],
+                          [
+                            "bg-purple-400/15 text-purple-100 border-purple-300/30",
+                            "Mobile double-tap",
+                            "Cycle score",
+                          ],
+                          [
+                            "bg-yellow-300/15 text-yellow-100 border-yellow-200/40",
+                            "Gold connector",
+                            "Link to top port",
+                          ],
+                          [
+                            "bg-red-400/15 text-red-100 border-red-300/30",
+                            "Select line + Del",
+                            "Remove link",
+                          ],
                         ].map(([classes, action, detail]) => (
-                          <div key={action} className={`rounded border px-2.5 py-2 ${classes}`}>
-                            <span className="block text-[10px] font-black uppercase tracking-wider">{action}</span>
+                          <div
+                            key={action}
+                            className={`rounded border px-2.5 py-2 ${classes}`}
+                          >
+                            <span className="block text-[10px] font-black uppercase tracking-wider">
+                              {action}
+                            </span>
                             <span className="text-white/65">{detail}</span>
                           </div>
                         ))}
@@ -1187,9 +1653,14 @@ export default function TournamentControlRoom() {
               </div>
               <div className="pointer-events-none sticky left-2 top-2 z-[54] h-0 w-0 lg:hidden">
                 {touchHelpOpen ? (
-                  <div className="pointer-events-auto ml-2 mt-2 max-h-[38dvh] w-[min(18rem,calc(100vw-2rem))] overflow-auto rounded-xl border border-cyan-300/25 bg-zinc-950/90 p-3 shadow-[0_0_24px_rgba(34,211,238,0.12)] backdrop-blur" data-no-canvas-pan="true">
+                  <div
+                    className="pointer-events-auto ml-2 mt-2 max-h-[38dvh] w-[min(18rem,calc(100vw-2rem))] overflow-auto rounded-xl border border-cyan-300/25 bg-zinc-950/90 p-3 shadow-[0_0_24px_rgba(34,211,238,0.12)] backdrop-blur"
+                    data-no-canvas-pan="true"
+                  >
                     <div className="flex items-center justify-between gap-3">
-                      <p className="font-mono text-xs font-black uppercase tracking-[0.24em] text-cyan-100">Touch Ops</p>
+                      <p className="font-mono text-xs font-black uppercase tracking-[0.24em] text-cyan-100">
+                        Touch Ops
+                      </p>
                       <button
                         type="button"
                         className="rounded border border-white/15 bg-white/10 px-2 py-1 font-mono text-[10px] font-black uppercase text-white/70 transition hover:border-cyan-200/60 hover:text-cyan-100"
@@ -1242,56 +1713,133 @@ export default function TournamentControlRoom() {
                     <defs>
                       <marker
                         id="tournament-flow-arrow"
-                        markerHeight="8"
-                        markerWidth="8"
+                        markerHeight="12"
+                        markerWidth="12"
                         orient="auto"
-                        refX="7"
-                        refY="4"
+                        refX="11"
+                        refY="6"
                       >
-                        <path d="M 0 0 L 8 4 L 0 8 z" fill="#FFD700" />
+                        <path d="M 0 0 L 12 6 L 0 12 z" fill="#FFD700" />
                       </marker>
                     </defs>
                     {connections.map(connection => {
                       const sourceGame = gamesById.get(connection.sourceGameId);
                       const targetGame = gamesById.get(connection.targetGameId);
                       if (!sourceGame || !targetGame) return null;
-                      const endpoints = getConnectorEndpoints(getPortCenter(sourceGame, "bottom"), getPortCenter(targetGame, "top"));
+                      const endpoints = getConnectorEndpoints(
+                        getPortCenter(sourceGame, "bottom"),
+                        getPortCenter(targetGame, "top")
+                      );
                       const source = endpoints.source;
                       const target = endpoints.target;
+                      const isSelectedConnection =
+                        selectedConnectionId === connection.id;
+                      const connectionPath = getConnectionPath(source, target);
+                      const selectConnection = () => {
+                        setSelectedConnectionId(connection.id);
+                        setSelectedAssignmentId(null);
+                      };
+                      const deleteConnection = () => {
+                        deleteGameConnection.mutate({
+                          connectionId: connection.id,
+                        });
+                        setSelectedConnectionId(current =>
+                          current === connection.id ? null : current
+                        );
+                      };
                       return (
-                        <path
-                          key={connection.id}
-                          d={getConnectionPath(source, target)}
-                          fill="none"
-                          markerEnd="url(#tournament-flow-arrow)"
-                          stroke="#FFD700"
-                          strokeOpacity="0.75"
-                          strokeWidth="3"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          style={{ pointerEvents: "stroke" }}
-                          className="cursor-pointer transition hover:stroke-[4px]"
-                          onDoubleClick={event => {
-                            event.stopPropagation();
-                            deleteGameConnection.mutate({ connectionId: connection.id });
-                          }}
-                        />
+                        <ContextMenu key={connection.id}>
+                          <ContextMenuTrigger asChild>
+                            <g
+                              data-connection-line="true"
+                              className="cursor-pointer"
+                              onPointerDown={event => {
+                                event.stopPropagation();
+                              }}
+                              onClick={event => {
+                                event.stopPropagation();
+                                selectConnection();
+                              }}
+                              onDoubleClick={event => {
+                                event.stopPropagation();
+                                deleteConnection();
+                              }}
+                              onContextMenu={event => {
+                                event.stopPropagation();
+                                selectConnection();
+                              }}
+                            >
+                              <path
+                                d={connectionPath}
+                                fill="none"
+                                stroke="transparent"
+                                strokeWidth="18"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                style={{ pointerEvents: "stroke" }}
+                              />
+                              {isSelectedConnection && (
+                                <path
+                                  d={connectionPath}
+                                  fill="none"
+                                  stroke="#FFF3A3"
+                                  strokeOpacity="0.55"
+                                  strokeWidth="12"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  style={{ pointerEvents: "none" }}
+                                />
+                              )}
+                              <path
+                                d={connectionPath}
+                                fill="none"
+                                markerEnd="url(#tournament-flow-arrow)"
+                                stroke={
+                                  isSelectedConnection ? "#FFF3A3" : "#FFD700"
+                                }
+                                strokeOpacity={
+                                  isSelectedConnection ? "1" : "0.82"
+                                }
+                                strokeWidth={isSelectedConnection ? "7" : "6"}
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                style={{ pointerEvents: "none" }}
+                              />
+                            </g>
+                          </ContextMenuTrigger>
+                          <ContextMenuContent>
+                            <ContextMenuItem onClick={selectConnection}>
+                              Select Connection
+                            </ContextMenuItem>
+                            <ContextMenuItem
+                              className="text-red-300"
+                              onClick={deleteConnection}
+                            >
+                              Delete Connection
+                            </ContextMenuItem>
+                          </ContextMenuContent>
+                        </ContextMenu>
                       );
                     })}
                     {connectionDrag && (
                       <path
-                        d={getConnectionPath(connectionDrag.sourcePoint, connectionDrag.currentPoint)}
+                        d={getConnectionPath(
+                          connectionDrag.sourcePoint,
+                          connectionDrag.currentPoint
+                        )}
                         fill="none"
                         stroke="#FFD700"
                         strokeDasharray="8 8"
                         strokeOpacity="0.85"
-                        strokeWidth="3"
+                        strokeWidth="6"
                       />
                     )}
                   </svg>
                   {games.length === 0 && (
                     <div className="absolute left-8 top-8 rounded border border-dashed border-neon-gold/40 bg-black/70 p-6">
-                      <h3 className="font-mono text-xl font-bold text-neon-gold">Empty board</h3>
+                      <h3 className="font-mono text-xl font-bold text-neon-gold">
+                        Empty board
+                      </h3>
                       <p className="text-sm text-white/60">
                         Right-click the canvas to create a team or lobby.
                       </p>
@@ -1314,11 +1862,27 @@ export default function TournamentControlRoom() {
                             data-control-node="true"
                             onContextMenu={event => event.stopPropagation()}
                             onPointerDown={event => {
-                              if (event.pointerType === "touch" || isPinchingRef.current) return;
-                              if (event.button !== 0 || shouldSkipNodeDrag(event.target)) return;
-                              const handle = event.target instanceof HTMLElement ? event.target.closest("[data-node-drag-handle='true']") : null;
+                              if (
+                                event.pointerType === "touch" ||
+                                isPinchingRef.current
+                              )
+                                return;
+                              if (
+                                event.button !== 0 ||
+                                shouldSkipNodeDrag(event.target)
+                              )
+                                return;
+                              const handle =
+                                event.target instanceof HTMLElement
+                                  ? event.target.closest(
+                                      "[data-node-drag-handle='true']"
+                                    )
+                                  : null;
                               if (!handle) return;
-                              const point = canvasPoint(event.clientX, event.clientY);
+                              const point = canvasPoint(
+                                event.clientX,
+                                event.clientY
+                              );
                               setNodeDrag({
                                 gameId: game.id,
                                 offsetX: point.x - visualPosition.x,
@@ -1332,13 +1896,19 @@ export default function TournamentControlRoom() {
                             }}
                             onDrop={event => {
                               if (isComplete) return;
-                              const payload = parseDragPayload(event.dataTransfer.getData("application/json")) ?? dragPayload;
+                              const payload =
+                                parseDragPayload(
+                                  event.dataTransfer.getData("application/json")
+                                ) ?? dragPayload;
                               if (!payload) return;
                               assignDroppedTeam(game, gameAssignments, payload);
                             }}
                             data-connection-target-game-id={game.id}
                             className={`absolute z-10 w-80 cursor-default rounded-lg border bg-zinc-950/95 p-4 shadow-2xl ${statusClasses.nodeBorder} ${statusClasses.accent} ${nodeDrag?.gameId === game.id ? "z-50 ring-2 ring-[#FFD700]/60" : ""}`}
-                            style={{ left: visualPosition.x, top: visualPosition.y }}
+                            style={{
+                              left: visualPosition.x,
+                              top: visualPosition.y,
+                            }}
                           >
                             <button
                               type="button"
@@ -1359,12 +1929,22 @@ export default function TournamentControlRoom() {
                               data-port="bottom"
                               className="absolute -bottom-3 left-1/2 z-20 h-6 w-6 -translate-x-1/2 rounded-full border-2 border-[#FFD700] bg-[#FFD700] shadow-[0_0_14px_rgba(255,215,0,0.45)] transition hover:scale-110"
                               onPointerDown={event => {
-                                if (event.pointerType === "touch" || isPinchingRef.current) return;
+                                if (
+                                  event.pointerType === "touch" ||
+                                  isPinchingRef.current
+                                )
+                                  return;
                                 if (event.button !== 0) return;
                                 event.preventDefault();
                                 event.stopPropagation();
-                                const sourceCenter = getPortCenter(game, "bottom");
-                                const sourcePoint = getConnectionEndpoint(sourceCenter, "bottom");
+                                const sourceCenter = getPortCenter(
+                                  game,
+                                  "bottom"
+                                );
+                                const sourcePoint = getConnectionEndpoint(
+                                  sourceCenter,
+                                  "bottom"
+                                );
                                 setConnectionDrag({
                                   sourceGameId: game.id,
                                   sourcePoint,
@@ -1372,10 +1952,15 @@ export default function TournamentControlRoom() {
                                 });
                               }}
                             />
-                            <div data-node-drag-handle="true" className="mb-3 flex cursor-grab items-start justify-between gap-2 active:cursor-grabbing">
+                            <div
+                              data-node-drag-handle="true"
+                              className="mb-3 flex cursor-grab items-start justify-between gap-2 active:cursor-grabbing"
+                            >
                               <div>
                                 <p className="font-mono text-xs uppercase tracking-widest text-white/45">
-                                  {game.gameType === "cashout" ? "Cashout Lobby" : "Final Round"}
+                                  {game.gameType === "cashout"
+                                    ? "Cashout Lobby"
+                                    : "Final Round"}
                                 </p>
                                 <h3 className="font-mono text-xl font-black text-white">
                                   {game.displayLabel}
@@ -1390,7 +1975,11 @@ export default function TournamentControlRoom() {
                                     event.stopPropagation();
                                     toggleMinimizedGame(game.id);
                                   }}
-                                  title={isMinimized ? "Expand lobby" : "Minimize lobby"}
+                                  title={
+                                    isMinimized
+                                      ? "Expand lobby"
+                                      : "Minimize lobby"
+                                  }
                                 >
                                   {isMinimized ? "+" : "−"}
                                 </button>
@@ -1416,7 +2005,9 @@ export default function TournamentControlRoom() {
                             </div>
                             <div className="mb-3 flex items-center justify-between gap-2">
                               <div className="flex min-w-0 items-center gap-2">
-                                <span className={`inline-block rounded border px-2 py-1 font-mono text-xs uppercase ${statusClasses.statusPill}`}>
+                                <span
+                                  className={`inline-block rounded border px-2 py-1 font-mono text-xs uppercase ${statusClasses.statusPill}`}
+                                >
                                   {game.status}
                                 </span>
                                 <select
@@ -1428,21 +2019,32 @@ export default function TournamentControlRoom() {
                                     event.stopPropagation();
                                     const value = event.target.value;
                                     if (value === "__random") {
-                                      randomizeGameMap.mutate({ gameId: game.id });
+                                      randomizeGameMap.mutate({
+                                        gameId: game.id,
+                                      });
                                       return;
                                     }
-                                    setGameMap.mutate({ gameId: game.id, mapId: value || null });
+                                    setGameMap.mutate({
+                                      gameId: game.id,
+                                      mapId: value || null,
+                                    });
                                   }}
                                 >
                                   <option value="">Map: TBD</option>
-                                  <option value="__random">Randomize Map</option>
+                                  <option value="__random">
+                                    Randomize Map
+                                  </option>
                                   {THE_FINALS_MAPS.map(map => (
-                                    <option key={map.id} value={map.id}>{map.name}</option>
+                                    <option key={map.id} value={map.id}>
+                                      {map.name}
+                                    </option>
                                   ))}
                                 </select>
                               </div>
                               <span className="font-mono text-[10px] uppercase tracking-widest text-white/35">
-                                {game.gameType === "cashout" ? "1st–4th" : `1st–2nd · BO${game.seriesBestOf ?? 1}`}
+                                {game.gameType === "cashout"
+                                  ? "1st–4th"
+                                  : `1st–2nd · BO${game.seriesBestOf ?? 1}`}
                               </span>
                             </div>
                             {isMinimized ? (
@@ -1450,66 +2052,118 @@ export default function TournamentControlRoom() {
                                 assignments={gameAssignments}
                                 selectedAssignmentId={selectedAssignmentId}
                                 teamsById={teamsById}
-                                onSelect={setSelectedAssignmentId}
+                                onSelect={assignmentId => {
+                                  setSelectedAssignmentId(assignmentId);
+                                  setSelectedConnectionId(null);
+                                }}
                               />
                             ) : (
                               <div
                                 className="space-y-2"
                                 data-no-node-drag="true"
-                                onDragOver={event => { if (!isComplete) event.preventDefault(); }}
+                                onDragOver={event => {
+                                  if (!isComplete) event.preventDefault();
+                                }}
                                 onDrop={event => {
                                   if (isComplete) return;
-                                  const payload = parseDragPayload(event.dataTransfer.getData("application/json")) ?? dragPayload;
+                                  const payload =
+                                    parseDragPayload(
+                                      event.dataTransfer.getData(
+                                        "application/json"
+                                      )
+                                    ) ?? dragPayload;
                                   if (!payload) return;
-                                  assignDroppedTeam(game, gameAssignments, payload);
+                                  assignDroppedTeam(
+                                    game,
+                                    gameAssignments,
+                                    payload
+                                  );
                                 }}
                               >
-                                {Array.from({ length: capacity }, (_, index) => {
-                                  const slot = index + 1;
-                                  const assignment = gameAssignments.find(item => item.slotIndex === slot);
-                                  const team = assignment ? teamsById.get(assignment.teamId) : undefined;
-                                  return (
-                                    <div
-                                      key={slot}
-                                      data-no-node-drag="true"
-                                      onDragOver={event => {
-                                        if (!isComplete) event.preventDefault();
-                                      }}
-                                      onDrop={event => {
-                                        if (isComplete) return;
-                                        event.stopPropagation();
-                                        const payload =
-                                          parseDragPayload(event.dataTransfer.getData("application/json")) ??
-                                          dragPayload;
-                                        if (!payload) return;
-                                        assignDroppedTeam(game, gameAssignments, payload, slot);
-                                      }}
-                                      className="min-h-12 rounded border border-white/10 bg-black/50 p-2"
-                                    >
-                                      <p className="mb-1 font-mono text-[10px] uppercase text-white/35">
-                                        Slot {slot}
-                                      </p>
-                                      {team && assignment ? (
-                                        <TeamCard
-                                          team={team}
-                                          fromGameId={isComplete ? undefined : game.id}
-                                          disabled={isComplete}
-                                          placement={assignment.resultPlacement ?? null}
-                                          selected={selectedAssignmentId === assignment.id}
-                                          onSelect={() => setSelectedAssignmentId(assignment.id)}
-                                          onCyclePlacement={() => cycleAssignmentPlacement(assignment, capacity)}
-                                          onDragStart={() =>
-                                            setDragPayload({ teamId: team.id, fromGameId: game.id })
-                                          }
-                                        />
-                                      ) : (
-                                        <p className="text-sm text-white/35">
-                                          {isComplete ? "Empty historical slot" : "Drop team here"}
+                                {Array.from(
+                                  { length: capacity },
+                                  (_, index) => {
+                                    const slot = index + 1;
+                                    const assignment = gameAssignments.find(
+                                      item => item.slotIndex === slot
+                                    );
+                                    const team = assignment
+                                      ? teamsById.get(assignment.teamId)
+                                      : undefined;
+                                    return (
+                                      <div
+                                        key={slot}
+                                        data-no-node-drag="true"
+                                        onDragOver={event => {
+                                          if (!isComplete)
+                                            event.preventDefault();
+                                        }}
+                                        onDrop={event => {
+                                          if (isComplete) return;
+                                          event.stopPropagation();
+                                          const payload =
+                                            parseDragPayload(
+                                              event.dataTransfer.getData(
+                                                "application/json"
+                                              )
+                                            ) ?? dragPayload;
+                                          if (!payload) return;
+                                          assignDroppedTeam(
+                                            game,
+                                            gameAssignments,
+                                            payload,
+                                            slot
+                                          );
+                                        }}
+                                        className="min-h-12 rounded border border-white/10 bg-black/50 p-2"
+                                      >
+                                        <p className="mb-1 font-mono text-[10px] uppercase text-white/35">
+                                          Slot {slot}
                                         </p>
-                                      )}
-                                    </div>
-                                  );
-                                })}
+                                        {team && assignment ? (
+                                          <TeamCard
+                                            team={team}
+                                            fromGameId={
+                                              isComplete ? undefined : game.id
+                                            }
+                                            disabled={isComplete}
+                                            placement={
+                                              assignment.resultPlacement ?? null
+                                            }
+                                            selected={
+                                              selectedAssignmentId ===
+                                              assignment.id
+                                            }
+                                            onSelect={() => {
+                                              setSelectedAssignmentId(
+                                                assignment.id
+                                              );
+                                              setSelectedConnectionId(null);
+                                            }}
+                                            onCyclePlacement={() =>
+                                              cycleAssignmentPlacement(
+                                                assignment,
+                                                capacity
+                                              )
+                                            }
+                                            onDragStart={() =>
+                                              setDragPayload({
+                                                teamId: team.id,
+                                                fromGameId: game.id,
+                                              })
+                                            }
+                                          />
+                                        ) : (
+                                          <p className="text-sm text-white/35">
+                                            {isComplete
+                                              ? "Empty historical slot"
+                                              : "Drop team here"}
+                                          </p>
+                                        )}
+                                      </div>
+                                    );
+                                  }
+                                )}
                               </div>
                             )}
                             {!isMinimized && (
@@ -1518,11 +2172,27 @@ export default function TournamentControlRoom() {
                                 game={game}
                                 assignments={gameAssignments}
                                 teamsById={teamsById}
-                                discordConfigured={Boolean(query.data.discordConfigured)}
-                                sendingTeamId={sendLobbyCodeToTeamLeader.variables?.teamId ?? null}
-                                sendingLobby={sendLobbyCodeToLobbyLeaders.isPending}
-                                onSendTeam={teamId => sendLobbyCodeToTeamLeader.mutate({ gameId: game.id, teamId })}
-                                onSendLobby={() => sendLobbyCodeToLobbyLeaders.mutate({ gameId: game.id })}
+                                discordConfigured={Boolean(
+                                  query.data.discordConfigured
+                                )}
+                                sendingTeamId={
+                                  sendLobbyCodeToTeamLeader.variables?.teamId ??
+                                  null
+                                }
+                                sendingLobby={
+                                  sendLobbyCodeToLobbyLeaders.isPending
+                                }
+                                onSendTeam={teamId =>
+                                  sendLobbyCodeToTeamLeader.mutate({
+                                    gameId: game.id,
+                                    teamId,
+                                  })
+                                }
+                                onSendLobby={() =>
+                                  sendLobbyCodeToLobbyLeaders.mutate({
+                                    gameId: game.id,
+                                  })
+                                }
                               />
                             )}
                           </div>
@@ -1535,7 +2205,12 @@ export default function TournamentControlRoom() {
                                 .map(status => (
                                   <ContextMenuItem
                                     key={status}
-                                    onClick={() => updateStatus.mutate({ gameId: game.id, status })}
+                                    onClick={() =>
+                                      updateStatus.mutate({
+                                        gameId: game.id,
+                                        status,
+                                      })
+                                    }
                                   >
                                     Reopen Game as {status}
                                   </ContextMenuItem>
@@ -1575,7 +2250,17 @@ export default function TournamentControlRoom() {
                               {game.gameType === "final_round" && (
                                 <>
                                   {[1, 3, 5].map(value => (
-                                    <ContextMenuItem key={value} onClick={() => setBestOf.mutate({ gameId: game.id, seriesBestOf: value as 1 | 3 | 5 })}>Set Final Round BO{value}</ContextMenuItem>
+                                    <ContextMenuItem
+                                      key={value}
+                                      onClick={() =>
+                                        setBestOf.mutate({
+                                          gameId: game.id,
+                                          seriesBestOf: value as 1 | 3 | 5,
+                                        })
+                                      }
+                                    >
+                                      Set Final Round BO{value}
+                                    </ContextMenuItem>
                                   ))}
                                   <ContextMenuSeparator />
                                 </>
@@ -1583,14 +2268,23 @@ export default function TournamentControlRoom() {
                               {statuses.map(status => (
                                 <ContextMenuItem
                                   key={status}
-                                  onClick={() => updateStatus.mutate({ gameId: game.id, status })}
+                                  onClick={() =>
+                                    updateStatus.mutate({
+                                      gameId: game.id,
+                                      status,
+                                    })
+                                  }
                                 >
                                   Mark {status}
                                 </ContextMenuItem>
                               ))}
                               <ContextMenuSeparator />
                               <ContextMenuItem
-                                onClick={() => removeAssignedTeams.mutate({ gameId: game.id })}
+                                onClick={() =>
+                                  removeAssignedTeams.mutate({
+                                    gameId: game.id,
+                                  })
+                                }
                               >
                                 Remove Assigned Teams
                               </ContextMenuItem>
@@ -1615,23 +2309,43 @@ export default function TournamentControlRoom() {
                 </div>
               </div>
               <div className="pointer-events-none sticky bottom-4 left-4 z-[60] mb-4 ml-4 w-fit rounded border border-white/10 bg-black/80 px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-white/50 shadow-xl">
-                Zoom {Math.round(zoom * 100)}% · Shift + scroll · Double-click line to remove
-                {selectedAssignmentContext?.team ? ` · Selected: ${selectedAssignmentContext.team.name}` : ""}
+                Zoom {Math.round(zoom * 100)}% · Shift + scroll · Select line +
+                Delete or double-click line to remove
+                {selectedAssignmentContext?.team
+                  ? ` · Selected: ${selectedAssignmentContext.team.name}`
+                  : ""}
+                {selectedConnectionId !== null ? " · Selected: Connection" : ""}
               </div>
             </main>
           </ContextMenuTrigger>
           <ContextMenuContent>
-            <ContextMenuItem onClick={() => openDialog({ type: "create-team" })}>
+            <ContextMenuItem
+              onClick={() => openDialog({ type: "create-team" })}
+            >
               Create Team
             </ContextMenuItem>
             <ContextMenuSeparator />
             <ContextMenuItem
-              onClick={() => createCashout.mutate({ tournamentId, position: canvasMenuPosition })}
+              onClick={() =>
+                createCashout.mutate({
+                  tournamentId,
+                  position: snapWindowsToGrid
+                    ? snapCanvasPointToGrid(canvasMenuPosition)
+                    : canvasMenuPosition,
+                })
+              }
             >
               Create Cashout Lobby
             </ContextMenuItem>
             <ContextMenuItem
-              onClick={() => createFinal.mutate({ tournamentId, position: canvasMenuPosition })}
+              onClick={() =>
+                createFinal.mutate({
+                  tournamentId,
+                  position: snapWindowsToGrid
+                    ? snapCanvasPointToGrid(canvasMenuPosition)
+                    : canvasMenuPosition,
+                })
+              }
             >
               Create Final Round Match
             </ContextMenuItem>
@@ -1681,7 +2395,10 @@ export default function TournamentControlRoom() {
                   createTeam.mutate({ tournamentId, name: formName, frp: 0 });
                 }
                 if (dialogState?.type === "rename") {
-                  renameGame.mutate({ gameId: dialogState.gameId, displayLabel: formName });
+                  renameGame.mutate({
+                    gameId: dialogState.gameId,
+                    displayLabel: formName,
+                  });
                 }
                 if (dialogState?.type === "lobby") {
                   setLobbyCode.mutate({
@@ -1705,7 +2422,8 @@ export default function TournamentControlRoom() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete lobby?</AlertDialogTitle>
             <AlertDialogDescription>
-              This deletes the lobby node, its assignments, and its flow connections. This cannot be undone.
+              This deletes the lobby node, its assignments, and its flow
+              connections. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1718,7 +2436,8 @@ export default function TournamentControlRoom() {
                 setDialogState(null);
               }}
             >
-              Delete {dialogState?.type === "delete" ? dialogState.label : "lobby"}
+              Delete{" "}
+              {dialogState?.type === "delete" ? dialogState.label : "lobby"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1726,7 +2445,6 @@ export default function TournamentControlRoom() {
     </section>
   );
 }
-
 
 function LobbyCodeTools({
   tournamentName,
@@ -1753,7 +2471,9 @@ function LobbyCodeTools({
   const assignedTeams = assignments
     .map(assignment => teamsById.get(assignment.teamId))
     .filter((team): team is ControlTeamView => Boolean(team));
-  const sendableTeams = assignedTeams.filter(team => !getRecipientWarning(team));
+  const sendableTeams = assignedTeams.filter(
+    team => !getRecipientWarning(team)
+  );
   const sendDisabledReason = !hasCode
     ? "Set a lobby code before sending."
     : !discordConfigured
@@ -1762,7 +2482,14 @@ function LobbyCodeTools({
         ? "No assigned captains can receive Discord DMs."
         : null;
   const lobbyMessage = assignedTeams
-    .map(team => getLobbyCodeMessage(tournamentName, game.displayLabel, team.name, game.privateLobbyCode ?? ""))
+    .map(team =>
+      getLobbyCodeMessage(
+        tournamentName,
+        game.displayLabel,
+        team.name,
+        game.privateLobbyCode ?? ""
+      )
+    )
     .join("\n\n---\n\n");
   const copyText = async (text: string) => {
     await navigator.clipboard.writeText(text);
@@ -1770,9 +2497,15 @@ function LobbyCodeTools({
   };
 
   return (
-    <div data-no-node-drag="true" data-no-canvas-pan="true" className="mt-3 rounded border border-[#FFD700]/20 bg-black/45 p-2">
+    <div
+      data-no-node-drag="true"
+      data-no-canvas-pan="true"
+      className="mt-3 rounded border border-[#FFD700]/20 bg-black/45 p-2"
+    >
       <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#FFD700]">Lobby code DMs</p>
+        <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#FFD700]">
+          Lobby code DMs
+        </p>
         <Button
           size="sm"
           variant="secondary"
@@ -1784,7 +2517,11 @@ function LobbyCodeTools({
           {sendingLobby ? "Sending…" : "Send Code to Lobby"}
         </Button>
       </div>
-      {sendDisabledReason && <p className="mb-2 text-[11px] text-amber-200/80">{sendDisabledReason}</p>}
+      {sendDisabledReason && (
+        <p className="mb-2 text-[11px] text-amber-200/80">
+          {sendDisabledReason}
+        </p>
+      )}
       {assignedTeams.length > 0 && hasCode && (
         <button
           type="button"
@@ -1796,24 +2533,74 @@ function LobbyCodeTools({
       )}
       <div className="space-y-1.5">
         {assignedTeams.length === 0 ? (
-          <p className="text-[11px] text-white/40">Assign teams to send or copy lobby-code messages.</p>
-        ) : assignedTeams.map(team => {
-          const warning = getRecipientWarning(team);
-          const message = getLobbyCodeMessage(tournamentName, game.displayLabel, team.name, game.privateLobbyCode ?? "");
-          return (
-            <div key={team.id} className="rounded border border-white/10 bg-zinc-950/80 p-1.5">
-              <div className="flex items-center justify-between gap-2">
-                <span className="min-w-0 truncate font-mono text-[11px] text-white/80">{team.name}</span>
-                <div className="flex shrink-0 gap-1">
-                  <button type="button" className="rounded border border-white/15 px-1.5 py-0.5 font-mono text-[9px] uppercase text-white/65 hover:border-[#FFD700]/60 hover:text-[#FFD700]" disabled={!hasCode} onClick={() => copyText(message)}>Copy Message</button>
-                  <button type="button" className="rounded border border-[#FFD700]/40 bg-[#FFD700]/10 px-1.5 py-0.5 font-mono text-[9px] uppercase text-[#FFD700] disabled:cursor-not-allowed disabled:border-white/10 disabled:text-white/30" disabled={!hasCode || !discordConfigured || Boolean(warning) || sendingTeamId === team.id} onClick={() => onSendTeam(team.id)} title={!discordConfigured ? "Discord sending is not configured on the server. Use Copy Message." : warning ?? "Send code to this team's captain."}>{sendingTeamId === team.id ? "Sending…" : "Send Code"}</button>
+          <p className="text-[11px] text-white/40">
+            Assign teams to send or copy lobby-code messages.
+          </p>
+        ) : (
+          assignedTeams.map(team => {
+            const warning = getRecipientWarning(team);
+            const message = getLobbyCodeMessage(
+              tournamentName,
+              game.displayLabel,
+              team.name,
+              game.privateLobbyCode ?? ""
+            );
+            return (
+              <div
+                key={team.id}
+                className="rounded border border-white/10 bg-zinc-950/80 p-1.5"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="min-w-0 truncate font-mono text-[11px] text-white/80">
+                    {team.name}
+                  </span>
+                  <div className="flex shrink-0 gap-1">
+                    <button
+                      type="button"
+                      className="rounded border border-white/15 px-1.5 py-0.5 font-mono text-[9px] uppercase text-white/65 hover:border-[#FFD700]/60 hover:text-[#FFD700]"
+                      disabled={!hasCode}
+                      onClick={() => copyText(message)}
+                    >
+                      Copy Message
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded border border-[#FFD700]/40 bg-[#FFD700]/10 px-1.5 py-0.5 font-mono text-[9px] uppercase text-[#FFD700] disabled:cursor-not-allowed disabled:border-white/10 disabled:text-white/30"
+                      disabled={
+                        !hasCode ||
+                        !discordConfigured ||
+                        Boolean(warning) ||
+                        sendingTeamId === team.id
+                      }
+                      onClick={() => onSendTeam(team.id)}
+                      title={
+                        !discordConfigured
+                          ? "Discord sending is not configured on the server. Use Copy Message."
+                          : (warning ?? "Send code to this team's captain.")
+                      }
+                    >
+                      {sendingTeamId === team.id ? "Sending…" : "Send Code"}
+                    </button>
+                  </div>
                 </div>
+                {(warning || !hasCode || !discordConfigured) && (
+                  <p className="mt-1 text-[10px] text-amber-200/75">
+                    {!hasCode
+                      ? "No lobby code set."
+                      : !discordConfigured
+                        ? "Discord sending not configured; use Copy Message."
+                        : warning}
+                  </p>
+                )}
+                {!warning && team.captainDisplayName && (
+                  <p className="mt-1 text-[10px] text-white/35">
+                    Captain: {team.captainDisplayName}
+                  </p>
+                )}
               </div>
-              {(warning || !hasCode || !discordConfigured) && <p className="mt-1 text-[10px] text-amber-200/75">{!hasCode ? "No lobby code set." : !discordConfigured ? "Discord sending not configured; use Copy Message." : warning}</p>}
-              {!warning && team.captainDisplayName && <p className="mt-1 text-[10px] text-white/35">Captain: {team.captainDisplayName}</p>}
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
     </div>
   );
@@ -1868,7 +2655,9 @@ function CompactResultList({
               {team?.name ?? "Unknown team"}
             </span>
             <span className="shrink-0 font-mono text-[10px] uppercase text-white/45">
-              {assignment.resultPlacement ? formatPlacement(assignment.resultPlacement) : `Slot ${assignment.slotIndex}`}
+              {assignment.resultPlacement
+                ? formatPlacement(assignment.resultPlacement)
+                : `Slot ${assignment.slotIndex}`}
             </span>
           </button>
         );
@@ -1898,7 +2687,9 @@ function TeamCard({
   onCyclePlacement?: () => void;
   onCreateClaimLink?: () => void;
 }) {
-  const lastTouchTapRef = useRef<{ time: number; x: number; y: number } | null>(null);
+  const lastTouchTapRef = useRef<{ time: number; x: number; y: number } | null>(
+    null
+  );
 
   return (
     <div
@@ -1917,11 +2708,16 @@ function TeamCard({
         if (!touch) return;
         const now = window.performance.now();
         const previous = lastTouchTapRef.current;
-        lastTouchTapRef.current = { time: now, x: touch.clientX, y: touch.clientY };
+        lastTouchTapRef.current = {
+          time: now,
+          x: touch.clientX,
+          y: touch.clientY,
+        };
         if (
           previous &&
           now - previous.time <= 320 &&
-          Math.hypot(touch.clientX - previous.x, touch.clientY - previous.y) <= 24
+          Math.hypot(touch.clientX - previous.x, touch.clientY - previous.y) <=
+            24
         ) {
           event.preventDefault();
           event.stopPropagation();
@@ -1989,7 +2785,9 @@ function ControlState({
   return (
     <section className="min-h-screen bg-black px-6 py-20 text-white">
       <div className="mx-auto max-w-xl rounded border border-neon-gold/30 bg-zinc-950 p-8">
-        <h1 className="font-mono text-2xl font-black text-neon-gold">{title}</h1>
+        <h1 className="font-mono text-2xl font-black text-neon-gold">
+          {title}
+        </h1>
         {description && <p className="mt-3 text-white/60">{description}</p>}
         {showDiscordSignIn && (
           <a
