@@ -164,7 +164,7 @@ async function fetchTournamentRows(db: QueryExecutor, tournamentId: number) {
       .from(tournamentGameAssignments)
       .innerJoin(tournamentGames, eq(tournamentGameAssignments.gameId, tournamentGames.id))
       .where(eq(tournamentGames.tournamentId, tournamentId)),
-    db.execute(sql`SELECT id, tournamentId, sourceGameId, targetGameId, COALESCE(flowType, 'winner') AS flowType FROM tournament_game_connections WHERE tournamentId = ${tournamentId}`),
+    db.execute(sql`SELECT id, tournamentId, sourceGameId, targetGameId, flowType FROM tournament_game_connections WHERE tournamentId = ${tournamentId}`),
   ]);
   return {
     tournament,
@@ -294,7 +294,7 @@ async function connectGames(tournamentId: number, sourceGameId: number, targetGa
 async function deleteGameConnection(connectionId: number) {
   const db = await requireDb();
   const connectionRows = readRows<ControlGameConnection>(
-    await db.execute(sql`SELECT id, tournamentId, sourceGameId, targetGameId, COALESCE(flowType, 'winner') AS flowType FROM tournament_game_connections WHERE id = ${connectionId} LIMIT 1`)
+    await db.execute(sql`SELECT id, tournamentId, sourceGameId, targetGameId, flowType FROM tournament_game_connections WHERE id = ${connectionId} LIMIT 1`)
   );
   const [connection] = connectionRows;
   if (!connection) throw new TRPCError({ code: "NOT_FOUND", message: "Lobby connection not found" });
@@ -444,7 +444,7 @@ async function getAssignmentsForGame(db: QueryExecutor, gameId: number) {
 
 async function advanceCompletedGameQualifiers(db: QueryExecutor, game: AdvancementGame) {
   const outgoingConnections = readRows<ControlGameConnection>(
-    await db.execute(sql`SELECT id, tournamentId, sourceGameId, targetGameId, COALESCE(flowType, 'winner') AS flowType FROM tournament_game_connections WHERE sourceGameId = ${game.id}`)
+    await db.execute(sql`SELECT id, tournamentId, sourceGameId, targetGameId, flowType FROM tournament_game_connections WHERE sourceGameId = ${game.id}`)
   );
 
   if (outgoingConnections.length === 0) return;
