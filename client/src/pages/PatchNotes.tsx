@@ -55,6 +55,61 @@ Competitive Notes
 • These changes are mode-specific to Respec Order and are not being pushed directly into the main game yet.`,
 };
 
+type PatchNoteListItem = {
+  id: number;
+  title: string;
+  date: string;
+  version: string | null;
+  url: string | null;
+  content: string;
+};
+
+const parsePatchDate = (date: string) => {
+  const [year, month, day] = date.split('.').map(Number);
+  if (!year || !month || !day) return 0;
+
+  return Date.UTC(year, month - 1, day);
+};
+
+const sortPatchNotesNewestFirst = (
+  a: PatchNoteListItem,
+  b: PatchNoteListItem
+) => {
+  const dateCompare = parsePatchDate(b.date) - parsePatchDate(a.date);
+  if (dateCompare !== 0) return dateCompare;
+
+  return (b.version ?? '').localeCompare(a.version ?? '', undefined, {
+    numeric: true,
+  });
+};
+
+const combinePatchNotes = (
+  patchNotesData: PatchNoteListItem[] | undefined
+) => {
+  const patchNotesByKey = new Map<string, PatchNoteListItem>();
+
+  for (const patch of [RESPEC_ORDER_PATCH_NOTE, ...(patchNotesData ?? [])]) {
+    const primaryKey = patch.url ?? patch.version ?? String(patch.id);
+    const versionKey = patch.version ? `version:${patch.version}` : null;
+    const urlKey = patch.url ? `url:${patch.url}` : null;
+
+    if (
+      (versionKey && patchNotesByKey.has(versionKey)) ||
+      (urlKey && patchNotesByKey.has(urlKey))
+    ) {
+      continue;
+    }
+
+    patchNotesByKey.set(primaryKey, patch);
+    if (versionKey) patchNotesByKey.set(versionKey, patch);
+    if (urlKey) patchNotesByKey.set(urlKey, patch);
+  }
+
+  return Array.from(new Set(patchNotesByKey.values())).sort(
+    sortPatchNotesNewestFirst
+  );
+};
+
 /**
  * Patch Notes Page
  * Cyberpunk Neon Rebellion Design
@@ -76,14 +131,7 @@ export default function PatchNotes() {
     return <LoadingThrobber />;
   }
 
-  const patches = [
-    RESPEC_ORDER_PATCH_NOTE,
-    ...(patchNotesData ?? []).filter(
-      patch =>
-        patch.url !== RESPEC_ORDER_PATCH_NOTE.url &&
-        patch.version !== RESPEC_ORDER_PATCH_NOTE.version
-    ),
-  ];
+  const patches = combinePatchNotes(patchNotesData);
 
   return (
     <div className="min-h-screen bg-dark-charcoal py-20">
