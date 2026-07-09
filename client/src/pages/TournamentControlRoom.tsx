@@ -1438,1025 +1438,1114 @@ export default function TournamentControlRoom() {
             </div>
           </div>
         </aside>
-        <ContextMenu>
-          <ContextMenuTrigger asChild>
-            <main
-              ref={canvasRef}
-              className={`relative min-h-0 touch-none overflow-auto overscroll-contain bg-[radial-gradient(circle_at_top,#4d39091a,transparent_32rem),linear-gradient(rgba(255,255,255,.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.04)_1px,transparent_1px)] bg-[size:auto,40px_40px,40px_40px] ${isPanning ? "cursor-grabbing" : "cursor-grab"}`}
-              onWheel={event => {
-                if (!event.shiftKey) return;
-                event.preventDefault();
-                const element = canvasRef.current;
-                const rect = element?.getBoundingClientRect();
-                if (!element || !rect) return;
-                const focalCanvasPoint = {
-                  x: (event.clientX - rect.left + element.scrollLeft) / zoom,
-                  y: (event.clientY - rect.top + element.scrollTop) / zoom,
-                };
-                const zoomDelta = event.deltaY > 0 ? -0.08 : 0.08;
-                const nextZoom = clampZoom(zoom + zoomDelta);
-                const nextScroll = getViewportPreservingScroll(
-                  focalCanvasPoint,
-                  { x: event.clientX, y: event.clientY },
-                  rect,
-                  nextZoom
-                );
-                setZoom(nextZoom);
-                requestAnimationFrame(() => {
-                  element.scrollLeft = nextScroll.scrollLeft;
-                  element.scrollTop = nextScroll.scrollTop;
-                });
-              }}
-              onPointerDown={event => {
-                if (event.pointerType === "touch") {
-                  touchPointersRef.current.set(
-                    event.pointerId,
-                    event.nativeEvent
+        <div className="relative min-h-0 overflow-hidden">
+          <ContextMenu>
+            <ContextMenuTrigger asChild>
+              <main
+                ref={canvasRef}
+                className={`relative h-full min-h-0 touch-none overflow-auto overscroll-contain bg-[radial-gradient(circle_at_top,#4d39091a,transparent_32rem),linear-gradient(rgba(255,255,255,.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.04)_1px,transparent_1px)] bg-[size:auto,40px_40px,40px_40px] ${isPanning ? "cursor-grabbing" : "cursor-grab"}`}
+                onWheel={event => {
+                  if (!event.shiftKey) return;
+                  event.preventDefault();
+                  const element = canvasRef.current;
+                  const rect = element?.getBoundingClientRect();
+                  if (!element || !rect) return;
+                  const focalCanvasPoint = {
+                    x: (event.clientX - rect.left + element.scrollLeft) / zoom,
+                    y: (event.clientY - rect.top + element.scrollTop) / zoom,
+                  };
+                  const zoomDelta = event.deltaY > 0 ? -0.08 : 0.08;
+                  const nextZoom = clampZoom(zoom + zoomDelta);
+                  const nextScroll = getViewportPreservingScroll(
+                    focalCanvasPoint,
+                    { x: event.clientX, y: event.clientY },
+                    rect,
+                    nextZoom
                   );
+                  setZoom(nextZoom);
+                  requestAnimationFrame(() => {
+                    element.scrollLeft = nextScroll.scrollLeft;
+                    element.scrollTop = nextScroll.scrollTop;
+                  });
+                }}
+                onPointerDown={event => {
+                  if (event.pointerType === "touch") {
+                    touchPointersRef.current.set(
+                      event.pointerId,
+                      event.nativeEvent
+                    );
+                    if (event.currentTarget.setPointerCapture) {
+                      event.currentTarget.setPointerCapture(event.pointerId);
+                    }
+                    if (
+                      shouldCancelBoardDragsForPinch(
+                        touchPointersRef.current.size
+                      )
+                    ) {
+                      cancelBoardDragsForPinch();
+                      const element = canvasRef.current;
+                      const rect = element?.getBoundingClientRect();
+                      const pointers = Array.from(
+                        touchPointersRef.current.values()
+                      );
+                      if (element && rect && pointers[0] && pointers[1]) {
+                        const midpoint = getMidpoint(pointers[0], pointers[1]);
+                        pinchStartRef.current = {
+                          distance: getPointerDistance(
+                            pointers[0],
+                            pointers[1]
+                          ),
+                          zoom,
+                          focalClientX: midpoint.x,
+                          focalClientY: midpoint.y,
+                          focalCanvasX:
+                            (midpoint.x - rect.left + element.scrollLeft) /
+                            zoom,
+                          focalCanvasY:
+                            (midpoint.y - rect.top + element.scrollTop) / zoom,
+                        };
+                        canvasPanRef.current = null;
+                        setIsPanning(false);
+                      }
+                      event.preventDefault();
+                      return;
+                    }
+                  }
+
+                  if (event.pointerType === "touch" && isPinchingRef.current)
+                    return;
+
+                  if (event.button !== 0 || !shouldStartCanvasPan(event.target))
+                    return;
+                  const element = canvasRef.current;
+                  if (!element) return;
+                  event.preventDefault();
+                  canvasPanRef.current = {
+                    pointerId: event.pointerId,
+                    clientX: event.clientX,
+                    clientY: event.clientY,
+                    scrollLeft: element.scrollLeft,
+                    scrollTop: element.scrollTop,
+                  };
                   if (event.currentTarget.setPointerCapture) {
                     event.currentTarget.setPointerCapture(event.pointerId);
                   }
+                  setIsPanning(true);
+                }}
+                onPointerMove={event => {
                   if (
-                    shouldCancelBoardDragsForPinch(
-                      touchPointersRef.current.size
-                    )
+                    event.pointerType === "touch" &&
+                    touchPointersRef.current.has(event.pointerId)
                   ) {
-                    cancelBoardDragsForPinch();
-                    const element = canvasRef.current;
-                    const rect = element?.getBoundingClientRect();
-                    const pointers = Array.from(
-                      touchPointersRef.current.values()
+                    touchPointersRef.current.set(
+                      event.pointerId,
+                      event.nativeEvent
                     );
-                    if (element && rect && pointers[0] && pointers[1]) {
-                      const midpoint = getMidpoint(pointers[0], pointers[1]);
-                      pinchStartRef.current = {
-                        distance: getPointerDistance(pointers[0], pointers[1]),
-                        zoom,
-                        focalClientX: midpoint.x,
-                        focalClientY: midpoint.y,
-                        focalCanvasX:
-                          (midpoint.x - rect.left + element.scrollLeft) / zoom,
-                        focalCanvasY:
-                          (midpoint.y - rect.top + element.scrollTop) / zoom,
-                      };
-                      canvasPanRef.current = null;
-                      setIsPanning(false);
-                    }
-                    event.preventDefault();
-                    return;
-                  }
-                }
-
-                if (event.pointerType === "touch" && isPinchingRef.current)
-                  return;
-
-                if (event.button !== 0 || !shouldStartCanvasPan(event.target))
-                  return;
-                const element = canvasRef.current;
-                if (!element) return;
-                event.preventDefault();
-                canvasPanRef.current = {
-                  pointerId: event.pointerId,
-                  clientX: event.clientX,
-                  clientY: event.clientY,
-                  scrollLeft: element.scrollLeft,
-                  scrollTop: element.scrollTop,
-                };
-                if (event.currentTarget.setPointerCapture) {
-                  event.currentTarget.setPointerCapture(event.pointerId);
-                }
-                setIsPanning(true);
-              }}
-              onPointerMove={event => {
-                if (
-                  event.pointerType === "touch" &&
-                  touchPointersRef.current.has(event.pointerId)
-                ) {
-                  touchPointersRef.current.set(
-                    event.pointerId,
-                    event.nativeEvent
-                  );
-                  if (
-                    touchPointersRef.current.size >= 2 &&
-                    pinchStartRef.current
-                  ) {
-                    const element = canvasRef.current;
-                    const rect = element?.getBoundingClientRect();
-                    const pointers = Array.from(
-                      touchPointersRef.current.values()
-                    );
-                    if (!element || !rect || !pointers[0] || !pointers[1])
+                    if (
+                      touchPointersRef.current.size >= 2 &&
+                      pinchStartRef.current
+                    ) {
+                      const element = canvasRef.current;
+                      const rect = element?.getBoundingClientRect();
+                      const pointers = Array.from(
+                        touchPointersRef.current.values()
+                      );
+                      if (!element || !rect || !pointers[0] || !pointers[1])
+                        return;
+                      event.preventDefault();
+                      const nextDistance = getPointerDistance(
+                        pointers[0],
+                        pointers[1]
+                      );
+                      if (pinchStartRef.current.distance <= 0) return;
+                      const nextZoom = clampZoom(
+                        pinchStartRef.current.zoom *
+                          (nextDistance / pinchStartRef.current.distance)
+                      );
+                      const nextScroll = getViewportPreservingScroll(
+                        {
+                          x: pinchStartRef.current.focalCanvasX,
+                          y: pinchStartRef.current.focalCanvasY,
+                        },
+                        {
+                          x: pinchStartRef.current.focalClientX,
+                          y: pinchStartRef.current.focalClientY,
+                        },
+                        rect,
+                        nextZoom
+                      );
+                      setZoom(nextZoom);
+                      element.scrollLeft = nextScroll.scrollLeft;
+                      element.scrollTop = nextScroll.scrollTop;
                       return;
-                    event.preventDefault();
-                    const nextDistance = getPointerDistance(
-                      pointers[0],
-                      pointers[1]
-                    );
-                    if (pinchStartRef.current.distance <= 0) return;
-                    const nextZoom = clampZoom(
-                      pinchStartRef.current.zoom *
-                        (nextDistance / pinchStartRef.current.distance)
-                    );
-                    const nextScroll = getViewportPreservingScroll(
-                      {
-                        x: pinchStartRef.current.focalCanvasX,
-                        y: pinchStartRef.current.focalCanvasY,
-                      },
-                      {
-                        x: pinchStartRef.current.focalClientX,
-                        y: pinchStartRef.current.focalClientY,
-                      },
-                      rect,
-                      nextZoom
-                    );
-                    setZoom(nextZoom);
-                    element.scrollLeft = nextScroll.scrollLeft;
-                    element.scrollTop = nextScroll.scrollTop;
-                    return;
+                    }
                   }
-                }
 
-                const panStart = canvasPanRef.current;
-                if (!panStart || panStart.pointerId !== event.pointerId) return;
-                const element = canvasRef.current;
-                if (!element) return;
-                event.preventDefault();
-                const nextScroll = getCanvasPanScroll(
-                  panStart,
-                  event.clientX,
-                  event.clientY
-                );
-                element.scrollLeft = nextScroll.scrollLeft;
-                element.scrollTop = nextScroll.scrollTop;
-              }}
-              onPointerUp={event => {
-                if (event.pointerType === "touch") {
-                  touchPointersRef.current.delete(event.pointerId);
-                  if (touchPointersRef.current.size < 2)
-                    pinchStartRef.current = null;
-                  if (touchPointersRef.current.size === 0)
-                    isPinchingRef.current = false;
-                }
-                if (canvasPanRef.current?.pointerId === event.pointerId) {
-                  canvasPanRef.current = null;
-                  setIsPanning(false);
-                }
-                if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
-                  event.currentTarget.releasePointerCapture(event.pointerId);
-                }
-              }}
-              onPointerCancel={event => {
-                if (event.pointerType === "touch") {
-                  touchPointersRef.current.delete(event.pointerId);
-                  if (touchPointersRef.current.size < 2)
-                    pinchStartRef.current = null;
-                  if (touchPointersRef.current.size === 0)
-                    isPinchingRef.current = false;
-                }
-                if (canvasPanRef.current?.pointerId === event.pointerId) {
-                  canvasPanRef.current = null;
-                  setIsPanning(false);
-                }
-              }}
-              onContextMenu={event => {
-                setCanvasMenuPosition(
-                  canvasPoint(event.clientX, event.clientY)
-                );
-              }}
-            >
-              <div className="pointer-events-none sticky left-3 top-1/2 z-[65] h-0 w-0 -translate-y-1/2 sm:left-4">
-                <div
-                  data-no-canvas-pan="true"
-                  className="pointer-events-auto flex w-11 flex-col items-center overflow-hidden rounded-xl border border-[#FFD700]/35 bg-zinc-950/95 font-mono text-white shadow-[0_0_24px_rgba(255,215,0,0.14)] backdrop-blur"
-                  onContextMenu={event => event.stopPropagation()}
-                >
-                  <button
-                    type="button"
+                  const panStart = canvasPanRef.current;
+                  if (!panStart || panStart.pointerId !== event.pointerId)
+                    return;
+                  const element = canvasRef.current;
+                  if (!element) return;
+                  event.preventDefault();
+                  const nextScroll = getCanvasPanScroll(
+                    panStart,
+                    event.clientX,
+                    event.clientY
+                  );
+                  element.scrollLeft = nextScroll.scrollLeft;
+                  element.scrollTop = nextScroll.scrollTop;
+                }}
+                onPointerUp={event => {
+                  if (event.pointerType === "touch") {
+                    touchPointersRef.current.delete(event.pointerId);
+                    if (touchPointersRef.current.size < 2)
+                      pinchStartRef.current = null;
+                    if (touchPointersRef.current.size === 0)
+                      isPinchingRef.current = false;
+                  }
+                  if (canvasPanRef.current?.pointerId === event.pointerId) {
+                    canvasPanRef.current = null;
+                    setIsPanning(false);
+                  }
+                  if (
+                    event.currentTarget.hasPointerCapture?.(event.pointerId)
+                  ) {
+                    event.currentTarget.releasePointerCapture(event.pointerId);
+                  }
+                }}
+                onPointerCancel={event => {
+                  if (event.pointerType === "touch") {
+                    touchPointersRef.current.delete(event.pointerId);
+                    if (touchPointersRef.current.size < 2)
+                      pinchStartRef.current = null;
+                    if (touchPointersRef.current.size === 0)
+                      isPinchingRef.current = false;
+                  }
+                  if (canvasPanRef.current?.pointerId === event.pointerId) {
+                    canvasPanRef.current = null;
+                    setIsPanning(false);
+                  }
+                }}
+                onContextMenu={event => {
+                  setCanvasMenuPosition(
+                    canvasPoint(event.clientX, event.clientY)
+                  );
+                }}
+              >
+                <div className="pointer-events-none sticky left-3 top-1/2 z-[65] h-0 w-0 -translate-y-1/2 sm:left-4">
+                  <div
                     data-no-canvas-pan="true"
-                    className="flex h-10 w-full items-center justify-center border-b border-white/10 text-white/45"
-                    title={`Board zoom controls · ${Math.round(zoom * 100)}%`}
-                    aria-label={`Board zoom controls, current zoom ${Math.round(zoom * 100)}%`}
-                    onPointerDown={event => event.stopPropagation()}
+                    className="pointer-events-auto flex w-11 flex-col items-center overflow-hidden rounded-xl border border-[#FFD700]/35 bg-zinc-950/95 font-mono text-white shadow-[0_0_24px_rgba(255,215,0,0.14)] backdrop-blur"
+                    onContextMenu={event => event.stopPropagation()}
                   >
-                    <Grip className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    data-no-canvas-pan="true"
-                    disabled={zoom >= maxZoom}
-                    className="flex h-10 w-full items-center justify-center border-b border-white/10 text-lg font-black leading-none text-white/80 transition hover:bg-[#FFD700]/10 hover:text-[#FFD700] disabled:cursor-not-allowed disabled:text-white/25 disabled:hover:bg-transparent"
-                    title={`Zoom in · ${Math.round(zoom * 100)}%`}
-                    aria-label="Zoom in"
-                    onPointerDown={event => event.stopPropagation()}
-                    onClick={event => {
-                      event.stopPropagation();
-                      zoomBoardFromCenter(0.1);
-                    }}
-                  >
-                    +
-                  </button>
-                  <button
-                    type="button"
-                    data-no-canvas-pan="true"
-                    disabled={zoom <= minZoom}
-                    className="flex h-10 w-full items-center justify-center border-b border-white/10 text-xl font-black leading-none text-white/80 transition hover:bg-[#FFD700]/10 hover:text-[#FFD700] disabled:cursor-not-allowed disabled:text-white/25 disabled:hover:bg-transparent"
-                    title={`Zoom out · ${Math.round(zoom * 100)}%`}
-                    aria-label="Zoom out"
-                    onPointerDown={event => event.stopPropagation()}
-                    onClick={event => {
-                      event.stopPropagation();
-                      zoomBoardFromCenter(-0.1);
-                    }}
-                  >
-                    −
-                  </button>
-                  <button
-                    type="button"
-                    data-no-canvas-pan="true"
-                    className="flex h-10 w-full items-center justify-center border-b border-white/10 text-white/70 transition hover:bg-[#FFD700]/10 hover:text-[#FFD700]"
-                    title={
-                      games.length > 0
-                        ? "Fit lobbies to view"
-                        : "Reset board view"
-                    }
-                    aria-label={
-                      games.length > 0
-                        ? "Fit lobbies to view"
-                        : "Reset board view"
-                    }
-                    onPointerDown={event => event.stopPropagation()}
-                    onClick={event => {
-                      event.stopPropagation();
-                      fitOrResetBoardView();
-                    }}
-                  >
-                    <Maximize2 className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                  <div className="w-full bg-black/70 px-1 py-1.5 text-center text-[10px] font-black leading-none tracking-tight text-[#FFD700]">
-                    {Math.round(zoom * 100)}%
-                  </div>
-                </div>
-              </div>
-              <div className="pointer-events-none sticky left-0 top-0 z-[55] hidden h-0 w-0 lg:block">
-                <div
-                  ref={controlKeyRef}
-                  data-no-canvas-pan="true"
-                  className={`pointer-events-none absolute rounded-xl border bg-black/90 font-mono shadow-[0_0_28px_rgba(255,215,0,0.16)] backdrop-blur ${
-                    controlKeyMinimized
-                      ? "w-max border-[#FFD700]/50"
-                      : "w-[min(26rem,calc(100vw-2rem))] border-[#FFD700]/35 p-4"
-                  }`}
-                  style={{
-                    transform: `translate(${controlKeyPosition.x}px, ${controlKeyPosition.y}px)`,
-                  }}
-                  onContextMenu={event => event.stopPropagation()}
-                >
-                  {controlKeyMinimized ? (
                     <button
                       type="button"
                       data-no-canvas-pan="true"
-                      className="pointer-events-auto flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-black uppercase tracking-[0.2em] text-[#FFD700] transition hover:bg-[#FFD700]/10"
+                      className="flex h-10 w-full items-center justify-center border-b border-white/10 text-white/45"
+                      title={`Board zoom controls · ${Math.round(zoom * 100)}%`}
+                      aria-label={`Board zoom controls, current zoom ${Math.round(zoom * 100)}%`}
+                      onPointerDown={event => event.stopPropagation()}
+                    >
+                      <Grip className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      data-no-canvas-pan="true"
+                      disabled={zoom >= maxZoom}
+                      className="flex h-10 w-full items-center justify-center border-b border-white/10 text-lg font-black leading-none text-white/80 transition hover:bg-[#FFD700]/10 hover:text-[#FFD700] disabled:cursor-not-allowed disabled:text-white/25 disabled:hover:bg-transparent"
+                      title={`Zoom in · ${Math.round(zoom * 100)}%`}
+                      aria-label="Zoom in"
+                      onPointerDown={event => event.stopPropagation()}
                       onClick={event => {
                         event.stopPropagation();
-                        setControlKeyMinimized(false);
+                        zoomBoardFromCenter(0.1);
                       }}
                     >
-                      <span className="h-2 w-2 rounded-full bg-[#FFD700] shadow-[0_0_12px_#FFD700]" />
-                      Controls · {Math.round(zoom * 100)}%
+                      +
                     </button>
-                  ) : (
-                    <>
-                      <div
-                        data-no-canvas-pan="true"
-                        className="pointer-events-auto mb-3 flex items-center justify-between gap-3 rounded border border-white/10 bg-white/5 px-2 py-2"
-                      >
-                        <div
-                          data-no-canvas-pan="true"
-                          data-control-key-drag-handle="true"
-                          className={`flex min-w-0 flex-1 items-center gap-2 ${
-                            controlKeyLocked
-                              ? "cursor-default"
-                              : "cursor-grab active:cursor-grabbing"
-                          }`}
-                          onPointerDown={startControlKeyDrag}
-                          onPointerMove={dragControlKey}
-                          onPointerUp={finishControlKeyDrag}
-                          onPointerCancel={finishControlKeyDrag}
-                        >
-                          <span className="h-2 w-2 rounded-full bg-[#FFD700] shadow-[0_0_12px_#FFD700]" />
-                          <div>
-                            <p className="text-xs font-black uppercase tracking-[0.28em] text-[#FFD700]">
-                              PC Control Key
-                            </p>
-                            <p className="text-[10px] uppercase tracking-wider text-white/45">
-                              {controlKeyLocked
-                                ? "Locked in place"
-                                : "Unlocked · drag the handle"}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-1">
-                          <button
-                            type="button"
-                            data-no-canvas-pan="true"
-                            data-control-key-action="true"
-                            className={`rounded border px-2 py-1 text-[10px] font-black uppercase transition ${
-                              controlKeyLocked
-                                ? "border-[#FFD700]/50 bg-[#FFD700]/15 text-[#FFD700]"
-                                : "border-cyan-300/40 bg-cyan-300/10 text-cyan-100"
-                            }`}
-                            onPointerDown={event => event.stopPropagation()}
-                            onClick={event => {
-                              event.stopPropagation();
-                              setControlKeyLocked(current => !current);
-                            }}
-                          >
-                            {controlKeyLocked ? "Unlock" : "Lock"}
-                          </button>
-                          <button
-                            type="button"
-                            data-no-canvas-pan="true"
-                            data-control-key-action="true"
-                            className="rounded border border-white/15 bg-white/10 px-2 py-1 text-[10px] font-black uppercase text-white/70 transition hover:border-[#FFD700]/60 hover:text-[#FFD700]"
-                            onPointerDown={event => event.stopPropagation()}
-                            onClick={event => {
-                              event.stopPropagation();
-                              setControlKeyMinimized(true);
-                            }}
-                          >
-                            Min
-                          </button>
-                        </div>
-                      </div>
-                      <div
-                        data-no-canvas-pan="true"
-                        className="pointer-events-auto mb-3 flex items-center justify-between gap-3 rounded border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-2"
-                      >
-                        <div>
-                          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#FFD700]">
-                            Snap to Grid
-                          </p>
-                          <p className="text-[10px] uppercase tracking-wider text-white/45">
-                            40px lobby magnet
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          data-no-canvas-pan="true"
-                          className={`rounded border px-3 py-1 text-[10px] font-black uppercase transition ${
-                            snapWindowsToGrid
-                              ? "border-[#FFD700] bg-[#FFD700] text-black shadow-[0_0_14px_rgba(255,215,0,0.24)]"
-                              : "border-white/15 bg-black/50 text-white/65 hover:border-[#FFD700]/60 hover:text-[#FFD700]"
-                          }`}
-                          aria-pressed={snapWindowsToGrid}
-                          onPointerDown={event => event.stopPropagation()}
-                          onClick={event => {
-                            event.stopPropagation();
-                            setSnapWindowsToGrid(current => !current);
-                          }}
-                        >
-                          {snapWindowsToGrid ? "On" : "Off"}
-                        </button>
-                      </div>
-                      <div className="grid gap-2 text-[11px] text-white/75 sm:grid-cols-2">
-                        {[
-                          [
-                            "bg-cyan-400/15 text-cyan-100 border-cyan-300/30",
-                            "Drag empty grid",
-                            "Pan board",
-                          ],
-                          [
-                            "bg-fuchsia-400/15 text-fuchsia-100 border-fuchsia-300/30",
-                            "Buttons / Shift + scroll",
-                            "Zoom board",
-                          ],
-                          [
-                            "bg-emerald-400/15 text-emerald-100 border-emerald-300/30",
-                            "Right-click grid",
-                            "Create teams/lobbies",
-                          ],
-                          [
-                            "bg-orange-400/15 text-orange-100 border-orange-300/30",
-                            "Drag lobby frame",
-                            "Move lobby",
-                          ],
-                          [
-                            "bg-sky-400/15 text-sky-100 border-sky-300/30",
-                            "Drag teams",
-                            "Drop into slots",
-                          ],
-                          [
-                            "bg-lime-400/15 text-lime-100 border-lime-300/30",
-                            "Team + 1–4",
-                            "Score placement",
-                          ],
-                          [
-                            "bg-purple-400/15 text-purple-100 border-purple-300/30",
-                            "Mobile double-tap",
-                            "Cycle score",
-                          ],
-                          [
-                            "bg-yellow-300/15 text-yellow-100 border-yellow-200/40",
-                            "W / L connectors",
-                            "W winners · L losers",
-                          ],
-                          [
-                            "bg-red-400/15 text-red-100 border-red-300/30",
-                            "Select line + Del",
-                            "Remove link",
-                          ],
-                        ].map(([classes, action, detail]) => (
-                          <div
-                            key={action}
-                            className={`rounded border px-2.5 py-2 ${classes}`}
-                          >
-                            <span className="block text-[10px] font-black uppercase tracking-wider">
-                              {action}
-                            </span>
-                            <span className="text-white/65">{detail}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
+                    <button
+                      type="button"
+                      data-no-canvas-pan="true"
+                      disabled={zoom <= minZoom}
+                      className="flex h-10 w-full items-center justify-center border-b border-white/10 text-xl font-black leading-none text-white/80 transition hover:bg-[#FFD700]/10 hover:text-[#FFD700] disabled:cursor-not-allowed disabled:text-white/25 disabled:hover:bg-transparent"
+                      title={`Zoom out · ${Math.round(zoom * 100)}%`}
+                      aria-label="Zoom out"
+                      onPointerDown={event => event.stopPropagation()}
+                      onClick={event => {
+                        event.stopPropagation();
+                        zoomBoardFromCenter(-0.1);
+                      }}
+                    >
+                      −
+                    </button>
+                    <button
+                      type="button"
+                      data-no-canvas-pan="true"
+                      className="flex h-10 w-full items-center justify-center border-b border-white/10 text-white/70 transition hover:bg-[#FFD700]/10 hover:text-[#FFD700]"
+                      title={
+                        games.length > 0
+                          ? "Fit lobbies to view"
+                          : "Reset board view"
+                      }
+                      aria-label={
+                        games.length > 0
+                          ? "Fit lobbies to view"
+                          : "Reset board view"
+                      }
+                      onPointerDown={event => event.stopPropagation()}
+                      onClick={event => {
+                        event.stopPropagation();
+                        fitOrResetBoardView();
+                      }}
+                    >
+                      <Maximize2 className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                    <div className="w-full bg-black/70 px-1 py-1.5 text-center text-[10px] font-black leading-none tracking-tight text-[#FFD700]">
+                      {Math.round(zoom * 100)}%
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div className="pointer-events-none sticky left-2 top-2 z-[54] h-0 w-0 lg:hidden">
-                {touchHelpOpen ? (
+                <div className="pointer-events-none sticky left-0 top-0 z-[55] hidden h-0 w-0 lg:block">
                   <div
-                    className="pointer-events-auto ml-2 mt-2 max-h-[38dvh] w-[min(18rem,calc(100vw-2rem))] overflow-auto rounded-xl border border-cyan-300/25 bg-zinc-950/90 p-3 shadow-[0_0_24px_rgba(34,211,238,0.12)] backdrop-blur"
+                    ref={controlKeyRef}
                     data-no-canvas-pan="true"
+                    className={`pointer-events-none absolute rounded-xl border bg-black/90 font-mono shadow-[0_0_28px_rgba(255,215,0,0.16)] backdrop-blur ${
+                      controlKeyMinimized
+                        ? "w-max border-[#FFD700]/50"
+                        : "w-[min(26rem,calc(100vw-2rem))] border-[#FFD700]/35 p-4"
+                    }`}
+                    style={{
+                      transform: `translate(${controlKeyPosition.x}px, ${controlKeyPosition.y}px)`,
+                    }}
+                    onContextMenu={event => event.stopPropagation()}
                   >
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="font-mono text-xs font-black uppercase tracking-[0.24em] text-cyan-100">
-                        Touch Ops
-                      </p>
+                    {controlKeyMinimized ? (
                       <button
                         type="button"
-                        className="rounded border border-white/15 bg-white/10 px-2 py-1 font-mono text-[10px] font-black uppercase text-white/70 transition hover:border-cyan-200/60 hover:text-cyan-100"
-                        onClick={() => setTouchHelpOpen(false)}
+                        data-no-canvas-pan="true"
+                        className="pointer-events-auto flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-black uppercase tracking-[0.2em] text-[#FFD700] transition hover:bg-[#FFD700]/10"
+                        onClick={event => {
+                          event.stopPropagation();
+                          setControlKeyMinimized(false);
+                        }}
                       >
-                        Close
+                        <span className="h-2 w-2 rounded-full bg-[#FFD700] shadow-[0_0_12px_#FFD700]" />
+                        Controls · {Math.round(zoom * 100)}%
                       </button>
-                    </div>
-                    <ul className="mt-2 space-y-1.5 font-mono text-[11px] text-white/70">
-                      <li>• Long-press teams/lobbies to open options.</li>
-                      <li>• Drag teams into lobbies or exact slots.</li>
-                      <li>• Double-tap an assigned team to cycle placement.</li>
-                      <li>• Drag the empty grid background to pan.</li>
-                      <li>• Pinch with two fingers to zoom the board.</li>
-                    </ul>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    data-no-canvas-pan="true"
-                    className="pointer-events-auto ml-2 mt-2 rounded-full border border-cyan-300/40 bg-zinc-950/90 px-3 py-2 font-mono text-[11px] font-black uppercase tracking-wider text-cyan-100 shadow-[0_0_18px_rgba(34,211,238,0.16)] backdrop-blur transition hover:bg-cyan-300/10"
-                    onClick={() => setTouchHelpOpen(true)}
-                  >
-                    Touch Help
-                  </button>
-                )}
-              </div>
-              <div
-                className="relative"
-                style={{
-                  width: logicalCanvasSize.width * zoom,
-                  height: logicalCanvasSize.height * zoom,
-                }}
-              >
-                <div
-                  className="absolute left-0 top-0"
-                  style={{
-                    width: logicalCanvasSize.width,
-                    height: logicalCanvasSize.height,
-                    transform: `scale(${zoom})`,
-                    transformOrigin: "top left",
-                  }}
-                  ref={boardRef}
-                >
-                  <svg
-                    className="absolute inset-0 z-0 overflow-visible"
-                    width={logicalCanvasSize.width}
-                    height={logicalCanvasSize.height}
-                  >
-                    {connections.map(connection => {
-                      const sourceGame = gamesById.get(connection.sourceGameId);
-                      const targetGame = gamesById.get(connection.targetGameId);
-                      if (!sourceGame || !targetGame) return null;
-                      const endpoints = getConnectorEndpoints(
-                        getPortCenter(
-                          sourceGame,
-                          "bottom",
-                          connection.flowType
-                        ),
-                        getPortCenter(targetGame, "top")
-                      );
-                      const source = endpoints.source;
-                      const target = endpoints.target;
-                      const isSelectedConnection =
-                        selectedConnectionId === connection.id;
-                      const connectionPath = getConnectionPath(source, target);
-                      const isLoserConnection = connection.flowType === "loser";
-                      const baseStroke = isLoserConnection
-                        ? "#F8FAFC"
-                        : "#FFD700";
-                      const selectedStroke = isLoserConnection
-                        ? "#FFFFFF"
-                        : "#FFF3A3";
-                      const selectedGlow = isLoserConnection
-                        ? "#CBD5E1"
-                        : "#FFF3A3";
-                      const connectionLabel = isLoserConnection
-                        ? "Loser"
-                        : "Winner";
-                      const selectConnection = () => {
-                        setSelectedConnectionId(connection.id);
-                        setSelectedAssignmentId(null);
-                      };
-                      const deleteConnection = () => {
-                        deleteGameConnection.mutate({
-                          connectionId: connection.id,
-                        });
-                        setSelectedConnectionId(current =>
-                          current === connection.id ? null : current
-                        );
-                      };
-                      return (
-                        <ContextMenu key={connection.id}>
-                          <ContextMenuTrigger asChild>
-                            <g
-                              data-connection-line="true"
-                              className="cursor-pointer"
-                              onPointerDown={event => {
-                                event.stopPropagation();
-                              }}
+                    ) : (
+                      <>
+                        <div
+                          data-no-canvas-pan="true"
+                          className="pointer-events-auto mb-3 flex items-center justify-between gap-3 rounded border border-white/10 bg-white/5 px-2 py-2"
+                        >
+                          <div
+                            data-no-canvas-pan="true"
+                            data-control-key-drag-handle="true"
+                            className={`flex min-w-0 flex-1 items-center gap-2 ${
+                              controlKeyLocked
+                                ? "cursor-default"
+                                : "cursor-grab active:cursor-grabbing"
+                            }`}
+                            onPointerDown={startControlKeyDrag}
+                            onPointerMove={dragControlKey}
+                            onPointerUp={finishControlKeyDrag}
+                            onPointerCancel={finishControlKeyDrag}
+                          >
+                            <span className="h-2 w-2 rounded-full bg-[#FFD700] shadow-[0_0_12px_#FFD700]" />
+                            <div>
+                              <p className="text-xs font-black uppercase tracking-[0.28em] text-[#FFD700]">
+                                PC Control Key
+                              </p>
+                              <p className="text-[10px] uppercase tracking-wider text-white/45">
+                                {controlKeyLocked
+                                  ? "Locked in place"
+                                  : "Unlocked · drag the handle"}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-1">
+                            <button
+                              type="button"
+                              data-no-canvas-pan="true"
+                              data-control-key-action="true"
+                              className={`rounded border px-2 py-1 text-[10px] font-black uppercase transition ${
+                                controlKeyLocked
+                                  ? "border-[#FFD700]/50 bg-[#FFD700]/15 text-[#FFD700]"
+                                  : "border-cyan-300/40 bg-cyan-300/10 text-cyan-100"
+                              }`}
+                              onPointerDown={event => event.stopPropagation()}
                               onClick={event => {
                                 event.stopPropagation();
-                                selectConnection();
-                              }}
-                              onDoubleClick={event => {
-                                event.stopPropagation();
-                                deleteConnection();
-                              }}
-                              onContextMenu={event => {
-                                event.stopPropagation();
-                                selectConnection();
+                                setControlKeyLocked(current => !current);
                               }}
                             >
-                              <path
-                                d={connectionPath}
-                                fill="none"
-                                stroke="transparent"
-                                strokeWidth="18"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                style={{ pointerEvents: "stroke" }}
-                              />
-                              {isSelectedConnection && (
+                              {controlKeyLocked ? "Unlock" : "Lock"}
+                            </button>
+                            <button
+                              type="button"
+                              data-no-canvas-pan="true"
+                              data-control-key-action="true"
+                              className="rounded border border-white/15 bg-white/10 px-2 py-1 text-[10px] font-black uppercase text-white/70 transition hover:border-[#FFD700]/60 hover:text-[#FFD700]"
+                              onPointerDown={event => event.stopPropagation()}
+                              onClick={event => {
+                                event.stopPropagation();
+                                setControlKeyMinimized(true);
+                              }}
+                            >
+                              Min
+                            </button>
+                          </div>
+                        </div>
+                        <div
+                          data-no-canvas-pan="true"
+                          className="pointer-events-auto mb-3 flex items-center justify-between gap-3 rounded border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-2"
+                        >
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#FFD700]">
+                              Snap to Grid
+                            </p>
+                            <p className="text-[10px] uppercase tracking-wider text-white/45">
+                              40px lobby magnet
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            data-no-canvas-pan="true"
+                            className={`rounded border px-3 py-1 text-[10px] font-black uppercase transition ${
+                              snapWindowsToGrid
+                                ? "border-[#FFD700] bg-[#FFD700] text-black shadow-[0_0_14px_rgba(255,215,0,0.24)]"
+                                : "border-white/15 bg-black/50 text-white/65 hover:border-[#FFD700]/60 hover:text-[#FFD700]"
+                            }`}
+                            aria-pressed={snapWindowsToGrid}
+                            onPointerDown={event => event.stopPropagation()}
+                            onClick={event => {
+                              event.stopPropagation();
+                              setSnapWindowsToGrid(current => !current);
+                            }}
+                          >
+                            {snapWindowsToGrid ? "On" : "Off"}
+                          </button>
+                        </div>
+                        <div className="grid gap-2 text-[11px] text-white/75 sm:grid-cols-2">
+                          {[
+                            [
+                              "bg-cyan-400/15 text-cyan-100 border-cyan-300/30",
+                              "Drag empty grid",
+                              "Pan board",
+                            ],
+                            [
+                              "bg-fuchsia-400/15 text-fuchsia-100 border-fuchsia-300/30",
+                              "Buttons / Shift + scroll",
+                              "Zoom board",
+                            ],
+                            [
+                              "bg-emerald-400/15 text-emerald-100 border-emerald-300/30",
+                              "Right-click grid",
+                              "Create teams/lobbies",
+                            ],
+                            [
+                              "bg-orange-400/15 text-orange-100 border-orange-300/30",
+                              "Drag lobby frame",
+                              "Move lobby",
+                            ],
+                            [
+                              "bg-sky-400/15 text-sky-100 border-sky-300/30",
+                              "Drag teams",
+                              "Drop into slots",
+                            ],
+                            [
+                              "bg-lime-400/15 text-lime-100 border-lime-300/30",
+                              "Team + 1–4",
+                              "Score placement",
+                            ],
+                            [
+                              "bg-purple-400/15 text-purple-100 border-purple-300/30",
+                              "Mobile double-tap",
+                              "Cycle score",
+                            ],
+                            [
+                              "bg-yellow-300/15 text-yellow-100 border-yellow-200/40",
+                              "W / L connectors",
+                              "W winners · L losers",
+                            ],
+                            [
+                              "bg-red-400/15 text-red-100 border-red-300/30",
+                              "Select line + Del",
+                              "Remove link",
+                            ],
+                          ].map(([classes, action, detail]) => (
+                            <div
+                              key={action}
+                              className={`rounded border px-2.5 py-2 ${classes}`}
+                            >
+                              <span className="block text-[10px] font-black uppercase tracking-wider">
+                                {action}
+                              </span>
+                              <span className="text-white/65">{detail}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <div className="pointer-events-none sticky left-2 top-2 z-[54] h-0 w-0 lg:hidden">
+                  {touchHelpOpen ? (
+                    <div
+                      className="pointer-events-auto ml-2 mt-2 max-h-[38dvh] w-[min(18rem,calc(100vw-2rem))] overflow-auto rounded-xl border border-cyan-300/25 bg-zinc-950/90 p-3 shadow-[0_0_24px_rgba(34,211,238,0.12)] backdrop-blur"
+                      data-no-canvas-pan="true"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="font-mono text-xs font-black uppercase tracking-[0.24em] text-cyan-100">
+                          Touch Ops
+                        </p>
+                        <button
+                          type="button"
+                          className="rounded border border-white/15 bg-white/10 px-2 py-1 font-mono text-[10px] font-black uppercase text-white/70 transition hover:border-cyan-200/60 hover:text-cyan-100"
+                          onClick={() => setTouchHelpOpen(false)}
+                        >
+                          Close
+                        </button>
+                      </div>
+                      <ul className="mt-2 space-y-1.5 font-mono text-[11px] text-white/70">
+                        <li>• Long-press teams/lobbies to open options.</li>
+                        <li>• Drag teams into lobbies or exact slots.</li>
+                        <li>
+                          • Double-tap an assigned team to cycle placement.
+                        </li>
+                        <li>• Drag the empty grid background to pan.</li>
+                        <li>• Pinch with two fingers to zoom the board.</li>
+                      </ul>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      data-no-canvas-pan="true"
+                      className="pointer-events-auto ml-2 mt-2 rounded-full border border-cyan-300/40 bg-zinc-950/90 px-3 py-2 font-mono text-[11px] font-black uppercase tracking-wider text-cyan-100 shadow-[0_0_18px_rgba(34,211,238,0.16)] backdrop-blur transition hover:bg-cyan-300/10"
+                      onClick={() => setTouchHelpOpen(true)}
+                    >
+                      Touch Help
+                    </button>
+                  )}
+                </div>
+                <div
+                  className="relative"
+                  style={{
+                    width: logicalCanvasSize.width * zoom,
+                    height: logicalCanvasSize.height * zoom,
+                  }}
+                >
+                  <div
+                    className="absolute left-0 top-0"
+                    style={{
+                      width: logicalCanvasSize.width,
+                      height: logicalCanvasSize.height,
+                      transform: `scale(${zoom})`,
+                      transformOrigin: "top left",
+                    }}
+                    ref={boardRef}
+                  >
+                    <svg
+                      className="absolute inset-0 z-0 overflow-visible"
+                      width={logicalCanvasSize.width}
+                      height={logicalCanvasSize.height}
+                    >
+                      {connections.map(connection => {
+                        const sourceGame = gamesById.get(
+                          connection.sourceGameId
+                        );
+                        const targetGame = gamesById.get(
+                          connection.targetGameId
+                        );
+                        if (!sourceGame || !targetGame) return null;
+                        const endpoints = getConnectorEndpoints(
+                          getPortCenter(
+                            sourceGame,
+                            "bottom",
+                            connection.flowType
+                          ),
+                          getPortCenter(targetGame, "top")
+                        );
+                        const source = endpoints.source;
+                        const target = endpoints.target;
+                        const isSelectedConnection =
+                          selectedConnectionId === connection.id;
+                        const connectionPath = getConnectionPath(
+                          source,
+                          target
+                        );
+                        const isLoserConnection =
+                          connection.flowType === "loser";
+                        const baseStroke = isLoserConnection
+                          ? "#F8FAFC"
+                          : "#FFD700";
+                        const selectedStroke = isLoserConnection
+                          ? "#FFFFFF"
+                          : "#FFF3A3";
+                        const selectedGlow = isLoserConnection
+                          ? "#CBD5E1"
+                          : "#FFF3A3";
+                        const connectionLabel = isLoserConnection
+                          ? "Loser"
+                          : "Winner";
+                        const selectConnection = () => {
+                          setSelectedConnectionId(connection.id);
+                          setSelectedAssignmentId(null);
+                        };
+                        const deleteConnection = () => {
+                          deleteGameConnection.mutate({
+                            connectionId: connection.id,
+                          });
+                          setSelectedConnectionId(current =>
+                            current === connection.id ? null : current
+                          );
+                        };
+                        return (
+                          <ContextMenu key={connection.id}>
+                            <ContextMenuTrigger asChild>
+                              <g
+                                data-connection-line="true"
+                                className="cursor-pointer"
+                                onPointerDown={event => {
+                                  event.stopPropagation();
+                                }}
+                                onClick={event => {
+                                  event.stopPropagation();
+                                  selectConnection();
+                                }}
+                                onDoubleClick={event => {
+                                  event.stopPropagation();
+                                  deleteConnection();
+                                }}
+                                onContextMenu={event => {
+                                  event.stopPropagation();
+                                  selectConnection();
+                                }}
+                              >
                                 <path
                                   d={connectionPath}
                                   fill="none"
-                                  stroke={selectedGlow}
-                                  strokeOpacity={
-                                    isLoserConnection ? "0.5" : "0.55"
+                                  stroke="transparent"
+                                  strokeWidth="18"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  style={{ pointerEvents: "stroke" }}
+                                />
+                                {isSelectedConnection && (
+                                  <path
+                                    d={connectionPath}
+                                    fill="none"
+                                    stroke={selectedGlow}
+                                    strokeOpacity={
+                                      isLoserConnection ? "0.5" : "0.55"
+                                    }
+                                    strokeWidth="12"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    style={{ pointerEvents: "none" }}
+                                  />
+                                )}
+                                <path
+                                  d={connectionPath}
+                                  fill="none"
+                                  stroke={
+                                    isSelectedConnection
+                                      ? selectedStroke
+                                      : baseStroke
                                   }
-                                  strokeWidth="12"
+                                  strokeOpacity={
+                                    isSelectedConnection ? "1" : "0.82"
+                                  }
+                                  strokeWidth={isSelectedConnection ? "7" : "6"}
                                   strokeLinecap="round"
                                   strokeLinejoin="round"
                                   style={{ pointerEvents: "none" }}
                                 />
-                              )}
-                              <path
-                                d={connectionPath}
-                                fill="none"
-                                stroke={
-                                  isSelectedConnection
-                                    ? selectedStroke
-                                    : baseStroke
-                                }
-                                strokeOpacity={
-                                  isSelectedConnection ? "1" : "0.82"
-                                }
-                                strokeWidth={isSelectedConnection ? "7" : "6"}
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                style={{ pointerEvents: "none" }}
-                              />
-                            </g>
-                          </ContextMenuTrigger>
-                          <ContextMenuContent>
-                            <ContextMenuItem onClick={selectConnection}>
-                              Select {connectionLabel} Connection
-                            </ContextMenuItem>
-                            <ContextMenuItem
-                              className="text-red-300"
-                              onClick={deleteConnection}
-                            >
-                              Delete Connection
-                            </ContextMenuItem>
-                          </ContextMenuContent>
-                        </ContextMenu>
-                      );
-                    })}
-                    {connectionDrag && (
-                      <path
-                        d={getConnectionPath(
-                          connectionDrag.sourcePoint,
-                          connectionDrag.currentPoint
-                        )}
-                        fill="none"
-                        stroke={
-                          connectionDrag.flowType === "loser"
-                            ? "#F8FAFC"
-                            : "#FFD700"
-                        }
-                        strokeDasharray="8 8"
-                        strokeOpacity="0.85"
-                        strokeWidth="6"
-                      />
+                              </g>
+                            </ContextMenuTrigger>
+                            <ContextMenuContent>
+                              <ContextMenuItem onClick={selectConnection}>
+                                Select {connectionLabel} Connection
+                              </ContextMenuItem>
+                              <ContextMenuItem
+                                className="text-red-300"
+                                onClick={deleteConnection}
+                              >
+                                Delete Connection
+                              </ContextMenuItem>
+                            </ContextMenuContent>
+                          </ContextMenu>
+                        );
+                      })}
+                      {connectionDrag && (
+                        <path
+                          d={getConnectionPath(
+                            connectionDrag.sourcePoint,
+                            connectionDrag.currentPoint
+                          )}
+                          fill="none"
+                          stroke={
+                            connectionDrag.flowType === "loser"
+                              ? "#F8FAFC"
+                              : "#FFD700"
+                          }
+                          strokeDasharray="8 8"
+                          strokeOpacity="0.85"
+                          strokeWidth="6"
+                        />
+                      )}
+                    </svg>
+                    {games.length === 0 && (
+                      <div className="absolute left-8 top-8 rounded border border-dashed border-neon-gold/40 bg-black/70 p-6">
+                        <h3 className="font-mono text-xl font-bold text-neon-gold">
+                          Empty board
+                        </h3>
+                        <p className="text-sm text-white/60">
+                          Right-click the canvas to create a team or lobby.
+                        </p>
+                      </div>
                     )}
-                  </svg>
-                  {games.length === 0 && (
-                    <div className="absolute left-8 top-8 rounded border border-dashed border-neon-gold/40 bg-black/70 p-6">
-                      <h3 className="font-mono text-xl font-bold text-neon-gold">
-                        Empty board
-                      </h3>
-                      <p className="text-sm text-white/60">
-                        Right-click the canvas to create a team or lobby.
-                      </p>
-                    </div>
-                  )}
-                  {games.map(game => {
-                    const gameAssignments = assignments.filter(
-                      assignment => assignment.gameId === game.id
-                    );
-                    const capacity = game.gameType === "cashout" ? 4 : 2;
-                    const isComplete = game.status === "complete";
-                    const isMinimized = minimizedGameIds.has(game.id);
-                    const visualPosition = getVisualPosition(game);
-                    const statusClasses = getGameStatusClasses(game.status);
+                    {games.map(game => {
+                      const gameAssignments = assignments.filter(
+                        assignment => assignment.gameId === game.id
+                      );
+                      const capacity = game.gameType === "cashout" ? 4 : 2;
+                      const isComplete = game.status === "complete";
+                      const isMinimized = minimizedGameIds.has(game.id);
+                      const visualPosition = getVisualPosition(game);
+                      const statusClasses = getGameStatusClasses(game.status);
 
-                    return (
-                      <ContextMenu key={game.id}>
-                        <ContextMenuTrigger asChild>
-                          <div
-                            data-control-node="true"
-                            onContextMenu={event => event.stopPropagation()}
-                            onPointerDown={event => {
-                              if (
-                                event.pointerType === "touch" ||
-                                isPinchingRef.current
-                              )
-                                return;
-                              if (
-                                event.button !== 0 ||
-                                shouldSkipNodeDrag(event.target)
-                              )
-                                return;
-                              const handle =
-                                event.target instanceof HTMLElement
-                                  ? event.target.closest(
-                                      "[data-node-drag-handle='true']"
+                      return (
+                        <ContextMenu key={game.id}>
+                          <ContextMenuTrigger asChild>
+                            <div
+                              data-control-node="true"
+                              onContextMenu={event => event.stopPropagation()}
+                              onPointerDown={event => {
+                                if (
+                                  event.pointerType === "touch" ||
+                                  isPinchingRef.current
+                                )
+                                  return;
+                                if (
+                                  event.button !== 0 ||
+                                  shouldSkipNodeDrag(event.target)
+                                )
+                                  return;
+                                const handle =
+                                  event.target instanceof HTMLElement
+                                    ? event.target.closest(
+                                        "[data-node-drag-handle='true']"
+                                      )
+                                    : null;
+                                if (!handle) return;
+                                const point = canvasPoint(
+                                  event.clientX,
+                                  event.clientY
+                                );
+                                setNodeDrag({
+                                  gameId: game.id,
+                                  offsetX: point.x - visualPosition.x,
+                                  offsetY: point.y - visualPosition.y,
+                                  x: visualPosition.x,
+                                  y: visualPosition.y,
+                                });
+                              }}
+                              onDragOver={event => {
+                                if (!isComplete) event.preventDefault();
+                              }}
+                              onDrop={event => {
+                                if (isComplete) return;
+                                const payload =
+                                  parseDragPayload(
+                                    event.dataTransfer.getData(
+                                      "application/json"
                                     )
-                                  : null;
-                              if (!handle) return;
-                              const point = canvasPoint(
-                                event.clientX,
-                                event.clientY
-                              );
-                              setNodeDrag({
-                                gameId: game.id,
-                                offsetX: point.x - visualPosition.x,
-                                offsetY: point.y - visualPosition.y,
-                                x: visualPosition.x,
-                                y: visualPosition.y,
-                              });
-                            }}
-                            onDragOver={event => {
-                              if (!isComplete) event.preventDefault();
-                            }}
-                            onDrop={event => {
-                              if (isComplete) return;
-                              const payload =
-                                parseDragPayload(
-                                  event.dataTransfer.getData("application/json")
-                                ) ?? dragPayload;
-                              if (!payload) return;
-                              assignDroppedTeam(game, gameAssignments, payload);
-                            }}
-                            data-connection-target-game-id={game.id}
-                            className={`absolute z-10 w-80 cursor-default rounded-lg border bg-zinc-950/95 p-4 shadow-2xl ${statusClasses.nodeBorder} ${statusClasses.accent} ${nodeDrag?.gameId === game.id ? "z-50 ring-2 ring-[#FFD700]/60" : ""}`}
-                            style={{
-                              left: visualPosition.x,
-                              top: visualPosition.y,
-                            }}
-                          >
-                            <button
-                              type="button"
-                              data-no-node-drag="true"
-                              data-input-port-game-id={game.id}
-                              title="Receive from previous lobby"
-                              data-connector-port="true"
-                              data-game-id={game.id}
-                              data-port="top"
-                              className="absolute -top-3 left-1/2 z-20 h-6 w-6 -translate-x-1/2 rounded-full border-2 border-[#FFD700] bg-black shadow-[0_0_14px_rgba(255,215,0,0.45)] transition hover:scale-110"
-                            />
-                            {(["winner", "loser"] as const).map(flowType => (
+                                  ) ?? dragPayload;
+                                if (!payload) return;
+                                assignDroppedTeam(
+                                  game,
+                                  gameAssignments,
+                                  payload
+                                );
+                              }}
+                              data-connection-target-game-id={game.id}
+                              className={`absolute z-10 w-80 cursor-default rounded-lg border bg-zinc-950/95 p-4 shadow-2xl ${statusClasses.nodeBorder} ${statusClasses.accent} ${nodeDrag?.gameId === game.id ? "z-50 ring-2 ring-[#FFD700]/60" : ""}`}
+                              style={{
+                                left: visualPosition.x,
+                                top: visualPosition.y,
+                              }}
+                            >
                               <button
-                                key={flowType}
                                 type="button"
                                 data-no-node-drag="true"
-                                title={`Drag to connect ${flowType === "winner" ? "winners" : "losers"} from this lobby`}
+                                data-input-port-game-id={game.id}
+                                title="Receive from previous lobby"
                                 data-connector-port="true"
                                 data-game-id={game.id}
-                                data-port="bottom"
-                                data-flow-type={flowType}
-                                className={`absolute -bottom-3 z-20 flex h-6 w-6 items-center justify-center rounded-full border-2 font-mono text-[11px] font-black leading-none transition hover:scale-110 ${
-                                  flowType === "winner"
-                                    ? "left-[calc(50%-44px)] -translate-x-1/2 border-[#FFD700] bg-[#FFD700] text-black shadow-[0_0_14px_rgba(255,215,0,0.45)]"
-                                    : "left-[calc(50%+44px)] -translate-x-1/2 border-slate-100 bg-slate-100 text-black shadow-[0_0_14px_rgba(226,232,240,0.45)]"
-                                }`}
-                                onPointerDown={event => {
-                                  if (
-                                    event.pointerType === "touch" ||
-                                    isPinchingRef.current
-                                  )
-                                    return;
-                                  if (event.button !== 0) return;
-                                  event.preventDefault();
-                                  event.stopPropagation();
-                                  const sourceCenter = getPortCenter(
-                                    game,
-                                    "bottom",
-                                    flowType
-                                  );
-                                  const sourcePoint = getConnectionEndpoint(
-                                    sourceCenter,
-                                    "bottom"
-                                  );
-                                  setConnectionDrag({
-                                    sourceGameId: game.id,
-                                    flowType,
-                                    sourcePoint,
-                                    currentPoint: sourcePoint,
-                                  });
-                                }}
-                              >
-                                {flowType === "winner" ? "W" : "L"}
-                              </button>
-                            ))}
-                            <div
-                              data-node-drag-handle="true"
-                              className="mb-3 flex cursor-grab items-start justify-between gap-2 active:cursor-grabbing"
-                            >
-                              <div>
-                                <p className="font-mono text-xs uppercase tracking-widest text-white/45">
-                                  {game.gameType === "cashout"
-                                    ? "Cashout Lobby"
-                                    : "Final Round"}
-                                </p>
-                                <h3 className="font-mono text-xl font-black text-white">
-                                  {game.displayLabel}
-                                </h3>
-                              </div>
-                              <div className="flex shrink-0 items-center gap-2">
+                                data-port="top"
+                                className="absolute -top-3 left-1/2 z-20 h-6 w-6 -translate-x-1/2 rounded-full border-2 border-[#FFD700] bg-black shadow-[0_0_14px_rgba(255,215,0,0.45)] transition hover:scale-110"
+                              />
+                              {(["winner", "loser"] as const).map(flowType => (
                                 <button
+                                  key={flowType}
                                   type="button"
                                   data-no-node-drag="true"
-                                  className="rounded border border-white/15 bg-white/10 px-2 py-1 font-mono text-xs uppercase text-white/70 transition hover:border-[#FFD700]/60 hover:text-[#FFD700]"
-                                  onClick={event => {
-                                    event.stopPropagation();
-                                    toggleMinimizedGame(game.id);
-                                  }}
-                                  title={
-                                    isMinimized
-                                      ? "Expand lobby"
-                                      : "Minimize lobby"
-                                  }
-                                >
-                                  {isMinimized ? "+" : "−"}
-                                </button>
-                                {!isComplete && (
-                                  <button
-                                    type="button"
-                                    data-no-node-drag="true"
-                                    className="rounded border border-red-400/30 bg-red-950/40 px-2 py-1 font-mono text-xs uppercase text-red-200 transition hover:border-red-300 hover:bg-red-900/70"
-                                    onClick={event => {
-                                      event.stopPropagation();
-                                      setDialogState({
-                                        type: "delete",
-                                        gameId: game.id,
-                                        label: game.displayLabel,
-                                      });
-                                    }}
-                                    title="Delete lobby"
-                                  >
-                                    ×
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                            <div className="mb-3 flex items-center justify-between gap-2">
-                              <div className="flex min-w-0 items-center gap-2">
-                                <span
-                                  className={`inline-block rounded border px-2 py-1 font-mono text-xs uppercase ${statusClasses.statusPill}`}
-                                >
-                                  {game.status}
-                                </span>
-                                <select
-                                  data-no-node-drag="true"
-                                  className="max-w-[8rem] rounded border border-[#FFD700]/30 bg-black px-2 py-1 font-mono text-[10px] uppercase text-yellow-100 outline-none hover:border-[#FFD700]"
-                                  value={game.mapId ?? ""}
-                                  title="Select map"
-                                  onChange={event => {
-                                    event.stopPropagation();
-                                    const value = event.target.value;
-                                    if (value === "__random") {
-                                      randomizeGameMap.mutate({
-                                        gameId: game.id,
-                                      });
+                                  title={`Drag to connect ${flowType === "winner" ? "winners" : "losers"} from this lobby`}
+                                  data-connector-port="true"
+                                  data-game-id={game.id}
+                                  data-port="bottom"
+                                  data-flow-type={flowType}
+                                  className={`absolute -bottom-3 z-20 flex h-6 w-6 items-center justify-center rounded-full border-2 font-mono text-[11px] font-black leading-none transition hover:scale-110 ${
+                                    flowType === "winner"
+                                      ? "left-[calc(50%-44px)] -translate-x-1/2 border-[#FFD700] bg-[#FFD700] text-black shadow-[0_0_14px_rgba(255,215,0,0.45)]"
+                                      : "left-[calc(50%+44px)] -translate-x-1/2 border-slate-100 bg-slate-100 text-black shadow-[0_0_14px_rgba(226,232,240,0.45)]"
+                                  }`}
+                                  onPointerDown={event => {
+                                    if (
+                                      event.pointerType === "touch" ||
+                                      isPinchingRef.current
+                                    )
                                       return;
-                                    }
-                                    setGameMap.mutate({
-                                      gameId: game.id,
-                                      mapId: value || null,
+                                    if (event.button !== 0) return;
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    const sourceCenter = getPortCenter(
+                                      game,
+                                      "bottom",
+                                      flowType
+                                    );
+                                    const sourcePoint = getConnectionEndpoint(
+                                      sourceCenter,
+                                      "bottom"
+                                    );
+                                    setConnectionDrag({
+                                      sourceGameId: game.id,
+                                      flowType,
+                                      sourcePoint,
+                                      currentPoint: sourcePoint,
                                     });
                                   }}
                                 >
-                                  <option value="">Map: TBD</option>
-                                  <option value="__random">
-                                    Randomize Map
-                                  </option>
-                                  {THE_FINALS_MAPS.map(map => (
-                                    <option key={map.id} value={map.id}>
-                                      {map.name}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                              <span className="font-mono text-[10px] uppercase tracking-widest text-white/35">
-                                {game.gameType === "cashout"
-                                  ? "1st–4th"
-                                  : `1st–2nd · BO${game.seriesBestOf ?? 1}`}
-                              </span>
-                            </div>
-                            {isMinimized ? (
-                              <CompactResultList
-                                assignments={gameAssignments}
-                                selectedAssignmentId={selectedAssignmentId}
-                                teamsById={teamsById}
-                                onSelect={assignmentId => {
-                                  setSelectedAssignmentId(assignmentId);
-                                  setSelectedConnectionId(null);
-                                }}
-                              />
-                            ) : (
+                                  {flowType === "winner" ? "W" : "L"}
+                                </button>
+                              ))}
                               <div
-                                className="space-y-2"
-                                data-no-node-drag="true"
-                                onDragOver={event => {
-                                  if (!isComplete) event.preventDefault();
-                                }}
-                                onDrop={event => {
-                                  if (isComplete) return;
-                                  const payload =
-                                    parseDragPayload(
-                                      event.dataTransfer.getData(
-                                        "application/json"
-                                      )
-                                    ) ?? dragPayload;
-                                  if (!payload) return;
-                                  assignDroppedTeam(
-                                    game,
-                                    gameAssignments,
-                                    payload
-                                  );
-                                }}
+                                data-node-drag-handle="true"
+                                className="mb-3 flex cursor-grab items-start justify-between gap-2 active:cursor-grabbing"
                               >
-                                {Array.from(
-                                  { length: capacity },
-                                  (_, index) => {
-                                    const slot = index + 1;
-                                    const assignment = gameAssignments.find(
-                                      item => item.slotIndex === slot
-                                    );
-                                    const team = assignment
-                                      ? teamsById.get(assignment.teamId)
-                                      : undefined;
-                                    return (
-                                      <div
-                                        key={slot}
-                                        data-no-node-drag="true"
-                                        onDragOver={event => {
-                                          if (!isComplete)
-                                            event.preventDefault();
-                                        }}
-                                        onDrop={event => {
-                                          if (isComplete) return;
-                                          event.stopPropagation();
-                                          const payload =
-                                            parseDragPayload(
-                                              event.dataTransfer.getData(
-                                                "application/json"
-                                              )
-                                            ) ?? dragPayload;
-                                          if (!payload) return;
-                                          assignDroppedTeam(
-                                            game,
-                                            gameAssignments,
-                                            payload,
-                                            slot
-                                          );
-                                        }}
-                                        className="min-h-12 rounded border border-white/10 bg-black/50 p-2"
-                                      >
-                                        <p className="mb-1 font-mono text-[10px] uppercase text-white/35">
-                                          Slot {slot}
-                                        </p>
-                                        {team && assignment ? (
-                                          <TeamCard
-                                            team={team}
-                                            fromGameId={
-                                              isComplete ? undefined : game.id
-                                            }
-                                            disabled={isComplete}
-                                            placement={
-                                              assignment.resultPlacement ?? null
-                                            }
-                                            selected={
-                                              selectedAssignmentId ===
-                                              assignment.id
-                                            }
-                                            onSelect={() => {
-                                              setSelectedAssignmentId(
-                                                assignment.id
-                                              );
-                                              setSelectedConnectionId(null);
-                                            }}
-                                            onCyclePlacement={() =>
-                                              cycleAssignmentPlacement(
-                                                assignment,
-                                                capacity
-                                              )
-                                            }
-                                            onDragStart={() =>
-                                              setDragPayload({
-                                                teamId: team.id,
-                                                fromGameId: game.id,
-                                              })
-                                            }
-                                          />
-                                        ) : (
-                                          <p className="text-sm text-white/35">
-                                            {isComplete
-                                              ? "Empty historical slot"
-                                              : "Drop team here"}
-                                          </p>
-                                        )}
-                                      </div>
-                                    );
-                                  }
-                                )}
+                                <div>
+                                  <p className="font-mono text-xs uppercase tracking-widest text-white/45">
+                                    {game.gameType === "cashout"
+                                      ? "Cashout Lobby"
+                                      : "Final Round"}
+                                  </p>
+                                  <h3 className="font-mono text-xl font-black text-white">
+                                    {game.displayLabel}
+                                  </h3>
+                                </div>
+                                <div className="flex shrink-0 items-center gap-2">
+                                  <button
+                                    type="button"
+                                    data-no-node-drag="true"
+                                    className="rounded border border-white/15 bg-white/10 px-2 py-1 font-mono text-xs uppercase text-white/70 transition hover:border-[#FFD700]/60 hover:text-[#FFD700]"
+                                    onClick={event => {
+                                      event.stopPropagation();
+                                      toggleMinimizedGame(game.id);
+                                    }}
+                                    title={
+                                      isMinimized
+                                        ? "Expand lobby"
+                                        : "Minimize lobby"
+                                    }
+                                  >
+                                    {isMinimized ? "+" : "−"}
+                                  </button>
+                                  {!isComplete && (
+                                    <button
+                                      type="button"
+                                      data-no-node-drag="true"
+                                      className="rounded border border-red-400/30 bg-red-950/40 px-2 py-1 font-mono text-xs uppercase text-red-200 transition hover:border-red-300 hover:bg-red-900/70"
+                                      onClick={event => {
+                                        event.stopPropagation();
+                                        setDialogState({
+                                          type: "delete",
+                                          gameId: game.id,
+                                          label: game.displayLabel,
+                                        });
+                                      }}
+                                      title="Delete lobby"
+                                    >
+                                      ×
+                                    </button>
+                                  )}
+                                </div>
                               </div>
-                            )}
-                            {!isMinimized && (
-                              <LobbyCodeTools
-                                tournamentName={query.data.tournament.name}
-                                game={game}
-                                assignments={gameAssignments}
-                                teamsById={teamsById}
-                                discordConfigured={Boolean(
-                                  query.data.discordConfigured
+                              <div className="mb-3 flex items-center justify-between gap-2">
+                                <div className="flex min-w-0 items-center gap-2">
+                                  <span
+                                    className={`inline-block rounded border px-2 py-1 font-mono text-xs uppercase ${statusClasses.statusPill}`}
+                                  >
+                                    {game.status}
+                                  </span>
+                                  <select
+                                    data-no-node-drag="true"
+                                    className="max-w-[8rem] rounded border border-[#FFD700]/30 bg-black px-2 py-1 font-mono text-[10px] uppercase text-yellow-100 outline-none hover:border-[#FFD700]"
+                                    value={game.mapId ?? ""}
+                                    title="Select map"
+                                    onChange={event => {
+                                      event.stopPropagation();
+                                      const value = event.target.value;
+                                      if (value === "__random") {
+                                        randomizeGameMap.mutate({
+                                          gameId: game.id,
+                                        });
+                                        return;
+                                      }
+                                      setGameMap.mutate({
+                                        gameId: game.id,
+                                        mapId: value || null,
+                                      });
+                                    }}
+                                  >
+                                    <option value="">Map: TBD</option>
+                                    <option value="__random">
+                                      Randomize Map
+                                    </option>
+                                    {THE_FINALS_MAPS.map(map => (
+                                      <option key={map.id} value={map.id}>
+                                        {map.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <span className="font-mono text-[10px] uppercase tracking-widest text-white/35">
+                                  {game.gameType === "cashout"
+                                    ? "1st–4th"
+                                    : `1st–2nd · BO${game.seriesBestOf ?? 1}`}
+                                </span>
+                              </div>
+                              {isMinimized ? (
+                                <CompactResultList
+                                  assignments={gameAssignments}
+                                  selectedAssignmentId={selectedAssignmentId}
+                                  teamsById={teamsById}
+                                  onSelect={assignmentId => {
+                                    setSelectedAssignmentId(assignmentId);
+                                    setSelectedConnectionId(null);
+                                  }}
+                                />
+                              ) : (
+                                <div
+                                  className="space-y-2"
+                                  data-no-node-drag="true"
+                                  onDragOver={event => {
+                                    if (!isComplete) event.preventDefault();
+                                  }}
+                                  onDrop={event => {
+                                    if (isComplete) return;
+                                    const payload =
+                                      parseDragPayload(
+                                        event.dataTransfer.getData(
+                                          "application/json"
+                                        )
+                                      ) ?? dragPayload;
+                                    if (!payload) return;
+                                    assignDroppedTeam(
+                                      game,
+                                      gameAssignments,
+                                      payload
+                                    );
+                                  }}
+                                >
+                                  {Array.from(
+                                    { length: capacity },
+                                    (_, index) => {
+                                      const slot = index + 1;
+                                      const assignment = gameAssignments.find(
+                                        item => item.slotIndex === slot
+                                      );
+                                      const team = assignment
+                                        ? teamsById.get(assignment.teamId)
+                                        : undefined;
+                                      return (
+                                        <div
+                                          key={slot}
+                                          data-no-node-drag="true"
+                                          onDragOver={event => {
+                                            if (!isComplete)
+                                              event.preventDefault();
+                                          }}
+                                          onDrop={event => {
+                                            if (isComplete) return;
+                                            event.stopPropagation();
+                                            const payload =
+                                              parseDragPayload(
+                                                event.dataTransfer.getData(
+                                                  "application/json"
+                                                )
+                                              ) ?? dragPayload;
+                                            if (!payload) return;
+                                            assignDroppedTeam(
+                                              game,
+                                              gameAssignments,
+                                              payload,
+                                              slot
+                                            );
+                                          }}
+                                          className="min-h-12 rounded border border-white/10 bg-black/50 p-2"
+                                        >
+                                          <p className="mb-1 font-mono text-[10px] uppercase text-white/35">
+                                            Slot {slot}
+                                          </p>
+                                          {team && assignment ? (
+                                            <TeamCard
+                                              team={team}
+                                              fromGameId={
+                                                isComplete ? undefined : game.id
+                                              }
+                                              disabled={isComplete}
+                                              placement={
+                                                assignment.resultPlacement ??
+                                                null
+                                              }
+                                              selected={
+                                                selectedAssignmentId ===
+                                                assignment.id
+                                              }
+                                              onSelect={() => {
+                                                setSelectedAssignmentId(
+                                                  assignment.id
+                                                );
+                                                setSelectedConnectionId(null);
+                                              }}
+                                              onCyclePlacement={() =>
+                                                cycleAssignmentPlacement(
+                                                  assignment,
+                                                  capacity
+                                                )
+                                              }
+                                              onDragStart={() =>
+                                                setDragPayload({
+                                                  teamId: team.id,
+                                                  fromGameId: game.id,
+                                                })
+                                              }
+                                            />
+                                          ) : (
+                                            <p className="text-sm text-white/35">
+                                              {isComplete
+                                                ? "Empty historical slot"
+                                                : "Drop team here"}
+                                            </p>
+                                          )}
+                                        </div>
+                                      );
+                                    }
+                                  )}
+                                </div>
+                              )}
+                              {!isMinimized && (
+                                <LobbyCodeTools
+                                  tournamentName={query.data.tournament.name}
+                                  game={game}
+                                  assignments={gameAssignments}
+                                  teamsById={teamsById}
+                                  discordConfigured={Boolean(
+                                    query.data.discordConfigured
+                                  )}
+                                  sendingTeamId={
+                                    sendLobbyCodeToTeamLeader.variables
+                                      ?.teamId ?? null
+                                  }
+                                  sendingLobby={
+                                    sendLobbyCodeToLobbyLeaders.isPending
+                                  }
+                                  onSendTeam={teamId =>
+                                    sendLobbyCodeToTeamLeader.mutate({
+                                      gameId: game.id,
+                                      teamId,
+                                    })
+                                  }
+                                  onSendLobby={() =>
+                                    sendLobbyCodeToLobbyLeaders.mutate({
+                                      gameId: game.id,
+                                    })
+                                  }
+                                />
+                              )}
+                            </div>
+                          </ContextMenuTrigger>
+                          <ContextMenuContent>
+                            {isComplete ? (
+                              <>
+                                {statuses
+                                  .filter(status => status !== "complete")
+                                  .map(status => (
+                                    <ContextMenuItem
+                                      key={status}
+                                      onClick={() =>
+                                        updateStatus.mutate({
+                                          gameId: game.id,
+                                          status,
+                                        })
+                                      }
+                                    >
+                                      Reopen Game as {status}
+                                    </ContextMenuItem>
+                                  ))}
+                              </>
+                            ) : (
+                              <>
+                                <ContextMenuItem
+                                  onClick={() =>
+                                    openDialog(
+                                      {
+                                        type: "rename",
+                                        gameId: game.id,
+                                        currentValue: game.displayLabel,
+                                      },
+                                      game.displayLabel
+                                    )
+                                  }
+                                >
+                                  Rename Game
+                                </ContextMenuItem>
+                                <ContextMenuItem
+                                  onClick={() =>
+                                    openDialog(
+                                      {
+                                        type: "lobby",
+                                        gameId: game.id,
+                                        currentValue:
+                                          game.privateLobbyCode ?? "",
+                                      },
+                                      game.privateLobbyCode ?? ""
+                                    )
+                                  }
+                                >
+                                  Set/Clear Lobby Code
+                                </ContextMenuItem>
+                                <ContextMenuSeparator />
+                                {game.gameType === "final_round" && (
+                                  <>
+                                    {[1, 3, 5].map(value => (
+                                      <ContextMenuItem
+                                        key={value}
+                                        onClick={() =>
+                                          setBestOf.mutate({
+                                            gameId: game.id,
+                                            seriesBestOf: value as 1 | 3 | 5,
+                                          })
+                                        }
+                                      >
+                                        Set Final Round BO{value}
+                                      </ContextMenuItem>
+                                    ))}
+                                    <ContextMenuSeparator />
+                                  </>
                                 )}
-                                sendingTeamId={
-                                  sendLobbyCodeToTeamLeader.variables?.teamId ??
-                                  null
-                                }
-                                sendingLobby={
-                                  sendLobbyCodeToLobbyLeaders.isPending
-                                }
-                                onSendTeam={teamId =>
-                                  sendLobbyCodeToTeamLeader.mutate({
-                                    gameId: game.id,
-                                    teamId,
-                                  })
-                                }
-                                onSendLobby={() =>
-                                  sendLobbyCodeToLobbyLeaders.mutate({
-                                    gameId: game.id,
-                                  })
-                                }
-                              />
-                            )}
-                          </div>
-                        </ContextMenuTrigger>
-                        <ContextMenuContent>
-                          {isComplete ? (
-                            <>
-                              {statuses
-                                .filter(status => status !== "complete")
-                                .map(status => (
+                                {statuses.map(status => (
                                   <ContextMenuItem
                                     key={status}
                                     onClick={() =>
@@ -2466,145 +2555,83 @@ export default function TournamentControlRoom() {
                                       })
                                     }
                                   >
-                                    Reopen Game as {status}
+                                    Mark {status}
                                   </ContextMenuItem>
                                 ))}
-                            </>
-                          ) : (
-                            <>
-                              <ContextMenuItem
-                                onClick={() =>
-                                  openDialog(
-                                    {
-                                      type: "rename",
-                                      gameId: game.id,
-                                      currentValue: game.displayLabel,
-                                    },
-                                    game.displayLabel
-                                  )
-                                }
-                              >
-                                Rename Game
-                              </ContextMenuItem>
-                              <ContextMenuItem
-                                onClick={() =>
-                                  openDialog(
-                                    {
-                                      type: "lobby",
-                                      gameId: game.id,
-                                      currentValue: game.privateLobbyCode ?? "",
-                                    },
-                                    game.privateLobbyCode ?? ""
-                                  )
-                                }
-                              >
-                                Set/Clear Lobby Code
-                              </ContextMenuItem>
-                              <ContextMenuSeparator />
-                              {game.gameType === "final_round" && (
-                                <>
-                                  {[1, 3, 5].map(value => (
-                                    <ContextMenuItem
-                                      key={value}
-                                      onClick={() =>
-                                        setBestOf.mutate({
-                                          gameId: game.id,
-                                          seriesBestOf: value as 1 | 3 | 5,
-                                        })
-                                      }
-                                    >
-                                      Set Final Round BO{value}
-                                    </ContextMenuItem>
-                                  ))}
-                                  <ContextMenuSeparator />
-                                </>
-                              )}
-                              {statuses.map(status => (
+                                <ContextMenuSeparator />
                                 <ContextMenuItem
-                                  key={status}
                                   onClick={() =>
-                                    updateStatus.mutate({
+                                    removeAssignedTeams.mutate({
                                       gameId: game.id,
-                                      status,
                                     })
                                   }
                                 >
-                                  Mark {status}
+                                  Remove Assigned Teams
                                 </ContextMenuItem>
-                              ))}
-                              <ContextMenuSeparator />
-                              <ContextMenuItem
-                                onClick={() =>
-                                  removeAssignedTeams.mutate({
-                                    gameId: game.id,
-                                  })
-                                }
-                              >
-                                Remove Assigned Teams
-                              </ContextMenuItem>
-                              <ContextMenuItem
-                                className="text-red-300"
-                                onClick={() =>
-                                  setDialogState({
-                                    type: "delete",
-                                    gameId: game.id,
-                                    label: game.displayLabel,
-                                  })
-                                }
-                              >
-                                Delete Game
-                              </ContextMenuItem>
-                            </>
-                          )}
-                        </ContextMenuContent>
-                      </ContextMenu>
-                    );
-                  })}
+                                <ContextMenuItem
+                                  className="text-red-300"
+                                  onClick={() =>
+                                    setDialogState({
+                                      type: "delete",
+                                      gameId: game.id,
+                                      label: game.displayLabel,
+                                    })
+                                  }
+                                >
+                                  Delete Game
+                                </ContextMenuItem>
+                              </>
+                            )}
+                          </ContextMenuContent>
+                        </ContextMenu>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-              <div className="pointer-events-none sticky bottom-4 left-4 z-[60] mb-4 ml-4 w-fit rounded border border-white/10 bg-black/80 px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-white/50 shadow-xl">
-                Zoom {Math.round(zoom * 100)}% · Use rail buttons or Shift +
-                scroll · Select line + Delete or double-click line to remove
-                {selectedAssignmentContext?.team
-                  ? ` · Selected: ${selectedAssignmentContext.team.name}`
-                  : ""}
-                {selectedConnectionId !== null ? " · Selected: Connection" : ""}
-              </div>
-            </main>
-          </ContextMenuTrigger>
-          <ContextMenuContent>
-            <ContextMenuItem
-              onClick={() => openDialog({ type: "create-team" })}
-            >
-              Create Team
-            </ContextMenuItem>
-            <ContextMenuSeparator />
-            <ContextMenuItem
-              onClick={() =>
-                createCashout.mutate({
-                  tournamentId,
-                  position: snapWindowsToGrid
-                    ? snapCanvasPointToGrid(canvasMenuPosition)
-                    : canvasMenuPosition,
-                })
-              }
-            >
-              Create Cashout Lobby
-            </ContextMenuItem>
-            <ContextMenuItem
-              onClick={() =>
-                createFinal.mutate({
-                  tournamentId,
-                  position: snapWindowsToGrid
-                    ? snapCanvasPointToGrid(canvasMenuPosition)
-                    : canvasMenuPosition,
-                })
-              }
-            >
-              Create Final Round Match
-            </ContextMenuItem>
-          </ContextMenuContent>
-        </ContextMenu>
+              </main>
+            </ContextMenuTrigger>
+            <ContextMenuContent>
+              <ContextMenuItem
+                onClick={() => openDialog({ type: "create-team" })}
+              >
+                Create Team
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+              <ContextMenuItem
+                onClick={() =>
+                  createCashout.mutate({
+                    tournamentId,
+                    position: snapWindowsToGrid
+                      ? snapCanvasPointToGrid(canvasMenuPosition)
+                      : canvasMenuPosition,
+                  })
+                }
+              >
+                Create Cashout Lobby
+              </ContextMenuItem>
+              <ContextMenuItem
+                onClick={() =>
+                  createFinal.mutate({
+                    tournamentId,
+                    position: snapWindowsToGrid
+                      ? snapCanvasPointToGrid(canvasMenuPosition)
+                      : canvasMenuPosition,
+                  })
+                }
+              >
+                Create Final Round Match
+              </ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenu>
+          <div className="pointer-events-none absolute bottom-4 left-4 z-[70] hidden w-fit max-w-[calc(100%-2rem)] rounded border border-white/10 bg-black/85 px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-white/60 shadow-xl backdrop-blur lg:block">
+            Zoom {Math.round(zoom * 100)}% · Use rail buttons or Shift + scroll
+            · Select line + Delete or double-click line to remove
+            {selectedAssignmentContext?.team
+              ? ` · Selected: ${selectedAssignmentContext.team.name}`
+              : ""}
+            {selectedConnectionId !== null ? " · Selected: Connection" : ""}
+          </div>
+        </div>
       </div>
       <Dialog
         open={
