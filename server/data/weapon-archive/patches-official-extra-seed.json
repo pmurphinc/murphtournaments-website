@@ -1,5 +1,14 @@
 [
   {
+    "id": "patch_11_0_0_official",
+    "versionLabel": "11.0.0",
+    "title": "Season 11 | Galaxy Masters",
+    "patchDate": "2026-07-09",
+    "seasonLabel": "Season 11",
+    "sourceUrl": "https://www.reachthefinals.com/patchnotes/11-00",
+    "sourceType": "official"
+  },
+  {
     "id": "patch_9_0_0_official",
     "versionLabel": "9.0.0",
     "title": "Season 9 | Dragon Rising",
