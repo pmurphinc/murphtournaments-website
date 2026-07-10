@@ -7,7 +7,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { Link, useParams } from "wouter";
-import { Grip, Maximize2 } from "lucide-react";
+import { Grip, Maximize2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -40,6 +40,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type DragPayload = { teamId: number; fromGameId?: number };
 type GameStatus = "draft" | "ready" | "live" | "complete";
@@ -77,7 +85,7 @@ type ControlGameView = {
   canvasX: number;
   canvasY: number;
   privateLobbyCode?: string | null;
-  seriesBestOf?: number;
+  seriesBestOf?: 1 | 3 | 5;
   mapId?: string | null;
 };
 type AssignmentView = {
@@ -120,12 +128,30 @@ type ControlKeyDragStart = {
   startX: number;
   startY: number;
 };
+type ZoomRailDragStart = {
+  pointerId: number;
+  clientX: number;
+  clientY: number;
+  startY: number;
+  dragged: boolean;
+};
+type BoardUndoSnapshot = {
+  games: ControlGameView[];
+  assignments: AssignmentView[];
+  connections: ConnectionView[];
+};
 
 type DialogState =
   | { type: "create-team" }
   | { type: "rename"; gameId: number; currentValue: string }
   | { type: "lobby"; gameId: number; currentValue: string }
   | { type: "delete"; gameId: number; label: string }
+  | {
+      type:
+        | "bulk-delete-connections"
+        | "bulk-return-teams"
+        | "bulk-wipe-canvas";
+    }
   | null;
 
 const statuses: GameStatus[] = ["draft", "ready", "live", "complete"];
@@ -590,7 +616,8 @@ export default function TournamentControlRoom() {
   const [selectedConnectionId, setSelectedConnectionId] = useState<
     number | null
   >(null);
-  const [snapWindowsToGrid, setSnapWindowsToGrid] = useState(false);
+  const [selectedGameId, setSelectedGameId] = useState<number | null>(null);
+  const [snapWindowsToGrid, setSnapWindowsToGrid] = useState(true);
   const [minimizedGameIds, setMinimizedGameIds] = useState<Set<number>>(
     () => new Set()
   );
@@ -607,7 +634,13 @@ export default function TournamentControlRoom() {
     x: 16,
     y: 16,
   });
+  const [zoomRailY, setZoomRailY] = useState(160);
+  const [zoomRailMenuOpen, setZoomRailMenuOpen] = useState(false);
+  const [undoSnapshot, setUndoSnapshot] = useState<BoardUndoSnapshot | null>(
+    null
+  );
   const controlKeyDragRef = useRef<ControlKeyDragStart | null>(null);
+  const zoomRailDragRef = useRef<ZoomRailDragStart | null>(null);
   const canvasPanRef = useRef<(CanvasPanStart & { pointerId: number }) | null>(
     null
   );
@@ -666,6 +699,25 @@ export default function TournamentControlRoom() {
     trpc.tournamentControl.removeAssignedTeams.useMutation(mutationOptions);
   const deleteGame =
     trpc.tournamentControl.deleteGame.useMutation(mutationOptions);
+  const clearTournamentConnections =
+    trpc.tournamentControl.clearTournamentConnections.useMutation(
+      mutationOptions
+    );
+  const returnTournamentTeamsToAvailable =
+    trpc.tournamentControl.returnTournamentTeamsToAvailable.useMutation(
+      mutationOptions
+    );
+  const clearTournamentCanvas =
+    trpc.tournamentControl.clearTournamentCanvas.useMutation(mutationOptions);
+  const restoreTournamentBoardSnapshot =
+    trpc.tournamentControl.restoreTournamentBoardSnapshot.useMutation({
+      onSuccess: () => {
+        setUndoSnapshot(null);
+        invalidate();
+        toast.success("Board restored");
+      },
+      onError: (error: { message: string }) => toast.error(error.message),
+    });
   const setBestOf =
     trpc.tournamentControl.setFinalRoundSeriesBestOf.useMutation(
       mutationOptions
@@ -727,6 +779,28 @@ export default function TournamentControlRoom() {
   const games = (query.data?.games ?? []) as ControlGameView[];
   const assignments = (query.data?.assignments ?? []) as AssignmentView[];
   const connections = (query.data?.connections ?? []) as ConnectionView[];
+
+  const captureUndoSnapshot = useCallback(() => {
+    setUndoSnapshot({
+      games: games.map(game => ({
+        ...game,
+        seriesBestOf:
+          game.seriesBestOf === 3 || game.seriesBestOf === 5
+            ? game.seriesBestOf
+            : 1,
+      })),
+      assignments: assignments.map(assignment => ({ ...assignment })),
+      connections: connections.map(connection => ({ ...connection })),
+    });
+  }, [assignments, connections, games]);
+
+  const runDestructiveBoardAction = useCallback(
+    (action: () => void) => {
+      captureUndoSnapshot();
+      action();
+    },
+    [captureUndoSnapshot]
+  );
 
   const gamesById = useMemo(
     () =>
@@ -941,6 +1015,12 @@ export default function TournamentControlRoom() {
   }, [connections, selectedConnectionId]);
 
   useEffect(() => {
+    if (selectedGameId === null) return;
+    const gameExists = games.some(game => game.id === selectedGameId);
+    if (!gameExists) setSelectedGameId(null);
+  }, [games, selectedGameId]);
+
+  useEffect(() => {
     setOptimisticGamePositions(current => {
       if (current.size === 0) return current;
       const next = new Map(current);
@@ -965,6 +1045,7 @@ export default function TournamentControlRoom() {
       if (event.key === "Escape") {
         setSelectedAssignmentId(null);
         setSelectedConnectionId(null);
+        setSelectedGameId(null);
         return;
       }
 
@@ -973,8 +1054,22 @@ export default function TournamentControlRoom() {
         ["Backspace", "Delete"].includes(event.key)
       ) {
         event.preventDefault();
-        deleteGameConnection.mutate({ connectionId: selectedConnectionId });
+        runDestructiveBoardAction(() =>
+          deleteGameConnection.mutate({ connectionId: selectedConnectionId })
+        );
         setSelectedConnectionId(null);
+        return;
+      }
+
+      if (
+        selectedGameId !== null &&
+        ["Backspace", "Delete"].includes(event.key)
+      ) {
+        event.preventDefault();
+        runDestructiveBoardAction(() =>
+          deleteGame.mutate({ gameId: selectedGameId })
+        );
+        setSelectedGameId(null);
         return;
       }
 
@@ -1011,9 +1106,12 @@ export default function TournamentControlRoom() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [
+    deleteGame,
     deleteGameConnection,
+    runDestructiveBoardAction,
     selectedAssignmentContext,
     selectedConnectionId,
+    selectedGameId,
     setPlacement,
   ]);
 
@@ -1203,6 +1301,79 @@ export default function TournamentControlRoom() {
       })
     );
   }, [applyBoardView, games, minimizedGameIds]);
+
+  const clampZoomRailY = useCallback((value: number) => {
+    const canvasRect = canvasRef.current?.getBoundingClientRect();
+    const railHeight = 250;
+    const viewportHeight = canvasRect?.height ?? window.innerHeight;
+    return Math.min(
+      Math.max(8, value),
+      Math.max(8, viewportHeight - railHeight - 8)
+    );
+  }, []);
+
+  const startZoomRailDrag = useCallback(
+    (event: ReactPointerEvent<HTMLButtonElement>) => {
+      if (event.button !== 0) return;
+      event.stopPropagation();
+      zoomRailDragRef.current = {
+        pointerId: event.pointerId,
+        clientX: event.clientX,
+        clientY: event.clientY,
+        startY: zoomRailY,
+        dragged: false,
+      };
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+    },
+    [zoomRailY]
+  );
+
+  const dragZoomRail = useCallback(
+    (event: ReactPointerEvent<HTMLButtonElement>) => {
+      const dragStart = zoomRailDragRef.current;
+      if (!dragStart || dragStart.pointerId !== event.pointerId) return;
+      const deltaX = event.clientX - dragStart.clientX;
+      const deltaY = event.clientY - dragStart.clientY;
+      if (Math.hypot(deltaX, deltaY) > 4) dragStart.dragged = true;
+      if (!dragStart.dragged) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setZoomRailY(clampZoomRailY(dragStart.startY + deltaY));
+    },
+    [clampZoomRailY]
+  );
+
+  const finishZoomRailDrag = useCallback(
+    (event: ReactPointerEvent<HTMLButtonElement>) => {
+      if (zoomRailDragRef.current?.pointerId !== event.pointerId) return;
+      event.stopPropagation();
+      if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+    },
+    []
+  );
+
+  const handleZoomRailGripClick = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      if (zoomRailDragRef.current?.dragged) {
+        event.preventDefault();
+        event.stopPropagation();
+        zoomRailDragRef.current = null;
+        return;
+      }
+      zoomRailDragRef.current = null;
+    },
+    []
+  );
+
+  const undoBoardAction = useCallback(() => {
+    if (!undoSnapshot) return;
+    restoreTournamentBoardSnapshot.mutate({
+      tournamentId,
+      snapshot: undoSnapshot,
+    });
+  }, [restoreTournamentBoardSnapshot, tournamentId, undoSnapshot]);
 
   const openDialog = (state: Exclude<DialogState, null>, defaultValue = "") => {
     setDialogState(state);
@@ -1632,21 +1803,91 @@ export default function TournamentControlRoom() {
                   );
                 }}
               >
-                <div className="pointer-events-none sticky left-3 top-1/2 z-[65] h-0 w-0 -translate-y-1/2 sm:left-4">
+                <div className="pointer-events-none sticky left-3 top-0 z-[65] h-0 w-0 sm:left-4">
                   <div
                     data-no-canvas-pan="true"
                     className="pointer-events-auto flex w-11 flex-col items-center overflow-hidden rounded-xl border border-[#FFD700]/35 bg-zinc-950/95 font-mono text-white shadow-[0_0_24px_rgba(255,215,0,0.14)] backdrop-blur"
+                    style={{ transform: `translateY(${zoomRailY}px)` }}
                     onContextMenu={event => event.stopPropagation()}
                   >
+                    <DropdownMenu
+                      open={zoomRailMenuOpen}
+                      onOpenChange={setZoomRailMenuOpen}
+                    >
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          data-no-canvas-pan="true"
+                          className="flex h-10 w-full touch-none items-center justify-center border-b border-white/10 text-white/45 transition hover:bg-[#FFD700]/10 hover:text-[#FFD700]"
+                          title="Board options · drag to move zoom controls"
+                          aria-label="Board options and draggable zoom controls"
+                          onPointerDown={startZoomRailDrag}
+                          onPointerMove={dragZoomRail}
+                          onPointerUp={finishZoomRailDrag}
+                          onPointerCancel={finishZoomRailDrag}
+                          onClick={handleZoomRailGripClick}
+                        >
+                          <Grip className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        align="start"
+                        side="right"
+                        className="border-[#FFD700]/35 bg-black/95 font-mono text-yellow-50 shadow-[0_0_24px_rgba(255,215,0,0.16)]"
+                      >
+                        <DropdownMenuCheckboxItem
+                          checked={snapWindowsToGrid}
+                          onCheckedChange={checked =>
+                            setSnapWindowsToGrid(Boolean(checked))
+                          }
+                          className="focus:bg-[#FFD700]/15 focus:text-[#FFD700]"
+                        >
+                          Snap to Grid
+                        </DropdownMenuCheckboxItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-red-200 focus:bg-red-950/60 focus:text-red-100"
+                          onClick={() =>
+                            setDialogState({ type: "bulk-delete-connections" })
+                          }
+                        >
+                          Delete All Connections
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-red-200 focus:bg-red-950/60 focus:text-red-100"
+                          onClick={() =>
+                            setDialogState({ type: "bulk-return-teams" })
+                          }
+                        >
+                          Return All Teams to Available
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-red-200 focus:bg-red-950/60 focus:text-red-100"
+                          onClick={() =>
+                            setDialogState({ type: "bulk-wipe-canvas" })
+                          }
+                        >
+                          Wipe Canvas
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                     <button
                       type="button"
                       data-no-canvas-pan="true"
-                      className="flex h-10 w-full items-center justify-center border-b border-white/10 text-white/45"
-                      title={`Board zoom controls · ${Math.round(zoom * 100)}%`}
-                      aria-label={`Board zoom controls, current zoom ${Math.round(zoom * 100)}%`}
+                      disabled={
+                        !undoSnapshot ||
+                        restoreTournamentBoardSnapshot.isPending
+                      }
+                      className="flex h-10 w-full items-center justify-center border-b border-white/10 text-white/70 transition hover:bg-[#FFD700]/10 hover:text-[#FFD700] disabled:cursor-not-allowed disabled:text-white/25 disabled:hover:bg-transparent"
+                      title="Undo last destructive board action"
+                      aria-label="Undo last destructive board action"
                       onPointerDown={event => event.stopPropagation()}
+                      onClick={event => {
+                        event.stopPropagation();
+                        undoBoardAction();
+                      }}
                     >
-                      <Grip className="h-4 w-4" aria-hidden="true" />
+                      <RotateCcw className="h-4 w-4" aria-hidden="true" />
                     </button>
                     <button
                       type="button"
@@ -1795,36 +2036,6 @@ export default function TournamentControlRoom() {
                               Min
                             </button>
                           </div>
-                        </div>
-                        <div
-                          data-no-canvas-pan="true"
-                          className="pointer-events-auto mb-3 flex items-center justify-between gap-3 rounded border border-[#FFD700]/25 bg-[#FFD700]/10 px-3 py-2"
-                        >
-                          <div>
-                            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#FFD700]">
-                              Snap to Grid
-                            </p>
-                            <p className="text-[10px] uppercase tracking-wider text-white/45">
-                              40px lobby magnet
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            data-no-canvas-pan="true"
-                            className={`rounded border px-3 py-1 text-[10px] font-black uppercase transition ${
-                              snapWindowsToGrid
-                                ? "border-[#FFD700] bg-[#FFD700] text-black shadow-[0_0_14px_rgba(255,215,0,0.24)]"
-                                : "border-white/15 bg-black/50 text-white/65 hover:border-[#FFD700]/60 hover:text-[#FFD700]"
-                            }`}
-                            aria-pressed={snapWindowsToGrid}
-                            onPointerDown={event => event.stopPropagation()}
-                            onClick={event => {
-                              event.stopPropagation();
-                              setSnapWindowsToGrid(current => !current);
-                            }}
-                          >
-                            {snapWindowsToGrid ? "On" : "Off"}
-                          </button>
                         </div>
                         <div className="grid gap-2 text-[11px] text-white/75 sm:grid-cols-2">
                           {[
@@ -1991,11 +2202,14 @@ export default function TournamentControlRoom() {
                         const selectConnection = () => {
                           setSelectedConnectionId(connection.id);
                           setSelectedAssignmentId(null);
+                          setSelectedGameId(null);
                         };
                         const deleteConnection = () => {
-                          deleteGameConnection.mutate({
-                            connectionId: connection.id,
-                          });
+                          runDestructiveBoardAction(() =>
+                            deleteGameConnection.mutate({
+                              connectionId: connection.id,
+                            })
+                          );
                           setSelectedConnectionId(current =>
                             current === connection.id ? null : current
                           );
@@ -2121,6 +2335,12 @@ export default function TournamentControlRoom() {
                             <div
                               data-control-node="true"
                               onContextMenu={event => event.stopPropagation()}
+                              onClick={event => {
+                                event.stopPropagation();
+                                setSelectedGameId(game.id);
+                                setSelectedConnectionId(null);
+                                setSelectedAssignmentId(null);
+                              }}
                               onPointerDown={event => {
                                 if (
                                   event.pointerType === "touch" ||
@@ -2170,7 +2390,7 @@ export default function TournamentControlRoom() {
                                 );
                               }}
                               data-connection-target-game-id={game.id}
-                              className={`absolute z-10 w-80 cursor-default rounded-lg border bg-zinc-950/95 p-4 shadow-2xl ${statusClasses.nodeBorder} ${statusClasses.accent} ${nodeDrag?.gameId === game.id ? "z-50 ring-2 ring-[#FFD700]/60" : ""}`}
+                              className={`absolute z-10 w-80 cursor-default rounded-lg border bg-zinc-950/95 p-4 shadow-2xl ${statusClasses.nodeBorder} ${statusClasses.accent} ${nodeDrag?.gameId === game.id || selectedGameId === game.id ? "z-50 ring-2 ring-[#FFD700]/80 shadow-[0_0_28px_rgba(255,215,0,0.22)]" : ""}`}
                               style={{
                                 left: visualPosition.x,
                                 top: visualPosition.y,
@@ -2333,6 +2553,7 @@ export default function TournamentControlRoom() {
                                   onSelect={assignmentId => {
                                     setSelectedAssignmentId(assignmentId);
                                     setSelectedConnectionId(null);
+                                    setSelectedGameId(null);
                                   }}
                                 />
                               ) : (
@@ -2418,6 +2639,7 @@ export default function TournamentControlRoom() {
                                                   assignment.id
                                                 );
                                                 setSelectedConnectionId(null);
+                                                setSelectedGameId(null);
                                               }}
                                               onCyclePlacement={() =>
                                                 cycleAssignmentPlacement(
@@ -2623,14 +2845,6 @@ export default function TournamentControlRoom() {
               </ContextMenuItem>
             </ContextMenuContent>
           </ContextMenu>
-          <div className="pointer-events-none absolute bottom-4 left-4 z-[70] hidden w-fit max-w-[calc(100%-2rem)] rounded border border-white/10 bg-black/85 px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-white/60 shadow-xl backdrop-blur lg:block">
-            Zoom {Math.round(zoom * 100)}% · Use rail buttons or Shift + scroll
-            · Select line + Delete or double-click line to remove
-            {selectedAssignmentContext?.team
-              ? ` · Selected: ${selectedAssignmentContext.team.name}`
-              : ""}
-            {selectedConnectionId !== null ? " · Selected: Connection" : ""}
-          </div>
         </div>
       </div>
       <Dialog
@@ -2704,7 +2918,7 @@ export default function TournamentControlRoom() {
             <AlertDialogTitle>Delete lobby?</AlertDialogTitle>
             <AlertDialogDescription>
               This deletes the lobby node, its assignments, and its flow
-              connections. This cannot be undone.
+              connections. You can undo this once from the zoom rail.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -2712,13 +2926,73 @@ export default function TournamentControlRoom() {
             <AlertDialogAction
               onClick={() => {
                 if (dialogState?.type === "delete") {
-                  deleteGame.mutate({ gameId: dialogState.gameId });
+                  runDestructiveBoardAction(() =>
+                    deleteGame.mutate({ gameId: dialogState.gameId })
+                  );
                 }
                 setDialogState(null);
               }}
             >
               Delete{" "}
               {dialogState?.type === "delete" ? dialogState.label : "lobby"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog
+        open={
+          dialogState?.type === "bulk-delete-connections" ||
+          dialogState?.type === "bulk-return-teams" ||
+          dialogState?.type === "bulk-wipe-canvas"
+        }
+        onOpenChange={open => !open && setDialogState(null)}
+      >
+        <AlertDialogContent className="border-[#FFD700]/35 bg-black text-white shadow-[0_0_30px_rgba(255,215,0,0.18)]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-mono text-[#FFD700]">
+              {dialogState?.type === "bulk-delete-connections"
+                ? "Delete all connections?"
+                : dialogState?.type === "bulk-return-teams"
+                  ? "Return all teams to available?"
+                  : "Wipe canvas?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-white/65">
+              {dialogState?.type === "bulk-delete-connections"
+                ? "This removes every lobby connection for this tournament and leaves lobbies, teams, assignments, submissions, and viewer links intact."
+                : dialogState?.type === "bulk-return-teams"
+                  ? "This removes every team assignment from the current lobbies without deleting teams, lobbies, or connections."
+                  : "This deletes every lobby on the canvas. Existing cascade cleanup removes their assignments and connections while preserving teams, submissions, viewer links, and the tournament."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-white/20 bg-white/10 text-white hover:bg-white/15">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-[#FFD700] font-mono font-black uppercase text-black hover:bg-[#e6c200]"
+              onClick={() => {
+                if (dialogState?.type === "bulk-delete-connections") {
+                  runDestructiveBoardAction(() =>
+                    clearTournamentConnections.mutate({ tournamentId })
+                  );
+                }
+                if (dialogState?.type === "bulk-return-teams") {
+                  runDestructiveBoardAction(() =>
+                    returnTournamentTeamsToAvailable.mutate({ tournamentId })
+                  );
+                }
+                if (dialogState?.type === "bulk-wipe-canvas") {
+                  runDestructiveBoardAction(() =>
+                    clearTournamentCanvas.mutate({ tournamentId })
+                  );
+                }
+                setSelectedAssignmentId(null);
+                setSelectedConnectionId(null);
+                setSelectedGameId(null);
+                setDialogState(null);
+              }}
+            >
+              Confirm
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
