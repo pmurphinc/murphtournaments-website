@@ -145,11 +145,38 @@ Esports Note
 
 Balance Changes
 
-• Gadgets: APS Turret, Breach Charge, Data Reshaper, and Hover Pad received buffs or adjustments.
-• Melee: Stamina and Precision were added across melee weapons, with major per-weapon tuning and new contextual melee behavior.
-• Specializations: Cloaking Device, Evasive Dash, and Winch Claw received nerfs or adjustments.
-• Weapons: .50 Akimbo, 93R, FCAR, KS-23, M134 Minigun, Model 1887, and Pike-556 were updated.
-• Item XP earn rates were increased for several specializations and gadgets.
+Gadgets
+• APS Turret: projectile blocks increased from 5 to 6; health increased from 160 to 175; cooldown no longer regenerates while deployed; manual retrieve now gives 5s cooldown, remote retrieve 15s, destroyed APS 30s.
+• Breach Charge: deployed arm time decreased from 1.5s to 1s.
+• Data Reshaper: can reshape Gateways to immediately disable them.
+• Hover Pad: health increased from 350 to 425.
+
+Melee Weapons
+• General: Stamina and Precision systems were added. Stamina controls lunge access and regenerates over time or on precise hits; Precision zones deal critical damage while glancing hits deal reduced damage.
+• Dagger: stamina recovery set to 2s; primary precise damage remains 60 and glancing damage is 42; attack movement speed reduced; sweep range reduced by about 0.5m; lunge distance increased from 3m to 4.5m; lunge target angle decreased from 25° to 20°; Precision angle set to 9°; Backstab multiplier increased from 4.26 to 4.5, charge time reduced from 0.8s to 0.65s, pushback added, and lunge distance increased from 3m to 4.5m.
+• Dual Blades: stamina recovery set to 3s; three-hit sequence replaced by two double-swipes; old 50x2, 60x2, and 100 sequence replaced by 57x2 precise and 39x2 glancing; lunge remains 4.5m; lunge target angle decreased from 25° to 20°; Precision angle set to 8°; Deflect movement speed reduced by 50%; Deflect damage multiplier increased from 0.1 to 0.2; Cross Slash added with 140 precise damage, 84 glancing damage, 5m lunge, pushback, and 8° Precision angle.
+• Quick Melee: damage decreased from 40 to 25; contextual Kick added at full Stamina with about 5m knockback; Kick stamina recovery set to 2.5s; knockback against hold-interaction targets reduced to about 1m.
+• Riot Shield: stamina recovery set to 3s; old 90 primary damage replaced by 82 precise and 57 glancing; sweep range reduced by 0.5m; lunge increased from 3m to 4m; lunge target angle decreased from 40° to 20°; Precision angle set to 9°; Shield Block collision now provides full frontal protection, blocking movement speed reduced by 25%, melee-block reliability improved; Shield Bash added with 40 damage, about 3m lunge, and about 5m knockback.
+• Sledgehammer: stamina recovery set to 2s; primary old 100 damage replaced by 120 precise and 90 glancing; primary lunge increased from 4.5m to 5m; lunge target angle decreased from 25° to 20°; Precision angle set to 10°; secondary old 175 damage replaced by 200 precise and 150 glancing; secondary pushback added; secondary lunge increased from 4.5m to 5m; secondary Precision angle set to 10°.
+• Spear: stamina recovery set to 3s; primary animation sequence reduced from three attacks to two; old 65/80/90 scaling sequence replaced by 74 precise and 55 glancing; lunge decreased from 7.5m to 5m; lunge target angle decreased from 30° to 20°; Precision angle set to 8°; old secondary spin of 100 damage per spin for three spins over 2.66s replaced by three spins dealing 75, 100, and 126 damage with 0.8s, 0.75s, and 1.1s spin durations.
+• Sword: stamina recovery set to 2s; old 88 primary damage replaced by 110 precise and 71 glancing; primary sweep updated; lunge increased from 3m to 4.25m; lunge target angle decreased from 25° to 20°; Precision angle set to 9°; secondary lunge now requires Stamina for max range, with stamina lunge increased from about 9m to about 10m and no-stamina lunge set to about 5m; forward clamp angle increased from 40° to 110°.
+
+Specializations
+• Cloaking Device: minimum cloak duration decreased from about 13s to about 11s; energy consumption changed so below-run-speed movement uses the minimum consumption rate and run-speed-or-faster movement uses the maximum consumption rate.
+• Evasive Dash: charges decreased from 3 to 2; cooldown decreased from 7.5s to 6.5s.
+• Winch Claw: minimum victim stun decreased from 0.25s to 0.1s; destination movement lock decreased from 0.15s to 0.1s; user act delay after grabbing decreased from 0.25s to 0.1s.
+
+Weapons
+• .50 Akimbo: damage increased from 44 to 46.
+• 93R: damage decreased from 25 to 24; ammo count increased from 21 to 27.
+• FCAR: fire rate decreased from 540 RPM to 530 RPM.
+• KS-23: damage increased from 100 to 110; damage falloff multiplier decreased from 0.70 to 0.64 so ranged damage stays similar after the close-range buff.
+• M134 Minigun: dispersion decreased in all aim states by 10%; dispersion scales up less aggressively during quick camera movement; environmental damage increased from 30 to 35.
+• Model 1887: pellet damage increased from 12 to 13.
+• Pike-556: headshot damage multiplier increased from 1.5 to 1.75.
+
+Item Progression
+• Item XP earn rates were increased for Cloaking Device, Dematerializer, Evasive Dash, Healing Beam, Mesh Shield, Shockwave, Winch Claw, Anti-Gravity Cube, APS Turret, C4, Data Reshaper, Defibrillator, Dome Shield, Explosive Mine, Frag Grenade, Gas Grenade, Gas Mine, Gateway, Glitch Grenade, H+ Infuser, Healing Emitter, Lockbolt, Nullifier, Proximity Sensor, and Vanishing Bomb.
 
 Bug Fixes
 

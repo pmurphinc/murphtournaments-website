@@ -1,14 +1,27 @@
 import { useMemo, useState } from "react";
 import type React from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowLeft, ChevronRight, Clock3, RotateCcw, Search, X } from "lucide-react";
+import {
+  ArrowLeft,
+  ChevronRight,
+  Clock3,
+  RotateCcw,
+  Search,
+  X,
+} from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import BaselineStatsCard from "@/components/BaselineStatsCard";
 
 type ClassFilter = "all" | "Light" | "Medium" | "Heavy" | "multi";
 type CategoryFilter = "all" | "Weapon" | "Gadget" | "Specialization";
 type SortOption = "alphabetical" | "recently-changed" | "most-changed";
-type ChangeTypeFilter = "all" | "buff" | "nerf" | "fix" | "adjustment" | "rework";
+type ChangeTypeFilter =
+  | "all"
+  | "buff"
+  | "nerf"
+  | "fix"
+  | "adjustment"
+  | "rework";
 
 type ArchiveMode = { kind: "list" } | { kind: "detail"; slug: string };
 
@@ -19,11 +32,18 @@ const CLASS_COLORS: Record<string, string> = {
   multi: "#a78bfa",
 };
 
-const CHANGE_TYPE_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+const CHANGE_TYPE_CONFIG: Record<
+  string,
+  { label: string; color: string; bg: string }
+> = {
   buff: { label: "BUFF", color: "#4ADE80", bg: "rgba(74, 222, 128, 0.13)" },
   nerf: { label: "NERF", color: "#E84B4B", bg: "rgba(232, 75, 75, 0.13)" },
   fix: { label: "FIX", color: "#818CF8", bg: "rgba(129, 140, 248, 0.13)" },
-  adjustment: { label: "ADJUST", color: "#E8B84B", bg: "rgba(232, 184, 75, 0.13)" },
+  adjustment: {
+    label: "ADJUST",
+    color: "#E8B84B",
+    bg: "rgba(232, 184, 75, 0.13)",
+  },
   rework: { label: "REWORK", color: "#F97316", bg: "rgba(249, 115, 22, 0.13)" },
 };
 
@@ -92,13 +112,22 @@ function ArchiveSkeleton() {
   return (
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
       {Array.from({ length: 9 }).map((_, index) => (
-        <div key={index} className="h-32 animate-pulse rounded-lg border border-white/10 bg-[#141830]" />
+        <div
+          key={index}
+          className="h-32 animate-pulse rounded-lg border border-white/10 bg-[#141830]"
+        />
       ))}
     </div>
   );
 }
 
-function EmptyState({ children, action }: { children: string; action?: React.ReactNode }) {
+function EmptyState({
+  children,
+  action,
+}: {
+  children: string;
+  action?: React.ReactNode;
+}) {
   return (
     <div className="rounded-lg border border-white/10 bg-[#141830] px-6 py-14 text-center">
       <p className="font-mono text-sm text-white/65">{children}</p>
@@ -151,7 +180,7 @@ function ArchiveList() {
       search: search.trim() || undefined,
       sort,
     }),
-    [categoryFilter, classFilter, search, sort],
+    [categoryFilter, classFilter, search, sort]
   );
 
   const {
@@ -198,7 +227,11 @@ function ArchiveList() {
           aria-label="Search archive items"
         />
         {search ? (
-          <button type="button" onClick={() => setSearch("")} className="text-white/45 transition hover:text-white">
+          <button
+            type="button"
+            onClick={() => setSearch("")}
+            className="text-white/45 transition hover:text-white"
+          >
             <X className="h-4 w-4" aria-hidden="true" />
             <span className="sr-only">Clear search</span>
           </button>
@@ -212,7 +245,9 @@ function ArchiveList() {
               key={filter.key}
               label={filter.label}
               active={classFilter === filter.key}
-              color={filter.key === "all" ? "#00d9ff" : getClassColor(filter.key)}
+              color={
+                filter.key === "all" ? "#00d9ff" : getClassColor(filter.key)
+              }
               onClick={() => setClassFilter(filter.key)}
             />
           ))}
@@ -228,7 +263,9 @@ function ArchiveList() {
           ))}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-mono text-[11px] font-bold text-white/45">SORT:</span>
+          <span className="font-mono text-[11px] font-bold text-white/45">
+            SORT:
+          </span>
           {SORT_OPTIONS.map(option => (
             <FilterChip
               key={option.key}
@@ -245,26 +282,34 @@ function ArchiveList() {
       {isLoading ? (
         <ArchiveSkeleton />
       ) : isError ? (
-        <EmptyState action={
-          <button
-            type="button"
-            onClick={() => refetch()}
-            className="inline-flex items-center gap-2 rounded-md border border-red-400 px-4 py-2 font-mono text-xs font-bold text-red-300"
-          >
-            <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-            Retry
-          </button>
-        }>
+        <EmptyState
+          action={
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className="inline-flex items-center gap-2 rounded-md border border-red-400 px-4 py-2 font-mono text-xs font-bold text-red-300"
+            >
+              <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+              Retry
+            </button>
+          }
+        >
           {`Failed to load archive${error?.message ? `: ${error.message}` : "."}`}
         </EmptyState>
       ) : !weapons || weapons.length === 0 ? (
-        <EmptyState action={
-          search || classFilter !== "all" || categoryFilter !== "all" ? (
-            <button type="button" onClick={resetFilters} className="font-mono text-sm text-[#00d9ff] underline">
-              Clear filters
-            </button>
-          ) : null
-        }>
+        <EmptyState
+          action={
+            search || classFilter !== "all" || categoryFilter !== "all" ? (
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="font-mono text-sm text-[#00d9ff] underline"
+              >
+                Clear filters
+              </button>
+            ) : null
+          }
+        >
           No items found.
         </EmptyState>
       ) : (
@@ -275,35 +320,60 @@ function ArchiveList() {
               <Link key={item.slug} href={`/balance-archive/${item.slug}`}>
                 <a
                   className="group block rounded-lg border bg-[#141830] transition duration-200 hover:-translate-y-0.5 hover:bg-[#171d3a]"
-                  style={{ borderColor: `${classColor}44`, borderLeftColor: classColor, borderLeftWidth: 4 }}
+                  style={{
+                    borderColor: `${classColor}44`,
+                    borderLeftColor: classColor,
+                    borderLeftWidth: 4,
+                  }}
                   aria-label={`View ${item.name} change history`}
                 >
                   <div className="flex items-center gap-3 p-3">
-                    <WeaponThumb imageUrl={item.imageUrl} name={item.name} color={classColor} />
+                    <WeaponThumb
+                      imageUrl={item.imageUrl}
+                      name={item.name}
+                      color={classColor}
+                    />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <h2 className="truncate font-mono text-base font-bold text-white">{item.name}</h2>
+                        <h2 className="truncate font-mono text-base font-bold text-white">
+                          {item.name}
+                        </h2>
                         {item.class ? (
                           <span
                             className="shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px] font-black"
-                            style={{ borderColor: classColor, color: classColor, background: `${classColor}22` }}
+                            style={{
+                              borderColor: classColor,
+                              color: classColor,
+                              background: `${classColor}22`,
+                            }}
                           >
                             {item.class.toUpperCase()}
                           </span>
                         ) : null}
                       </div>
-                      <p className="mt-1 font-mono text-xs text-white/50">{item.category ?? "Unknown"}</p>
+                      <p className="mt-1 font-mono text-xs text-white/50">
+                        {item.category ?? "Unknown"}
+                      </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 border-t px-3 py-2" style={{ borderColor: `${classColor}22` }}>
+                  <div
+                    className="flex items-center gap-3 border-t px-3 py-2"
+                    style={{ borderColor: `${classColor}22` }}
+                  >
                     <span className="inline-flex min-w-0 items-center gap-1.5 font-mono text-[11px] text-white/55">
                       <Clock3 className="h-3 w-3 shrink-0" aria-hidden="true" />
-                      {item.changeCount} {item.changeCount === 1 ? "change" : "changes"}
+                      {item.changeCount}{" "}
+                      {item.changeCount === 1 ? "change" : "changes"}
                     </span>
                     <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-[#4ADE80]">
-                      {item.latestPatch ? `v${item.latestPatch}` : "No changes logged"}
+                      {item.latestPatch
+                        ? `v${item.latestPatch}`
+                        : "No changes logged"}
                     </span>
-                    <ChevronRight className="h-4 w-4 text-white/45 transition group-hover:text-[#00d9ff]" aria-hidden="true" />
+                    <ChevronRight
+                      className="h-4 w-4 text-white/45 transition group-hover:text-[#00d9ff]"
+                      aria-hidden="true"
+                    />
                   </div>
                 </a>
               </Link>
@@ -315,11 +385,24 @@ function ArchiveList() {
   );
 }
 
-function DetailStat({ label, value, color = "#00d9ff" }: { label: string; value: string | number; color?: string }) {
+function DetailStat({
+  label,
+  value,
+  color = "#00d9ff",
+}: {
+  label: string;
+  value: string | number;
+  color?: string;
+}) {
   return (
     <div className="flex-1 text-center">
-      <div className="font-mono text-[10px] font-bold tracking-wide text-white/45">{label}</div>
-      <div className="mt-1 truncate font-mono text-lg font-black" style={{ color }}>
+      <div className="font-mono text-[10px] font-bold tracking-wide text-white/45">
+        {label}
+      </div>
+      <div
+        className="mt-1 truncate font-mono text-lg font-black"
+        style={{ color }}
+      >
         {value}
       </div>
     </div>
@@ -329,16 +412,29 @@ function DetailStat({ label, value, color = "#00d9ff" }: { label: string; value:
 function ArchiveDetail({ slug }: { slug: string }) {
   const [, navigate] = useLocation();
   const [changeFilter, setChangeFilter] = useState<ChangeTypeFilter>("all");
-  const { data: detail, isLoading, isError } = trpc.weaponArchive.getBySlug.useQuery({ slug }, { enabled: Boolean(slug) });
+  const {
+    data: detail,
+    isLoading,
+    isError,
+  } = trpc.weaponArchive.getBySlug.useQuery(
+    { slug },
+    { enabled: Boolean(slug) }
+  );
 
   const history = detail?.history ?? [];
   const filteredHistory = history
     .map(entry => ({
       ...entry,
-      changes: changeFilter === "all" ? entry.changes : entry.changes.filter(change => change.changeType === changeFilter),
+      changes:
+        changeFilter === "all"
+          ? entry.changes
+          : entry.changes.filter(change => change.changeType === changeFilter),
     }))
     .filter(entry => entry.changes.length > 0);
-  const totalChanges = history.reduce((sum, entry) => sum + entry.changes.length, 0);
+  const totalChanges = history.reduce(
+    (sum, entry) => sum + entry.changes.length,
+    0
+  );
   const latestPatch = history[0]?.patch.versionLabel ?? null;
   const classColor = getClassColor(detail?.weapon.class);
 
@@ -348,16 +444,18 @@ function ArchiveDetail({ slug }: { slug: string }) {
 
   if (isError || !detail) {
     return (
-      <EmptyState action={
-        <button
-          type="button"
-          onClick={() => navigate("/balance-archive")}
-          className="inline-flex items-center gap-2 rounded-md border border-[#00d9ff] px-4 py-2 font-mono text-xs font-bold text-[#00d9ff]"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
-          Balance Archive
-        </button>
-      }>
+      <EmptyState
+        action={
+          <button
+            type="button"
+            onClick={() => navigate("/balance-archive")}
+            className="inline-flex items-center gap-2 rounded-md border border-[#00d9ff] px-4 py-2 font-mono text-xs font-bold text-[#00d9ff]"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
+            Balance Archive
+          </button>
+        }
+      >
         {isError ? "Failed to load item." : "Item not found."}
       </EmptyState>
     );
@@ -377,17 +475,31 @@ function ArchiveDetail({ slug }: { slug: string }) {
 
       <div
         className="mb-5 overflow-hidden rounded-xl border bg-[#141830]"
-        style={{ borderColor: `${classColor}44`, borderLeftColor: classColor, borderLeftWidth: 4 }}
+        style={{
+          borderColor: `${classColor}44`,
+          borderLeftColor: classColor,
+          borderLeftWidth: 4,
+        }}
       >
         <div className="flex flex-col gap-4 p-4 sm:flex-row">
-          <WeaponThumb imageUrl={weapon.imageUrl} name={weapon.name} color={classColor} />
+          <WeaponThumb
+            imageUrl={weapon.imageUrl}
+            name={weapon.name}
+            color={classColor}
+          />
           <div className="min-w-0 flex-1">
-            <h1 className="font-mono text-3xl font-black leading-tight text-white">{weapon.name}</h1>
+            <h1 className="font-mono text-3xl font-black leading-tight text-white">
+              {weapon.name}
+            </h1>
             <div className="mt-2 flex flex-wrap gap-2">
               {weapon.class ? (
                 <span
                   className="rounded border px-2 py-1 font-mono text-[10px] font-black"
-                  style={{ borderColor: classColor, color: classColor, background: `${classColor}22` }}
+                  style={{
+                    borderColor: classColor,
+                    color: classColor,
+                    background: `${classColor}22`,
+                  }}
                 >
                   {weapon.class.toUpperCase()}
                 </span>
@@ -398,7 +510,11 @@ function ArchiveDetail({ slug }: { slug: string }) {
                 </span>
               ) : null}
             </div>
-            {weapon.description ? <p className="mt-3 font-mono text-sm leading-6 text-white/55">{weapon.description}</p> : null}
+            {weapon.description ? (
+              <p className="mt-3 font-mono text-sm leading-6 text-white/55">
+                {weapon.description}
+              </p>
+            ) : null}
           </div>
         </div>
         <div className="flex border-t border-white/10 px-3 py-3">
@@ -406,26 +522,34 @@ function ArchiveDetail({ slug }: { slug: string }) {
           <div className="w-px bg-white/10" />
           <DetailStat label="PATCHES" value={history.length} />
           <div className="w-px bg-white/10" />
-          <DetailStat label="LATEST" value={latestPatch ? `v${latestPatch}` : "-"} color={latestPatch ? "#4ADE80" : "#9ba1a6"} />
+          <DetailStat
+            label="LATEST"
+            value={latestPatch ? `v${latestPatch}` : "-"}
+            color={latestPatch ? "#4ADE80" : "#9ba1a6"}
+          />
           {weapon.fireRate ? (
             <>
               <div className="w-px bg-white/10" />
-              <DetailStat label="FIRE RATE" value={weapon.fireRate} color="#ffffff" />
+              <DetailStat
+                label="FIRE RATE"
+                value={weapon.fireRate}
+                color="#ffffff"
+              />
             </>
           ) : null}
         </div>
       </div>
 
-      {isWeapon && detail.baselineStats.length > 0 ? (
-        detail.baselineStats.map(stat => (
-          <BaselineStatsCard
-            key={`${stat.weaponId ?? stat.name ?? weapon.slug}`}
-            weaponName={stat.name ?? weapon.name}
-            stat={stat}
-            source={detail.baselineSource}
-          />
-        ))
-      ) : null}
+      {isWeapon && detail.baselineStats.length > 0
+        ? detail.baselineStats.map(stat => (
+            <BaselineStatsCard
+              key={`${stat.weaponId ?? stat.name ?? weapon.slug}`}
+              weaponName={stat.name ?? weapon.name}
+              stat={stat}
+              source={detail.baselineSource}
+            />
+          ))
+        : null}
 
       {isWeapon && detail.baselineStats.length === 0 ? (
         <div className="mb-5 rounded-lg border border-white/10 bg-[#141830] px-4 py-3 font-mono text-sm text-white/55">
@@ -434,7 +558,9 @@ function ArchiveDetail({ slug }: { slug: string }) {
       ) : null}
 
       <div className="mb-5">
-        <div className="mb-2 font-mono text-[11px] font-bold tracking-wide text-white/45">FILTER BY TYPE:</div>
+        <div className="mb-2 font-mono text-[11px] font-bold tracking-wide text-white/45">
+          FILTER BY TYPE:
+        </div>
         <div className="flex gap-2 overflow-x-auto pb-1">
           {CHANGE_FILTERS.map(filter => {
             const cfg = CHANGE_TYPE_CONFIG[filter.key] ?? { color: "#00d9ff" };
@@ -451,64 +577,119 @@ function ArchiveDetail({ slug }: { slug: string }) {
         </div>
       </div>
 
-      <h2 className="mb-3 font-mono text-xs font-bold tracking-wide text-white/45">PATCH HISTORY</h2>
+      <h2 className="mb-3 font-mono text-xs font-bold tracking-wide text-white/45">
+        PATCH HISTORY
+      </h2>
       {filteredHistory.length === 0 ? (
-        <EmptyState>{history.length === 0 ? "No patch changes recorded yet." : "No changes match this filter."}</EmptyState>
+        <EmptyState>
+          {history.length === 0
+            ? "No patch changes recorded yet."
+            : "No changes match this filter."}
+        </EmptyState>
       ) : (
         <div className="space-y-3">
           {filteredHistory.map((entry, entryIndex) => (
             <section key={entry.patch.id} className="space-y-1">
               <div
                 className="flex items-center justify-between gap-4 rounded-lg border bg-[#141830] p-3"
-                style={{ borderColor: entryIndex === 0 ? "#00d9ff" : "#2a2a4a" }}
+                style={{
+                  borderColor: entryIndex === 0 ? "#00d9ff" : "#2a2a4a",
+                }}
               >
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-mono text-sm font-black text-[#00d9ff]">v{entry.patch.versionLabel}</span>
+                    <Link
+                      href={`/patchnotes?version=${encodeURIComponent(entry.patch.versionLabel)}#patch-${entry.patch.versionLabel.replace(/[^a-zA-Z0-9_-]/g, "-")}`}
+                    >
+                      <a className="font-mono text-sm font-black text-[#00d9ff] underline decoration-[#00d9ff]/40 underline-offset-4 transition hover:text-white">
+                        v{entry.patch.versionLabel}
+                      </a>
+                    </Link>
                     {entryIndex === 0 ? (
                       <span className="rounded border border-[#00d9ff] bg-[#00d9ff]/10 px-1.5 py-0.5 font-mono text-[8px] font-black text-[#00d9ff]">
                         LATEST
                       </span>
                     ) : null}
-                    {entry.patch.seasonLabel ? <span className="font-mono text-xs text-white/50">{entry.patch.seasonLabel}</span> : null}
+                    {entry.patch.seasonLabel ? (
+                      <span className="font-mono text-xs text-white/50">
+                        {entry.patch.seasonLabel}
+                      </span>
+                    ) : null}
                   </div>
-                  {entry.patch.patchDate ? <div className="mt-1 font-mono text-[11px] text-white/45">{entry.patch.patchDate}</div> : null}
+                  {entry.patch.patchDate ? (
+                    <div className="mt-1 font-mono text-[11px] text-white/45">
+                      {entry.patch.patchDate}
+                    </div>
+                  ) : null}
                 </div>
                 <div className="shrink-0 font-mono text-xs text-white/50">
-                  {entry.changes.length} {entry.changes.length === 1 ? "change" : "changes"}
+                  {entry.changes.length}{" "}
+                  {entry.changes.length === 1 ? "change" : "changes"}
                 </div>
               </div>
 
               <div className="space-y-1 pl-3">
                 {entry.changes.map(change => {
-                  const cfg = CHANGE_TYPE_CONFIG[change.changeType ?? "adjustment"] ?? CHANGE_TYPE_CONFIG.adjustment;
+                  const cfg =
+                    CHANGE_TYPE_CONFIG[change.changeType ?? "adjustment"] ??
+                    CHANGE_TYPE_CONFIG.adjustment;
                   return (
                     <article
                       key={change.id}
                       className="rounded-lg border bg-[#1a1a3a] p-3"
-                      style={{ borderColor: "#2a2a4a", borderLeftColor: cfg.color, borderLeftWidth: 4 }}
+                      style={{
+                        borderColor: "#2a2a4a",
+                        borderLeftColor: cfg.color,
+                        borderLeftWidth: 4,
+                      }}
                     >
                       <div className="mb-2 flex flex-wrap items-center gap-2">
                         <span
                           className="rounded border px-2 py-0.5 font-mono text-[9px] font-black"
-                          style={{ color: cfg.color, borderColor: cfg.color, background: cfg.bg }}
+                          style={{
+                            color: cfg.color,
+                            borderColor: cfg.color,
+                            background: cfg.bg,
+                          }}
                         >
                           {cfg.label}
                         </span>
-                        {change.statField ? <span className="font-mono text-[11px] text-white/45">{change.statField}</span> : null}
+                        {change.statField ? (
+                          <span className="font-mono text-[11px] text-white/45">
+                            {change.statField}
+                          </span>
+                        ) : null}
                       </div>
-                      <p className="font-mono text-sm leading-6 text-white">{change.changeSummary ?? change.changeText}</p>
-                      {(change.oldValue || change.newValue) ? (
+                      <p className="font-mono text-sm leading-6 text-white">
+                        {change.changeSummary ?? change.changeText}
+                      </p>
+                      {change.oldValue || change.newValue ? (
                         <div className="mt-2 flex flex-wrap items-center gap-2">
-                          {change.oldValue ? <span className="rounded border border-red-400/30 bg-red-400/10 px-2 py-1 font-mono text-xs text-red-300">{change.oldValue}</span> : null}
-                          {change.oldValue && change.newValue ? <span className="font-mono text-xs text-white/45">to</span> : null}
-                          {change.newValue ? <span className="rounded border border-green-400/30 bg-green-400/10 px-2 py-1 font-mono text-xs text-green-300">{change.newValue}</span> : null}
+                          {change.oldValue ? (
+                            <span className="rounded border border-red-400/30 bg-red-400/10 px-2 py-1 font-mono text-xs text-red-300">
+                              {change.oldValue}
+                            </span>
+                          ) : null}
+                          {change.oldValue && change.newValue ? (
+                            <span className="font-mono text-xs text-white/45">
+                              to
+                            </span>
+                          ) : null}
+                          {change.newValue ? (
+                            <span className="rounded border border-green-400/30 bg-green-400/10 px-2 py-1 font-mono text-xs text-green-300">
+                              {change.newValue}
+                            </span>
+                          ) : null}
                         </div>
                       ) : null}
                       {change.devNote?.trim() ? (
                         <div className="mt-3 rounded-md border border-[#00d9ff]/30 bg-[#0a0e27] p-3">
-                          <div className="mb-1 font-mono text-[10px] font-black text-[#00d9ff]">DEV NOTE</div>
-                          <p className="font-mono text-xs leading-5 text-white/60">{change.devNote}</p>
+                          <div className="mb-1 font-mono text-[10px] font-black text-[#00d9ff]">
+                            DEV NOTE
+                          </div>
+                          <p className="font-mono text-xs leading-5 text-white/60">
+                            {change.devNote}
+                          </p>
                         </div>
                       ) : null}
                     </article>
@@ -527,7 +708,11 @@ export default function WeaponBalanceArchive({ mode }: { mode: ArchiveMode }) {
   return (
     <div className="min-h-screen bg-[#0a0e27] py-10">
       <div className="container max-w-[1200px]">
-        {mode.kind === "list" ? <ArchiveList /> : <ArchiveDetail slug={mode.slug} />}
+        {mode.kind === "list" ? (
+          <ArchiveList />
+        ) : (
+          <ArchiveDetail slug={mode.slug} />
+        )}
       </div>
     </div>
   );
