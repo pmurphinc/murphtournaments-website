@@ -48,6 +48,11 @@ type AssignmentResultRow = {
   slotIndex: number;
   resultPlacement: number | null;
 };
+type BoardSnapshotInput = {
+  games: Array<{ id: number; tournamentId: number; gameType: TournamentGameType; status: (typeof tournamentGameStatuses)[number]; displayLabel: string; canvasX: number; canvasY: number; privateLobbyCode?: string | null; seriesBestOf?: number; mapId?: string | null }>;
+  assignments: Array<{ id: number; gameId: number; teamId: number; slotIndex: number; resultPlacement?: number | null }>;
+  connections: Array<{ id: number; tournamentId: number; sourceGameId: number; targetGameId: number; flowType: ConnectionFlowType }>;
+};
 
 type AdvancementGame = {
   id: number;
@@ -71,6 +76,11 @@ const adminNoteSchema = z.string().trim().max(1000).nullable().optional();
 const resultPlacementSchema = z.number().int().min(1).max(4).nullable();
 const validMapIds = new Set<string>(THE_FINALS_MAPS.map(map => map.id));
 const mapIdSchema = z.string().trim().max(64).nullable().refine(value => value === null || validMapIds.has(value), "Unknown THE FINALS map id");
+const boardSnapshotSchema = z.object({
+  games: z.array(z.object({ id: idSchema, tournamentId: idSchema, gameType: z.enum(["cashout", "final_round"]), status: z.enum(tournamentGameStatuses), displayLabel: labelSchema, canvasX: z.number().int().min(-10000).max(10000), canvasY: z.number().int().min(-10000).max(10000), privateLobbyCode: z.string().trim().max(64).nullable().optional(), seriesBestOf: seriesBestOfSchema.optional(), mapId: mapIdSchema.optional() })),
+  assignments: z.array(z.object({ id: idSchema, gameId: idSchema, teamId: idSchema, slotIndex: z.number().int().positive(), resultPlacement: resultPlacementSchema.optional() })),
+  connections: z.array(z.object({ id: idSchema, tournamentId: idSchema, sourceGameId: idSchema, targetGameId: idSchema, flowType: connectionFlowTypeSchema })),
+});
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object";
@@ -300,6 +310,79 @@ async function deleteGameConnection(connectionId: number) {
   if (!connection) throw new TRPCError({ code: "NOT_FOUND", message: "Lobby connection not found" });
   await db.execute(sql`DELETE FROM tournament_game_connections WHERE id = ${connectionId}`);
   return fetchTournamentControlData(connection.tournamentId);
+}
+
+
+async function clearTournamentConnections(tournamentId: number) {
+  const db = await requireDb();
+  await fetchTournamentRows(db, tournamentId);
+  await db.execute(sql`DELETE FROM tournament_game_connections WHERE tournamentId = ${tournamentId}`);
+  return fetchTournamentControlData(tournamentId);
+}
+
+async function returnTournamentTeamsToAvailable(tournamentId: number) {
+  const db = await requireDb();
+  await fetchTournamentRows(db, tournamentId);
+  await db.execute(sql`DELETE tournament_game_assignments FROM tournament_game_assignments INNER JOIN tournament_games ON tournament_game_assignments.gameId = tournament_games.id WHERE tournament_games.tournamentId = ${tournamentId}`);
+  return fetchTournamentControlData(tournamentId);
+}
+
+async function clearTournamentCanvas(tournamentId: number) {
+  const db = await requireDb();
+  return db.transaction(async tx => {
+    await fetchTournamentRows(tx, tournamentId);
+    await tx.execute(sql`DELETE FROM tournament_game_connections WHERE tournamentId = ${tournamentId}`);
+    await tx.execute(sql`DELETE tournament_game_assignments FROM tournament_game_assignments INNER JOIN tournament_games ON tournament_game_assignments.gameId = tournament_games.id WHERE tournament_games.tournamentId = ${tournamentId}`);
+    await tx.delete(tournamentGames).where(eq(tournamentGames.tournamentId, tournamentId));
+    return fetchTournamentRows(tx, tournamentId);
+  });
+}
+
+async function restoreTournamentBoardSnapshot(tournamentId: number, snapshot: BoardSnapshotInput) {
+  const db = await requireDb();
+  return db.transaction(async tx => {
+    await fetchTournamentRows(tx, tournamentId);
+    const tournamentTeamRows = await tx.select({ id: teams.id }).from(teams).where(eq(teams.tournamentId, tournamentId));
+    const tournamentTeamIds = new Set(tournamentTeamRows.map(team => team.id));
+    for (const game of snapshot.games) {
+      if (game.tournamentId !== tournamentId) throw new TRPCError({ code: "BAD_REQUEST", message: "Snapshot contains a lobby from another tournament" });
+    }
+    const snapshotGameIds = new Set(snapshot.games.map(game => game.id));
+    for (const assignment of snapshot.assignments) {
+      if (!snapshotGameIds.has(assignment.gameId)) throw new TRPCError({ code: "BAD_REQUEST", message: "Snapshot assignment references an unknown lobby" });
+      if (!tournamentTeamIds.has(assignment.teamId)) throw new TRPCError({ code: "BAD_REQUEST", message: "Snapshot assignment references a team from another tournament" });
+    }
+    for (const connection of snapshot.connections) {
+      if (connection.tournamentId !== tournamentId || !snapshotGameIds.has(connection.sourceGameId) || !snapshotGameIds.has(connection.targetGameId)) throw new TRPCError({ code: "BAD_REQUEST", message: "Snapshot connection references an unknown lobby" });
+    }
+
+    await tx.execute(sql`DELETE FROM tournament_game_connections WHERE tournamentId = ${tournamentId}`);
+    await tx.execute(sql`DELETE tournament_game_assignments FROM tournament_game_assignments INNER JOIN tournament_games ON tournament_game_assignments.gameId = tournament_games.id WHERE tournament_games.tournamentId = ${tournamentId}`);
+    await tx.delete(tournamentGames).where(eq(tournamentGames.tournamentId, tournamentId));
+
+    const gameIdMap = new Map<number, number>();
+    for (const game of snapshot.games) {
+      const result = await tx.insert(tournamentGames).values({ tournamentId, gameType: game.gameType, status: game.status, displayLabel: game.displayLabel, canvasX: game.canvasX, canvasY: game.canvasY, privateLobbyCode: game.privateLobbyCode ?? null, seriesBestOf: game.seriesBestOf ?? 1, mapId: game.mapId ?? null });
+      gameIdMap.set(game.id, requireInsertId(result, "Failed to restore lobby"));
+    }
+
+    for (const assignment of snapshot.assignments) {
+      const newGameId = gameIdMap.get(assignment.gameId);
+      if (!newGameId) continue;
+      const result = await tx.insert(tournamentGameAssignments).values({ gameId: newGameId, teamId: assignment.teamId, slotIndex: assignment.slotIndex });
+      const newAssignmentId = requireInsertId(result, "Failed to restore team assignment");
+      if (assignment.resultPlacement !== undefined) await tx.execute(sql`UPDATE tournament_game_assignments SET resultPlacement = ${assignment.resultPlacement ?? null} WHERE id = ${newAssignmentId}`);
+    }
+
+    for (const connection of snapshot.connections) {
+      const sourceGameId = gameIdMap.get(connection.sourceGameId);
+      const targetGameId = gameIdMap.get(connection.targetGameId);
+      if (!sourceGameId || !targetGameId) continue;
+      await tx.execute(sql`INSERT INTO tournament_game_connections (tournamentId, sourceGameId, targetGameId, flowType) VALUES (${tournamentId}, ${sourceGameId}, ${targetGameId}, ${connection.flowType})`);
+    }
+
+    return fetchTournamentRows(tx, tournamentId);
+  });
 }
 
 
@@ -827,6 +910,12 @@ export const tournamentControlRouter = router({
   }),
   connectGames: discordTournamentStaffProcedure.input(tournamentIdSchema.extend({ sourceGameId: idSchema, targetGameId: idSchema, flowType: connectionFlowTypeSchema.default("winner") })).mutation(({ input }) => connectGames(input.tournamentId, input.sourceGameId, input.targetGameId, input.flowType)),
   deleteGameConnection: discordTournamentStaffProcedure.input(z.object({ connectionId: idSchema })).mutation(({ input }) => deleteGameConnection(input.connectionId)),
+  deleteTournamentGameConnections: discordTournamentStaffProcedure.input(tournamentIdSchema).mutation(({ input }) => clearTournamentConnections(input.tournamentId)),
+  clearTournamentConnections: discordTournamentStaffProcedure.input(tournamentIdSchema).mutation(({ input }) => clearTournamentConnections(input.tournamentId)),
+  clearTournamentGameAssignments: discordTournamentStaffProcedure.input(tournamentIdSchema).mutation(({ input }) => returnTournamentTeamsToAvailable(input.tournamentId)),
+  returnTournamentTeamsToAvailable: discordTournamentStaffProcedure.input(tournamentIdSchema).mutation(({ input }) => returnTournamentTeamsToAvailable(input.tournamentId)),
+  clearTournamentCanvas: discordTournamentStaffProcedure.input(tournamentIdSchema).mutation(({ input }) => clearTournamentCanvas(input.tournamentId)),
+  restoreTournamentBoardSnapshot: discordTournamentStaffProcedure.input(tournamentIdSchema.extend({ snapshot: boardSnapshotSchema })).mutation(({ input }) => restoreTournamentBoardSnapshot(input.tournamentId, input.snapshot)),
   updateStatus: discordTournamentStaffProcedure.input(gameIdSchema.extend({ status: z.enum(tournamentGameStatuses) })).mutation(async ({ input }) => {
     const db = await requireDb();
     const game = await getGameOrThrow(db, input.gameId);

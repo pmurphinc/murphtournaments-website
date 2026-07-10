@@ -72,4 +72,19 @@ describe("Tournament Control Room improvements", () => {
     expect(server).toContain("deleteTournament");
     expect(server).toContain("UPDATE tournament_control_templates SET sourceTournamentId = NULL");
   });
+
+  it("adds staff-protected board cleanup and undo restore mutations", async () => {
+    const server = await readFile(new URL("../../../server/tournamentControl.ts", import.meta.url), "utf8");
+    expect(server).toContain("clearTournamentConnections");
+    expect(server).toContain("returnTournamentTeamsToAvailable");
+    expect(server).toContain("clearTournamentCanvas");
+    expect(server).toContain("restoreTournamentBoardSnapshot");
+    expect(server).toContain("discordTournamentStaffProcedure.input(tournamentIdSchema)");
+    expect(server).toContain("boardSnapshotSchema");
+    expect(server).toContain("Snapshot assignment references a team from another tournament");
+    expect(server).toContain("const gameIdMap = new Map<number, number>()");
+    expect(server).toContain("DELETE FROM tournament_game_connections WHERE tournamentId");
+    expect(server).toContain("return fetchTournamentRows(tx, tournamentId)");
+  });
+
 });
