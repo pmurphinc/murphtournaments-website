@@ -4,11 +4,11 @@
     "weaponId": "weapon_93r",
     "class": "Light",
     "name": "93R",
-    "bodyDamage": 25,
-    "headDamage": 37.5,
+    "bodyDamage": 24,
+    "headDamage": 36,
     "rateOfFireRpm": 1000,
-    "magazineSize": 21,
-    "damagePerMagazine": 525,
+    "magazineSize": 27,
+    "damagePerMagazine": 648,
     "tacticalReloadTimeSeconds": 1.45,
     "emptyReloadTimeSeconds": 1.75,
     "shotsPerBurst": 3,
@@ -29,7 +29,7 @@
     "damageDropoffMaxRange": 37.5,
     "damageDropoffModifierAtMaxRange": 50,
     "sourceNotes": null,
-    "rawValues": "{\"bodyDamageRaw\":\"25\",\"headDamageRaw\":\"37.5\",\"magazineRaw\":\"21\",\"damagePerMagazineRaw\":\"525\",\"headDamagePerMagazineRaw\":\"787.5\",\"tacticalReloadRaw\":\"1.45\",\"emptyReloadRaw\":\"1.75\",\"damageDropoffMinRange\":\"30m\",\"damageDropoffMaxRange\":\"37.5m\",\"damageDropoffModifierAtMaxRange\":\"~50%\"}"
+    "rawValues": "{\"bodyDamageRaw\":\"24\",\"headDamageRaw\":\"36\",\"magazineRaw\":\"27\",\"damagePerMagazineRaw\":\"648\",\"headDamagePerMagazineRaw\":\"972\",\"tacticalReloadRaw\":\"1.45\",\"emptyReloadRaw\":\"1.75\",\"damageDropoffMinRange\":\"30m\",\"damageDropoffMaxRange\":\"37.5m\",\"damageDropoffModifierAtMaxRange\":\"~50%\"}"
   },
   {
     "batchId": "baseline_kromes_spreadsheet_10_6_0",
@@ -92,8 +92,8 @@
     "damageDropoffMinRange": null,
     "damageDropoffMaxRange": null,
     "damageDropoffModifierAtMaxRange": null,
-    "sourceNotes": null,
-    "rawValues": "{\"bodyDamageRaw\":\"60\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}",
+    "sourceNotes": "Season 11 melee rework: precise hit 60, glancing blow 42, stamina recovery 2s.",
+    "rawValues": "{\"bodyDamageRaw\":\"60 precise / 42 glancing\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}",
     "weaponType": "melee"
   },
   {
@@ -391,7 +391,7 @@
     "weaponId": "weapon_sword",
     "class": "Light",
     "name": "Sword",
-    "bodyDamage": 88,
+    "bodyDamage": 110,
     "headDamage": null,
     "rateOfFireRpm": null,
     "magazineSize": null,
@@ -415,8 +415,8 @@
     "damageDropoffMinRange": null,
     "damageDropoffMaxRange": null,
     "damageDropoffModifierAtMaxRange": null,
-    "sourceNotes": null,
-    "rawValues": "{\"bodyDamageRaw\":\"88\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}",
+    "sourceNotes": "Season 11 melee rework: primary precise 110, glancing 71; stamina recovery 2s.",
+    "rawValues": "{\"bodyDamageRaw\":\"110 precise / 71 glancing\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}",
     "weaponType": "melee"
   },
   {
@@ -801,8 +801,8 @@
     "damageDropoffMinRange": null,
     "damageDropoffMaxRange": null,
     "damageDropoffModifierAtMaxRange": null,
-    "sourceNotes": "LMB combo = 2x50 damage, then 2x60 damage, then 100 damage.  Can swap-cancel the combo when started.  Swap-cancel will not optimize TTK, but quick melee will. Deflecting bullets deals 100% damage to the enemy, and 10% to you (30% if glancing).  Blocking melee hits will reduce their damage to 25%.",
-    "rawValues": "{\"bodyDamageRaw\":\"(notes)\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}",
+    "sourceNotes": "Season 11 melee rework: primary precise 57 x2, glancing 39 x2; Cross Slash precise 140, glancing 84; stamina recovery 3s.",
+    "rawValues": "{\"bodyDamageRaw\":\"57x2 precise / 39x2 glancing\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}",
     "weaponType": "melee"
   },
   {
@@ -844,7 +844,7 @@
     "name": "Fcar",
     "bodyDamage": 23,
     "headDamage": 34.5,
-    "rateOfFireRpm": 540,
+    "rateOfFireRpm": 530,
     "magazineSize": 25,
     "damagePerMagazine": 575,
     "tacticalReloadTimeSeconds": 2.1,
@@ -874,11 +874,11 @@
     "weaponId": "weapon_model_1887",
     "class": "Medium",
     "name": "Model 1887",
-    "bodyDamage": 108,
+    "bodyDamage": 117,
     "headDamage": null,
     "rateOfFireRpm": 69,
     "magazineSize": 7,
-    "damagePerMagazine": 756,
+    "damagePerMagazine": 819,
     "tacticalReloadTimeSeconds": null,
     "emptyReloadTimeSeconds": 4.3,
     "shotsPerBurst": null,
@@ -899,7 +899,7 @@
     "damageDropoffMaxRange": 30,
     "damageDropoffModifierAtMaxRange": 65,
     "sourceNotes": "Firing the weapon will cancel the reload animation. Tactical reload intro animation duration is 1.5s.",
-    "rawValues": "{\"bodyDamageRaw\":\"108\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"7\",\"damagePerMagazineRaw\":\"756\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"(varies)\",\"emptyReloadRaw\":\"4.3\",\"damageDropoffMinRange\":\"20m\",\"damageDropoffMaxRange\":\"30m\",\"damageDropoffModifierAtMaxRange\":\"~65%\"}"
+    "rawValues": "{\"bodyDamageRaw\":\"117\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"7\",\"damagePerMagazineRaw\":\"819\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"(varies)\",\"emptyReloadRaw\":\"4.3\",\"damageDropoffMinRange\":\"20m\",\"damageDropoffMaxRange\":\"30m\",\"damageDropoffModifierAtMaxRange\":\"~65%\"}"
   },
   {
     "batchId": "baseline_kromes_spreadsheet_10_6_0",
@@ -939,7 +939,7 @@
     "class": "Medium",
     "name": "Pike .556",
     "bodyDamage": 49,
-    "headDamage": 73.5,
+    "headDamage": 85.75,
     "rateOfFireRpm": 200,
     "magazineSize": 12,
     "damagePerMagazine": 588,
@@ -963,7 +963,7 @@
     "damageDropoffMaxRange": 50,
     "damageDropoffModifierAtMaxRange": 80,
     "sourceNotes": "Vs. Heavy, Pike is stronger than Repeater for ranged duals.",
-    "rawValues": "{\"bodyDamageRaw\":\"49\",\"headDamageRaw\":\"73.5\",\"magazineRaw\":\"12\",\"damagePerMagazineRaw\":\"588\",\"headDamagePerMagazineRaw\":\"882\",\"tacticalReloadRaw\":\"2.1\",\"emptyReloadRaw\":\"3.25\",\"damageDropoffMinRange\":\"40m\",\"damageDropoffMaxRange\":\"50m\",\"damageDropoffModifierAtMaxRange\":\"~80%\"}"
+    "rawValues": "{\"bodyDamageRaw\":\"49\",\"headDamageRaw\":\"85.75\",\"magazineRaw\":\"12\",\"damagePerMagazineRaw\":\"588\",\"headDamagePerMagazineRaw\":\"1029\",\"tacticalReloadRaw\":\"2.1\",\"emptyReloadRaw\":\"3.25\",\"damageDropoffMinRange\":\"40m\",\"damageDropoffMaxRange\":\"50m\",\"damageDropoffModifierAtMaxRange\":\"~80%\"}"
   },
   {
     "batchId": "baseline_kromes_spreadsheet_10_6_0",
@@ -1002,7 +1002,7 @@
     "weaponId": "weapon_riot_shield",
     "class": "Medium",
     "name": "Riot Shield",
-    "bodyDamage": 90,
+    "bodyDamage": 82,
     "headDamage": null,
     "rateOfFireRpm": null,
     "magazineSize": null,
@@ -1026,8 +1026,8 @@
     "damageDropoffMinRange": null,
     "damageDropoffMaxRange": null,
     "damageDropoffModifierAtMaxRange": null,
-    "sourceNotes": null,
-    "rawValues": "{\"bodyDamageRaw\":\"90\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}",
+    "sourceNotes": "Season 11 melee rework: precise hit 82, glancing blow 57; Shield Bash 40; stamina recovery 3s.",
+    "rawValues": "{\"bodyDamageRaw\":\"82 precise / 57 glancing\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}",
     "weaponType": "melee"
   },
   {
@@ -1035,11 +1035,11 @@
     "weaponId": "weapon_50_akimbo",
     "class": "Heavy",
     "name": ".50 Akimbo",
-    "bodyDamage": 44,
-    "headDamage": 88,
+    "bodyDamage": 46,
+    "headDamage": 92,
     "rateOfFireRpm": 230,
     "magazineSize": 14,
-    "damagePerMagazine": 616,
+    "damagePerMagazine": 644,
     "tacticalReloadTimeSeconds": 2.2,
     "emptyReloadTimeSeconds": 3,
     "shotsPerBurst": null,
@@ -1060,7 +1060,7 @@
     "damageDropoffMaxRange": 39,
     "damageDropoffModifierAtMaxRange": 50,
     "sourceNotes": "Max bullet dispersion when firing from the hip is 7.5. Default hip fire dispersion when firing from the hip while standing is 1.8. Default dispersion when firing from the hip while moving is 2.2.",
-    "rawValues": "{\"bodyDamageRaw\":\"44\",\"headDamageRaw\":\"88\",\"magazineRaw\":\"14\",\"damagePerMagazineRaw\":\"616\",\"headDamagePerMagazineRaw\":\"1232\",\"tacticalReloadRaw\":\"2.2\",\"emptyReloadRaw\":\"3\",\"damageDropoffMinRange\":\"32m\",\"damageDropoffMaxRange\":\"39m\",\"damageDropoffModifierAtMaxRange\":\"~50%\"}"
+    "rawValues": "{\"bodyDamageRaw\":\"46\",\"headDamageRaw\":\"92\",\"magazineRaw\":\"14\",\"damagePerMagazineRaw\":\"644\",\"headDamagePerMagazineRaw\":\"1288\",\"tacticalReloadRaw\":\"2.2\",\"emptyReloadRaw\":\"3\",\"damageDropoffMinRange\":\"32m\",\"damageDropoffMaxRange\":\"39m\",\"damageDropoffModifierAtMaxRange\":\"~50%\"}"
   },
   {
     "batchId": "baseline_kromes_spreadsheet_10_6_0",
@@ -1128,14 +1128,14 @@
   },
   {
     "batchId": "baseline_kromes_spreadsheet_10_6_0",
-    "weaponId": "weapon_ks-23",
+    "weaponId": "weapon_ks_23",
     "class": "Heavy",
     "name": "Ks-23",
-    "bodyDamage": 100,
+    "bodyDamage": 110,
     "headDamage": null,
     "rateOfFireRpm": 78,
     "magazineSize": 6,
-    "damagePerMagazine": 600,
+    "damagePerMagazine": 660,
     "tacticalReloadTimeSeconds": null,
     "emptyReloadTimeSeconds": 5.55,
     "shotsPerBurst": null,
@@ -1154,9 +1154,9 @@
     "stkHeavyHead": null,
     "damageDropoffMinRange": 18,
     "damageDropoffMaxRange": 23,
-    "damageDropoffModifierAtMaxRange": 70,
+    "damageDropoffModifierAtMaxRange": 64,
     "sourceNotes": "Shots are hitscan within 25m, and then they become projectiles afterwards (with a projectile velocity of 280 m/s).  Firing the weapon will cancel the reload animation.",
-    "rawValues": "{\"bodyDamageRaw\":\"100\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"6\",\"damagePerMagazineRaw\":\"600\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"(varies)\",\"emptyReloadRaw\":\"5.55\",\"damageDropoffMinRange\":\"18m\",\"damageDropoffMaxRange\":\"23m\",\"damageDropoffModifierAtMaxRange\":\"~70%\"}"
+    "rawValues": "{\"bodyDamageRaw\":\"110\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"6\",\"damagePerMagazineRaw\":\"660\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"(varies)\",\"emptyReloadRaw\":\"5.55\",\"damageDropoffMinRange\":\"18m\",\"damageDropoffMaxRange\":\"23m\",\"damageDropoffModifierAtMaxRange\":\"~64%\"}"
   },
   {
     "batchId": "baseline_kromes_spreadsheet_10_6_0",
@@ -1355,7 +1355,7 @@
     "weaponId": "weapon_sledgehammer",
     "class": "Heavy",
     "name": "Sledgehammer",
-    "bodyDamage": 100,
+    "bodyDamage": 120,
     "headDamage": null,
     "rateOfFireRpm": null,
     "magazineSize": null,
@@ -1379,8 +1379,8 @@
     "damageDropoffMinRange": null,
     "damageDropoffMaxRange": null,
     "damageDropoffModifierAtMaxRange": null,
-    "sourceNotes": null,
-    "rawValues": "{\"bodyDamageRaw\":\"100\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}",
+    "sourceNotes": "Season 11 melee rework: primary precise 120, glancing 90; stamina recovery 2s.",
+    "rawValues": "{\"bodyDamageRaw\":\"120 precise / 90 glancing\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}",
     "weaponType": "melee"
   },
   {
@@ -1388,7 +1388,7 @@
     "weaponId": "weapon_sledgehammer_alt",
     "class": "Heavy",
     "name": "Sledgehammer (Alt.)",
-    "bodyDamage": 175,
+    "bodyDamage": 200,
     "headDamage": null,
     "rateOfFireRpm": null,
     "magazineSize": null,
@@ -1412,8 +1412,8 @@
     "damageDropoffMinRange": null,
     "damageDropoffMaxRange": null,
     "damageDropoffModifierAtMaxRange": null,
-    "sourceNotes": "Cannot hit multiple targets in one swing.",
-    "rawValues": "{\"bodyDamageRaw\":\"175\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}",
+    "sourceNotes": "Season 11 melee rework: secondary precise 200, glancing 150.",
+    "rawValues": "{\"bodyDamageRaw\":\"200 precise / 150 glancing\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}",
     "weaponType": "melee"
   },
   {
@@ -1445,8 +1445,8 @@
     "damageDropoffMinRange": null,
     "damageDropoffMaxRange": null,
     "damageDropoffModifierAtMaxRange": null,
-    "sourceNotes": "LMB combo = 65 damage, then 80 damage, then 90 damage.  Has a ~4.4m range on 1st attack then ~4.6m range on 2nd and 3rd attack (credit to u/beansoncrayons on reddit).",
-    "rawValues": "{\"bodyDamageRaw\":\"(notes)\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}",
+    "sourceNotes": "Season 11 melee rework: primary precise 74, glancing 55; stamina recovery 3s.",
+    "rawValues": "{\"bodyDamageRaw\":\"74 precise / 55 glancing\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}",
     "weaponType": "melee"
   },
   {
@@ -1454,7 +1454,7 @@
     "weaponId": "weapon_spear_alt",
     "class": "Heavy",
     "name": "Spear (Alt.)",
-    "bodyDamage": 105,
+    "bodyDamage": null,
     "headDamage": null,
     "rateOfFireRpm": null,
     "magazineSize": null,
@@ -1478,8 +1478,8 @@
     "damageDropoffMinRange": null,
     "damageDropoffMaxRange": null,
     "damageDropoffModifierAtMaxRange": null,
-    "sourceNotes": "Damage is per hit in a 3-hit combo.  Has a 3m radius. Cap on how many player are targeted by a spin attack is 24 players.",
-    "rawValues": "{\"bodyDamageRaw\":\"105\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}",
+    "sourceNotes": "Season 11 melee rework: spin sequence 75, 100, 126; each spin requires stamina.",
+    "rawValues": "{\"bodyDamageRaw\":\"75 / 100 / 126 spin sequence\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}",
     "weaponType": "melee"
   }
 ]
