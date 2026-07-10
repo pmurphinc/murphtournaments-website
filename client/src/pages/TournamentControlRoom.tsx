@@ -780,8 +780,8 @@ export default function TournamentControlRoom() {
   const assignments = (query.data?.assignments ?? []) as AssignmentView[];
   const connections = (query.data?.connections ?? []) as ConnectionView[];
 
-  const captureUndoSnapshot = useCallback(() => {
-    setUndoSnapshot({
+  const captureUndoSnapshot = useCallback(
+    (): BoardUndoSnapshot => ({
       games: games.map(game => ({
         ...game,
         seriesBestOf:
@@ -791,13 +791,16 @@ export default function TournamentControlRoom() {
       })),
       assignments: assignments.map(assignment => ({ ...assignment })),
       connections: connections.map(connection => ({ ...connection })),
-    });
-  }, [assignments, connections, games]);
+    }),
+    [assignments, connections, games]
+  );
 
   const runDestructiveBoardAction = useCallback(
-    (action: () => void) => {
-      captureUndoSnapshot();
-      action();
+    (action: () => Promise<unknown>) => {
+      const snapshot = captureUndoSnapshot();
+      void action()
+        .then(() => setUndoSnapshot(snapshot))
+        .catch(() => undefined);
     },
     [captureUndoSnapshot]
   );
@@ -1055,7 +1058,7 @@ export default function TournamentControlRoom() {
       ) {
         event.preventDefault();
         runDestructiveBoardAction(() =>
-          deleteGameConnection.mutate({ connectionId: selectedConnectionId })
+          deleteGameConnection.mutateAsync({ connectionId: selectedConnectionId })
         );
         setSelectedConnectionId(null);
         return;
@@ -1067,7 +1070,7 @@ export default function TournamentControlRoom() {
       ) {
         event.preventDefault();
         runDestructiveBoardAction(() =>
-          deleteGame.mutate({ gameId: selectedGameId })
+          deleteGame.mutateAsync({ gameId: selectedGameId })
         );
         setSelectedGameId(null);
         return;
@@ -2206,7 +2209,7 @@ export default function TournamentControlRoom() {
                         };
                         const deleteConnection = () => {
                           runDestructiveBoardAction(() =>
-                            deleteGameConnection.mutate({
+                            deleteGameConnection.mutateAsync({
                               connectionId: connection.id,
                             })
                           );
@@ -2927,7 +2930,7 @@ export default function TournamentControlRoom() {
               onClick={() => {
                 if (dialogState?.type === "delete") {
                   runDestructiveBoardAction(() =>
-                    deleteGame.mutate({ gameId: dialogState.gameId })
+                    deleteGame.mutateAsync({ gameId: dialogState.gameId })
                   );
                 }
                 setDialogState(null);
@@ -2973,17 +2976,17 @@ export default function TournamentControlRoom() {
               onClick={() => {
                 if (dialogState?.type === "bulk-delete-connections") {
                   runDestructiveBoardAction(() =>
-                    clearTournamentConnections.mutate({ tournamentId })
+                    clearTournamentConnections.mutateAsync({ tournamentId })
                   );
                 }
                 if (dialogState?.type === "bulk-return-teams") {
                   runDestructiveBoardAction(() =>
-                    returnTournamentTeamsToAvailable.mutate({ tournamentId })
+                    returnTournamentTeamsToAvailable.mutateAsync({ tournamentId })
                   );
                 }
                 if (dialogState?.type === "bulk-wipe-canvas") {
                   runDestructiveBoardAction(() =>
-                    clearTournamentCanvas.mutate({ tournamentId })
+                    clearTournamentCanvas.mutateAsync({ tournamentId })
                   );
                 }
                 setSelectedAssignmentId(null);
