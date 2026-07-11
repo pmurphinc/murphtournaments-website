@@ -171,13 +171,7 @@ export default function Navigation() {
             asChild
             className="cursor-pointer font-mono text-white focus:bg-yellow-400/15 focus:text-yellow-200"
           >
-            <Link href="/team-finder">My Listings</Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            asChild
-            className="cursor-pointer font-mono text-white focus:bg-yellow-400/15 focus:text-yellow-200"
-          >
-            <Link href="/team-finder?post=1">Post Listing</Link>
+            <Link href="/team-finder">Team Finder</Link>
           </DropdownMenuItem>
           <DropdownMenuSeparator className="bg-yellow-400/25" />
           <DropdownMenuItem
@@ -194,14 +188,6 @@ export default function Navigation() {
               <Link href="/admin/tournaments/control">Tournament Control</Link>
             </DropdownMenuItem>
           )}
-          <DropdownMenuItem disabled className="font-mono text-white/45">
-            <span className="flex w-full items-center justify-between">
-              Tournament Signups{" "}
-              <span className="text-[10px] uppercase text-yellow-400/70">
-                Coming soon
-              </span>
-            </span>
-          </DropdownMenuItem>
           <DropdownMenuSeparator className="bg-yellow-400/25" />
           <DropdownMenuItem
             onClick={() => void logout()}

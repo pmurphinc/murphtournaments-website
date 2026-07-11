@@ -20,6 +20,7 @@ export const THE_FINALS_MAPS = [
   { id: "las-vegas-stadium", name: "Las Vegas Stadium", category: "main" },
   { id: "nozomi-citadel", name: "NOZOMI/CITADEL", category: "main" },
   { id: "fangwai-city", name: "Fangwai City", category: "main" },
+  { id: "galaxy-estates", name: "GALAXY ESTATES", category: "main" },
   { id: "starlight-hollow", name: "Starlight Hollow", category: "compact" },
   { id: "peace-center", name: "P.E.A.C.E. Center", category: "compact" },
   { id: "practice-range", name: "Practice Range", category: "training" },
@@ -27,7 +28,11 @@ export const THE_FINALS_MAPS = [
 
 export type FinalsMapId = (typeof THE_FINALS_MAPS)[number]["id"];
 
-export const DEFAULT_COMPETITIVE_EXCLUDED_MAP_IDS = ["seoul", "kyoto"] as const satisfies readonly FinalsMapId[];
+export const DEFAULT_COMPETITIVE_EXCLUDED_MAP_IDS = [
+  "seoul",
+  "kyoto",
+  "galaxy-estates",
+] as const satisfies readonly FinalsMapId[];
 
 const defaultCompetitiveExcludedMapIds = new Set<FinalsMapId>(
   DEFAULT_COMPETITIVE_EXCLUDED_MAP_IDS

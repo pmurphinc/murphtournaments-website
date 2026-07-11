@@ -18,12 +18,19 @@ describe("Discord avatar header control", () => {
     expect(source).toContain("xl:hidden");
   });
 
-  it("links account menu tools while keeping Tournament Signups disabled", () => {
+  it("links the account menu to Team Finder without listing/post duplicates", () => {
+    expect(source).toContain('<Link href="/team-finder">Team Finder</Link>');
+    expect(source).not.toContain("My Listings");
+    expect(source).not.toContain("Post Listing");
+    expect(source).not.toContain("/team-finder?post=1");
+  });
+
+  it("keeps management links and removes Tournament Signups", () => {
     expect(source).toContain('href="/teams"');
     expect(source).toContain('href="/admin/tournaments/control"');
     expect(source).toContain("Tournament Control");
-    expect(source).toContain("Tournament Signups");
-    expect(source).toContain("Coming soon");
+    expect(source).not.toContain("Tournament Signups");
+    expect(source).not.toContain("Coming soon");
   });
 
   it("only shows the Tournament Control menu link to admin users", () => {
