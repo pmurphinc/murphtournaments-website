@@ -13,6 +13,39 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getDiscordLoginUrl } from "@/lib/discordLogin";
 import { Button } from "@/components/ui/button";
+import {
+  baseCanvasSize,
+  clampZoom,
+  connectorRadius,
+  controlRoomGridSize,
+  getBoundedControlKeyPosition,
+  getCanvasPanScroll,
+  getCenterZoomView,
+  getConnectionEndpoint,
+  getConnectionPath,
+  getConnectorCenter,
+  getConnectorEndpoints,
+  getConnectorPoint,
+  getEmptyBoardResetView,
+  getFitToContentView,
+  getMidpoint,
+  getNodeHeight,
+  getPointerDistance,
+  resolveConnectionDropTargetGameId,
+  getViewportPreservingScroll,
+  maxZoom,
+  minZoom,
+  nodeWidth,
+  shouldCancelBoardDragsForPinch,
+  shouldStartCanvasPan,
+  snapCanvasPointToGrid,
+  type CanvasPanStart,
+  type CanvasPoint,
+  type ConnectionFlowType,
+  type GameType,
+  type ViewportSize,
+} from "@/lib/tournamentControlBoard";
+export { resolveConnectionDropTargetGameId } from "@/lib/tournamentControlBoard";
 import { THE_FINALS_MAPS } from "@/lib/finalsMaps";
 import { Input } from "@/components/ui/input";
 import {
@@ -51,10 +84,6 @@ import {
 
 type DragPayload = { teamId: number; fromGameId?: number };
 type GameStatus = "draft" | "ready" | "live" | "complete";
-type GameType = "cashout" | "final_round";
-type CanvasPoint = { x: number; y: number };
-type ConnectionFlowType = "winner" | "loser";
-type ViewportSize = { width: number; height: number };
 type NodeDragState = {
   gameId: number;
   offsetX: number;
@@ -87,6 +116,7 @@ type ControlGameView = {
   privateLobbyCode?: string | null;
   seriesBestOf?: 1 | 3 | 5;
   mapId?: string | null;
+  broadcastUrl?: string | null;
 };
 type AssignmentView = {
   id: number;
@@ -106,12 +136,6 @@ type GameStatusClasses = {
   nodeBorder: string;
   statusPill: string;
   accent: string;
-};
-type CanvasPanStart = {
-  clientX: number;
-  clientY: number;
-  scrollLeft: number;
-  scrollTop: number;
 };
 type PinchZoomStart = {
   distance: number;
@@ -145,6 +169,7 @@ type DialogState =
   | { type: "create-team" }
   | { type: "rename"; gameId: number; currentValue: string }
   | { type: "lobby"; gameId: number; currentValue: string }
+  | { type: "broadcast"; gameId: number; currentValue: string }
   | { type: "delete"; gameId: number; label: string }
   | {
       type:
@@ -156,17 +181,6 @@ type DialogState =
 
 const statuses: GameStatus[] = ["draft", "ready", "live", "complete"];
 const activeStatuses = new Set<GameStatus>(["draft", "ready", "live"]);
-export const minZoom = 0.55;
-export const maxZoom = 1.8;
-const baseCanvasSize = { width: 2200, height: 1400 };
-const nodeWidth = 320;
-const connectorHorizontalOffset = 44;
-export const controlRoomGridSize = 40;
-export const connectorRadius = 12;
-const expandedCashoutNodeHeight = 438;
-const expandedFinalNodeHeight = 300;
-const minimizedNodeHeight = 132;
-
 function parseDragPayload(value: string): DragPayload | null {
   try {
     const parsed = JSON.parse(value) as Partial<DragPayload>;
@@ -191,104 +205,6 @@ function formatPlacement(value: number) {
   if (value === 2) return "2nd";
   if (value === 3) return "3rd";
   return `${value}th`;
-}
-
-function clampZoom(value: number) {
-  return Math.min(maxZoom, Math.max(minZoom, Number(value.toFixed(2))));
-}
-
-export function getNodeHeight(gameType: GameType, minimized: boolean) {
-  if (minimized) return minimizedNodeHeight;
-  return gameType === "cashout"
-    ? expandedCashoutNodeHeight
-    : expandedFinalNodeHeight;
-}
-
-export function getConnectorCenter(
-  game: Pick<ControlGameView, "gameType" | "canvasX" | "canvasY">,
-  port: "top" | "bottom",
-  minimized: boolean,
-  position: CanvasPoint = { x: game.canvasX, y: game.canvasY },
-  flowType: ConnectionFlowType = "winner"
-) {
-  const bottomOffset =
-    flowType === "winner"
-      ? -connectorHorizontalOffset
-      : connectorHorizontalOffset;
-  return {
-    x: position.x + nodeWidth / 2 + (port === "bottom" ? bottomOffset : 0),
-    y:
-      port === "top"
-        ? position.y
-        : position.y + getNodeHeight(game.gameType, minimized),
-  };
-}
-
-export function getConnectionEndpoint(
-  center: CanvasPoint,
-  port: "top" | "bottom"
-) {
-  return {
-    x: center.x,
-    y: center.y + (port === "top" ? -connectorRadius : connectorRadius),
-  };
-}
-
-export function getConnectorEndpoints(
-  sourceCenter: CanvasPoint,
-  targetCenter: CanvasPoint,
-  radius = connectorRadius
-) {
-  const dx = targetCenter.x - sourceCenter.x;
-  const dy = targetCenter.y - sourceCenter.y;
-  const length = Math.hypot(dx, dy);
-  if (length === 0) return { source: sourceCenter, target: targetCenter };
-  const unitX = dx / length;
-  const unitY = dy / length;
-  return {
-    source: {
-      x: sourceCenter.x + unitX * radius,
-      y: sourceCenter.y + unitY * radius,
-    },
-    target: {
-      x: targetCenter.x - unitX * radius,
-      y: targetCenter.y - unitY * radius,
-    },
-  };
-}
-
-export function resolveConnectionDropTargetGameId(
-  target: EventTarget | null,
-  sourceGameId: number
-) {
-  const element =
-    target instanceof HTMLElement
-      ? target.closest(
-          "[data-connection-target-game-id], [data-input-port-game-id]"
-        )
-      : null;
-  const raw =
-    element instanceof HTMLElement
-      ? (element.dataset.connectionTargetGameId ??
-        element.dataset.inputPortGameId)
-      : undefined;
-  const targetGameId = raw ? Number(raw) : NaN;
-  return Number.isInteger(targetGameId) &&
-    targetGameId > 0 &&
-    targetGameId !== sourceGameId
-    ? targetGameId
-    : null;
-}
-
-export function getCanvasPanScroll(
-  start: CanvasPanStart,
-  clientX: number,
-  clientY: number
-) {
-  return {
-    scrollLeft: start.scrollLeft - (clientX - start.clientX),
-    scrollTop: start.scrollTop - (clientY - start.clientY),
-  };
 }
 
 export function getGameStatusClasses(status: GameStatus): GameStatusClasses {
@@ -364,60 +280,6 @@ export function getResolvedDropSlot(
   );
 }
 
-export function snapCanvasPointToGrid(
-  position: CanvasPoint,
-  gridSize = controlRoomGridSize
-): CanvasPoint {
-  const safeGridSize = gridSize > 0 ? gridSize : controlRoomGridSize;
-  return {
-    x: Math.max(0, Math.round(position.x / safeGridSize) * safeGridSize),
-    y: Math.max(0, Math.round(position.y / safeGridSize) * safeGridSize),
-  };
-}
-
-export function getConnectorPoint(
-  game: Pick<ControlGameView, "gameType" | "canvasX" | "canvasY">,
-  port: "top" | "bottom",
-  minimized: boolean,
-  position?: CanvasPoint,
-  flowType: ConnectionFlowType = "winner"
-) {
-  return getConnectionEndpoint(
-    getConnectorCenter(game, port, minimized, position, flowType),
-    port
-  );
-}
-
-const canvasPanBlockedSelector =
-  '[data-control-node="true"], [data-team-card="true"], [data-connector-port="true"], [data-connection-line="true"], [data-no-canvas-pan="true"], button, a, input, select, textarea, [role="menuitem"], [role="button"], [draggable="true"]';
-
-export function shouldStartCanvasPan(target: EventTarget | null) {
-  if (!(target instanceof Element)) return false;
-  return !Boolean(target.closest(canvasPanBlockedSelector));
-}
-
-export function getPointerDistance(
-  first: Pick<PointerEvent, "clientX" | "clientY"> | CanvasPoint,
-  second: Pick<PointerEvent, "clientX" | "clientY"> | CanvasPoint
-) {
-  const firstX = "clientX" in first ? first.clientX : first.x;
-  const firstY = "clientY" in first ? first.clientY : first.y;
-  const secondX = "clientX" in second ? second.clientX : second.x;
-  const secondY = "clientY" in second ? second.clientY : second.y;
-  return Math.hypot(secondX - firstX, secondY - firstY);
-}
-
-export function getMidpoint(
-  first: Pick<PointerEvent, "clientX" | "clientY"> | CanvasPoint,
-  second: Pick<PointerEvent, "clientX" | "clientY"> | CanvasPoint
-) {
-  const firstX = "clientX" in first ? first.clientX : first.x;
-  const firstY = "clientY" in first ? first.clientY : first.y;
-  const secondX = "clientX" in second ? second.clientX : second.x;
-  const secondY = "clientY" in second ? second.clientY : second.y;
-  return { x: (firstX + secondX) / 2, y: (firstY + secondY) / 2 };
-}
-
 export function getNextPlacementValue(
   currentPlacement: number | null | undefined,
   capacity: number
@@ -425,114 +287,6 @@ export function getNextPlacementValue(
   const current = currentPlacement ?? 0;
   if (current < 0 || current >= capacity) return null;
   return current + 1;
-}
-
-export function getBoundedControlKeyPosition(
-  position: CanvasPoint,
-  viewport: ViewportSize,
-  overlay: ViewportSize,
-  padding = 8
-) {
-  const maxX = Math.max(padding, viewport.width - overlay.width - padding);
-  const maxY = Math.max(padding, viewport.height - overlay.height - padding);
-  return {
-    x: Math.min(maxX, Math.max(padding, position.x)),
-    y: Math.min(maxY, Math.max(padding, position.y)),
-  };
-}
-
-export function getViewportPreservingScroll(
-  focalCanvasPoint: CanvasPoint,
-  focalClientPoint: CanvasPoint,
-  canvasRect: Pick<DOMRect, "left" | "top">,
-  nextZoom: number
-) {
-  return {
-    scrollLeft:
-      focalCanvasPoint.x * nextZoom - (focalClientPoint.x - canvasRect.left),
-    scrollTop:
-      focalCanvasPoint.y * nextZoom - (focalClientPoint.y - canvasRect.top),
-  };
-}
-
-export function shouldCancelBoardDragsForPinch(
-  activeTouchPointerCount: number
-) {
-  return activeTouchPointerCount >= 2;
-}
-
-export function getCenterZoomView(
-  viewport: ViewportSize,
-  scroll: Pick<HTMLElement, "scrollLeft" | "scrollTop">,
-  currentZoom: number,
-  requestedZoom: number
-) {
-  const nextZoom = clampZoom(requestedZoom);
-  const focalClientPoint = { x: viewport.width / 2, y: viewport.height / 2 };
-  const focalCanvasPoint = {
-    x: (scroll.scrollLeft + focalClientPoint.x) / currentZoom,
-    y: (scroll.scrollTop + focalClientPoint.y) / currentZoom,
-  };
-  return {
-    zoom: nextZoom,
-    ...getViewportPreservingScroll(
-      focalCanvasPoint,
-      focalClientPoint,
-      { left: 0, top: 0 },
-      nextZoom
-    ),
-  };
-}
-
-export function getEmptyBoardResetView() {
-  return { zoom: 1, scrollLeft: 0, scrollTop: 0 };
-}
-
-export function getFitToContentView(
-  games: Pick<ControlGameView, "gameType" | "canvasX" | "canvasY" | "id">[],
-  minimizedGameIds: ReadonlySet<number>,
-  viewport: ViewportSize,
-  padding = 96
-) {
-  if (games.length === 0) return getEmptyBoardResetView();
-
-  const bounds = games.reduce(
-    (accumulator, game) => {
-      const nodeHeight = getNodeHeight(
-        game.gameType,
-        minimizedGameIds.has(game.id)
-      );
-      return {
-        minX: Math.min(accumulator.minX, game.canvasX),
-        minY: Math.min(accumulator.minY, game.canvasY),
-        maxX: Math.max(accumulator.maxX, game.canvasX + nodeWidth),
-        maxY: Math.max(accumulator.maxY, game.canvasY + nodeHeight),
-      };
-    },
-    {
-      minX: Number.POSITIVE_INFINITY,
-      minY: Number.POSITIVE_INFINITY,
-      maxX: Number.NEGATIVE_INFINITY,
-      maxY: Number.NEGATIVE_INFINITY,
-    }
-  );
-  const contentWidth = Math.max(1, bounds.maxX - bounds.minX);
-  const contentHeight = Math.max(1, bounds.maxY - bounds.minY);
-  const usableWidth = Math.max(1, viewport.width - padding * 2);
-  const usableHeight = Math.max(1, viewport.height - padding * 2);
-  const nextZoom = clampZoom(
-    Math.min(usableWidth / contentWidth, usableHeight / contentHeight)
-  );
-  const centeredScrollLeft =
-    (bounds.minX + contentWidth / 2) * nextZoom - viewport.width / 2;
-  const centeredScrollTop =
-    (bounds.minY + contentHeight / 2) * nextZoom - viewport.height / 2;
-
-  return {
-    zoom: nextZoom,
-    scrollLeft: Math.max(0, centeredScrollLeft),
-    scrollTop: Math.max(0, centeredScrollTop),
-  };
 }
 
 export function getAvailableTeamsToggleLabel(teamCount: number) {
@@ -566,11 +320,6 @@ function getRecipientWarning(team: ControlTeamView) {
   if (!team.captainUserId) return "Managed team has no captain recipient.";
   if (!team.captainDiscordId) return "Captain has no Discord ID available.";
   return null;
-}
-
-export function getConnectionPath(source: CanvasPoint, target: CanvasPoint) {
-  const distance = Math.max(80, Math.abs(target.y - source.y) * 0.55);
-  return `M ${source.x} ${source.y} C ${source.x} ${source.y + distance}, ${target.x} ${target.y - distance}, ${target.x} ${target.y}`;
 }
 
 function isTypingTarget(target: EventTarget | null) {
@@ -682,6 +431,8 @@ export default function TournamentControlRoom() {
     trpc.tournamentControl.setLobbyCode.useMutation(mutationOptions);
   const setGameMap =
     trpc.tournamentControl.setGameMap.useMutation(mutationOptions);
+  const setBroadcastUrl =
+    trpc.tournamentControl.setBroadcastUrl.useMutation(mutationOptions);
   const randomizeGameMap =
     trpc.tournamentControl.randomizeGameMap.useMutation(mutationOptions);
   const updateStatus =
@@ -1058,7 +809,9 @@ export default function TournamentControlRoom() {
       ) {
         event.preventDefault();
         runDestructiveBoardAction(() =>
-          deleteGameConnection.mutateAsync({ connectionId: selectedConnectionId })
+          deleteGameConnection.mutateAsync({
+            connectionId: selectedConnectionId,
+          })
         );
         setSelectedConnectionId(null);
         return;
@@ -2541,6 +2294,11 @@ export default function TournamentControlRoom() {
                                       </option>
                                     ))}
                                   </select>
+                                  {game.broadcastUrl && (
+                                    <span className="rounded border border-cyan-300/30 bg-cyan-300/10 px-2 py-1 font-mono text-[10px] uppercase text-cyan-100">
+                                      Broadcast set
+                                    </span>
+                                  )}
                                 </div>
                                 <span className="font-mono text-[10px] uppercase tracking-widest text-white/35">
                                   {game.gameType === "cashout"
@@ -2751,6 +2509,20 @@ export default function TournamentControlRoom() {
                                 >
                                   Set/Clear Lobby Code
                                 </ContextMenuItem>
+                                <ContextMenuItem
+                                  onClick={() =>
+                                    openDialog(
+                                      {
+                                        type: "broadcast",
+                                        gameId: game.id,
+                                        currentValue: game.broadcastUrl ?? "",
+                                      },
+                                      game.broadcastUrl ?? ""
+                                    )
+                                  }
+                                >
+                                  Set/Clear Broadcast Link
+                                </ContextMenuItem>
                                 <ContextMenuSeparator />
                                 {game.gameType === "final_round" && (
                                   <>
@@ -2865,12 +2637,16 @@ export default function TournamentControlRoom() {
                 ? "Create Team"
                 : dialogState?.type === "rename"
                   ? "Rename Game"
-                  : "Set Lobby Code"}
+                  : dialogState?.type === "broadcast"
+                    ? "Set Broadcast Link"
+                    : "Set Lobby Code"}
             </DialogTitle>
             <DialogDescription>
               {dialogState?.type === "lobby"
                 ? "Leave blank to clear the private lobby code."
-                : "Changes persist immediately to the control room."}
+                : dialogState?.type === "broadcast"
+                  ? "Leave blank to clear the public broadcast link."
+                  : "Changes persist immediately to the control room."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -2882,7 +2658,9 @@ export default function TournamentControlRoom() {
                   ? "Team name"
                   : dialogState?.type === "rename"
                     ? "Game label"
-                    : "Lobby code"
+                    : dialogState?.type === "broadcast"
+                      ? "https://twitch.tv/channel"
+                      : "Lobby code"
               }
             />
           </div>
@@ -2902,6 +2680,12 @@ export default function TournamentControlRoom() {
                   setLobbyCode.mutate({
                     gameId: dialogState.gameId,
                     lobbyCode: formName.trim() ? formName.trim() : null,
+                  });
+                }
+                if (dialogState?.type === "broadcast") {
+                  setBroadcastUrl.mutate({
+                    gameId: dialogState.gameId,
+                    broadcastUrl: formName.trim() ? formName.trim() : null,
                   });
                 }
                 setDialogState(null);
@@ -2981,7 +2765,9 @@ export default function TournamentControlRoom() {
                 }
                 if (dialogState?.type === "bulk-return-teams") {
                   runDestructiveBoardAction(() =>
-                    returnTournamentTeamsToAvailable.mutateAsync({ tournamentId })
+                    returnTournamentTeamsToAvailable.mutateAsync({
+                      tournamentId,
+                    })
                   );
                 }
                 if (dialogState?.type === "bulk-wipe-canvas") {

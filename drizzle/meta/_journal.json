@@ -148,6 +148,13 @@
       "when": 1784160000000,
       "tag": "0020_add_tournament_connection_flow_type",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "5",
+      "when": 1784246400000,
+      "tag": "0021_add_tournament_game_broadcast_url",
+      "breakpoints": true
     }
   ]
 }

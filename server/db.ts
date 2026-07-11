@@ -58,6 +58,7 @@ async function addColumnIfMissing(db: AppDb, tableName: string, columnName: stri
 async function ensureTournamentControlColumns(db: AppDb) {
   await addColumnIfMissing(db, "tournaments", "ownerUserId", "int");
   await addColumnIfMissing(db, "tournament_games", "mapId", "varchar(64)");
+  await addColumnIfMissing(db, "tournament_games", "broadcastUrl", "varchar(1024)");
   await addColumnIfMissing(db, "tournament_control_template_games", "mapId", "varchar(64)");
 }
 
