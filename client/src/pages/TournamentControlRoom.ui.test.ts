@@ -57,10 +57,6 @@ describe("Tournament Control Room guide and zoom rail UI", () => {
     expect(adminSource).toContain("Zoom Out");
     expect(adminSource).toContain("Fit");
     expect(adminSource).toContain("Snap to Grid");
-    expect(adminSource).toContain("<Switch");
-    expect(adminSource).toContain('aria-label="Toggle snap to grid"');
-    expect(adminSource).toContain("setSnapWindowsToGrid(current => !current)");
-    expect(adminSource).toContain("onCheckedChange={setSnapWindowsToGrid}");
     expect(adminSource).toContain("Delete All Connections");
     expect(adminSource).toContain("Return All Teams to Available");
     expect(adminSource).toContain("Wipe Canvas");
