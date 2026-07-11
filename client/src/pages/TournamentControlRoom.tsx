@@ -11,6 +11,7 @@ import { Link, useLocation, useParams } from "wouter";
 import { Grip, Maximize2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { getSafeTournamentControlErrorMessage } from "@/lib/tcrError";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getDiscordLoginUrl } from "@/lib/discordLogin";
 import { Button } from "@/components/ui/button";
@@ -1391,7 +1392,7 @@ export default function TournamentControlRoom() {
               ? "Discord service verification failed"
               : "Tournament Control role required"
         }
-        description={query.error.message}
+        description={getSafeTournamentControlErrorMessage(query.error.message)}
       />
     );
   }
