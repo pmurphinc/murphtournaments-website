@@ -44,7 +44,7 @@ type ViewerGame = {
   broadcastUrl?: string | null;
 };
 
-type NodeDragState = {
+export type NodeDragState = {
   gameId: number;
   offsetX: number;
   offsetY: number;
@@ -70,6 +70,50 @@ export function getViewerLocalPosition(
   localPositions: ReadonlyMap<number, CanvasPoint>
 ) {
   return localPositions.get(game.id) ?? { x: game.canvasX, y: game.canvasY };
+}
+
+export function getViewerVisualPosition(
+  game: Pick<ViewerGame, "id" | "canvasX" | "canvasY">,
+  localPositions: ReadonlyMap<number, CanvasPoint>,
+  nodeDrag: Pick<NodeDragState, "gameId" | "x" | "y"> | null
+): CanvasPoint {
+  if (nodeDrag?.gameId === game.id) {
+    return { x: nodeDrag.x, y: nodeDrag.y };
+  }
+  return getViewerLocalPosition(game, localPositions);
+}
+
+export function getViewerConnectionEndpoints(
+  source: Pick<ViewerGame, "id" | "gameType" | "canvasX" | "canvasY">,
+  target: Pick<ViewerGame, "id" | "gameType" | "canvasX" | "canvasY">,
+  flowType: "winner" | "loser",
+  minimizedGameIds: ReadonlySet<number>,
+  localPositions: ReadonlyMap<number, CanvasPoint>,
+  nodeDrag: Pick<NodeDragState, "gameId" | "x" | "y"> | null
+) {
+  return getConnectorEndpoints(
+    getConnectorPoint(
+      source,
+      "bottom",
+      minimizedGameIds.has(source.id),
+      getViewerVisualPosition(source, localPositions, nodeDrag),
+      flowType
+    ),
+    getConnectorPoint(
+      target,
+      "top",
+      minimizedGameIds.has(target.id),
+      getViewerVisualPosition(target, localPositions, nodeDrag)
+    )
+  );
+}
+
+export function getViewerConnectorNodeDescriptors() {
+  return [
+    { port: "top", label: "Receives advancing team", interactive: false },
+    { port: "winner", label: "Winner advances", interactive: false },
+    { port: "loser", label: "Loser advances", interactive: false },
+  ] as const;
 }
 
 export function resetViewerLayoutState() {
@@ -117,17 +161,19 @@ export default function TournamentControlViewer() {
       width: Math.max(
         baseCanvasSize.width,
         ...games.map(
-          game => getViewerLocalPosition(game, localPositions).x + 520
+          game =>
+            getViewerVisualPosition(game, localPositions, nodeDrag).x + 520
         )
       ),
       height: Math.max(
         baseCanvasSize.height,
         ...games.map(
-          game => getViewerLocalPosition(game, localPositions).y + 680
+          game =>
+            getViewerVisualPosition(game, localPositions, nodeDrag).y + 680
         )
       ),
     }),
-    [games, localPositions]
+    [games, localPositions, nodeDrag]
   );
 
   const applyBoardView = useCallback(
@@ -148,7 +194,7 @@ export default function TournamentControlViewer() {
     if (!element) return;
     const visualGames = games.map(game => ({
       ...game,
-      ...getViewerLocalPosition(game, localPositions),
+      ...getViewerVisualPosition(game, localPositions, nodeDrag),
     }));
     applyBoardView(
       getFitToContentView(visualGames, minimizedGameIds, {
@@ -156,7 +202,7 @@ export default function TournamentControlViewer() {
         height: element.clientHeight,
       })
     );
-  }, [applyBoardView, games, localPositions, minimizedGameIds]);
+  }, [applyBoardView, games, localPositions, minimizedGameIds, nodeDrag]);
 
   const resetLayout = useCallback(() => {
     setLocalPositions(new Map());
@@ -401,43 +447,62 @@ export default function TournamentControlViewer() {
           setIsPanning(false);
         }}
       >
-        <div className="pointer-events-none sticky left-3 top-3 z-50 h-0">
+        <div className="pointer-events-none sticky left-3 top-3 z-50 h-0 w-0">
           <div
             data-no-canvas-pan="true"
-            className="pointer-events-auto inline-flex items-center gap-2 rounded-xl border border-[#FFD700]/35 bg-zinc-950/95 p-2 font-mono shadow-[0_0_24px_rgba(255,215,0,0.16)]"
+            className="pointer-events-auto flex w-20 flex-col items-center gap-2 rounded-xl border border-[#FFD700]/35 bg-zinc-950/95 p-2 font-mono shadow-[0_0_24px_rgba(255,215,0,0.16)] sm:w-24"
           >
             <button
-              disabled={zoom <= minZoom}
-              onClick={() => zoomBoardFromCenter(-0.1)}
-              className="rounded border border-white/15 px-3 py-1 text-lg font-black disabled:opacity-30"
-            >
-              −
-            </button>
-            <span className="min-w-12 text-center text-xs font-black text-[#FFD700]">
-              {Math.round(zoom * 100)}%
-            </span>
-            <button
+              aria-label="Zoom in"
+              title="Zoom in"
               disabled={zoom >= maxZoom}
               onClick={() => zoomBoardFromCenter(0.1)}
-              className="rounded border border-white/15 px-3 py-1 text-lg font-black disabled:opacity-30"
+              className="h-9 w-full rounded border border-white/15 text-lg font-black disabled:opacity-30"
             >
               +
             </button>
+            <span className="w-full rounded bg-black/50 px-1 py-1 text-center text-xs font-black text-[#FFD700]">
+              {Math.round(zoom * 100)}%
+            </span>
             <button
+              aria-label="Zoom out"
+              title="Zoom out"
+              disabled={zoom <= minZoom}
+              onClick={() => zoomBoardFromCenter(-0.1)}
+              className="h-9 w-full rounded border border-white/15 text-lg font-black disabled:opacity-30"
+            >
+              −
+            </button>
+            <button
+              aria-label="Fit bracket to view"
+              title="Fit bracket to view"
               onClick={fitBoardView}
-              className="rounded border border-[#FFD700]/40 px-3 py-1 text-xs font-black uppercase text-[#FFD700]"
+              className="w-full rounded border border-[#FFD700]/40 px-1 py-2 text-[10px] font-black uppercase leading-tight text-[#FFD700]"
             >
-              Fit to View
+              Fit
             </button>
             <button
+              aria-label="Reset viewer layout"
+              title="Reset viewer layout"
               onClick={resetLayout}
-              className="rounded border border-white/20 px-3 py-1 text-xs font-black uppercase text-white/80"
+              className="w-full rounded border border-white/20 px-1 py-2 text-[10px] font-black uppercase leading-tight text-white/80"
             >
-              Reset Layout
+              Reset
             </button>
-            <span className="hidden rounded bg-white/5 px-2 py-1 text-[10px] uppercase tracking-wider text-white/50 sm:inline">
+            <span className="w-full rounded bg-white/5 px-1 py-1 text-center text-[9px] uppercase tracking-wider text-white/50">
               Read-only
             </span>
+            <div
+              aria-label="Connector legend"
+              className="w-full rounded border border-white/10 bg-black/50 px-1.5 py-1 text-[9px] leading-snug text-white/60"
+            >
+              <p>
+                <span className="font-black text-[#FFD700]">W</span> — Winner
+              </p>
+              <p>
+                <span className="font-black text-slate-100">L</span> — Loser
+              </p>
+            </div>
           </div>
         </div>
         <div
@@ -465,20 +530,13 @@ export default function TournamentControlViewer() {
                 const source = gamesById.get(connection.sourceGameId);
                 const target = gamesById.get(connection.targetGameId);
                 if (!source || !target) return null;
-                const endpoints = getConnectorEndpoints(
-                  getConnectorPoint(
-                    source,
-                    "bottom",
-                    minimizedGameIds.has(source.id),
-                    getViewerLocalPosition(source, localPositions),
-                    connection.flowType
-                  ),
-                  getConnectorPoint(
-                    target,
-                    "top",
-                    minimizedGameIds.has(target.id),
-                    getViewerLocalPosition(target, localPositions)
-                  )
+                const endpoints = getViewerConnectionEndpoints(
+                  source,
+                  target,
+                  connection.flowType,
+                  minimizedGameIds,
+                  localPositions,
+                  nodeDrag
                 );
                 const isLoserConnection = connection.flowType === "loser";
                 return (
@@ -494,10 +552,11 @@ export default function TournamentControlViewer() {
               })}
             </svg>
             {games.map(game => {
-              const position =
-                nodeDrag?.gameId === game.id
-                  ? { x: nodeDrag.x, y: nodeDrag.y }
-                  : getViewerLocalPosition(game, localPositions);
+              const position = getViewerVisualPosition(
+                game,
+                localPositions,
+                nodeDrag
+              );
               const assignments = query.data.assignments
                 .filter(assignment => assignment.gameId === game.id)
                 .sort((a, b) => a.slotIndex - b.slotIndex);
@@ -539,6 +598,31 @@ export default function TournamentControlViewer() {
                     });
                   }}
                 >
+                  <span
+                    data-no-node-drag="true"
+                    data-connector-port="true"
+                    aria-label="Receives advancing team"
+                    title="Receives advancing team"
+                    className="pointer-events-none absolute -top-3 left-1/2 z-20 h-6 w-6 -translate-x-1/2 rounded-full border-2 border-[#FFD700] bg-black shadow-[0_0_14px_rgba(255,215,0,0.45)]"
+                  />
+                  <span
+                    data-no-node-drag="true"
+                    data-connector-port="true"
+                    aria-label="Winner advances"
+                    title="Winner advances"
+                    className="pointer-events-none absolute -bottom-3 left-[calc(50%-44px)] z-20 flex h-6 w-6 -translate-x-1/2 items-center justify-center rounded-full border-2 border-[#FFD700] bg-[#FFD700] font-mono text-[11px] font-black leading-none text-black shadow-[0_0_14px_rgba(255,215,0,0.45)]"
+                  >
+                    W
+                  </span>
+                  <span
+                    data-no-node-drag="true"
+                    data-connector-port="true"
+                    aria-label="Loser advances"
+                    title="Loser advances"
+                    className="pointer-events-none absolute -bottom-3 left-[calc(50%+44px)] z-20 flex h-6 w-6 -translate-x-1/2 items-center justify-center rounded-full border-2 border-slate-100 bg-slate-100 font-mono text-[11px] font-black leading-none text-black shadow-[0_0_14px_rgba(226,232,240,0.45)]"
+                  >
+                    L
+                  </span>
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="font-mono text-xs uppercase tracking-widest text-white/45">
