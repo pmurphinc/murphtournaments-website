@@ -23,6 +23,8 @@ import {
   hasPointerExceededDragThreshold,
   getEmptyBoardResetView,
   getFitToContentView,
+  getKeyboardPanVector,
+  isKeyboardPanKeyCode,
   minZoom,
   maxZoom,
   getBoundedControlKeyPosition,
@@ -202,6 +204,39 @@ describe("Tournament Control Room advancement placement flow", () => {
   it("returns loser flow placements", () => {
     expect(getAdvancingPlacements("cashout", "loser")).toEqual([3, 4]);
     expect(getAdvancingPlacements("final_round", "loser")).toEqual([2]);
+  });
+});
+
+describe("Tournament Control Room WASD keyboard pan helpers", () => {
+  it.each([
+    ["KeyA", { x: -1, y: 0 }],
+    ["KeyD", { x: 1, y: 0 }],
+    ["KeyW", { x: 0, y: -1 }],
+    ["KeyS", { x: 0, y: 1 }],
+  ] as const)("maps %s to the expected scroll direction", (code, expected) => {
+    expect(isKeyboardPanKeyCode(code)).toBe(true);
+    expect(getKeyboardPanVector(new Set([code]))).toEqual(expected);
+  });
+
+  it("ignores unrelated keyboard codes", () => {
+    expect(isKeyboardPanKeyCode("ArrowLeft")).toBe(false);
+    expect(isKeyboardPanKeyCode("KeyQ")).toBe(false);
+    expect(getKeyboardPanVector(new Set())).toEqual({ x: 0, y: 0 });
+  });
+
+  it("normalizes diagonal movement so it is not substantially faster", () => {
+    const vector = getKeyboardPanVector(new Set(["KeyW", "KeyD"]));
+
+    expect(vector.x).toBeCloseTo(Math.SQRT1_2);
+    expect(vector.y).toBeCloseTo(-Math.SQRT1_2);
+    expect(Math.hypot(vector.x, vector.y)).toBeCloseTo(1);
+  });
+
+  it("cancels opposing keys on the same axis while preserving the other axis", () => {
+    expect(getKeyboardPanVector(new Set(["KeyA", "KeyD", "KeyS"]))).toEqual({
+      x: 0,
+      y: 1,
+    });
   });
 });
 
