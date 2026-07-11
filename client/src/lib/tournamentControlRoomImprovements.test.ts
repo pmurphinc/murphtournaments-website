@@ -182,4 +182,24 @@ describe("Tournament Control Room improvements", () => {
     );
     expect(restoreCode).toContain("broadcastUrl: game.broadcastUrl ?? null");
   });
+
+  it("keeps broadcast dialog reachable and splits lobby metadata into two non-overlapping rows", async () => {
+    const controlRoom = await readFile(
+      new URL("../pages/TournamentControlRoom.tsx", import.meta.url),
+      "utf8"
+    );
+
+    expect(controlRoom).toContain('dialogState?.type === "broadcast"');
+    expect(controlRoom).toContain('className="mb-3 space-y-2"');
+    expect(controlRoom).toContain(
+      'className="min-w-0 flex-1 rounded border border-[#FFD700]/30'
+    );
+    expect(controlRoom).toContain(
+      'className="shrink-0 whitespace-nowrap rounded border border-cyan-300/30'
+    );
+    expect(controlRoom).toContain("Broadcast Link Set");
+    expect(controlRoom).toContain(
+      'className="ml-auto shrink-0 font-mono text-[10px] uppercase tracking-widest text-white/35"'
+    );
+  });
 });
