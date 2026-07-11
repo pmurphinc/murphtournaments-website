@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   getAdvancingPlacements,
   getAvailableTeamsToggleLabel,
-  getGameStatusClasses,
   getNextAvailableSlot,
   getNextPlacementValue,
   getResolvedDropSlot,
 } from "../pages/TournamentControlRoom";
 import {
+  getGameStatusClasses,
   clampZoom,
   connectorRadius,
   controlRoomGridSize,

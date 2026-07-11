@@ -1,4 +1,40 @@
 export type GameType = "cashout" | "final_round";
+
+export type GameStatus = "draft" | "ready" | "live" | "complete";
+export type GameStatusClasses = {
+  nodeBorder: string;
+  statusPill: string;
+  accent: string;
+};
+
+export function getGameStatusClasses(status: GameStatus): GameStatusClasses {
+  switch (status) {
+    case "draft":
+      return {
+        nodeBorder: "border-zinc-500/70",
+        statusPill: "border-zinc-400/40 bg-zinc-500/15 text-zinc-200",
+        accent: "shadow-[0_0_24px_rgba(113,113,122,0.14)]",
+      };
+    case "ready":
+      return {
+        nodeBorder: "border-yellow-300/80",
+        statusPill: "border-yellow-300/50 bg-yellow-300/15 text-yellow-100",
+        accent: "shadow-[0_0_26px_rgba(250,204,21,0.18)]",
+      };
+    case "live":
+      return {
+        nodeBorder: "border-emerald-400/80",
+        statusPill: "border-emerald-400/50 bg-emerald-400/15 text-emerald-100",
+        accent: "shadow-[0_0_26px_rgba(52,211,153,0.18)]",
+      };
+    case "complete":
+      return {
+        nodeBorder: "border-red-400/75",
+        statusPill: "border-red-400/50 bg-red-500/15 text-red-100",
+        accent: "shadow-[0_0_24px_rgba(248,113,113,0.14)]",
+      };
+  }
+}
 export type ConnectionFlowType = "winner" | "loser";
 export type CanvasPoint = { x: number; y: number };
 export type ViewportSize = { width: number; height: number };

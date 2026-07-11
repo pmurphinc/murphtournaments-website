@@ -18,6 +18,7 @@ import {
   getConnectorPoint,
   getConnectionPath,
   getFitToContentView,
+  getGameStatusClasses,
   getMidpoint,
   getNodeHeight,
   getPointerDistance,
@@ -567,11 +568,12 @@ export default function TournamentControlViewer() {
                     game.mapId as keyof (typeof THE_FINALS_MAPS)[number]
                   )
                 : null;
+              const statusClasses = getGameStatusClasses(game.status);
               return (
                 <article
                   key={game.id}
                   data-control-node="true"
-                  className="absolute w-80 rounded-lg border border-neon-gold/30 bg-zinc-950/95 p-4 shadow-2xl"
+                  className={`absolute w-80 rounded-lg border bg-zinc-950/95 p-4 shadow-2xl ${statusClasses.nodeBorder} ${statusClasses.accent}`}
                   style={{
                     left: position.x,
                     top: position.y,
@@ -651,7 +653,7 @@ export default function TournamentControlViewer() {
                     </button>
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <p className="inline-flex rounded border border-white/15 px-2 py-1 font-mono text-xs uppercase text-white/60">
+                    <p className={`inline-flex rounded border px-2 py-1 font-mono text-xs uppercase ${statusClasses.statusPill}`}>
                       {game.status}
                     </p>
                     <p className="rounded border border-[#FFD700]/25 bg-[#FFD700]/10 px-2 py-1 font-mono text-xs uppercase text-[#FFD700]">
