@@ -248,6 +248,7 @@ export const tournamentGames = mysqlTable(
     canvasX: int("canvasX").default(120).notNull(),
     canvasY: int("canvasY").default(120).notNull(),
     privateLobbyCode: varchar("privateLobbyCode", { length: 64 }),
+    broadcastUrl: varchar("broadcastUrl", { length: 1024 }),
     mapId: varchar("mapId", { length: 64 }),
     seriesBestOf: int("seriesBestOf").default(1).notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),

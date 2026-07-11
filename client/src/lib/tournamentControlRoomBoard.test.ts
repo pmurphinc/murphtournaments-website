@@ -1,18 +1,22 @@
 import { describe, expect, it } from "vitest";
 import {
+  getAdvancingPlacements,
+  getAvailableTeamsToggleLabel,
+  getGameStatusClasses,
+  getNextAvailableSlot,
+  getNextPlacementValue,
+  getResolvedDropSlot,
+} from "../pages/TournamentControlRoom";
+import {
   connectorRadius,
   controlRoomGridSize,
   getCanvasPanScroll,
   getConnectionEndpoint,
   getConnectorEndpoints,
   getConnectorPoint,
-  getGameStatusClasses,
   getMidpoint,
-  getNextPlacementValue,
   getPointerDistance,
-  getNextAvailableSlot,
   getNodeHeight,
-  getResolvedDropSlot,
   getViewportPreservingScroll,
   getCenterZoomView,
   getEmptyBoardResetView,
@@ -20,12 +24,10 @@ import {
   minZoom,
   maxZoom,
   getBoundedControlKeyPosition,
-  getAvailableTeamsToggleLabel,
-  getAdvancingPlacements,
   shouldStartCanvasPan,
   shouldCancelBoardDragsForPinch,
   snapCanvasPointToGrid,
-} from "../pages/TournamentControlRoom";
+} from "./tournamentControlBoard";
 
 const cashout = { gameType: "cashout" as const, canvasX: 100, canvasY: 200 };
 const final = { gameType: "final_round" as const, canvasX: 500, canvasY: 75 };

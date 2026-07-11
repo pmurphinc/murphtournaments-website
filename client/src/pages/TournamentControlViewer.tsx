@@ -1,18 +1,246 @@
-import { useMemo } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { THE_FINALS_MAPS } from "@/lib/finalsMaps";
+import {
+  baseCanvasSize,
+  clampZoom,
+  getCanvasPanScroll,
+  getCenterZoomView,
+  getConnectorEndpoints,
+  getConnectorPoint,
+  getConnectionPath,
+  getFitToContentView,
+  getMidpoint,
+  getNodeHeight,
+  getPointerDistance,
+  getViewportPreservingScroll,
+  maxZoom,
+  minZoom,
+  nodeWidth,
+  shouldCancelBoardDragsForPinch,
+  shouldStartCanvasPan,
+  type CanvasPanStart,
+  type CanvasPoint,
+} from "@/lib/tournamentControlBoard";
+
+type ViewerGame = {
+  id: number;
+  tournamentId: number;
+  gameType: "cashout" | "final_round";
+  status: "draft" | "ready" | "live" | "complete";
+  displayLabel: string;
+  canvasX: number;
+  canvasY: number;
+  seriesBestOf?: number | null;
+  mapId?: string | null;
+  broadcastUrl?: string | null;
+};
+
+type NodeDragState = {
+  gameId: number;
+  offsetX: number;
+  offsetY: number;
+  x: number;
+  y: number;
+};
+
+type PinchZoomStart = {
+  distance: number;
+  zoom: number;
+  focalClientX: number;
+  focalClientY: number;
+  focalCanvasX: number;
+  focalCanvasY: number;
+};
+
+const mapsById = new Map<string, string>(
+  THE_FINALS_MAPS.map(map => [map.id, map.name])
+);
+
+export function getViewerLocalPosition(
+  game: Pick<ViewerGame, "id" | "canvasX" | "canvasY">,
+  localPositions: ReadonlyMap<number, CanvasPoint>
+) {
+  return localPositions.get(game.id) ?? { x: game.canvasX, y: game.canvasY };
+}
+
+export function resetViewerLayoutState() {
+  return {
+    localPositions: new Map<number, CanvasPoint>(),
+    minimized: new Set<number>(),
+  };
+}
 
 export default function TournamentControlViewer() {
   const params = useParams<{ viewerToken: string }>();
+  const canvasRef = useRef<HTMLDivElement | null>(null);
+  const canvasPanRef = useRef<(CanvasPanStart & { pointerId: number }) | null>(
+    null
+  );
+  const touchPointersRef = useRef<Map<number, PointerEvent>>(new Map());
+  const pinchStartRef = useRef<PinchZoomStart | null>(null);
+  const isPinchingRef = useRef(false);
+  const [zoom, setZoom] = useState(1);
+  const [isPanning, setIsPanning] = useState(false);
+  const [localPositions, setLocalPositions] = useState<
+    Map<number, CanvasPoint>
+  >(() => new Map());
+  const [minimizedGameIds, setMinimizedGameIds] = useState<Set<number>>(
+    () => new Set()
+  );
+  const [nodeDrag, setNodeDrag] = useState<NodeDragState | null>(null);
   const query = trpc.tournamentControl.getViewer.useQuery(
     { token: params.viewerToken ?? "" },
     { enabled: Boolean(params.viewerToken), retry: false }
   );
+  const games = (query.data?.games ?? []) as ViewerGame[];
   const teamsById = useMemo(
     () =>
       new Map(query.data?.teams.map(team => [team.id, team] as const) ?? []),
     [query.data]
   );
+  const gamesById = useMemo(
+    () => new Map(games.map(game => [game.id, game] as const)),
+    [games]
+  );
+
+  const logicalCanvasSize = useMemo(
+    () => ({
+      width: Math.max(
+        baseCanvasSize.width,
+        ...games.map(
+          game => getViewerLocalPosition(game, localPositions).x + 520
+        )
+      ),
+      height: Math.max(
+        baseCanvasSize.height,
+        ...games.map(
+          game => getViewerLocalPosition(game, localPositions).y + 680
+        )
+      ),
+    }),
+    [games, localPositions]
+  );
+
+  const applyBoardView = useCallback(
+    (view: { zoom: number; scrollLeft: number; scrollTop: number }) => {
+      const element = canvasRef.current;
+      if (!element) return;
+      setZoom(view.zoom);
+      requestAnimationFrame(() => {
+        element.scrollLeft = view.scrollLeft;
+        element.scrollTop = view.scrollTop;
+      });
+    },
+    []
+  );
+
+  const fitBoardView = useCallback(() => {
+    const element = canvasRef.current;
+    if (!element) return;
+    const visualGames = games.map(game => ({
+      ...game,
+      ...getViewerLocalPosition(game, localPositions),
+    }));
+    applyBoardView(
+      getFitToContentView(visualGames, minimizedGameIds, {
+        width: element.clientWidth,
+        height: element.clientHeight,
+      })
+    );
+  }, [applyBoardView, games, localPositions, minimizedGameIds]);
+
+  const resetLayout = useCallback(() => {
+    setLocalPositions(new Map());
+    setMinimizedGameIds(new Set());
+    requestAnimationFrame(fitBoardView);
+  }, [fitBoardView]);
+
+  const zoomBoardFromCenter = useCallback(
+    (zoomDelta: number) => {
+      const element = canvasRef.current;
+      if (!element) return;
+      applyBoardView(
+        getCenterZoomView(
+          { width: element.clientWidth, height: element.clientHeight },
+          { scrollLeft: element.scrollLeft, scrollTop: element.scrollTop },
+          zoom,
+          zoom + zoomDelta
+        )
+      );
+    },
+    [applyBoardView, zoom]
+  );
+
+  const canvasPoint = useCallback(
+    (clientX: number, clientY: number) => {
+      const rect = canvasRef.current?.getBoundingClientRect();
+      return {
+        x: Math.max(
+          0,
+          Math.round(
+            (clientX -
+              (rect?.left ?? 0) +
+              (canvasRef.current?.scrollLeft ?? 0)) /
+              zoom
+          )
+        ),
+        y: Math.max(
+          0,
+          Math.round(
+            (clientY - (rect?.top ?? 0) + (canvasRef.current?.scrollTop ?? 0)) /
+              zoom
+          )
+        ),
+      };
+    },
+    [zoom]
+  );
+
+  useEffect(() => {
+    if (!nodeDrag) return;
+    const { gameId, offsetX, offsetY } = nodeDrag;
+    const move = (event: PointerEvent) => {
+      if (isPinchingRef.current) return;
+      const point = canvasPoint(event.clientX, event.clientY);
+      setNodeDrag(current =>
+        current?.gameId === gameId
+          ? {
+              ...current,
+              x: Math.max(0, point.x - offsetX),
+              y: Math.max(0, point.y - offsetY),
+            }
+          : current
+      );
+    };
+    const finish = (event: PointerEvent) => {
+      const point = canvasPoint(event.clientX, event.clientY);
+      setLocalPositions(current =>
+        new Map(current).set(gameId, {
+          x: Math.max(0, point.x - offsetX),
+          y: Math.max(0, point.y - offsetY),
+        })
+      );
+      setNodeDrag(null);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", finish, { once: true });
+    window.addEventListener("pointercancel", () => setNodeDrag(null), {
+      once: true,
+    });
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", finish);
+    };
+  }, [canvasPoint, nodeDrag]);
 
   if (query.isLoading) return <ViewerState title="Loading bracket…" />;
   if (query.error)
@@ -38,100 +266,360 @@ export default function TournamentControlViewer() {
           {query.data.tournament.currentStage}
         </p>
       </header>
-      <main className="overflow-auto bg-[radial-gradient(circle_at_top,#4d39091a,transparent_32rem),linear-gradient(rgba(255,255,255,.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.04)_1px,transparent_1px)] bg-[size:auto,40px_40px,40px_40px] p-6">
+      <main
+        ref={canvasRef}
+        className={`relative h-[calc(100dvh-8.5rem)] touch-none overflow-auto overscroll-contain bg-[radial-gradient(circle_at_top,#4d39091a,transparent_32rem),linear-gradient(rgba(255,255,255,.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.04)_1px,transparent_1px)] bg-[size:auto,40px_40px,40px_40px] ${isPanning ? "cursor-grabbing" : "cursor-grab"}`}
+        onWheel={event => {
+          if (!event.shiftKey) return;
+          event.preventDefault();
+          const element = canvasRef.current;
+          const rect = element?.getBoundingClientRect();
+          if (!element || !rect) return;
+          const focalCanvasPoint = {
+            x: (event.clientX - rect.left + element.scrollLeft) / zoom,
+            y: (event.clientY - rect.top + element.scrollTop) / zoom,
+          };
+          const nextZoom = clampZoom(zoom + (event.deltaY > 0 ? -0.08 : 0.08));
+          const nextScroll = getViewportPreservingScroll(
+            focalCanvasPoint,
+            { x: event.clientX, y: event.clientY },
+            rect,
+            nextZoom
+          );
+          setZoom(nextZoom);
+          requestAnimationFrame(() => {
+            element.scrollLeft = nextScroll.scrollLeft;
+            element.scrollTop = nextScroll.scrollTop;
+          });
+        }}
+        onPointerDown={event => {
+          if (event.pointerType === "touch") {
+            touchPointersRef.current.set(event.pointerId, event.nativeEvent);
+            event.currentTarget.setPointerCapture?.(event.pointerId);
+            if (shouldCancelBoardDragsForPinch(touchPointersRef.current.size)) {
+              isPinchingRef.current = true;
+              setNodeDrag(null);
+              canvasPanRef.current = null;
+              const element = canvasRef.current;
+              const rect = element?.getBoundingClientRect();
+              const pointers = Array.from(touchPointersRef.current.values());
+              if (element && rect && pointers[0] && pointers[1]) {
+                const midpoint = getMidpoint(pointers[0], pointers[1]);
+                pinchStartRef.current = {
+                  distance: getPointerDistance(pointers[0], pointers[1]),
+                  zoom,
+                  focalClientX: midpoint.x,
+                  focalClientY: midpoint.y,
+                  focalCanvasX:
+                    (midpoint.x - rect.left + element.scrollLeft) / zoom,
+                  focalCanvasY:
+                    (midpoint.y - rect.top + element.scrollTop) / zoom,
+                };
+              }
+              event.preventDefault();
+              return;
+            }
+          }
+          if (event.button !== 0 || !shouldStartCanvasPan(event.target)) return;
+          const element = canvasRef.current;
+          if (!element) return;
+          event.preventDefault();
+          canvasPanRef.current = {
+            pointerId: event.pointerId,
+            clientX: event.clientX,
+            clientY: event.clientY,
+            scrollLeft: element.scrollLeft,
+            scrollTop: element.scrollTop,
+          };
+          event.currentTarget.setPointerCapture?.(event.pointerId);
+          setIsPanning(true);
+        }}
+        onPointerMove={event => {
+          if (
+            event.pointerType === "touch" &&
+            touchPointersRef.current.has(event.pointerId)
+          ) {
+            touchPointersRef.current.set(event.pointerId, event.nativeEvent);
+            if (touchPointersRef.current.size >= 2 && pinchStartRef.current) {
+              const element = canvasRef.current;
+              const rect = element?.getBoundingClientRect();
+              const pointers = Array.from(touchPointersRef.current.values());
+              if (!element || !rect || !pointers[0] || !pointers[1]) return;
+              event.preventDefault();
+              const nextZoom = clampZoom(
+                pinchStartRef.current.zoom *
+                  (getPointerDistance(pointers[0], pointers[1]) /
+                    pinchStartRef.current.distance)
+              );
+              const nextScroll = getViewportPreservingScroll(
+                {
+                  x: pinchStartRef.current.focalCanvasX,
+                  y: pinchStartRef.current.focalCanvasY,
+                },
+                {
+                  x: pinchStartRef.current.focalClientX,
+                  y: pinchStartRef.current.focalClientY,
+                },
+                rect,
+                nextZoom
+              );
+              setZoom(nextZoom);
+              element.scrollLeft = nextScroll.scrollLeft;
+              element.scrollTop = nextScroll.scrollTop;
+              return;
+            }
+          }
+          const panStart = canvasPanRef.current;
+          if (!panStart || panStart.pointerId !== event.pointerId) return;
+          const element = canvasRef.current;
+          if (!element) return;
+          event.preventDefault();
+          const nextScroll = getCanvasPanScroll(
+            panStart,
+            event.clientX,
+            event.clientY
+          );
+          element.scrollLeft = nextScroll.scrollLeft;
+          element.scrollTop = nextScroll.scrollTop;
+        }}
+        onPointerUp={event => {
+          if (event.pointerType === "touch") {
+            touchPointersRef.current.delete(event.pointerId);
+            if (touchPointersRef.current.size < 2) pinchStartRef.current = null;
+            if (touchPointersRef.current.size === 0)
+              isPinchingRef.current = false;
+          }
+          if (canvasPanRef.current?.pointerId === event.pointerId) {
+            canvasPanRef.current = null;
+            setIsPanning(false);
+          }
+          event.currentTarget.releasePointerCapture?.(event.pointerId);
+        }}
+        onPointerCancel={event => {
+          touchPointersRef.current.delete(event.pointerId);
+          canvasPanRef.current = null;
+          setIsPanning(false);
+        }}
+      >
+        <div className="pointer-events-none sticky left-3 top-3 z-50 h-0">
+          <div
+            data-no-canvas-pan="true"
+            className="pointer-events-auto inline-flex items-center gap-2 rounded-xl border border-[#FFD700]/35 bg-zinc-950/95 p-2 font-mono shadow-[0_0_24px_rgba(255,215,0,0.16)]"
+          >
+            <button
+              disabled={zoom <= minZoom}
+              onClick={() => zoomBoardFromCenter(-0.1)}
+              className="rounded border border-white/15 px-3 py-1 text-lg font-black disabled:opacity-30"
+            >
+              −
+            </button>
+            <span className="min-w-12 text-center text-xs font-black text-[#FFD700]">
+              {Math.round(zoom * 100)}%
+            </span>
+            <button
+              disabled={zoom >= maxZoom}
+              onClick={() => zoomBoardFromCenter(0.1)}
+              className="rounded border border-white/15 px-3 py-1 text-lg font-black disabled:opacity-30"
+            >
+              +
+            </button>
+            <button
+              onClick={fitBoardView}
+              className="rounded border border-[#FFD700]/40 px-3 py-1 text-xs font-black uppercase text-[#FFD700]"
+            >
+              Fit to View
+            </button>
+            <button
+              onClick={resetLayout}
+              className="rounded border border-white/20 px-3 py-1 text-xs font-black uppercase text-white/80"
+            >
+              Reset Layout
+            </button>
+            <span className="hidden rounded bg-white/5 px-2 py-1 text-[10px] uppercase tracking-wider text-white/50 sm:inline">
+              Read-only
+            </span>
+          </div>
+        </div>
         <div
           className="relative"
           style={{
-            width: Math.max(
-              1800,
-              ...query.data.games.map(game => game.canvasX + 420)
-            ),
-            height: Math.max(
-              1000,
-              ...query.data.games.map(game => game.canvasY + 420)
-            ),
+            width: logicalCanvasSize.width * zoom,
+            height: logicalCanvasSize.height * zoom,
           }}
         >
-          <svg className="absolute inset-0 overflow-visible">
-            {query.data.connections.map(connection => {
-              const source = query.data.games.find(
-                game => game.id === connection.sourceGameId
-              );
-              const target = query.data.games.find(
-                game => game.id === connection.targetGameId
-              );
-              if (!source || !target) return null;
-              const isLoserConnection = connection.flowType === "loser";
-              const sx = source.canvasX + 160 + (isLoserConnection ? 44 : -44);
-              const sy =
-                source.canvasY + (source.gameType === "cashout" ? 390 : 260);
-              const tx = target.canvasX + 160;
-              const ty = target.canvasY;
-              const mid = Math.max(80, Math.abs(ty - sy) * 0.55);
+          <div
+            className="absolute left-0 top-0"
+            style={{
+              width: logicalCanvasSize.width,
+              height: logicalCanvasSize.height,
+              transform: `scale(${zoom})`,
+              transformOrigin: "top left",
+            }}
+          >
+            <svg
+              className="absolute inset-0 overflow-visible"
+              width={logicalCanvasSize.width}
+              height={logicalCanvasSize.height}
+            >
+              {query.data.connections.map(connection => {
+                const source = gamesById.get(connection.sourceGameId);
+                const target = gamesById.get(connection.targetGameId);
+                if (!source || !target) return null;
+                const endpoints = getConnectorEndpoints(
+                  getConnectorPoint(
+                    source,
+                    "bottom",
+                    minimizedGameIds.has(source.id),
+                    getViewerLocalPosition(source, localPositions),
+                    connection.flowType
+                  ),
+                  getConnectorPoint(
+                    target,
+                    "top",
+                    minimizedGameIds.has(target.id),
+                    getViewerLocalPosition(target, localPositions)
+                  )
+                );
+                const isLoserConnection = connection.flowType === "loser";
+                return (
+                  <path
+                    key={connection.id}
+                    d={getConnectionPath(endpoints.source, endpoints.target)}
+                    stroke={isLoserConnection ? "#F8FAFC" : "#FFD700"}
+                    strokeWidth="3"
+                    fill="none"
+                    opacity={isLoserConnection ? "0.82" : "0.75"}
+                  />
+                );
+              })}
+            </svg>
+            {games.map(game => {
+              const position =
+                nodeDrag?.gameId === game.id
+                  ? { x: nodeDrag.x, y: nodeDrag.y }
+                  : getViewerLocalPosition(game, localPositions);
+              const assignments = query.data.assignments
+                .filter(assignment => assignment.gameId === game.id)
+                .sort((a, b) => a.slotIndex - b.slotIndex);
+              const capacity = game.gameType === "cashout" ? 4 : 2;
+              const isMinimized = minimizedGameIds.has(game.id);
+              const mapName = game.mapId
+                ? mapsById.get(
+                    game.mapId as keyof (typeof THE_FINALS_MAPS)[number]
+                  )
+                : null;
               return (
-                <path
-                  key={connection.id}
-                  d={`M ${sx} ${sy} C ${sx} ${sy + mid}, ${tx} ${ty - mid}, ${tx} ${ty}`}
-                  stroke={isLoserConnection ? "#F8FAFC" : "#FFD700"}
-                  strokeWidth="3"
-                  fill="none"
-                  opacity={isLoserConnection ? "0.82" : "0.75"}
-                />
+                <article
+                  key={game.id}
+                  data-control-node="true"
+                  className="absolute w-80 rounded-lg border border-neon-gold/30 bg-zinc-950/95 p-4 shadow-2xl"
+                  style={{
+                    left: position.x,
+                    top: position.y,
+                    minHeight: getNodeHeight(game.gameType, isMinimized),
+                  }}
+                  onPointerDown={(event: ReactPointerEvent<HTMLElement>) => {
+                    if (
+                      event.button !== 0 ||
+                      (event.target instanceof Element &&
+                        event.target.closest(
+                          '[data-no-node-drag="true"], button, a'
+                        ))
+                    )
+                      return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const point = canvasPoint(event.clientX, event.clientY);
+                    setNodeDrag({
+                      gameId: game.id,
+                      offsetX: point.x - position.x,
+                      offsetY: point.y - position.y,
+                      x: position.x,
+                      y: position.y,
+                    });
+                  }}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-mono text-xs uppercase tracking-widest text-white/45">
+                        {game.gameType === "cashout"
+                          ? "Cashout Lobby"
+                          : `Final Round · BO${game.seriesBestOf ?? 1}`}
+                      </p>
+                      <h2 className="mt-1 font-mono text-xl font-black text-white">
+                        {game.displayLabel}
+                      </h2>
+                    </div>
+                    <button
+                      data-no-node-drag="true"
+                      className="rounded border border-white/15 bg-white/10 px-2 py-1 font-mono text-xs uppercase text-white/70"
+                      onClick={() =>
+                        setMinimizedGameIds(current => {
+                          const next = new Set(current);
+                          next.has(game.id)
+                            ? next.delete(game.id)
+                            : next.add(game.id);
+                          return next;
+                        })
+                      }
+                    >
+                      {isMinimized ? "+" : "−"}
+                    </button>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <p className="inline-flex rounded border border-white/15 px-2 py-1 font-mono text-xs uppercase text-white/60">
+                      {game.status}
+                    </p>
+                    <p className="rounded border border-[#FFD700]/25 bg-[#FFD700]/10 px-2 py-1 font-mono text-xs uppercase text-[#FFD700]">
+                      Map: {mapName ?? "TBD"}
+                    </p>
+                  </div>
+                  {!isMinimized && (
+                    <>
+                      {game.broadcastUrl && (
+                        <a
+                          data-no-node-drag="true"
+                          href={game.broadcastUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-3 inline-flex w-full items-center justify-center rounded border border-[#FFD700] bg-[#FFD700] px-3 py-2 font-mono text-xs font-black uppercase tracking-wider text-black shadow-[0_0_18px_rgba(255,215,0,0.24)] hover:bg-[#D4AF37]"
+                        >
+                          Watch Broadcast
+                        </a>
+                      )}
+                      <div className="mt-3 space-y-2">
+                        {Array.from({ length: capacity }, (_, index) => {
+                          const slot = index + 1;
+                          const assignment = assignments.find(
+                            item => item.slotIndex === slot
+                          );
+                          const team = assignment
+                            ? teamsById.get(assignment.teamId)
+                            : null;
+                          return (
+                            <div
+                              key={slot}
+                              className="rounded border border-white/10 bg-black/50 p-2"
+                            >
+                              <p className="font-mono text-[10px] uppercase text-white/35">
+                                Slot {slot}
+                              </p>
+                              <p className="font-mono text-sm font-bold text-white">
+                                {team?.name ?? "TBD"}
+                                {assignment?.resultPlacement
+                                  ? ` · ${assignment.resultPlacement}`
+                                  : ""}
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                </article>
               );
             })}
-          </svg>
-          {query.data.games.map(game => {
-            const assignments = query.data.assignments
-              .filter(assignment => assignment.gameId === game.id)
-              .sort((a, b) => a.slotIndex - b.slotIndex);
-            const capacity = game.gameType === "cashout" ? 4 : 2;
-            return (
-              <article
-                key={game.id}
-                className="absolute w-80 rounded-lg border border-neon-gold/30 bg-zinc-950/95 p-4 shadow-2xl"
-                style={{ left: game.canvasX, top: game.canvasY }}
-              >
-                <p className="font-mono text-xs uppercase tracking-widest text-white/45">
-                  {game.gameType === "cashout"
-                    ? "Cashout Lobby"
-                    : `Final Round · BO${game.seriesBestOf ?? 1}`}
-                </p>
-                <h2 className="mt-1 font-mono text-xl font-black text-white">
-                  {game.displayLabel}
-                </h2>
-                <p className="mt-2 inline-flex rounded border border-white/15 px-2 py-1 font-mono text-xs uppercase text-white/60">
-                  {game.status}
-                </p>
-                <div className="mt-3 space-y-2">
-                  {Array.from({ length: capacity }, (_, index) => {
-                    const slot = index + 1;
-                    const assignment = assignments.find(
-                      item => item.slotIndex === slot
-                    );
-                    const team = assignment
-                      ? teamsById.get(assignment.teamId)
-                      : null;
-                    return (
-                      <div
-                        key={slot}
-                        className="rounded border border-white/10 bg-black/50 p-2"
-                      >
-                        <p className="font-mono text-[10px] uppercase text-white/35">
-                          Slot {slot}
-                        </p>
-                        <p className="font-mono text-sm font-bold text-white">
-                          {team?.name ?? "TBD"}
-                          {assignment?.resultPlacement
-                            ? ` · ${assignment.resultPlacement}`
-                            : ""}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </article>
-            );
-          })}
+          </div>
         </div>
       </main>
     </section>

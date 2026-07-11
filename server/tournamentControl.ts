@@ -49,7 +49,7 @@ type AssignmentResultRow = {
   resultPlacement: number | null;
 };
 type BoardSnapshotInput = {
-  games: Array<{ id: number; tournamentId: number; gameType: TournamentGameType; status: (typeof tournamentGameStatuses)[number]; displayLabel: string; canvasX: number; canvasY: number; privateLobbyCode?: string | null; seriesBestOf?: number; mapId?: string | null }>;
+  games: Array<{ id: number; tournamentId: number; gameType: TournamentGameType; status: (typeof tournamentGameStatuses)[number]; displayLabel: string; canvasX: number; canvasY: number; privateLobbyCode?: string | null; seriesBestOf?: number; mapId?: string | null; broadcastUrl?: string | null }>;
   assignments: Array<{ id: number; gameId: number; teamId: number; slotIndex: number; resultPlacement?: number | null }>;
   connections: Array<{ id: number; tournamentId: number; sourceGameId: number; targetGameId: number; flowType: ConnectionFlowType }>;
 };
@@ -76,8 +76,21 @@ const adminNoteSchema = z.string().trim().max(1000).nullable().optional();
 const resultPlacementSchema = z.number().int().min(1).max(4).nullable();
 const validMapIds = new Set<string>(THE_FINALS_MAPS.map(map => map.id));
 const mapIdSchema = z.string().trim().max(64).nullable().refine(value => value === null || validMapIds.has(value), "Unknown THE FINALS map id");
+export const broadcastUrlSchema = z.preprocess(value => {
+  if (typeof value !== "string") return value;
+  const trimmed = value.trim();
+  return trimmed.length === 0 ? null : trimmed;
+}, z.string().max(1024).url().nullable().refine(value => {
+  if (value === null) return true;
+  try {
+    const protocol = new URL(value).protocol;
+    return protocol === "http:" || protocol === "https:";
+  } catch {
+    return false;
+  }
+}, "Broadcast URL must be a valid http or https URL"));
 const boardSnapshotSchema = z.object({
-  games: z.array(z.object({ id: idSchema, tournamentId: idSchema, gameType: z.enum(["cashout", "final_round"]), status: z.enum(tournamentGameStatuses), displayLabel: labelSchema, canvasX: z.number().int().min(-10000).max(10000), canvasY: z.number().int().min(-10000).max(10000), privateLobbyCode: z.string().trim().max(64).nullable().optional(), seriesBestOf: seriesBestOfSchema.optional(), mapId: mapIdSchema.optional() })),
+  games: z.array(z.object({ id: idSchema, tournamentId: idSchema, gameType: z.enum(["cashout", "final_round"]), status: z.enum(tournamentGameStatuses), displayLabel: labelSchema, canvasX: z.number().int().min(-10000).max(10000), canvasY: z.number().int().min(-10000).max(10000), privateLobbyCode: z.string().trim().max(64).nullable().optional(), seriesBestOf: seriesBestOfSchema.optional(), mapId: mapIdSchema.optional(), broadcastUrl: broadcastUrlSchema.optional() })),
   assignments: z.array(z.object({ id: idSchema, gameId: idSchema, teamId: idSchema, slotIndex: z.number().int().positive(), resultPlacement: resultPlacementSchema.optional() })),
   connections: z.array(z.object({ id: idSchema, tournamentId: idSchema, sourceGameId: idSchema, targetGameId: idSchema, flowType: connectionFlowTypeSchema })),
 });
@@ -362,7 +375,7 @@ async function restoreTournamentBoardSnapshot(tournamentId: number, snapshot: Bo
 
     const gameIdMap = new Map<number, number>();
     for (const game of snapshot.games) {
-      const result = await tx.insert(tournamentGames).values({ tournamentId, gameType: game.gameType, status: game.status, displayLabel: game.displayLabel, canvasX: game.canvasX, canvasY: game.canvasY, privateLobbyCode: game.privateLobbyCode ?? null, seriesBestOf: game.seriesBestOf ?? 1, mapId: game.mapId ?? null });
+      const result = await tx.insert(tournamentGames).values({ tournamentId, gameType: game.gameType, status: game.status, displayLabel: game.displayLabel, canvasX: game.canvasX, canvasY: game.canvasY, privateLobbyCode: game.privateLobbyCode ?? null, seriesBestOf: game.seriesBestOf ?? 1, mapId: game.mapId ?? null, broadcastUrl: game.broadcastUrl ?? null });
       gameIdMap.set(game.id, requireInsertId(result, "Failed to restore lobby"));
     }
 
@@ -434,7 +447,7 @@ async function getViewerDataByToken(token: string) {
       currentMatch: data.tournament.currentMatch,
     },
     teams: data.teams.map(team => ({ id: team.id, name: team.name, frp: team.frp })),
-    games: data.games.map(game => ({ id: game.id, tournamentId: game.tournamentId, gameType: game.gameType, status: game.status, displayLabel: game.displayLabel, canvasX: game.canvasX, canvasY: game.canvasY, seriesBestOf: game.seriesBestOf, mapId: game.mapId })),
+    games: data.games.map(game => ({ id: game.id, tournamentId: game.tournamentId, gameType: game.gameType, status: game.status, displayLabel: game.displayLabel, canvasX: game.canvasX, canvasY: game.canvasY, seriesBestOf: game.seriesBestOf, mapId: game.mapId, broadcastUrl: game.broadcastUrl })),
     assignments: data.assignments,
     connections: data.connections,
   };
@@ -953,6 +966,13 @@ export const tournamentControlRouter = router({
     const db = await requireDb();
     const game = await getGameOrThrow(db, input.gameId);
     await db.update(tournamentGames).set({ mapId }).where(eq(tournamentGames.id, input.gameId));
+    return fetchTournamentControlData(game.tournamentId);
+  }),
+
+  setBroadcastUrl: discordTournamentStaffProcedure.input(gameIdSchema.extend({ broadcastUrl: broadcastUrlSchema })).mutation(async ({ input }) => {
+    const db = await requireDb();
+    const game = await getGameOrThrow(db, input.gameId);
+    await db.update(tournamentGames).set({ broadcastUrl: input.broadcastUrl }).where(eq(tournamentGames.id, input.gameId));
     return fetchTournamentControlData(game.tournamentId);
   }),
   setLobbyCode: discordTournamentStaffProcedure.input(gameIdSchema.extend({ lobbyCode: lobbyCodeSchema })).mutation(async ({ input }) => {
