@@ -77,12 +77,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuTrigger,
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { Switch } from "@/components/ui/switch";
 
 type DragPayload = { teamId: number; fromGameId?: number };
 type GameStatus = "draft" | "ready" | "live" | "complete";
@@ -1611,15 +1611,22 @@ export default function TournamentControlRoom() {
                         side="right"
                         className="border-[#FFD700]/35 bg-black/95 font-mono text-yellow-50 shadow-[0_0_24px_rgba(255,215,0,0.16)]"
                       >
-                        <DropdownMenuCheckboxItem
-                          checked={snapWindowsToGrid}
-                          onCheckedChange={checked =>
-                            setSnapWindowsToGrid(Boolean(checked))
+                        <DropdownMenuItem
+                          className="flex cursor-pointer items-center justify-between gap-3 focus:bg-[#FFD700]/15 focus:text-[#FFD700]"
+                          onSelect={event => event.preventDefault()}
+                          onClick={() =>
+                            setSnapWindowsToGrid(current => !current)
                           }
-                          className="focus:bg-[#FFD700]/15 focus:text-[#FFD700]"
                         >
-                          Snap to Grid
-                        </DropdownMenuCheckboxItem>
+                          <span>Snap to Grid</span>
+                          <Switch
+                            checked={snapWindowsToGrid}
+                            onCheckedChange={setSnapWindowsToGrid}
+                            onClick={event => event.stopPropagation()}
+                            aria-label="Toggle snap to grid"
+                            className="border-[#FFD700]/40 bg-zinc-800 data-[state=checked]:bg-[#FFD700]"
+                          />
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           className="text-red-200 focus:bg-red-950/60 focus:text-red-100"
