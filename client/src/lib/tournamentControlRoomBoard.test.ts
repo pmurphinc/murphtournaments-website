@@ -8,6 +8,7 @@ import {
   getResolvedDropSlot,
 } from "../pages/TournamentControlRoom";
 import {
+  clampZoom,
   connectorRadius,
   controlRoomGridSize,
   getCanvasPanScroll,
@@ -348,6 +349,11 @@ describe("Tournament Control Room zoom rail click and drag guard", () => {
 });
 
 describe("Tournament Control Room zoom controls", () => {
+  it("allows zooming out to 10 percent", () => {
+    expect(minZoom).toBe(0.1);
+    expect(clampZoom(0)).toBe(0.1);
+  });
+
   it("zooms button clicks around the viewport center while preserving scroll focus", () => {
     expect(
       getCenterZoomView(

@@ -183,6 +183,50 @@ type DialogState =
 
 const statuses: GameStatus[] = ["draft", "ready", "live", "complete"];
 const activeStatuses = new Set<GameStatus>(["draft", "ready", "live"]);
+
+const controlRoomOverlayStorageKey = "murph:tournament-control-room:overlays";
+const defaultControlKeyPosition: CanvasPoint = { x: 16, y: 16 };
+const defaultZoomRailY = 160;
+
+type ControlRoomOverlayPreferences = {
+  controlKeyPosition: CanvasPoint;
+  zoomRailY: number;
+};
+
+function readControlRoomOverlayPreferences(): Partial<ControlRoomOverlayPreferences> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(controlRoomOverlayStorageKey);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Partial<ControlRoomOverlayPreferences>;
+    return {
+      controlKeyPosition:
+        typeof parsed.controlKeyPosition?.x === "number" &&
+        typeof parsed.controlKeyPosition?.y === "number"
+          ? parsed.controlKeyPosition
+          : undefined,
+      zoomRailY:
+        typeof parsed.zoomRailY === "number" ? parsed.zoomRailY : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
+function writeControlRoomOverlayPreferences(
+  preferences: ControlRoomOverlayPreferences
+) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      controlRoomOverlayStorageKey,
+      JSON.stringify(preferences)
+    );
+  } catch {
+    // Ignore unavailable or full local storage so controls remain usable.
+  }
+}
+
 function parseDragPayload(value: string): DragPayload | null {
   try {
     const parsed = JSON.parse(value) as Partial<DragPayload>;
@@ -381,11 +425,14 @@ export default function TournamentControlRoom() {
   const [controlKeyLocked, setControlKeyLocked] = useState(true);
   const [mobileTeamsOpen, setMobileTeamsOpen] = useState(false);
   const [touchHelpOpen, setTouchHelpOpen] = useState(false);
-  const [controlKeyPosition, setControlKeyPosition] = useState<CanvasPoint>({
-    x: 16,
-    y: 16,
-  });
-  const [zoomRailY, setZoomRailY] = useState(160);
+  const [controlKeyPosition, setControlKeyPosition] = useState<CanvasPoint>(
+    () =>
+      readControlRoomOverlayPreferences().controlKeyPosition ??
+      defaultControlKeyPosition
+  );
+  const [zoomRailY, setZoomRailY] = useState(
+    () => readControlRoomOverlayPreferences().zoomRailY ?? defaultZoomRailY
+  );
   const [zoomRailMenuOpen, setZoomRailMenuOpen] = useState(false);
   const suppressZoomRailClickRef = useRef(false);
   const [undoSnapshot, setUndoSnapshot] = useState<BoardUndoSnapshot | null>(
@@ -754,6 +801,10 @@ export default function TournamentControlRoom() {
       window.removeEventListener("resize", measurePorts);
     };
   }, [assignments, games, minimizedGameIds, nodeDrag, query.data, zoom]);
+
+  useEffect(() => {
+    writeControlRoomOverlayPreferences({ controlKeyPosition, zoomRailY });
+  }, [controlKeyPosition, zoomRailY]);
 
   useEffect(() => {
     if (selectedAssignmentId === null) return;
