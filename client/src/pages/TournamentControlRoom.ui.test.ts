@@ -18,6 +18,8 @@ describe("Tournament Control Room guide and zoom rail UI", () => {
     expect(adminSource).toContain("Pan around the bracket");
     expect(adminSource).toContain("+ / − or Shift + wheel");
     expect(adminSource).toContain("Zoom in and out");
+    expect(adminSource).toContain("W A S D");
+    expect(adminSource).toContain("Move around the canvas");
     expect(adminSource).toContain("Right-click empty board");
     expect(adminSource).toContain("Add a team or lobby");
     expect(adminSource).toContain("Select connection, press Del");
@@ -47,6 +49,24 @@ describe("Tournament Control Room guide and zoom rail UI", () => {
     expect(adminSource).toContain("suppressZoomRailClickRef");
     expect(adminSource).toContain("hasPointerExceededDragThreshold");
     expect(adminSource).toContain("setZoomRailMenuOpen(open => !open)");
+  });
+
+  it("keeps existing keyboard shortcuts alongside WASD movement handling", () => {
+    expect(adminSource).toContain('event.key === "Escape"');
+    expect(adminSource).toContain(
+      '["Backspace", "Delete"].includes(event.key)'
+    );
+    expect(adminSource).toContain(
+      '["0", "Backspace", "Delete"].includes(event.key)'
+    );
+    expect(adminSource).toContain("setPlacement.mutate");
+    expect(adminSource).toContain("isKeyboardPanKeyCode(event.code)");
+    expect(adminSource).toContain(
+      'window.addEventListener("keyup", handleKeyUp)'
+    );
+    expect(adminSource).toContain(
+      'window.addEventListener("blur", stopKeyboardPan)'
+    );
   });
 
   it("adds compact labels to the admin zoom rail while preserving current actions", () => {

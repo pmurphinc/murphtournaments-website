@@ -232,6 +232,34 @@ export function getFitToContentView(
   };
 }
 
+export type KeyboardPanKeyCode = "KeyA" | "KeyD" | "KeyW" | "KeyS";
+
+const keyboardPanKeyDeltas: Record<KeyboardPanKeyCode, CanvasPoint> = {
+  KeyA: { x: -1, y: 0 },
+  KeyD: { x: 1, y: 0 },
+  KeyW: { x: 0, y: -1 },
+  KeyS: { x: 0, y: 1 },
+};
+
+export function isKeyboardPanKeyCode(code: string): code is KeyboardPanKeyCode {
+  return code in keyboardPanKeyDeltas;
+}
+
+export function getKeyboardPanVector(
+  activeCodes: ReadonlySet<KeyboardPanKeyCode>
+): CanvasPoint {
+  const vector = Array.from(activeCodes).reduce(
+    (accumulator, code) => ({
+      x: accumulator.x + keyboardPanKeyDeltas[code].x,
+      y: accumulator.y + keyboardPanKeyDeltas[code].y,
+    }),
+    { x: 0, y: 0 }
+  );
+  const magnitude = Math.hypot(vector.x, vector.y);
+  if (magnitude <= 1) return vector;
+  return { x: vector.x / magnitude, y: vector.y / magnitude };
+}
+
 export function snapCanvasPointToGrid(
   position: CanvasPoint,
   gridSize = controlRoomGridSize

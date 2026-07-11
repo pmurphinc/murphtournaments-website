@@ -29,6 +29,7 @@ import {
   getConnectorPoint,
   getEmptyBoardResetView,
   getFitToContentView,
+  getKeyboardPanVector,
   getMidpoint,
   getNodeHeight,
   getPointerDistance,
@@ -38,6 +39,7 @@ import {
   maxZoom,
   minZoom,
   nodeWidth,
+  isKeyboardPanKeyCode,
   shouldCancelBoardDragsForPinch,
   shouldStartCanvasPan,
   snapCanvasPointToGrid,
@@ -45,6 +47,7 @@ import {
   type CanvasPoint,
   type ConnectionFlowType,
   type GameType,
+  type KeyboardPanKeyCode,
   type ViewportSize,
 } from "@/lib/tournamentControlBoard";
 export { resolveConnectionDropTargetGameId } from "@/lib/tournamentControlBoard";
@@ -187,6 +190,7 @@ const activeStatuses = new Set<GameStatus>(["draft", "ready", "live"]);
 const controlRoomOverlayStorageKey = "murph:tournament-control-room:overlays";
 const defaultControlKeyPosition: CanvasPoint = { x: 16, y: 16 };
 const defaultZoomRailY = 160;
+const keyboardPanSpeedPixelsPerSecond = 520;
 
 type ControlRoomOverlayPreferences = {
   controlKeyPosition: CanvasPoint;
@@ -390,7 +394,9 @@ function shouldSkipNodeDrag(target: EventTarget | null) {
 export default function TournamentControlRoom() {
   const params = useParams<{ tournamentId: string }>();
   const [location] = useLocation();
-  const isPersonalTcr = location === `/TCR/${params.tournamentId}` || location === `/tcr/${params.tournamentId}`;
+  const isPersonalTcr =
+    location === `/TCR/${params.tournamentId}` ||
+    location === `/tcr/${params.tournamentId}`;
   const controlApi = isPersonalTcr ? trpc.personalTcr : trpc.tournamentControl;
   const tournamentId = Number(params.tournamentId);
   const auth = useAuth();
@@ -449,6 +455,9 @@ export default function TournamentControlRoom() {
   const touchPointersRef = useRef<Map<number, PointerEvent>>(new Map());
   const pinchStartRef = useRef<PinchZoomStart | null>(null);
   const isPinchingRef = useRef(false);
+  const keyboardPanKeysRef = useRef<Set<KeyboardPanKeyCode>>(new Set());
+  const keyboardPanAnimationRef = useRef<number | null>(null);
+  const keyboardPanPreviousTimestampRef = useRef<number | null>(null);
   const [measuredPortCenters, setMeasuredPortCenters] = useState<
     Map<string, CanvasPoint>
   >(() => new Map());
@@ -469,50 +478,35 @@ export default function TournamentControlRoom() {
     onSuccess: invalidate,
     onError: (error: { message: string }) => toast.error(error.message),
   };
-  const createTeam =
-    controlApi.createTeam.useMutation(mutationOptions);
+  const createTeam = controlApi.createTeam.useMutation(mutationOptions);
   const createCashout =
     controlApi.createCashoutLobby.useMutation(mutationOptions);
   const createFinal =
     controlApi.createFinalRoundMatch.useMutation(mutationOptions);
   const moveGame = controlApi.moveGame.useMutation(mutationOptions);
-  const connectGames =
-    controlApi.connectGames.useMutation(mutationOptions);
+  const connectGames = controlApi.connectGames.useMutation(mutationOptions);
   const deleteGameConnection =
     controlApi.deleteGameConnection.useMutation(mutationOptions);
-  const renameGame =
-    controlApi.renameGame.useMutation(mutationOptions);
-  const setLobbyCode =
-    controlApi.setLobbyCode.useMutation(mutationOptions);
-  const setGameMap =
-    controlApi.setGameMap.useMutation(mutationOptions);
+  const renameGame = controlApi.renameGame.useMutation(mutationOptions);
+  const setLobbyCode = controlApi.setLobbyCode.useMutation(mutationOptions);
+  const setGameMap = controlApi.setGameMap.useMutation(mutationOptions);
   const setBroadcastUrl =
     controlApi.setBroadcastUrl.useMutation(mutationOptions);
   const randomizeGameMap =
     controlApi.randomizeGameMap.useMutation(mutationOptions);
-  const updateStatus =
-    controlApi.updateStatus.useMutation(mutationOptions);
+  const updateStatus = controlApi.updateStatus.useMutation(mutationOptions);
   const setPlacement =
-    controlApi.setAssignmentResultPlacement.useMutation(
-      mutationOptions
-    );
-  const assignTeam =
-    controlApi.assignTeam.useMutation(mutationOptions);
+    controlApi.setAssignmentResultPlacement.useMutation(mutationOptions);
+  const assignTeam = controlApi.assignTeam.useMutation(mutationOptions);
   const moveTeam = controlApi.moveTeam.useMutation(mutationOptions);
-  const removeTeam =
-    controlApi.removeTeam.useMutation(mutationOptions);
+  const removeTeam = controlApi.removeTeam.useMutation(mutationOptions);
   const removeAssignedTeams =
     controlApi.removeAssignedTeams.useMutation(mutationOptions);
-  const deleteGame =
-    controlApi.deleteGame.useMutation(mutationOptions);
+  const deleteGame = controlApi.deleteGame.useMutation(mutationOptions);
   const clearTournamentConnections =
-    controlApi.clearTournamentConnections.useMutation(
-      mutationOptions
-    );
+    controlApi.clearTournamentConnections.useMutation(mutationOptions);
   const returnTournamentTeamsToAvailable =
-    controlApi.returnTournamentTeamsToAvailable.useMutation(
-      mutationOptions
-    );
+    controlApi.returnTournamentTeamsToAvailable.useMutation(mutationOptions);
   const clearTournamentCanvas =
     controlApi.clearTournamentCanvas.useMutation(mutationOptions);
   const restoreTournamentBoardSnapshot =
@@ -525,9 +519,7 @@ export default function TournamentControlRoom() {
       onError: (error: { message: string }) => toast.error(error.message),
     });
   const setBestOf =
-    controlApi.setFinalRoundSeriesBestOf.useMutation(
-      mutationOptions
-    );
+    controlApi.setFinalRoundSeriesBestOf.useMutation(mutationOptions);
   const saveAdminTemplate =
     trpc.tournamentControl.saveTemplateFromTournament.useMutation({
       onSuccess: () => toast.success("Template saved"),
@@ -547,16 +539,15 @@ export default function TournamentControlRoom() {
     },
     onError: (error: { message: string }) => toast.error(error.message),
   });
-  const createClaimLink =
-    controlApi.createTeamClaimLink.useMutation({
-      onSuccess: async data => {
-        await navigator.clipboard.writeText(
-          `${window.location.origin}${data.path}`
-        );
-        toast.success("Team claim link copied");
-      },
-      onError: (error: { message: string }) => toast.error(error.message),
-    });
+  const createClaimLink = controlApi.createTeamClaimLink.useMutation({
+    onSuccess: async data => {
+      await navigator.clipboard.writeText(
+        `${window.location.origin}${data.path}`
+      );
+      toast.success("Team claim link copied");
+    },
+    onError: (error: { message: string }) => toast.error(error.message),
+  });
   const sendLobbyCodeToTeamLeader =
     controlApi.sendLobbyCodeToTeamLeader.useMutation({
       onSuccess: result => {
@@ -855,6 +846,86 @@ export default function TournamentControlRoom() {
       return next.size === current.size ? current : next;
     });
   }, [games]);
+
+  useEffect(() => {
+    const stopKeyboardPan = () => {
+      keyboardPanKeysRef.current.clear();
+      keyboardPanPreviousTimestampRef.current = null;
+      if (keyboardPanAnimationRef.current !== null) {
+        window.cancelAnimationFrame(keyboardPanAnimationRef.current);
+        keyboardPanAnimationRef.current = null;
+      }
+    };
+
+    const stepKeyboardPan = (timestamp: number) => {
+      const canvas = canvasRef.current;
+      const vector = getKeyboardPanVector(keyboardPanKeysRef.current);
+      const previousTimestamp = keyboardPanPreviousTimestampRef.current;
+      keyboardPanPreviousTimestampRef.current = timestamp;
+
+      if (!canvas || (vector.x === 0 && vector.y === 0)) {
+        stopKeyboardPan();
+        return;
+      }
+
+      if (previousTimestamp !== null) {
+        const elapsedSeconds = Math.min(
+          0.05,
+          (timestamp - previousTimestamp) / 1000
+        );
+        const distance = keyboardPanSpeedPixelsPerSecond * elapsedSeconds;
+        canvas.scrollLeft += vector.x * distance;
+        canvas.scrollTop += vector.y * distance;
+      }
+
+      keyboardPanAnimationRef.current =
+        window.requestAnimationFrame(stepKeyboardPan);
+    };
+
+    const startKeyboardPan = () => {
+      if (keyboardPanAnimationRef.current === null) {
+        keyboardPanPreviousTimestampRef.current = null;
+        keyboardPanAnimationRef.current =
+          window.requestAnimationFrame(stepKeyboardPan);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (
+        dialogState !== null ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.altKey ||
+        isTypingTarget(event.target)
+      ) {
+        stopKeyboardPan();
+        return;
+      }
+      if (!isKeyboardPanKeyCode(event.code)) return;
+
+      event.preventDefault();
+      keyboardPanKeysRef.current.add(event.code);
+      startKeyboardPan();
+    };
+
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (!isKeyboardPanKeyCode(event.code)) return;
+      keyboardPanKeysRef.current.delete(event.code);
+      if (keyboardPanKeysRef.current.size === 0) stopKeyboardPan();
+    };
+
+    if (dialogState !== null) stopKeyboardPan();
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    window.addEventListener("blur", stopKeyboardPan);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+      window.removeEventListener("blur", stopKeyboardPan);
+      stopKeyboardPan();
+    };
+  }, [dialogState]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -1362,8 +1433,14 @@ export default function TournamentControlRoom() {
                 const visibility = window.confirm("Make this template public?")
                   ? "public"
                   : "private";
-                if (isPersonalTcr) savePersonalTemplate.mutate({ tournamentId, name, visibility: "private" });
-                else saveAdminTemplate.mutate({ tournamentId, name, visibility });
+                if (isPersonalTcr)
+                  savePersonalTemplate.mutate({
+                    tournamentId,
+                    name,
+                    visibility: "private",
+                  });
+                else
+                  saveAdminTemplate.mutate({ tournamentId, name, visibility });
               }}
             >
               Save Template
@@ -1919,6 +1996,11 @@ export default function TournamentControlRoom() {
                                 "bg-fuchsia-400/15 text-fuchsia-100 border-fuchsia-300/30",
                                 "+ / − or Shift + wheel",
                                 "Zoom in and out",
+                              ],
+                              [
+                                "bg-blue-400/15 text-blue-100 border-blue-300/30",
+                                "W A S D",
+                                "Move around the canvas",
                               ],
                               [
                                 "bg-emerald-400/15 text-emerald-100 border-emerald-300/30",
