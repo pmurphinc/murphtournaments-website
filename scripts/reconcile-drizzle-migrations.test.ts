@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { parseMysqlNonUnique } from "./reconcile-drizzle-migrations";
+import {
+  buildIndexDefinitionFromStatisticsRows,
+  normalizeIndexColumnName,
+  parseMysqlNonUnique,
+} from "./reconcile-drizzle-migrations";
 
 describe("parseMysqlNonUnique", () => {
   it("recognizes unique index metadata values returned as zero", () => {
@@ -23,5 +27,53 @@ describe("parseMysqlNonUnique", () => {
     expect(() => parseMysqlNonUnique("yes")).toThrow(
       /Unexpected information_schema\.statistics\.non_unique value/
     );
+  });
+});
+
+describe("normalizeIndexColumnName", () => {
+  it("normalizes string and Buffer column names", () => {
+    expect(normalizeIndexColumnName("sourceGameId")).toBe("sourceGameId");
+    expect(normalizeIndexColumnName(Buffer.from("targetGameId"))).toBe(
+      "targetGameId"
+    );
+  });
+});
+
+describe("buildIndexDefinitionFromStatisticsRows", () => {
+  it("uses aliased production-style fields to build a unique index definition", () => {
+    expect(
+      buildIndexDefinitionFromStatisticsRows([
+        { columnName: "sourceGameId", nonUnique: "0" },
+        { columnName: "targetGameId", nonUnique: 0 },
+        { columnName: Buffer.from("flowType"), nonUnique: 0n },
+      ])
+    ).toEqual({
+      exists: true,
+      columns: ["sourceGameId", "targetGameId", "flowType"],
+      unique: true,
+    });
+  });
+
+  it("supports string, numeric, bigint, and Buffer nonUnique values", () => {
+    expect(
+      buildIndexDefinitionFromStatisticsRows([
+        { columnName: Buffer.from("sourceGameId"), nonUnique: "1" },
+        { columnName: "targetGameId", nonUnique: 1 },
+        { columnName: "flowType", nonUnique: 1n },
+        { columnName: "extra", nonUnique: Buffer.from("1") },
+      ])
+    ).toEqual({
+      exists: true,
+      columns: ["sourceGameId", "targetGameId", "flowType", "extra"],
+      unique: false,
+    });
+  });
+
+  it("rejects undefined aliased nonUnique values instead of guessing", () => {
+    expect(() =>
+      buildIndexDefinitionFromStatisticsRows([
+        { columnName: "sourceGameId", nonUnique: undefined },
+      ])
+    ).toThrow(/Unexpected information_schema\.statistics\.non_unique value/);
   });
 });

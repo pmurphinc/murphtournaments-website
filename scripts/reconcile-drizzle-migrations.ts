@@ -47,8 +47,8 @@ type IndexDefinition = {
 };
 
 type IndexStatisticsRow = {
-  column_name: string;
-  non_unique: unknown;
+  columnName: string | Buffer;
+  nonUnique: unknown;
 };
 
 const migrationsToReconcile = [
@@ -174,18 +174,18 @@ async function getIndexDefinition(
   index: string
 ): Promise<IndexDefinition> {
   const [rows] = await connection.execute<IndexStatisticsRow[]>(
-    `select column_name, non_unique
+    `select
+        COLUMN_NAME as columnName,
+        NON_UNIQUE as nonUnique
        from information_schema.statistics
-      where table_schema = ? and table_name = ? and index_name = ?
-      order by seq_in_index`,
+      where table_schema = ?
+        and table_name = ?
+        and index_name = ?
+      order by SEQ_IN_INDEX`,
     [databaseName, table, index]
   );
 
-  return {
-    exists: rows.length > 0,
-    columns: rows.map(row => row.column_name),
-    unique: rows.length > 0 && rows.every(row => isUniqueIndexRow(row)),
-  };
+  return buildIndexDefinitionFromStatisticsRows(rows);
 }
 
 export function parseMysqlNonUnique(value: unknown): boolean {
@@ -220,8 +220,19 @@ export function parseMysqlNonUnique(value: unknown): boolean {
   );
 }
 
-function isUniqueIndexRow(row: IndexStatisticsRow): boolean {
-  return !parseMysqlNonUnique(row.non_unique);
+export function normalizeIndexColumnName(value: string | Buffer): string {
+  return Buffer.isBuffer(value) ? value.toString("utf8") : String(value);
+}
+
+export function buildIndexDefinitionFromStatisticsRows(
+  rows: IndexStatisticsRow[]
+): IndexDefinition {
+  return {
+    exists: rows.length > 0,
+    columns: rows.map(row => normalizeIndexColumnName(row.columnName)),
+    unique:
+      rows.length > 0 && rows.every(row => !parseMysqlNonUnique(row.nonUnique)),
+  };
 }
 
 function indexMatchesDefinition(
