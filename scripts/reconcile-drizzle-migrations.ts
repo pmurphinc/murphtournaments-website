@@ -268,6 +268,13 @@ async function reconcileMigration0020IndexTransition(
     console.log(
       "Recreated tournament_game_connections unique index with flowType."
     );
+  } else if (!gameLegacyIndex.exists && !gameFlowIndex.exists) {
+    await connection.execute(
+      "create unique index `tournament_game_connections_source_target_flow_unique` on `tournament_game_connections` (`sourceGameId`, `targetGameId`, `flowType`)"
+    );
+    console.log(
+      "Created tournament_game_connections_source_target_flow_unique index after interrupted transition."
+    );
   } else {
     throw new Error(
       "tournament_game_connections migration 0020 indexes are not in a recognized safe transition state; not modifying them."
