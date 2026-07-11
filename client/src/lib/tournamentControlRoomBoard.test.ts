@@ -19,6 +19,7 @@ import {
   getNodeHeight,
   getViewportPreservingScroll,
   getCenterZoomView,
+  hasPointerExceededDragThreshold,
   getEmptyBoardResetView,
   getFitToContentView,
   minZoom,
@@ -323,6 +324,26 @@ describe("Tournament Control Room pinch zoom math", () => {
       scrollLeft: 250,
       scrollTop: 150,
     });
+  });
+});
+
+describe("Tournament Control Room zoom rail click and drag guard", () => {
+  it("keeps small pointer movement eligible for a click-open action", () => {
+    expect(
+      hasPointerExceededDragThreshold(
+        { clientX: 100, clientY: 100 },
+        { clientX: 103, clientY: 102 }
+      )
+    ).toBe(false);
+  });
+
+  it("treats movement beyond the drag threshold as a completed drag", () => {
+    expect(
+      hasPointerExceededDragThreshold(
+        { clientX: 100, clientY: 100 },
+        { clientX: 105, clientY: 100 }
+      )
+    ).toBe(true);
   });
 });
 

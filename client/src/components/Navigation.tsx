@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Menu, X, ChevronDown, LogOut } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -38,6 +38,27 @@ export default function Navigation() {
   const canSeeTournamentControl = user?.role === "admin";
   const displayName = user?.discordDisplayName || user?.name || "Discord user";
   const username = user?.discordUsername;
+  const navRef = useRef<HTMLElement | null>(null);
+
+  const closeCustomMenus = () => {
+    setIsOpen(false);
+    setBracketOpen(false);
+    setHistoryOpen(false);
+    setTournamentOpen(false);
+  };
+
+  useEffect(() => {
+    const handleDocumentPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Node && navRef.current?.contains(target)) return;
+      closeCustomMenus();
+    };
+
+    document.addEventListener("pointerdown", handleDocumentPointerDown);
+    return () => {
+      document.removeEventListener("pointerdown", handleDocumentPointerDown);
+    };
+  }, []);
 
   const navItems: NavItem[] = [
     { label: "Home", href: "/" },
@@ -74,12 +95,7 @@ export default function Navigation() {
     { label: "Watch", href: "/watch" },
   ];
 
-  const closeMobileMenu = () => {
-    setIsOpen(false);
-    setBracketOpen(false);
-    setHistoryOpen(false);
-    setTournamentOpen(false);
-  };
+  const closeMobileMenu = closeCustomMenus;
 
   const isRouteActive = (href: string) => location === href;
   const isItemActive = (item: NavItem) =>
@@ -209,7 +225,10 @@ export default function Navigation() {
     );
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-[#0a0e27] border-b border-neon-magenta/30">
+    <nav
+      ref={navRef}
+      className="fixed top-0 left-0 right-0 z-50 bg-[#0a0e27] border-b border-neon-magenta/30"
+    >
       <div className="container flex items-center justify-between h-16">
         <div className="flex shrink-0 items-center gap-2 sm:gap-3 md:gap-4 lg:gap-6">
           <Link
@@ -267,6 +286,7 @@ export default function Navigation() {
                           href={subitem.href}
                           aria-current={subitemActive ? "page" : undefined}
                           className={getSubmenuClassName(subitemActive)}
+                          onClick={closeCustomMenus}
                         >
                           {subitem.label}
                         </Link>

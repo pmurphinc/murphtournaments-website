@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
+  type ReactNode,
 } from "react";
 import { Link, useParams } from "wouter";
 import { Grip, Maximize2, RotateCcw } from "lucide-react";
@@ -31,6 +32,7 @@ import {
   getMidpoint,
   getNodeHeight,
   getPointerDistance,
+  hasPointerExceededDragThreshold,
   resolveConnectionDropTargetGameId,
   getViewportPreservingScroll,
   maxZoom,
@@ -75,12 +77,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuTrigger,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Switch } from "@/components/ui/switch";
 
 type DragPayload = { teamId: number; fromGameId?: number };
 type GameStatus = "draft" | "ready" | "live" | "complete";
@@ -385,6 +387,7 @@ export default function TournamentControlRoom() {
   });
   const [zoomRailY, setZoomRailY] = useState(160);
   const [zoomRailMenuOpen, setZoomRailMenuOpen] = useState(false);
+  const suppressZoomRailClickRef = useRef(false);
   const [undoSnapshot, setUndoSnapshot] = useState<BoardUndoSnapshot | null>(
     null
   );
@@ -1072,6 +1075,7 @@ export default function TournamentControlRoom() {
     (event: ReactPointerEvent<HTMLButtonElement>) => {
       if (event.button !== 0) return;
       event.stopPropagation();
+      setZoomRailMenuOpen(false);
       zoomRailDragRef.current = {
         pointerId: event.pointerId,
         clientX: event.clientX,
@@ -1090,7 +1094,11 @@ export default function TournamentControlRoom() {
       if (!dragStart || dragStart.pointerId !== event.pointerId) return;
       const deltaX = event.clientX - dragStart.clientX;
       const deltaY = event.clientY - dragStart.clientY;
-      if (Math.hypot(deltaX, deltaY) > 4) dragStart.dragged = true;
+      if (hasPointerExceededDragThreshold(dragStart, event)) {
+        dragStart.dragged = true;
+        suppressZoomRailClickRef.current = true;
+        setZoomRailMenuOpen(false);
+      }
       if (!dragStart.dragged) return;
       event.preventDefault();
       event.stopPropagation();
@@ -1101,24 +1109,29 @@ export default function TournamentControlRoom() {
 
   const finishZoomRailDrag = useCallback(
     (event: ReactPointerEvent<HTMLButtonElement>) => {
-      if (zoomRailDragRef.current?.pointerId !== event.pointerId) return;
+      const dragStart = zoomRailDragRef.current;
+      if (dragStart?.pointerId !== event.pointerId) return;
       event.stopPropagation();
+      if (dragStart.dragged) {
+        suppressZoomRailClickRef.current = true;
+      }
       if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
         event.currentTarget.releasePointerCapture(event.pointerId);
       }
+      zoomRailDragRef.current = null;
     },
     []
   );
 
   const handleZoomRailGripClick = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>) => {
-      if (zoomRailDragRef.current?.dragged) {
+      if (suppressZoomRailClickRef.current) {
         event.preventDefault();
         event.stopPropagation();
-        zoomRailDragRef.current = null;
+        suppressZoomRailClickRef.current = false;
         return;
       }
-      zoomRailDragRef.current = null;
+      setZoomRailMenuOpen(open => !open);
     },
     []
   );
@@ -1562,7 +1575,7 @@ export default function TournamentControlRoom() {
                 <div className="pointer-events-none sticky left-3 top-0 z-[65] h-0 w-0 sm:left-4">
                   <div
                     data-no-canvas-pan="true"
-                    className="pointer-events-auto flex w-11 flex-col items-center overflow-hidden rounded-xl border border-[#FFD700]/35 bg-zinc-950/95 font-mono text-white shadow-[0_0_24px_rgba(255,215,0,0.14)] backdrop-blur"
+                    className="pointer-events-auto flex w-20 flex-col items-center overflow-hidden rounded-xl sm:w-24 border border-[#FFD700]/35 bg-zinc-950/95 font-mono text-white shadow-[0_0_24px_rgba(255,215,0,0.14)] backdrop-blur"
                     style={{ transform: `translateY(${zoomRailY}px)` }}
                     onContextMenu={event => event.stopPropagation()}
                   >
@@ -1574,9 +1587,10 @@ export default function TournamentControlRoom() {
                         <button
                           type="button"
                           data-no-canvas-pan="true"
-                          className="flex h-10 w-full touch-none items-center justify-center border-b border-white/10 text-white/45 transition hover:bg-[#FFD700]/10 hover:text-[#FFD700]"
+                          className="flex min-h-12 w-full touch-none flex-col items-center justify-center gap-0.5 border-b border-white/10 text-white/45 transition hover:bg-[#FFD700]/10 hover:text-[#FFD700]"
                           title="Board options · drag to move zoom controls"
                           aria-label="Board options and draggable zoom controls"
+                          onPointerDownCapture={event => event.preventDefault()}
                           onPointerDown={startZoomRailDrag}
                           onPointerMove={dragZoomRail}
                           onPointerUp={finishZoomRailDrag}
@@ -1584,6 +1598,12 @@ export default function TournamentControlRoom() {
                           onClick={handleZoomRailGripClick}
                         >
                           <Grip className="h-4 w-4" aria-hidden="true" />
+                          <span className="text-[9px] font-black uppercase leading-none tracking-tight">
+                            Options
+                          </span>
+                          <span className="text-[8px] uppercase leading-none text-white/40">
+                            Move
+                          </span>
                         </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent
@@ -1591,15 +1611,22 @@ export default function TournamentControlRoom() {
                         side="right"
                         className="border-[#FFD700]/35 bg-black/95 font-mono text-yellow-50 shadow-[0_0_24px_rgba(255,215,0,0.16)]"
                       >
-                        <DropdownMenuCheckboxItem
-                          checked={snapWindowsToGrid}
-                          onCheckedChange={checked =>
-                            setSnapWindowsToGrid(Boolean(checked))
+                        <DropdownMenuItem
+                          className="flex cursor-pointer items-center justify-between gap-3 focus:bg-[#FFD700]/15 focus:text-[#FFD700]"
+                          onSelect={event => event.preventDefault()}
+                          onClick={() =>
+                            setSnapWindowsToGrid(current => !current)
                           }
-                          className="focus:bg-[#FFD700]/15 focus:text-[#FFD700]"
                         >
-                          Snap to Grid
-                        </DropdownMenuCheckboxItem>
+                          <span>Snap to Grid</span>
+                          <Switch
+                            checked={snapWindowsToGrid}
+                            onCheckedChange={setSnapWindowsToGrid}
+                            onClick={event => event.stopPropagation()}
+                            aria-label="Toggle snap to grid"
+                            className="border-[#FFD700]/40 bg-zinc-800 data-[state=checked]:bg-[#FFD700]"
+                          />
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           className="text-red-200 focus:bg-red-950/60 focus:text-red-100"
@@ -1634,7 +1661,7 @@ export default function TournamentControlRoom() {
                         !undoSnapshot ||
                         restoreTournamentBoardSnapshot.isPending
                       }
-                      className="flex h-10 w-full items-center justify-center border-b border-white/10 text-white/70 transition hover:bg-[#FFD700]/10 hover:text-[#FFD700] disabled:cursor-not-allowed disabled:text-white/25 disabled:hover:bg-transparent"
+                      className="flex min-h-12 w-full flex-col items-center justify-center gap-0.5 border-b border-white/10 text-white/70 transition hover:bg-[#FFD700]/10 hover:text-[#FFD700] disabled:cursor-not-allowed disabled:text-white/25 disabled:hover:bg-transparent"
                       title="Undo last destructive board action"
                       aria-label="Undo last destructive board action"
                       onPointerDown={event => event.stopPropagation()}
@@ -1644,12 +1671,15 @@ export default function TournamentControlRoom() {
                       }}
                     >
                       <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                      <span className="text-[9px] font-black uppercase leading-none">
+                        Undo
+                      </span>
                     </button>
                     <button
                       type="button"
                       data-no-canvas-pan="true"
                       disabled={zoom >= maxZoom}
-                      className="flex h-10 w-full items-center justify-center border-b border-white/10 text-lg font-black leading-none text-white/80 transition hover:bg-[#FFD700]/10 hover:text-[#FFD700] disabled:cursor-not-allowed disabled:text-white/25 disabled:hover:bg-transparent"
+                      className="flex min-h-12 w-full flex-col items-center justify-center border-b border-white/10 text-lg font-black leading-none text-white/80 transition hover:bg-[#FFD700]/10 hover:text-[#FFD700] disabled:cursor-not-allowed disabled:text-white/25 disabled:hover:bg-transparent"
                       title={`Zoom in · ${Math.round(zoom * 100)}%`}
                       aria-label="Zoom in"
                       onPointerDown={event => event.stopPropagation()}
@@ -1659,12 +1689,15 @@ export default function TournamentControlRoom() {
                       }}
                     >
                       +
+                      <span className="text-[9px] font-black uppercase leading-none">
+                        Zoom In
+                      </span>
                     </button>
                     <button
                       type="button"
                       data-no-canvas-pan="true"
                       disabled={zoom <= minZoom}
-                      className="flex h-10 w-full items-center justify-center border-b border-white/10 text-xl font-black leading-none text-white/80 transition hover:bg-[#FFD700]/10 hover:text-[#FFD700] disabled:cursor-not-allowed disabled:text-white/25 disabled:hover:bg-transparent"
+                      className="flex min-h-12 w-full flex-col items-center justify-center border-b border-white/10 text-xl font-black leading-none text-white/80 transition hover:bg-[#FFD700]/10 hover:text-[#FFD700] disabled:cursor-not-allowed disabled:text-white/25 disabled:hover:bg-transparent"
                       title={`Zoom out · ${Math.round(zoom * 100)}%`}
                       aria-label="Zoom out"
                       onPointerDown={event => event.stopPropagation()}
@@ -1674,11 +1707,14 @@ export default function TournamentControlRoom() {
                       }}
                     >
                       −
+                      <span className="text-[9px] font-black uppercase leading-none">
+                        Zoom Out
+                      </span>
                     </button>
                     <button
                       type="button"
                       data-no-canvas-pan="true"
-                      className="flex h-10 w-full items-center justify-center border-b border-white/10 text-white/70 transition hover:bg-[#FFD700]/10 hover:text-[#FFD700]"
+                      className="flex min-h-12 w-full flex-col items-center justify-center gap-0.5 border-b border-white/10 text-white/70 transition hover:bg-[#FFD700]/10 hover:text-[#FFD700]"
                       title={
                         games.length > 0
                           ? "Fit lobbies to view"
@@ -1696,9 +1732,25 @@ export default function TournamentControlRoom() {
                       }}
                     >
                       <Maximize2 className="h-4 w-4" aria-hidden="true" />
+                      <span className="text-[9px] font-black uppercase leading-none">
+                        Fit
+                      </span>
                     </button>
                     <div className="w-full bg-black/70 px-1 py-1.5 text-center text-[10px] font-black leading-none tracking-tight text-[#FFD700]">
                       {Math.round(zoom * 100)}%
+                    </div>
+                    <div
+                      aria-label="Admin connector legend"
+                      className="w-full border-t border-white/10 bg-black/60 px-1.5 py-1 text-[9px] leading-snug text-white/60"
+                    >
+                      <p>
+                        <span className="font-black text-[#FFD700]">W</span> —
+                        Winners
+                      </p>
+                      <p>
+                        <span className="font-black text-slate-100">L</span> —
+                        Losers
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -1751,12 +1803,12 @@ export default function TournamentControlRoom() {
                             <span className="h-2 w-2 rounded-full bg-[#FFD700] shadow-[0_0_12px_#FFD700]" />
                             <div>
                               <p className="text-xs font-black uppercase tracking-[0.28em] text-[#FFD700]">
-                                PC Control Key
+                                PC Controls
                               </p>
                               <p className="text-[10px] uppercase tracking-wider text-white/45">
                                 {controlKeyLocked
-                                  ? "Locked in place"
-                                  : "Unlocked · drag the handle"}
+                                  ? "Locked — click Unlock to reposition"
+                                  : "Unlocked — drag this header to reposition"}
                               </p>
                             </div>
                           </div>
@@ -1794,53 +1846,64 @@ export default function TournamentControlRoom() {
                           </div>
                         </div>
                         <div className="grid gap-2 text-[11px] text-white/75 sm:grid-cols-2">
-                          {[
+                          {(
                             [
-                              "bg-cyan-400/15 text-cyan-100 border-cyan-300/30",
-                              "Drag empty grid",
-                              "Pan board",
-                            ],
-                            [
-                              "bg-fuchsia-400/15 text-fuchsia-100 border-fuchsia-300/30",
-                              "Buttons / Shift + scroll",
-                              "Zoom board",
-                            ],
-                            [
-                              "bg-emerald-400/15 text-emerald-100 border-emerald-300/30",
-                              "Right-click grid",
-                              "Create teams/lobbies",
-                            ],
-                            [
-                              "bg-orange-400/15 text-orange-100 border-orange-300/30",
-                              "Drag lobby frame",
-                              "Move lobby",
-                            ],
-                            [
-                              "bg-sky-400/15 text-sky-100 border-sky-300/30",
-                              "Drag teams",
-                              "Drop into slots",
-                            ],
-                            [
-                              "bg-lime-400/15 text-lime-100 border-lime-300/30",
-                              "Team + 1–4",
-                              "Score placement",
-                            ],
-                            [
-                              "bg-purple-400/15 text-purple-100 border-purple-300/30",
-                              "Mobile double-tap",
-                              "Cycle score",
-                            ],
-                            [
-                              "bg-yellow-300/15 text-yellow-100 border-yellow-200/40",
-                              "W / L connectors",
-                              "W winners · L losers",
-                            ],
-                            [
-                              "bg-red-400/15 text-red-100 border-red-300/30",
-                              "Select line + Del",
-                              "Remove link",
-                            ],
-                          ].map(([classes, action, detail]) => (
+                              [
+                                "bg-cyan-400/15 text-cyan-100 border-cyan-300/30",
+                                "Drag empty board",
+                                "Pan around the bracket",
+                              ],
+                              [
+                                "bg-fuchsia-400/15 text-fuchsia-100 border-fuchsia-300/30",
+                                "+ / − or Shift + wheel",
+                                "Zoom in and out",
+                              ],
+                              [
+                                "bg-emerald-400/15 text-emerald-100 border-emerald-300/30",
+                                "Right-click empty board",
+                                "Add a team or lobby",
+                              ],
+                              [
+                                "bg-orange-400/15 text-orange-100 border-orange-300/30",
+                                "Drag lobby header",
+                                "Reposition a lobby",
+                              ],
+                              [
+                                "bg-sky-400/15 text-sky-100 border-sky-300/30",
+                                "Drag a team card",
+                                "Place or move a team",
+                              ],
+                              [
+                                "bg-lime-400/15 text-lime-100 border-lime-300/30",
+                                "Select team, press 1–4",
+                                "Set final placement",
+                              ],
+                              [
+                                "bg-purple-400/15 text-purple-100 border-purple-300/30",
+                                "Mobile: double-tap team",
+                                "Cycle placement",
+                              ],
+                              [
+                                "bg-yellow-300/15 text-yellow-100 border-yellow-200/40",
+                                "Drag W / L connector",
+                                <span>
+                                  <span className="font-black text-[#FFD700]">
+                                    W
+                                  </span>{" "}
+                                  — Winners ·{" "}
+                                  <span className="font-black text-slate-100">
+                                    L
+                                  </span>{" "}
+                                  — Losers
+                                </span>,
+                              ],
+                              [
+                                "bg-red-400/15 text-red-100 border-red-300/30",
+                                "Select connection, press Del",
+                                "Remove connection",
+                              ],
+                            ] satisfies [string, string, ReactNode][]
+                          ).map(([classes, action, detail]) => (
                             <div
                               key={action}
                               className={`rounded border px-2.5 py-2 ${classes}`}
