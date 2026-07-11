@@ -50,7 +50,7 @@ export function getDiscordUserId(user: { openId?: string; loginMethod?: string |
 
 function isSiteOwnerOrAdmin(ctx: TrpcContext) {
   if (!ctx.user) return false;
-  return ctx.user.role === "admin" || Boolean(ENV.ownerOpenId && ctx.user.openId === ENV.ownerOpenId);
+  return Boolean(ENV.ownerOpenId && ctx.user.openId === ENV.ownerOpenId);
 }
 
 export async function assertDiscordTournamentStaff(ctx: TrpcContext) {

@@ -7,7 +7,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
-import { Link, useParams } from "wouter";
+import { Link, useLocation, useParams } from "wouter";
 import { Grip, Maximize2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -389,6 +389,9 @@ function shouldSkipNodeDrag(target: EventTarget | null) {
 
 export default function TournamentControlRoom() {
   const params = useParams<{ tournamentId: string }>();
+  const [location] = useLocation();
+  const isPersonalTcr = location === `/TCR/${params.tournamentId}` || location === `/tcr/${params.tournamentId}`;
+  const controlApi = isPersonalTcr ? trpc.personalTcr : trpc.tournamentControl;
   const tournamentId = Number(params.tournamentId);
   const auth = useAuth();
   const utils = trpc.useUtils();
@@ -450,7 +453,7 @@ export default function TournamentControlRoom() {
     Map<string, CanvasPoint>
   >(() => new Map());
 
-  const query = trpc.tournamentControl.get.useQuery(
+  const query = controlApi.get.useQuery(
     { tournamentId },
     {
       enabled:
@@ -459,59 +462,61 @@ export default function TournamentControlRoom() {
     }
   );
   const invalidate = () =>
-    utils.tournamentControl.get.invalidate({ tournamentId });
+    isPersonalTcr
+      ? utils.personalTcr.get.invalidate({ tournamentId })
+      : utils.tournamentControl.get.invalidate({ tournamentId });
   const mutationOptions = {
     onSuccess: invalidate,
     onError: (error: { message: string }) => toast.error(error.message),
   };
   const createTeam =
-    trpc.tournamentControl.createTeam.useMutation(mutationOptions);
+    controlApi.createTeam.useMutation(mutationOptions);
   const createCashout =
-    trpc.tournamentControl.createCashoutLobby.useMutation(mutationOptions);
+    controlApi.createCashoutLobby.useMutation(mutationOptions);
   const createFinal =
-    trpc.tournamentControl.createFinalRoundMatch.useMutation(mutationOptions);
-  const moveGame = trpc.tournamentControl.moveGame.useMutation(mutationOptions);
+    controlApi.createFinalRoundMatch.useMutation(mutationOptions);
+  const moveGame = controlApi.moveGame.useMutation(mutationOptions);
   const connectGames =
-    trpc.tournamentControl.connectGames.useMutation(mutationOptions);
+    controlApi.connectGames.useMutation(mutationOptions);
   const deleteGameConnection =
-    trpc.tournamentControl.deleteGameConnection.useMutation(mutationOptions);
+    controlApi.deleteGameConnection.useMutation(mutationOptions);
   const renameGame =
-    trpc.tournamentControl.renameGame.useMutation(mutationOptions);
+    controlApi.renameGame.useMutation(mutationOptions);
   const setLobbyCode =
-    trpc.tournamentControl.setLobbyCode.useMutation(mutationOptions);
+    controlApi.setLobbyCode.useMutation(mutationOptions);
   const setGameMap =
-    trpc.tournamentControl.setGameMap.useMutation(mutationOptions);
+    controlApi.setGameMap.useMutation(mutationOptions);
   const setBroadcastUrl =
-    trpc.tournamentControl.setBroadcastUrl.useMutation(mutationOptions);
+    controlApi.setBroadcastUrl.useMutation(mutationOptions);
   const randomizeGameMap =
-    trpc.tournamentControl.randomizeGameMap.useMutation(mutationOptions);
+    controlApi.randomizeGameMap.useMutation(mutationOptions);
   const updateStatus =
-    trpc.tournamentControl.updateStatus.useMutation(mutationOptions);
+    controlApi.updateStatus.useMutation(mutationOptions);
   const setPlacement =
-    trpc.tournamentControl.setAssignmentResultPlacement.useMutation(
+    controlApi.setAssignmentResultPlacement.useMutation(
       mutationOptions
     );
   const assignTeam =
-    trpc.tournamentControl.assignTeam.useMutation(mutationOptions);
-  const moveTeam = trpc.tournamentControl.moveTeam.useMutation(mutationOptions);
+    controlApi.assignTeam.useMutation(mutationOptions);
+  const moveTeam = controlApi.moveTeam.useMutation(mutationOptions);
   const removeTeam =
-    trpc.tournamentControl.removeTeam.useMutation(mutationOptions);
+    controlApi.removeTeam.useMutation(mutationOptions);
   const removeAssignedTeams =
-    trpc.tournamentControl.removeAssignedTeams.useMutation(mutationOptions);
+    controlApi.removeAssignedTeams.useMutation(mutationOptions);
   const deleteGame =
-    trpc.tournamentControl.deleteGame.useMutation(mutationOptions);
+    controlApi.deleteGame.useMutation(mutationOptions);
   const clearTournamentConnections =
-    trpc.tournamentControl.clearTournamentConnections.useMutation(
+    controlApi.clearTournamentConnections.useMutation(
       mutationOptions
     );
   const returnTournamentTeamsToAvailable =
-    trpc.tournamentControl.returnTournamentTeamsToAvailable.useMutation(
+    controlApi.returnTournamentTeamsToAvailable.useMutation(
       mutationOptions
     );
   const clearTournamentCanvas =
-    trpc.tournamentControl.clearTournamentCanvas.useMutation(mutationOptions);
+    controlApi.clearTournamentCanvas.useMutation(mutationOptions);
   const restoreTournamentBoardSnapshot =
-    trpc.tournamentControl.restoreTournamentBoardSnapshot.useMutation({
+    controlApi.restoreTournamentBoardSnapshot.useMutation({
       onSuccess: () => {
         setUndoSnapshot(null);
         invalidate();
@@ -520,15 +525,20 @@ export default function TournamentControlRoom() {
       onError: (error: { message: string }) => toast.error(error.message),
     });
   const setBestOf =
-    trpc.tournamentControl.setFinalRoundSeriesBestOf.useMutation(
+    controlApi.setFinalRoundSeriesBestOf.useMutation(
       mutationOptions
     );
-  const saveTemplate =
+  const saveAdminTemplate =
     trpc.tournamentControl.saveTemplateFromTournament.useMutation({
       onSuccess: () => toast.success("Template saved"),
       onError: (error: { message: string }) => toast.error(error.message),
     });
-  const enableViewerLink = trpc.tournamentControl.enableViewerLink.useMutation({
+  const savePersonalTemplate =
+    trpc.personalTcr.saveTemplateFromTournament.useMutation({
+      onSuccess: () => toast.success("Template saved"),
+      onError: (error: { message: string }) => toast.error(error.message),
+    });
+  const enableViewerLink = controlApi.enableViewerLink.useMutation({
     onSuccess: async data => {
       await navigator.clipboard.writeText(
         `${window.location.origin}${data.path}`
@@ -538,7 +548,7 @@ export default function TournamentControlRoom() {
     onError: (error: { message: string }) => toast.error(error.message),
   });
   const createClaimLink =
-    trpc.tournamentControl.createTeamClaimLink.useMutation({
+    controlApi.createTeamClaimLink.useMutation({
       onSuccess: async data => {
         await navigator.clipboard.writeText(
           `${window.location.origin}${data.path}`
@@ -548,7 +558,7 @@ export default function TournamentControlRoom() {
       onError: (error: { message: string }) => toast.error(error.message),
     });
   const sendLobbyCodeToTeamLeader =
-    trpc.tournamentControl.sendLobbyCodeToTeamLeader.useMutation({
+    controlApi.sendLobbyCodeToTeamLeader.useMutation({
       onSuccess: result => {
         for (const item of result.results) {
           if (item.status === "sent")
@@ -559,7 +569,7 @@ export default function TournamentControlRoom() {
       onError: (error: { message: string }) => toast.error(error.message),
     });
   const sendLobbyCodeToLobbyLeaders =
-    trpc.tournamentControl.sendLobbyCodeToLobbyLeaders.useMutation({
+    controlApi.sendLobbyCodeToLobbyLeaders.useMutation({
       onSuccess: result => {
         const sent = result.results.filter(
           item => item.status === "sent"
@@ -1322,7 +1332,7 @@ export default function TournamentControlRoom() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="font-mono text-xs uppercase tracking-[0.35em] text-neon-gold">
-              Admin Tournament Control Room
+              MTC Discord TCR
             </p>
             <h1 className="mt-2 font-mono text-3xl font-black uppercase">
               {query.data.tournament.name}
@@ -1352,13 +1362,14 @@ export default function TournamentControlRoom() {
                 const visibility = window.confirm("Make this template public?")
                   ? "public"
                   : "private";
-                saveTemplate.mutate({ tournamentId, name, visibility });
+                if (isPersonalTcr) savePersonalTemplate.mutate({ tournamentId, name, visibility: "private" });
+                else saveAdminTemplate.mutate({ tournamentId, name, visibility });
               }}
             >
               Save Template
             </Button>
             <Link
-              href="/admin/tournaments/control"
+              href={isPersonalTcr ? "/TCR" : "/admin/tournaments/control"}
               className="inline-flex rounded border border-[#FFD700]/70 bg-[#FFD700] px-4 py-2 font-mono text-xs font-black uppercase tracking-wider text-black shadow-[0_0_18px_rgba(255,215,0,0.22)] transition hover:bg-[#D4AF37]"
             >
               ← Tournament Rooms

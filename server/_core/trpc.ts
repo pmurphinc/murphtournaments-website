@@ -27,6 +27,16 @@ const requireUser = t.middleware(async opts => {
 
 export const protectedProcedure = t.procedure.use(requireUser);
 
+export const discordAuthenticatedProcedure = t.procedure.use(
+  t.middleware(async opts => {
+    const { ctx, next } = opts;
+    if (!ctx.user || ctx.user.loginMethod !== "discord") {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Discord sign-in is required." });
+    }
+    return next({ ctx: { ...ctx, user: ctx.user } });
+  }),
+);
+
 export const adminProcedure = t.procedure.use(
   t.middleware(async opts => {
     const { ctx, next } = opts;
