@@ -15,7 +15,7 @@ export type CanvasPanStart = {
   scrollTop: number;
 };
 
-export const minZoom = 0.55;
+export const minZoom = 0.1;
 export const maxZoom = 1.8;
 export const baseCanvasSize = { width: 2200, height: 1400 };
 export const nodeWidth = 320;
