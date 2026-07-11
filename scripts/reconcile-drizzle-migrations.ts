@@ -40,6 +40,12 @@ type IndexCheck = {
   unique: boolean;
 };
 
+type IndexDefinition = {
+  exists: boolean;
+  columns: string[];
+  unique: boolean;
+};
+
 const migrationsToReconcile = [
   "0019_tournament_maps_and_owners",
   "0020_add_tournament_connection_flow_type",
@@ -156,11 +162,12 @@ async function assertColumnExists(
   }
 }
 
-async function assertIndexExists(
+async function getIndexDefinition(
   connection: mysql.Connection,
   databaseName: string,
-  check: IndexCheck
-) {
+  table: string,
+  index: string
+): Promise<IndexDefinition> {
   const [rows] = await connection.execute<
     Array<{ column_name: string; non_unique: number }>
   >(
@@ -168,21 +175,141 @@ async function assertIndexExists(
        from information_schema.statistics
       where table_schema = ? and table_name = ? and index_name = ?
       order by seq_in_index`,
-    [databaseName, check.table, check.index]
+    [databaseName, table, index]
   );
 
-  const actualColumns = rows.map(row => row.column_name);
-  const hasExpectedColumns =
-    actualColumns.join(",") === check.columns.join(",");
-  const hasExpectedUniqueness = rows.every(
-    row => Boolean(row.non_unique) !== check.unique
+  return {
+    exists: rows.length > 0,
+    columns: rows.map(row => row.column_name),
+    unique: rows.length > 0 && rows.every(row => row.non_unique === 0),
+  };
+}
+
+function indexMatchesDefinition(
+  definition: IndexDefinition,
+  columns: string[],
+  unique: boolean
+): boolean {
+  return (
+    definition.exists &&
+    definition.unique === unique &&
+    definition.columns.join(",") === columns.join(",")
+  );
+}
+
+async function assertIndexExists(
+  connection: mysql.Connection,
+  databaseName: string,
+  check: IndexCheck
+) {
+  const definition = await getIndexDefinition(
+    connection,
+    databaseName,
+    check.table,
+    check.index
   );
 
-  if (!hasExpectedColumns || !hasExpectedUniqueness) {
+  if (!indexMatchesDefinition(definition, check.columns, check.unique)) {
     throw new Error(
       `Required index ${check.table}.${check.index} is missing or has an unexpected definition.`
     );
   }
+}
+
+async function reconcileMigration0020IndexTransition(
+  connection: mysql.Connection,
+  databaseName: string
+) {
+  const gameLegacyIndex = await getIndexDefinition(
+    connection,
+    databaseName,
+    "tournament_game_connections",
+    "tournament_game_connections_source_target_unique"
+  );
+  const gameFlowIndex = await getIndexDefinition(
+    connection,
+    databaseName,
+    "tournament_game_connections",
+    "tournament_game_connections_source_target_flow_unique"
+  );
+
+  const gameLegacyMatches = indexMatchesDefinition(
+    gameLegacyIndex,
+    ["sourceGameId", "targetGameId"],
+    true
+  );
+  const gameFlowMatches = indexMatchesDefinition(
+    gameFlowIndex,
+    ["sourceGameId", "targetGameId", "flowType"],
+    true
+  );
+
+  if (gameFlowMatches) {
+    if (gameLegacyIndex.exists) {
+      if (!gameLegacyMatches) {
+        throw new Error(
+          "Obsolete index tournament_game_connections.tournament_game_connections_source_target_unique has an unexpected definition; not dropping it."
+        );
+      }
+      await connection.execute(
+        "alter table `tournament_game_connections` drop index `tournament_game_connections_source_target_unique`"
+      );
+      console.log(
+        "Dropped obsolete tournament_game_connections_source_target_unique index."
+      );
+    }
+  } else if (gameLegacyMatches && !gameFlowIndex.exists) {
+    await connection.execute(
+      "alter table `tournament_game_connections` drop index `tournament_game_connections_source_target_unique`"
+    );
+    await connection.execute(
+      "create unique index `tournament_game_connections_source_target_flow_unique` on `tournament_game_connections` (`sourceGameId`, `targetGameId`, `flowType`)"
+    );
+    console.log(
+      "Recreated tournament_game_connections unique index with flowType."
+    );
+  } else {
+    throw new Error(
+      "tournament_game_connections migration 0020 indexes are not in a recognized safe transition state; not modifying them."
+    );
+  }
+
+  const templateIndex = await getIndexDefinition(
+    connection,
+    databaseName,
+    "tournament_control_template_connections",
+    "tournament_control_template_connections_unique"
+  );
+  const templateDesiredMatches = indexMatchesDefinition(
+    templateIndex,
+    ["sourceTemplateGameId", "targetTemplateGameId", "flowType"],
+    true
+  );
+  const templateLegacyMatches = indexMatchesDefinition(
+    templateIndex,
+    ["sourceTemplateGameId", "targetTemplateGameId"],
+    true
+  );
+
+  if (templateDesiredMatches) {
+    return;
+  }
+
+  if (!templateLegacyMatches) {
+    throw new Error(
+      "tournament_control_template_connections migration 0020 index is not in a recognized safe transition state; not modifying it."
+    );
+  }
+
+  await connection.execute(
+    "alter table `tournament_control_template_connections` drop index `tournament_control_template_connections_unique`"
+  );
+  await connection.execute(
+    "create unique index `tournament_control_template_connections_unique` on `tournament_control_template_connections` (`sourceTemplateGameId`, `targetTemplateGameId`, `flowType`)"
+  );
+  console.log(
+    "Recreated tournament_control_template_connections_unique index with flowType."
+  );
 }
 
 async function assertForeignKeyExists(
@@ -227,6 +354,7 @@ async function assertProductionSchemaAlreadyHasMigrations(
       assertColumnExists(connection, databaseName, check)
     )
   );
+  await reconcileMigration0020IndexTransition(connection, databaseName);
   await Promise.all(
     requiredIndexes.map(check =>
       assertIndexExists(connection, databaseName, check)
