@@ -46,6 +46,11 @@ type IndexDefinition = {
   unique: boolean;
 };
 
+type IndexStatisticsRow = {
+  column_name: string;
+  non_unique: unknown;
+};
+
 const migrationsToReconcile = [
   "0019_tournament_maps_and_owners",
   "0020_add_tournament_connection_flow_type",
@@ -168,9 +173,7 @@ async function getIndexDefinition(
   table: string,
   index: string
 ): Promise<IndexDefinition> {
-  const [rows] = await connection.execute<
-    Array<{ column_name: string; non_unique: number }>
-  >(
+  const [rows] = await connection.execute<IndexStatisticsRow[]>(
     `select column_name, non_unique
        from information_schema.statistics
       where table_schema = ? and table_name = ? and index_name = ?
@@ -181,8 +184,44 @@ async function getIndexDefinition(
   return {
     exists: rows.length > 0,
     columns: rows.map(row => row.column_name),
-    unique: rows.length > 0 && rows.every(row => row.non_unique === 0),
+    unique: rows.length > 0 && rows.every(row => isUniqueIndexRow(row)),
   };
+}
+
+export function parseMysqlNonUnique(value: unknown): boolean {
+  if (typeof value === "number") {
+    return value !== 0;
+  }
+
+  if (typeof value === "bigint") {
+    return value !== 0n;
+  }
+
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "0") {
+      return false;
+    }
+    if (trimmed === "1") {
+      return true;
+    }
+  }
+
+  if (Buffer.isBuffer(value)) {
+    return parseMysqlNonUnique(value.toString("utf8"));
+  }
+
+  throw new Error(
+    `Unexpected information_schema.statistics.non_unique value: ${String(value)}`
+  );
+}
+
+function isUniqueIndexRow(row: IndexStatisticsRow): boolean {
+  return !parseMysqlNonUnique(row.non_unique);
 }
 
 function indexMatchesDefinition(
@@ -432,7 +471,9 @@ async function main() {
   }
 }
 
-main().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exit(1);
-});
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((error: unknown) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  });
+}
