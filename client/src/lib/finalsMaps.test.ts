@@ -6,14 +6,27 @@ import {
 } from "./finalsMaps";
 
 describe("default competitive maps", () => {
-  it("excludes Seoul and Kyoto from the default competitive pool", () => {
+  it("includes Galaxy Estates in the main arena collection", () => {
+    expect(THE_FINALS_MAPS).toContainEqual({
+      id: "galaxy-estates",
+      name: "GALAXY ESTATES",
+      category: "main",
+    });
+  });
+
+  it("excludes Seoul, Kyoto, and Galaxy Estates from the default competitive pool", () => {
     expect(DEFAULT_COMPETITIVE_MAP_IDS).not.toContain("seoul");
     expect(DEFAULT_COMPETITIVE_MAP_IDS).not.toContain("kyoto");
+    expect(DEFAULT_COMPETITIVE_MAP_IDS).not.toContain("galaxy-estates");
   });
 
   it("keeps every other main arena in the default competitive pool", () => {
     const expectedDefaultMapIds = THE_FINALS_MAPS.filter(
-      map => map.category === "main" && map.id !== "seoul" && map.id !== "kyoto"
+      map =>
+        map.category === "main" &&
+        map.id !== "seoul" &&
+        map.id !== "kyoto" &&
+        map.id !== "galaxy-estates"
     ).map(map => map.id);
 
     expect(DEFAULT_COMPETITIVE_MAP_IDS).toEqual(expectedDefaultMapIds);

@@ -29,7 +29,7 @@ const categoryLabels: Record<FinalsMapCategory, string> = {
 };
 
 const categoryDescriptions: Record<FinalsMapCategory, string> = {
-  main: "Main arenas. Seoul and Kyoto are available here, but excluded from the Default Competitive preset.",
+  main: "Main arenas. Seoul, Kyoto, and Galaxy Estates are available here, but excluded from the Default Competitive preset.",
   compact: "Visible for mode-specific blocks; not selected by default.",
   training: "Non-tournament practice option; not selected by default.",
 };
@@ -200,7 +200,7 @@ export default function MapRandomizer() {
           </GlitchText>
           <p className="max-w-3xl font-mono text-sm leading-7 text-white/75 md:text-base">
             Randomly select maps for tournaments, scrims, warmups, or practice
-            blocks. Default competitive rolls skip Seoul and Kyoto. Choose your
+            blocks. Default competitive rolls skip Seoul, Kyoto, and Galaxy Estates. Choose your
             pool, pick how many maps you need, and roll instantly.
           </p>
         </div>
