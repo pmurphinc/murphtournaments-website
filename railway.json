@@ -5,6 +5,6 @@
     "dockerfilePath": "Dockerfile"
   },
   "deploy": {
-    "preDeployCommand": "pnpm db:migrate"
+    "preDeployCommand": "pnpm db:reconcile && pnpm db:migrate"
   }
 }
