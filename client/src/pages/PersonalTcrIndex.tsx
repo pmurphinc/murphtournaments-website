@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getDiscordLoginUrl } from "@/lib/discordLogin";
+import { getSafeTournamentControlErrorMessage } from "@/lib/tcrError";
 
 const goldButtonClass = "border border-[#FFD700] bg-[#FFD700] px-5 font-mono font-black uppercase tracking-wider text-black shadow-[0_0_18px_rgba(255,215,0,0.28)] hover:bg-[#D4AF37] hover:text-black";
 
@@ -37,7 +38,7 @@ export default function PersonalTcrIndex() {
   if (auth.loading) return <State title="Loading TCR…" />;
   if (!auth.user || auth.user.loginMethod !== "discord") return <State title="Discord sign-in required" description="Sign in with Discord to create and manage your Tournament Control Rooms." showDiscordSignIn />;
   if (query.isLoading) return <State title="Loading your Tournament Control Rooms…" />;
-  if (query.error) return <State title="TCR unavailable" description={query.error.message} />;
+  if (query.error) return <State title="TCR unavailable" description={getSafeTournamentControlErrorMessage(query.error.message)} />;
 
   return <section className="min-h-screen bg-black px-6 py-12 text-white"><div className="mx-auto max-w-6xl">
     <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between"><div><p className="font-mono text-xs uppercase tracking-[0.35em] text-neon-gold">Tournament Organizer</p><h1 className="mt-2 font-mono text-4xl font-black uppercase">Tournament Control Rooms</h1><p className="mt-3 max-w-2xl text-sm text-white/60">Create and manage your own tournaments with Discord sign-in.</p><p className="mt-2 text-xs text-white/45">Signed in as {auth.user.discordDisplayName || auth.user.discordUsername || auth.user.name || "Discord user"}</p></div><Button className={goldButtonClass} onClick={() => setCreateOpen(true)}>Create Tournament</Button></div>

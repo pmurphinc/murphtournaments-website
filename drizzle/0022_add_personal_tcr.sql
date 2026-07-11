@@ -3,11 +3,13 @@ ALTER TABLE tournaments
   ADD COLUMN publicSlug varchar(120) DEFAULT NULL AFTER visibility,
   ADD COLUMN publishedAt timestamp NULL DEFAULT NULL AFTER publicSlug,
   ADD COLUMN maxTeams int DEFAULT NULL AFTER publishedAt;
-
+--> statement-breakpoint
 CREATE UNIQUE INDEX tournaments_publicSlug_unique ON tournaments (publicSlug);
+--> statement-breakpoint
 CREATE INDEX tournaments_visibility_published_idx ON tournaments (visibility, publishedAt);
+--> statement-breakpoint
 CREATE INDEX tournaments_owner_visibility_idx ON tournaments (ownerUserId, visibility);
-
+--> statement-breakpoint
 CREATE TABLE tournament_private_invite_links (
   id int AUTO_INCREMENT PRIMARY KEY,
   tournamentId int NOT NULL,
@@ -21,7 +23,7 @@ CREATE TABLE tournament_private_invite_links (
   UNIQUE KEY tournament_private_invite_links_token_unique (token),
   KEY tournament_private_invite_links_tournament_status_idx (tournamentId, status)
 );
-
+--> statement-breakpoint
 CREATE TABLE tournament_lobby_code_deliveries (
   id int AUTO_INCREMENT PRIMARY KEY,
   gameId int NOT NULL,
