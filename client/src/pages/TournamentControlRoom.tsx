@@ -2257,16 +2257,16 @@ export default function TournamentControlRoom() {
                                   )}
                                 </div>
                               </div>
-                              <div className="mb-3 flex items-center justify-between gap-2">
+                              <div className="mb-3 space-y-2">
                                 <div className="flex min-w-0 items-center gap-2">
                                   <span
-                                    className={`inline-block rounded border px-2 py-1 font-mono text-xs uppercase ${statusClasses.statusPill}`}
+                                    className={`inline-block shrink-0 rounded border px-2 py-1 font-mono text-xs uppercase ${statusClasses.statusPill}`}
                                   >
                                     {game.status}
                                   </span>
                                   <select
                                     data-no-node-drag="true"
-                                    className="max-w-[8rem] rounded border border-[#FFD700]/30 bg-black px-2 py-1 font-mono text-[10px] uppercase text-yellow-100 outline-none hover:border-[#FFD700]"
+                                    className="min-w-0 flex-1 rounded border border-[#FFD700]/30 bg-black px-2 py-1 font-mono text-[10px] uppercase text-yellow-100 outline-none hover:border-[#FFD700]"
                                     value={game.mapId ?? ""}
                                     title="Select map"
                                     onChange={event => {
@@ -2294,17 +2294,19 @@ export default function TournamentControlRoom() {
                                       </option>
                                     ))}
                                   </select>
+                                </div>
+                                <div className="flex min-w-0 items-center justify-between gap-2">
                                   {game.broadcastUrl && (
-                                    <span className="rounded border border-cyan-300/30 bg-cyan-300/10 px-2 py-1 font-mono text-[10px] uppercase text-cyan-100">
-                                      Broadcast set
+                                    <span className="shrink-0 whitespace-nowrap rounded border border-cyan-300/30 bg-cyan-300/10 px-2 py-1 font-mono text-[10px] uppercase text-cyan-100">
+                                      Broadcast Link Set
                                     </span>
                                   )}
+                                  <span className="ml-auto shrink-0 font-mono text-[10px] uppercase tracking-widest text-white/35">
+                                    {game.gameType === "cashout"
+                                      ? "1st–4th"
+                                      : `1st–2nd · BO${game.seriesBestOf ?? 1}`}
+                                  </span>
                                 </div>
-                                <span className="font-mono text-[10px] uppercase tracking-widest text-white/35">
-                                  {game.gameType === "cashout"
-                                    ? "1st–4th"
-                                    : `1st–2nd · BO${game.seriesBestOf ?? 1}`}
-                                </span>
                               </div>
                               {isMinimized ? (
                                 <CompactResultList
