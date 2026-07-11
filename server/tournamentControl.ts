@@ -313,6 +313,14 @@ async function updateTournamentName(tournamentId: number, name: string) {
   return listTournamentRows(db);
 }
 
+async function deleteTournamentTeam(tournamentId: number, teamId: number) {
+  const db = await requireDb();
+  const [team] = await db.select().from(teams).where(and(eq(teams.id, teamId), eq(teams.tournamentId, tournamentId))).limit(1);
+  if (!team) throw new TRPCError({ code: "NOT_FOUND", message: "Team not found." });
+  await db.delete(teams).where(and(eq(teams.id, teamId), eq(teams.tournamentId, tournamentId)));
+  return fetchTournamentControlData(tournamentId);
+}
+
 async function setTournamentOwner(tournamentId: number, ownerUserId: number | null) {
   const db = await requireDb();
   await fetchTournamentRows(db, tournamentId);
@@ -949,6 +957,7 @@ export const personalTcrRouter = router({
   approveTeamSubmission: personalTcrProcedure.input(z.object({ submissionId: idSchema })).mutation(async ({ input, ctx }) => { const db = await requireDb(); const [submission] = await db.select().from(tournamentTeamSubmissions).where(eq(tournamentTeamSubmissions.id, input.submissionId)).limit(1); if (!submission) throw new TRPCError({ code: "NOT_FOUND", message: "Team submission not found" }); await getOwnedTournamentOrThrow(db, submission.tournamentId, ctx.user); return approveSubmission(input.submissionId); }),
   rejectTeamSubmission: personalTcrProcedure.input(z.object({ submissionId: idSchema, adminNote: adminNoteSchema })).mutation(async ({ input, ctx }) => { const db = await requireDb(); const [submission] = await db.select().from(tournamentTeamSubmissions).where(eq(tournamentTeamSubmissions.id, input.submissionId)).limit(1); if (!submission) throw new TRPCError({ code: "NOT_FOUND", message: "Team submission not found" }); await getOwnedTournamentOrThrow(db, submission.tournamentId, ctx.user); return rejectSubmission(input.submissionId, input.adminNote); }),
   createTeam: personalTcrProcedure.input(tournamentIdSchema.extend({ name: teamNameSchema, frp: frpSchema })).mutation(async ({ input, ctx }) => { const db = await requireDb(); await getOwnedTournamentOrThrow(db, input.tournamentId, ctx.user); const teamRows = await db.select({ id: teams.id }).from(teams).where(eq(teams.tournamentId, input.tournamentId)); if (ctx.user.role !== "admin" && teamRows.length >= PERSONAL_TCR_LIMITS.teamsPerTournament) throw new TRPCError({ code: "FORBIDDEN", message: "Team limit reached." }); await assertUniqueTeamName(db, input.tournamentId, input.name); await db.insert(teams).values({ tournamentId: input.tournamentId, name: input.name, frp: input.frp }); return fetchTournamentControlData(input.tournamentId); }),
+  deleteTeam: personalTcrProcedure.input(tournamentIdSchema.extend({ teamId: idSchema })).mutation(async ({ input, ctx }) => { const db = await requireDb(); await getOwnedTournamentOrThrow(db, input.tournamentId, ctx.user); return deleteTournamentTeam(input.tournamentId, input.teamId); }),
   createCashoutLobby: personalTcrProcedure.input(tournamentIdSchema.extend({ position: positionSchema })).mutation(async ({ input, ctx }) => { const db = await requireDb(); await getOwnedTournamentOrThrow(db, input.tournamentId, ctx.user); const games = await db.select({ id: tournamentGames.id }).from(tournamentGames).where(eq(tournamentGames.tournamentId, input.tournamentId)); if (ctx.user.role !== "admin" && games.length >= PERSONAL_TCR_LIMITS.gameNodesPerTournament) throw new TRPCError({ code: "FORBIDDEN", message: "Lobby node limit reached." }); return createGame(input.tournamentId, "cashout", input.position); }),
   createFinalRoundMatch: personalTcrProcedure.input(tournamentIdSchema.extend({ position: positionSchema })).mutation(async ({ input, ctx }) => { const db = await requireDb(); await getOwnedTournamentOrThrow(db, input.tournamentId, ctx.user); return createGame(input.tournamentId, "final_round", input.position); }),
   renameGame: personalTcrProcedure.input(gameIdSchema.extend({ displayLabel: labelSchema })).mutation(async ({ input, ctx }) => { const db = await requireDb(); await assertGameBelongsToOwnedTournament(db, input.gameId, ctx.user); const game = await getGameOrThrow(db, input.gameId); assertGameIsMutable(game); await db.update(tournamentGames).set({ displayLabel: input.displayLabel }).where(eq(tournamentGames.id, input.gameId)); return fetchTournamentControlData(game.tournamentId); }),
@@ -1086,6 +1095,11 @@ export const tournamentControlRouter = router({
     await assertUniqueTeamName(db, input.tournamentId, input.name);
     await db.insert(teams).values({ tournamentId: input.tournamentId, name: input.name, frp: input.frp });
     return fetchTournamentControlData(input.tournamentId);
+  }),
+  deleteTeam: discordTournamentStaffProcedure.input(tournamentIdSchema.extend({ teamId: idSchema })).mutation(async ({ input }) => {
+    const db = await requireDb();
+    await fetchTournamentRows(db, input.tournamentId);
+    return deleteTournamentTeam(input.tournamentId, input.teamId);
   }),
   createCashoutLobby: discordTournamentStaffProcedure.input(tournamentIdSchema.extend({ position: positionSchema })).mutation(({ input }) => createGame(input.tournamentId, "cashout", input.position)),
   createFinalRoundMatch: discordTournamentStaffProcedure.input(tournamentIdSchema.extend({ position: positionSchema })).mutation(({ input }) => createGame(input.tournamentId, "final_round", input.position)),

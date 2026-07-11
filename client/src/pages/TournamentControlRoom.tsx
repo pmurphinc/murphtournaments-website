@@ -47,6 +47,9 @@ import {
   type CanvasPanStart,
   type CanvasPoint,
   type ConnectionFlowType,
+  getGameStatusClasses,
+  type GameStatus,
+  type GameStatusClasses,
   type GameType,
   type KeyboardPanKeyCode,
   type ViewportSize,
@@ -89,7 +92,6 @@ import {
 import { Switch } from "@/components/ui/switch";
 
 type DragPayload = { teamId: number; fromGameId?: number };
-type GameStatus = "draft" | "ready" | "live" | "complete";
 type NodeDragState = {
   gameId: number;
   offsetX: number;
@@ -138,11 +140,6 @@ type ConnectionView = {
   targetGameId: number;
   flowType: ConnectionFlowType;
 };
-type GameStatusClasses = {
-  nodeBorder: string;
-  statusPill: string;
-  accent: string;
-};
 type PinchZoomStart = {
   distance: number;
   zoom: number;
@@ -173,6 +170,8 @@ type BoardUndoSnapshot = {
 
 type DialogState =
   | { type: "create-team" }
+  | { type: "rename-tournament"; currentValue: string }
+  | { type: "delete-team"; teamId: number; teamName: string }
   | { type: "rename"; gameId: number; currentValue: string }
   | { type: "lobby"; gameId: number; currentValue: string }
   | { type: "broadcast"; gameId: number; currentValue: string }
@@ -256,35 +255,6 @@ function formatPlacement(value: number) {
   if (value === 2) return "2nd";
   if (value === 3) return "3rd";
   return `${value}th`;
-}
-
-export function getGameStatusClasses(status: GameStatus): GameStatusClasses {
-  switch (status) {
-    case "draft":
-      return {
-        nodeBorder: "border-zinc-500/70",
-        statusPill: "border-zinc-400/40 bg-zinc-500/15 text-zinc-200",
-        accent: "shadow-[0_0_24px_rgba(113,113,122,0.14)]",
-      };
-    case "ready":
-      return {
-        nodeBorder: "border-yellow-300/80",
-        statusPill: "border-yellow-300/50 bg-yellow-300/15 text-yellow-100",
-        accent: "shadow-[0_0_26px_rgba(250,204,21,0.18)]",
-      };
-    case "live":
-      return {
-        nodeBorder: "border-emerald-400/80",
-        statusPill: "border-emerald-400/50 bg-emerald-400/15 text-emerald-100",
-        accent: "shadow-[0_0_26px_rgba(52,211,153,0.18)]",
-      };
-    case "complete":
-      return {
-        nodeBorder: "border-red-400/75",
-        statusPill: "border-red-400/50 bg-red-500/15 text-red-100",
-        accent: "shadow-[0_0_24px_rgba(248,113,113,0.14)]",
-      };
-  }
 }
 
 export function getNextAvailableSlot(
@@ -415,6 +385,7 @@ export default function TournamentControlRoom() {
   });
   const [dialogState, setDialogState] = useState<DialogState>(null);
   const [formName, setFormName] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<
     number | null
   >(null);
@@ -479,6 +450,15 @@ export default function TournamentControlRoom() {
     onSuccess: invalidate,
     onError: (error: { message: string }) => toast.error(error.message),
   };
+  const renameTournament = controlApi.renameTournament.useMutation({
+    onSuccess: () => {
+      setDialogState(null);
+      setFormError(null);
+      invalidate();
+      toast.success("Tournament name updated");
+    },
+    onError: (error: { message: string }) => setFormError(error.message),
+  });
   const createTeam = controlApi.createTeam.useMutation(mutationOptions);
   const createCashout =
     controlApi.createCashoutLobby.useMutation(mutationOptions);
@@ -503,6 +483,14 @@ export default function TournamentControlRoom() {
   const removeTeam = controlApi.removeTeam.useMutation(mutationOptions);
   const removeAssignedTeams =
     controlApi.removeAssignedTeams.useMutation(mutationOptions);
+  const deleteTeam = controlApi.deleteTeam.useMutation({
+    onSuccess: () => {
+      setDialogState(null);
+      invalidate();
+      toast.success("Team deleted");
+    },
+    onError: (error: { message: string }) => toast.error(error.message),
+  });
   const deleteGame = controlApi.deleteGame.useMutation(mutationOptions);
   const clearTournamentConnections =
     controlApi.clearTournamentConnections.useMutation(mutationOptions);
@@ -1406,9 +1394,26 @@ export default function TournamentControlRoom() {
             <p className="font-mono text-xs uppercase tracking-[0.35em] text-neon-gold">
               MTC Discord TCR
             </p>
-            <h1 className="mt-2 font-mono text-3xl font-black uppercase">
-              {query.data.tournament.name}
-            </h1>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <h1 className="font-mono text-3xl font-black uppercase">
+                {query.data.tournament.name}
+              </h1>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-neon-gold/40 text-neon-gold hover:bg-neon-gold/10"
+                onClick={() => {
+                  setFormName(query.data.tournament.name);
+                  setFormError(null);
+                  setDialogState({
+                    type: "rename-tournament",
+                    currentValue: query.data.tournament.name,
+                  });
+                }}
+              >
+                Edit Name
+              </Button>
+            </div>
             <p className="text-sm text-white/60">
               {query.data.tournament.eventStatus} ·{" "}
               {query.data.tournament.currentStage}
@@ -1512,6 +1517,14 @@ export default function TournamentControlRoom() {
                         ? () => createClaimLink.mutate({ teamId: team.id })
                         : undefined
                     }
+                    onDelete={() =>
+                      setDialogState({
+                        type: "delete-team",
+                        teamId: team.id,
+                        teamName: team.name,
+                      })
+                    }
+                    deleteDisabled={deleteTeam.isPending}
                   />
                 ))
               )}
@@ -1715,7 +1728,7 @@ export default function TournamentControlRoom() {
                 <div className="pointer-events-none sticky left-3 top-0 z-[65] h-0 w-0 sm:left-4">
                   <div
                     data-no-canvas-pan="true"
-                    className="pointer-events-auto flex w-20 flex-col items-center overflow-hidden rounded-xl sm:w-24 border border-[#FFD700]/35 bg-zinc-950/95 font-mono text-white shadow-[0_0_24px_rgba(255,215,0,0.14)] backdrop-blur"
+                    className="pointer-events-auto flex w-16 flex-col items-center overflow-hidden rounded-xl sm:w-20 border border-[#FFD700]/35 bg-zinc-950/95 font-mono text-white shadow-[0_0_24px_rgba(255,215,0,0.14)] backdrop-blur"
                     style={{ transform: `translateY(${zoomRailY}px)` }}
                     onContextMenu={event => event.stopPropagation()}
                   >
@@ -2835,6 +2848,7 @@ export default function TournamentControlRoom() {
       <Dialog
         open={
           dialogState?.type === "create-team" ||
+          dialogState?.type === "rename-tournament" ||
           dialogState?.type === "rename" ||
           dialogState?.type === "lobby" ||
           dialogState?.type === "broadcast"
@@ -2846,7 +2860,9 @@ export default function TournamentControlRoom() {
             <DialogTitle>
               {dialogState?.type === "create-team"
                 ? "Create Team"
-                : dialogState?.type === "rename"
+                : dialogState?.type === "rename-tournament"
+                  ? "Edit Tournament Name"
+                  : dialogState?.type === "rename"
                   ? "Rename Game"
                   : dialogState?.type === "broadcast"
                     ? "Set Broadcast Link"
@@ -2860,14 +2876,17 @@ export default function TournamentControlRoom() {
                   : "Changes persist immediately to the control room."}
             </DialogDescription>
           </DialogHeader>
+          {formError && dialogState?.type === "rename-tournament" && <p className="text-sm text-red-200">{formError}</p>}
           <div className="space-y-3">
             <Input
               value={formName}
-              onChange={event => setFormName(event.target.value)}
+              onChange={event => { setFormName(event.target.value); setFormError(null); }}
               placeholder={
                 dialogState?.type === "create-team"
                   ? "Team name"
-                  : dialogState?.type === "rename"
+                  : dialogState?.type === "rename-tournament"
+                    ? "Tournament name"
+                    : dialogState?.type === "rename"
                     ? "Game label"
                     : dialogState?.type === "broadcast"
                       ? "https://twitch.tv/channel"
@@ -2877,7 +2896,12 @@ export default function TournamentControlRoom() {
           </div>
           <DialogFooter>
             <Button
+              disabled={dialogState?.type === "rename-tournament" ? formName.trim().length < 2 || renameTournament.isPending || formName.trim() === dialogState.currentValue : undefined}
               onClick={() => {
+                if (dialogState?.type === "rename-tournament") {
+                  renameTournament.mutate({ tournamentId, name: formName });
+                  return;
+                }
                 if (dialogState?.type === "create-team") {
                   createTeam.mutate({ tournamentId, name: formName, frp: 0 });
                 }
@@ -2902,7 +2926,7 @@ export default function TournamentControlRoom() {
                 setDialogState(null);
               }}
             >
-              Save
+              {dialogState?.type === "rename-tournament" && renameTournament.isPending ? "Saving…" : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2935,6 +2959,12 @@ export default function TournamentControlRoom() {
               {dialogState?.type === "delete" ? dialogState.label : "lobby"}
             </AlertDialogAction>
           </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={dialogState?.type === "delete-team"} onOpenChange={open => !open && setDialogState(null)}>
+        <AlertDialogContent className="border-[#FFD700]/35 bg-black text-white shadow-[0_0_30px_rgba(255,215,0,0.18)]">
+          <AlertDialogHeader><AlertDialogTitle className="font-mono text-[#FFD700]">Delete {dialogState?.type === "delete-team" ? dialogState.teamName : "team"}?</AlertDialogTitle><AlertDialogDescription className="text-white/65">This permanently deletes the team and clears its bracket assignments, claim links, and lobby-code delivery records. Tournament submissions for its managed team are preserved.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel className="border-white/20 bg-white/10 text-white hover:bg-white/15">Cancel</AlertDialogCancel><AlertDialogAction disabled={deleteTeam.isPending} className="bg-red-600 font-mono font-black uppercase text-white hover:bg-red-500" onClick={() => { if (dialogState?.type === "delete-team") deleteTeam.mutate({ tournamentId, teamId: dialogState.teamId }); }}>{deleteTeam.isPending ? "Deleting…" : "Delete Team"}</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
       <AlertDialog
@@ -3231,6 +3261,8 @@ function TeamCard({
   onSelect,
   onCyclePlacement,
   onCreateClaimLink,
+  onDelete,
+  deleteDisabled,
 }: {
   team: ControlTeamView;
   fromGameId?: number;
@@ -3241,6 +3273,8 @@ function TeamCard({
   onSelect?: () => void;
   onCyclePlacement?: () => void;
   onCreateClaimLink?: () => void;
+  onDelete?: () => void;
+  deleteDisabled?: boolean;
 }) {
   const lastTouchTapRef = useRef<{ time: number; x: number; y: number } | null>(
     null
@@ -3324,6 +3358,16 @@ function TeamCard({
           </span>
         ) : null}
       </div>
+      {onDelete && (
+        <button
+          type="button"
+          className="mt-2 w-full rounded border border-red-400/30 bg-red-950/30 px-2 py-1 font-mono text-[10px] uppercase text-red-200 transition hover:border-red-300 hover:bg-red-900/60 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={deleteDisabled}
+          onClick={event => { event.stopPropagation(); onDelete(); }}
+        >
+          Delete Team
+        </button>
+      )}
     </div>
   );
 }
