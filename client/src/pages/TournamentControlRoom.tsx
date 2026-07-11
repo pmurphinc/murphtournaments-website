@@ -2626,7 +2626,8 @@ export default function TournamentControlRoom() {
         open={
           dialogState?.type === "create-team" ||
           dialogState?.type === "rename" ||
-          dialogState?.type === "lobby"
+          dialogState?.type === "lobby" ||
+          dialogState?.type === "broadcast"
         }
         onOpenChange={open => !open && setDialogState(null)}
       >
