@@ -264,6 +264,19 @@ export function shouldStartCanvasPan(target: EventTarget | null) {
   return !Boolean(target.closest(canvasPanBlockedSelector));
 }
 
+export function hasPointerExceededDragThreshold(
+  start: Pick<PointerEvent, "clientX" | "clientY">,
+  current: Pick<PointerEvent, "clientX" | "clientY">,
+  threshold = 4
+) {
+  return (
+    Math.hypot(
+      current.clientX - start.clientX,
+      current.clientY - start.clientY
+    ) > threshold
+  );
+}
+
 export function getPointerDistance(
   first: Pick<PointerEvent, "clientX" | "clientY"> | CanvasPoint,
   second: Pick<PointerEvent, "clientX" | "clientY"> | CanvasPoint

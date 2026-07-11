@@ -34,7 +34,9 @@ describe("Discord avatar header control", () => {
   });
 
   it("only shows the Tournament Control menu link to admin users", () => {
-    expect(source).toContain('const canSeeTournamentControl = user?.role === "admin";');
+    expect(source).toContain(
+      'const canSeeTournamentControl = user?.role === "admin";'
+    );
     expect(source).toContain("{canSeeTournamentControl && (");
   });
 });
@@ -93,8 +95,32 @@ describe("Navigation active state and dropdown behavior", () => {
     expect(source).toContain("block w-full px-4 py-3 text-sm font-mono");
   });
 
+  it("closes custom navigation menus from an outside pointer interaction", () => {
+    expect(source).toContain(
+      "const navRef = useRef<HTMLElement | null>(null);"
+    );
+    expect(source).toContain("const closeCustomMenus = () => {");
+    expect(source).toContain(
+      'document.addEventListener("pointerdown", handleDocumentPointerDown);'
+    );
+    expect(source).toContain(
+      'document.removeEventListener("pointerdown", handleDocumentPointerDown);'
+    );
+    expect(source).toContain("navRef.current?.contains(target)");
+    expect(source).toContain("return;");
+    expect(source).toContain("setIsOpen(false);");
+    expect(source).toContain("setHistoryOpen(false);");
+    expect(source).toContain("setTournamentOpen(false);");
+  });
+
+  it("closes desktop submenu selections without affecting the Radix account menu", () => {
+    expect(source).toContain("onClick={closeCustomMenus}");
+    expect(source).toContain("<DropdownMenu>");
+    expect(source).toContain("<DropdownMenuTrigger asChild>");
+  });
+
   it("uses the mobile close handler for direct links and submenu selections", () => {
-    expect(source).toContain("const closeMobileMenu = () => {");
+    expect(source).toContain("const closeMobileMenu = closeCustomMenus;");
     expect(source).toContain("setHistoryOpen(false);");
     expect(source).toContain("setTournamentOpen(false);");
     expect(source).toContain("onClick={closeMobileMenu}");
