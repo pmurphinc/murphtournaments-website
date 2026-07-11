@@ -196,12 +196,18 @@ export default function Navigation() {
           >
             <Link href="/teams">Team Management</Link>
           </DropdownMenuItem>
+          <DropdownMenuItem
+            asChild
+            className="cursor-pointer font-mono text-white focus:bg-yellow-400/15 focus:text-yellow-200"
+          >
+            <Link href="/TCR">TCR</Link>
+          </DropdownMenuItem>
           {canSeeTournamentControl && (
             <DropdownMenuItem
               asChild
               className="cursor-pointer font-mono text-white focus:bg-yellow-400/15 focus:text-yellow-200"
             >
-              <Link href="/admin/tournaments/control">Tournament Control</Link>
+              <Link href="/admin/tournaments/control">MTC Discord TCR</Link>
             </DropdownMenuItem>
           )}
           <DropdownMenuSeparator className="bg-yellow-400/25" />

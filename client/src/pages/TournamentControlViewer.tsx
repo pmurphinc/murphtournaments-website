@@ -143,7 +143,7 @@ export default function TournamentControlViewer() {
   const [nodeDrag, setNodeDrag] = useState<NodeDragState | null>(null);
   const query = trpc.tournamentControl.getViewer.useQuery(
     { token: params.viewerToken ?? "" },
-    { enabled: Boolean(params.viewerToken), retry: false }
+    { enabled: Boolean(params.viewerToken), retry: false, refetchInterval: 5000 }
   );
   const games = (query.data?.games ?? []) as ViewerGame[];
   const teamsById = useMemo(

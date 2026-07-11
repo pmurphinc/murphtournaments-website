@@ -192,6 +192,10 @@ export const tournaments = mysqlTable("tournaments", {
   ),
   eventNote: text("eventNote"),
   registrationOpen: int("registrationOpen").default(0).notNull(),
+  visibility: mysqlEnum("visibility", ["private", "public"]).default("private").notNull(),
+  publicSlug: varchar("publicSlug", { length: 120 }),
+  publishedAt: timestamp("publishedAt"),
+  maxTeams: int("maxTeams"),
   ownerUserId: int("ownerUserId").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -199,6 +203,26 @@ export const tournaments = mysqlTable("tournaments", {
 
 export type Tournament = typeof tournaments.$inferSelect;
 export type InsertTournament = typeof tournaments.$inferInsert;
+
+export const tournamentPrivateInviteLinks = mysqlTable(
+  "tournament_private_invite_links",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    tournamentId: int("tournamentId").notNull().references(() => tournaments.id, { onDelete: "cascade" }),
+    createdByUserId: int("createdByUserId").notNull().references(() => users.id),
+    token: varchar("token", { length: 128 }).notNull(),
+    status: mysqlEnum("status", ["active", "revoked"]).default("active").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    index("tournament_private_invite_links_tournament_status_idx").on(table.tournamentId, table.status),
+    uniqueIndex("tournament_private_invite_links_token_unique").on(table.token),
+  ]
+);
+
+export type TournamentPrivateInviteLink = typeof tournamentPrivateInviteLinks.$inferSelect;
+
 
 // Teams in a tournament
 export const teams = mysqlTable("teams", {
@@ -391,6 +415,26 @@ export type InsertTournamentGame = typeof tournamentGames.$inferInsert;
 export type TournamentGameAssignment = typeof tournamentGameAssignments.$inferSelect;
 export type InsertTournamentGameAssignment = typeof tournamentGameAssignments.$inferInsert;
 export type TournamentTeamClaimLink = typeof tournamentTeamClaimLinks.$inferSelect;
+
+export const tournamentLobbyCodeDeliveries = mysqlTable(
+  "tournament_lobby_code_deliveries",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    gameId: int("gameId").notNull().references(() => tournamentGames.id, { onDelete: "cascade" }),
+    teamId: int("teamId").notNull().references(() => teams.id, { onDelete: "cascade" }),
+    releasedByUserId: int("releasedByUserId").notNull().references(() => users.id),
+    status: mysqlEnum("status", ["available", "revoked"]).default("available").notNull(),
+    lastDiscordAttemptAt: timestamp("lastDiscordAttemptAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    index("tournament_lobby_code_deliveries_team_status_idx").on(table.teamId, table.status),
+    uniqueIndex("tournament_lobby_code_deliveries_game_team_unique").on(table.gameId, table.teamId),
+  ]
+);
+
+export type TournamentLobbyCodeDelivery = typeof tournamentLobbyCodeDeliveries.$inferSelect;
 
 // Tournament history archive
 export const tournamentHistory = mysqlTable("tournament_history", {

@@ -86,7 +86,7 @@ export default function TournamentControlIndex() {
             ? "Discord role configuration error"
             : query.error.message.includes("Unable to verify")
               ? "Discord service verification failed"
-              : "Tournament Control role required"
+              : "MTC Discord TCR role required"
         }
         description={query.error.message}
       />
@@ -105,7 +105,7 @@ export default function TournamentControlIndex() {
               Admin
             </p>
             <h1 className="mt-2 font-mono text-4xl font-black uppercase">
-              Tournament Control Rooms
+              MTC Discord TCR
             </h1>
             <p className="mt-3 max-w-2xl text-sm text-white/60">
               Create and enter Discord-protected control rooms for live
