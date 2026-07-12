@@ -24,8 +24,12 @@ describe("Tournament Control Room guide and zoom rail UI", () => {
     expect(adminSource).toContain("Add a team or lobby");
     expect(adminSource).toContain("Select connection, press Del");
     expect(adminSource).toContain("Remove connection");
-    expect(adminSource).toContain('type ZoomRailActivePanel = "options" | "rounds" | "controls" | null');
-    expect(adminSource).toContain('const [zoomRailActivePanel, setZoomRailActivePanel]');
+    expect(adminSource).toContain(
+      'type ZoomRailActivePanel = "options" | "rounds" | "controls" | null'
+    );
+    expect(adminSource).toContain(
+      "const [zoomRailActivePanel, setZoomRailActivePanel]"
+    );
     expect(adminSource).toContain('zoomRailActivePanel === "controls"');
   });
 
@@ -56,16 +60,22 @@ describe("Tournament Control Room guide and zoom rail UI", () => {
     expect(adminSource).toContain('panel === "controls" ? null : "controls"');
   });
 
-
   it("places Rounds and PC Controls after the W/L legend and keeps the selected count badge", () => {
-    const legendIndex = adminSource.indexOf('aria-label="Admin connector legend"');
+    const legendIndex = adminSource.indexOf(
+      'aria-label="Admin connector legend"'
+    );
     const roundsIndex = adminSource.indexOf('title="Rounds"', legendIndex);
-    const controlsIndex = adminSource.indexOf('title="PC Controls"', roundsIndex);
+    const controlsIndex = adminSource.indexOf(
+      'title="PC Controls"',
+      roundsIndex
+    );
     expect(legendIndex).toBeGreaterThan(-1);
     expect(roundsIndex).toBeGreaterThan(legendIndex);
     expect(controlsIndex).toBeGreaterThan(roundsIndex);
-    expect(adminSource).toContain('selectedRoundGameIds.size > 0');
-    expect(adminSource).toContain('Rounds panel, ${selectedRoundGameIds.size} games selected');
+    expect(adminSource).toContain("selectedRoundGameIds.size > 0");
+    expect(adminSource).toContain(
+      "Rounds panel, ${selectedRoundGameIds.size} games selected"
+    );
   });
 
   it("removes obsolete independent Rounds rail and draggable/minimizable PC Controls window", () => {
@@ -77,7 +87,9 @@ describe("Tournament Control Room guide and zoom rail UI", () => {
     expect(adminSource).not.toContain("controlKeyMinimized");
     expect(adminSource).not.toContain("startControlKeyDrag");
     expect(adminSource).not.toContain("Locked — click Unlock to reposition");
-    expect(adminSource).not.toContain("Unlocked — drag this header to reposition");
+    expect(adminSource).not.toContain(
+      "Unlocked — drag this header to reposition"
+    );
   });
 
   it("keeps existing keyboard shortcuts alongside WASD movement handling", () => {
@@ -191,5 +203,67 @@ describe("Tournament Control Room staff invite permissions and security", () => 
     expect(serverSource).toContain("path: null");
     expect(serverSource).toContain("hasActiveInvite: true");
     expect(serverSource).toContain("const STAFF_INVITE_TTL_DAYS = 7");
+  });
+});
+
+const adminIndexSource = readFileSync(
+  new URL("./TournamentControlIndex.tsx", import.meta.url),
+  "utf8"
+);
+const personalIndexSource = readFileSync(
+  new URL("./PersonalTcrIndex.tsx", import.meta.url),
+  "utf8"
+);
+
+describe("Tournament Control Room round lobby selection", () => {
+  it("removes the obsolete persistent round selection mode and button text", () => {
+    expect(adminSource).not.toContain("selectionMode");
+    expect(adminSource).not.toContain("setSelectionMode");
+    expect(adminSource).not.toContain("Select Rounds");
+    expect(adminSource).not.toContain("Selection On");
+  });
+
+  it("toggles round lobby selection directly with Control or Shift click", () => {
+    expect(adminSource).toContain("event.ctrlKey || event.shiftKey");
+    expect(adminSource).toContain(
+      "if (next.has(game.id)) next.delete(game.id);"
+    );
+    expect(adminSource).toContain("else next.add(game.id);");
+  });
+
+  it("clears selected round lobbies on unmodified background clicks without clearing after canvas drags", () => {
+    expect(adminSource).toContain("const isBackgroundClick =");
+    expect(adminSource).toContain("!panStart.dragged");
+    expect(adminSource).toContain("!event.ctrlKey");
+    expect(adminSource).toContain("!event.shiftKey");
+    expect(adminSource).toContain("setSelectedRoundGameIds(new Set())");
+    expect(adminSource).toContain("panStart.dragged = true");
+    expect(adminSource).toContain("hasPointerExceededDragThreshold(");
+  });
+
+  it("keeps selected count and all round-management actions", () => {
+    expect(adminSource).toContain("selectedRoundGameIds.size} selected");
+    expect(adminSource).toContain("Create Round");
+    expect(adminSource).toContain("Rename Round");
+    expect(adminSource).toContain("Add Selected");
+    expect(adminSource).toContain("Remove From Round");
+    expect(adminSource).toContain("Clear Selection");
+  });
+
+  it("documents the new round-selection controls in the guide and Rounds panel", () => {
+    expect(adminSource).toContain("Ctrl/Shift + click lobby");
+    expect(adminSource).toContain("Select lobbies for rounds");
+    expect(adminSource).toContain("Click empty board");
+    expect(adminSource).toContain("Clear lobby selection");
+  });
+});
+
+describe("Tournament Control Room alpha badge", () => {
+  it("appears on personal index, admin index, and active control room headings", () => {
+    for (const source of [personalIndexSource, adminIndexSource, adminSource]) {
+      expect(source).toContain("ALPHA");
+      expect(source).toContain("Tournament Control Room is a work in progress");
+      expect(source).toContain("border-[#FFD700]/60");
+    }
   });
 });

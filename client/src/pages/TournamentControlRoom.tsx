@@ -190,6 +190,15 @@ type DialogState =
 const statuses: GameStatus[] = ["draft", "ready", "live", "complete"];
 const activeStatuses = new Set<GameStatus>(["draft", "ready", "live"]);
 
+const alphaBadge = (
+  <span
+    className="inline-flex rounded-full border border-[#FFD700]/60 bg-[#FFD700]/10 px-2.5 py-1 align-middle font-mono text-xs font-black uppercase tracking-[0.22em] text-[#FFD700] shadow-[0_0_14px_rgba(255,215,0,0.18)]"
+    title="Tournament Control Room is a work in progress"
+  >
+    ALPHA
+  </span>
+);
+
 const controlRoomOverlayStorageKey = "murph:tournament-control-room:overlays";
 const defaultZoomRailY = 160;
 const keyboardPanSpeedPixelsPerSecond = 520;
@@ -419,9 +428,9 @@ export default function TournamentControlRoom() {
     null
   );
   const zoomRailDragRef = useRef<ZoomRailDragStart | null>(null);
-  const canvasPanRef = useRef<(CanvasPanStart & { pointerId: number }) | null>(
-    null
-  );
+  const canvasPanRef = useRef<
+    (CanvasPanStart & { pointerId: number; dragged: boolean }) | null
+  >(null);
   const touchPointersRef = useRef<Map<number, PointerEvent>>(new Map());
   const pinchStartRef = useRef<PinchZoomStart | null>(null);
   const isPinchingRef = useRef(false);
@@ -434,7 +443,6 @@ export default function TournamentControlRoom() {
   const [measuredNodeHeights, setMeasuredNodeHeights] = useState<
     Map<number, number>
   >(() => new Map());
-  const [selectionMode, setSelectionMode] = useState(false);
   const [selectedRoundGameIds, setSelectedRoundGameIds] = useState<Set<number>>(
     () => new Set()
   );
@@ -1460,6 +1468,7 @@ export default function TournamentControlRoom() {
               <h1 className="font-mono text-3xl font-black uppercase">
                 {query.data.tournament.name}
               </h1>
+              {alphaBadge}
               <Button
                 size="sm"
                 variant="outline"
@@ -1799,6 +1808,7 @@ export default function TournamentControlRoom() {
                     clientY: event.clientY,
                     scrollLeft: element.scrollLeft,
                     scrollTop: element.scrollTop,
+                    dragged: false,
                   };
                   if (event.currentTarget.setPointerCapture) {
                     event.currentTarget.setPointerCapture(event.pointerId);
@@ -1860,6 +1870,11 @@ export default function TournamentControlRoom() {
                   const element = canvasRef.current;
                   if (!element) return;
                   event.preventDefault();
+                  if (
+                    hasPointerExceededDragThreshold(panStart, event.nativeEvent)
+                  ) {
+                    panStart.dragged = true;
+                  }
                   const nextScroll = getCanvasPanScroll(
                     panStart,
                     event.clientX,
@@ -1876,9 +1891,21 @@ export default function TournamentControlRoom() {
                     if (touchPointersRef.current.size === 0)
                       isPinchingRef.current = false;
                   }
-                  if (canvasPanRef.current?.pointerId === event.pointerId) {
+                  const panStart = canvasPanRef.current;
+                  if (panStart?.pointerId === event.pointerId) {
+                    const isBackgroundClick =
+                      !panStart.dragged &&
+                      !event.ctrlKey &&
+                      !event.shiftKey &&
+                      !hasPointerExceededDragThreshold(
+                        panStart,
+                        event.nativeEvent
+                      );
                     canvasPanRef.current = null;
                     setIsPanning(false);
+                    if (isBackgroundClick) {
+                      setSelectedRoundGameIds(new Set());
+                    }
                   }
                   if (
                     event.currentTarget.hasPointerCapture?.(event.pointerId)
@@ -2050,7 +2077,9 @@ export default function TournamentControlRoom() {
                         );
                       }}
                     >
-                      <span className="text-[9px] font-black uppercase leading-none">Rounds</span>
+                      <span className="text-[9px] font-black uppercase leading-none">
+                        Rounds
+                      </span>
                       {selectedRoundGameIds.size > 0 && (
                         <span className="absolute right-1 top-1 rounded bg-[#FFD700] px-1.5 py-0.5 text-[10px] font-black text-black">
                           {selectedRoundGameIds.size}
@@ -2073,8 +2102,12 @@ export default function TournamentControlRoom() {
                         );
                       }}
                     >
-                      <span className="text-[9px] font-black uppercase leading-none">PC</span>
-                      <span className="text-[9px] font-black uppercase leading-none">Controls</span>
+                      <span className="text-[9px] font-black uppercase leading-none">
+                        PC
+                      </span>
+                      <span className="text-[9px] font-black uppercase leading-none">
+                        Controls
+                      </span>
                     </button>
 
                     {zoomRailActivePanel !== null && (
@@ -2106,41 +2139,234 @@ export default function TournamentControlRoom() {
                         </div>
                         {zoomRailActivePanel === "options" && (
                           <div className="flex flex-col gap-2 text-xs">
-                            <button className="flex items-center justify-between rounded border border-white/10 bg-white/5 px-3 py-2 text-left hover:bg-[#FFD700]/10" onClick={() => setSnapWindowsToGrid(current => !current)}>
+                            <button
+                              className="flex items-center justify-between rounded border border-white/10 bg-white/5 px-3 py-2 text-left hover:bg-[#FFD700]/10"
+                              onClick={() =>
+                                setSnapWindowsToGrid(current => !current)
+                              }
+                            >
                               <span>Snap to Grid</span>
-                              <Switch checked={snapWindowsToGrid} onCheckedChange={setSnapWindowsToGrid} aria-label="Toggle snap to grid" className="border-[#FFD700]/40 bg-zinc-800 data-[state=checked]:bg-[#FFD700]" />
+                              <Switch
+                                checked={snapWindowsToGrid}
+                                onCheckedChange={setSnapWindowsToGrid}
+                                aria-label="Toggle snap to grid"
+                                className="border-[#FFD700]/40 bg-zinc-800 data-[state=checked]:bg-[#FFD700]"
+                              />
                             </button>
-                            <button className="rounded border border-red-400/25 bg-red-950/30 px-3 py-2 text-left font-black text-red-200 hover:bg-red-950/60" onClick={() => setDialogState({ type: "bulk-delete-connections" })}>Delete All Connections</button>
-                            <button className="rounded border border-red-400/25 bg-red-950/30 px-3 py-2 text-left font-black text-red-200 hover:bg-red-950/60" onClick={() => setDialogState({ type: "bulk-return-teams" })}>Return All Teams to Available</button>
-                            <button className="rounded border border-red-400/25 bg-red-950/30 px-3 py-2 text-left font-black text-red-200 hover:bg-red-950/60" onClick={() => setDialogState({ type: "bulk-wipe-canvas" })}>Wipe Canvas</button>
+                            <button
+                              className="rounded border border-red-400/25 bg-red-950/30 px-3 py-2 text-left font-black text-red-200 hover:bg-red-950/60"
+                              onClick={() =>
+                                setDialogState({
+                                  type: "bulk-delete-connections",
+                                })
+                              }
+                            >
+                              Delete All Connections
+                            </button>
+                            <button
+                              className="rounded border border-red-400/25 bg-red-950/30 px-3 py-2 text-left font-black text-red-200 hover:bg-red-950/60"
+                              onClick={() =>
+                                setDialogState({ type: "bulk-return-teams" })
+                              }
+                            >
+                              Return All Teams to Available
+                            </button>
+                            <button
+                              className="rounded border border-red-400/25 bg-red-950/30 px-3 py-2 text-left font-black text-red-200 hover:bg-red-950/60"
+                              onClick={() =>
+                                setDialogState({ type: "bulk-wipe-canvas" })
+                              }
+                            >
+                              Wipe Canvas
+                            </button>
                           </div>
                         )}
                         {zoomRailActivePanel === "rounds" && (
                           <div className="flex flex-col gap-2 text-[10px] uppercase">
-                            <Button size="sm" variant="secondary" className="h-8 justify-start px-2 text-[10px]" title="Toggle round game selection" onClick={() => setSelectionMode(value => !value)}>{selectionMode ? "Selection On" : "Select Rounds"}</Button>
-                            <span className="rounded border border-white/10 bg-white/5 px-2 py-1 text-white/55">{selectedRoundGameIds.size} selected</span>
-                            <Button size="sm" className="h-8 justify-start bg-[#FFD700] px-2 text-[10px] font-black text-black hover:bg-yellow-300" title="Create a round from selected games" disabled={selectedRoundGameIds.size < 2} onClick={() => openDialog({ type: "round", mode: "create" }, "Round")}>Create Round</Button>
-                            <Button size="sm" variant="secondary" className="h-8 justify-start px-2 text-[10px]" title="Rename the selected round" disabled={selectedRoundGameIds.size === 0 || !games.find(game => selectedRoundGameIds.has(game.id))?.roundGroupId} onClick={() => { const game = games.find(item => selectedRoundGameIds.has(item.id) && item.roundGroupId); if (game?.roundGroupId) openDialog({ type: "round", mode: "rename", roundGroupId: game.roundGroupId, currentValue: game.roundLabel ?? "Round" }, game.roundLabel ?? "Round"); }}>Rename Round</Button>
-                            <Button size="sm" variant="secondary" className="h-8 justify-start px-2 text-[10px]" title="Add selected games to their selected round" disabled={selectedRoundGameIds.size === 0 || !games.find(game => selectedRoundGameIds.has(game.id))?.roundGroupId} onClick={() => { const roundGame = games.find(game => selectedRoundGameIds.has(game.id) && game.roundGroupId); if (!roundGame?.roundGroupId) return; updateRoundGroup.mutate({ tournamentId, gameIds: Array.from(selectedRoundGameIds), mode: "add", roundGroupId: roundGame.roundGroupId, label: roundGame.roundLabel ?? "Round" }); }}>Add Selected</Button>
-                            <Button size="sm" variant="secondary" className="h-8 justify-start px-2 text-[10px]" title="Remove selected games from their round" disabled={selectedRoundGameIds.size === 0} onClick={() => updateRoundGroup.mutate({ tournamentId, gameIds: Array.from(selectedRoundGameIds), mode: "remove" })}>Remove From Round</Button>
-                            <Button size="sm" variant="ghost" className="h-8 justify-start px-2 text-[10px]" title="Clear round selection" onClick={() => setSelectedRoundGameIds(new Set())}>Clear Selection</Button>
+                            <p className="rounded border border-[#FFD700]/30 bg-[#FFD700]/10 px-2 py-1 text-white/70 normal-case">
+                              Ctrl/Shift + click lobby to select lobbies for
+                              rounds. Click empty board to clear lobby
+                              selection.
+                            </p>
+                            <span className="rounded border border-white/10 bg-white/5 px-2 py-1 text-white/55">
+                              {selectedRoundGameIds.size} selected
+                            </span>
+                            <Button
+                              size="sm"
+                              className="h-8 justify-start bg-[#FFD700] px-2 text-[10px] font-black text-black hover:bg-yellow-300"
+                              title="Create a round from selected games"
+                              disabled={selectedRoundGameIds.size < 2}
+                              onClick={() =>
+                                openDialog(
+                                  { type: "round", mode: "create" },
+                                  "Round"
+                                )
+                              }
+                            >
+                              Create Round
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              className="h-8 justify-start px-2 text-[10px]"
+                              title="Rename the selected round"
+                              disabled={
+                                selectedRoundGameIds.size === 0 ||
+                                !games.find(game =>
+                                  selectedRoundGameIds.has(game.id)
+                                )?.roundGroupId
+                              }
+                              onClick={() => {
+                                const game = games.find(
+                                  item =>
+                                    selectedRoundGameIds.has(item.id) &&
+                                    item.roundGroupId
+                                );
+                                if (game?.roundGroupId)
+                                  openDialog(
+                                    {
+                                      type: "round",
+                                      mode: "rename",
+                                      roundGroupId: game.roundGroupId,
+                                      currentValue: game.roundLabel ?? "Round",
+                                    },
+                                    game.roundLabel ?? "Round"
+                                  );
+                              }}
+                            >
+                              Rename Round
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              className="h-8 justify-start px-2 text-[10px]"
+                              title="Add selected games to their selected round"
+                              disabled={
+                                selectedRoundGameIds.size === 0 ||
+                                !games.find(game =>
+                                  selectedRoundGameIds.has(game.id)
+                                )?.roundGroupId
+                              }
+                              onClick={() => {
+                                const roundGame = games.find(
+                                  game =>
+                                    selectedRoundGameIds.has(game.id) &&
+                                    game.roundGroupId
+                                );
+                                if (!roundGame?.roundGroupId) return;
+                                updateRoundGroup.mutate({
+                                  tournamentId,
+                                  gameIds: Array.from(selectedRoundGameIds),
+                                  mode: "add",
+                                  roundGroupId: roundGame.roundGroupId,
+                                  label: roundGame.roundLabel ?? "Round",
+                                });
+                              }}
+                            >
+                              Add Selected
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              className="h-8 justify-start px-2 text-[10px]"
+                              title="Remove selected games from their round"
+                              disabled={selectedRoundGameIds.size === 0}
+                              onClick={() =>
+                                updateRoundGroup.mutate({
+                                  tournamentId,
+                                  gameIds: Array.from(selectedRoundGameIds),
+                                  mode: "remove",
+                                })
+                              }
+                            >
+                              Remove From Round
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 justify-start px-2 text-[10px]"
+                              title="Clear round selection"
+                              onClick={() => setSelectedRoundGameIds(new Set())}
+                            >
+                              Clear Selection
+                            </Button>
                           </div>
                         )}
                         {zoomRailActivePanel === "controls" && (
                           <div className="grid gap-2 text-[11px] text-white/75 sm:grid-cols-2">
-                            {([
-                              ["bg-cyan-400/15 text-cyan-100 border-cyan-300/30", "Drag empty board", "Pan around the bracket"],
-                              ["bg-fuchsia-400/15 text-fuchsia-100 border-fuchsia-300/30", "+ / − or Shift + wheel", "Zoom in and out"],
-                              ["bg-blue-400/15 text-blue-100 border-blue-300/30", "W A S D", "Move around the canvas"],
-                              ["bg-emerald-400/15 text-emerald-100 border-emerald-300/30", "Right-click empty board", "Add a team or lobby"],
-                              ["bg-orange-400/15 text-orange-100 border-orange-300/30", "Drag lobby header", "Reposition a lobby"],
-                              ["bg-sky-400/15 text-sky-100 border-sky-300/30", "Drag a team card", "Place or move a team"],
-                              ["bg-lime-400/15 text-lime-100 border-lime-300/30", "Select team, press 1–4", "Set final placement"],
-                              ["bg-purple-400/15 text-purple-100 border-purple-300/30", "Mobile: double-tap team", "Cycle placement"],
-                              ["bg-yellow-300/15 text-yellow-100 border-yellow-200/40", "Drag W / L connector", "W — Winners · L — Losers"],
-                              ["bg-red-400/15 text-red-100 border-red-300/30", "Select connection, press Del", "Remove connection"],
-                            ] satisfies [string, string, ReactNode][]).map(([classes, action, detail]) => (
-                              <div key={action} className={`rounded border px-2.5 py-2 ${classes}`}><span className="block text-[10px] font-black uppercase tracking-wider">{action}</span><span className="text-white/65">{detail}</span></div>
+                            {(
+                              [
+                                [
+                                  "bg-cyan-400/15 text-cyan-100 border-cyan-300/30",
+                                  "Drag empty board",
+                                  "Pan around the bracket",
+                                ],
+                                [
+                                  "bg-fuchsia-400/15 text-fuchsia-100 border-fuchsia-300/30",
+                                  "+ / − or Shift + wheel",
+                                  "Zoom in and out",
+                                ],
+                                [
+                                  "bg-blue-400/15 text-blue-100 border-blue-300/30",
+                                  "W A S D",
+                                  "Move around the canvas",
+                                ],
+                                [
+                                  "bg-emerald-400/15 text-emerald-100 border-emerald-300/30",
+                                  "Right-click empty board",
+                                  "Add a team or lobby",
+                                ],
+                                [
+                                  "bg-orange-400/15 text-orange-100 border-orange-300/30",
+                                  "Drag lobby header",
+                                  "Reposition a lobby",
+                                ],
+                                [
+                                  "bg-amber-300/15 text-amber-100 border-amber-200/40",
+                                  "Ctrl/Shift + click lobby",
+                                  "Select lobbies for rounds",
+                                ],
+                                [
+                                  "bg-zinc-300/15 text-zinc-100 border-zinc-200/30",
+                                  "Click empty board",
+                                  "Clear lobby selection",
+                                ],
+                                [
+                                  "bg-sky-400/15 text-sky-100 border-sky-300/30",
+                                  "Drag a team card",
+                                  "Place or move a team",
+                                ],
+                                [
+                                  "bg-lime-400/15 text-lime-100 border-lime-300/30",
+                                  "Select team, press 1–4",
+                                  "Set final placement",
+                                ],
+                                [
+                                  "bg-purple-400/15 text-purple-100 border-purple-300/30",
+                                  "Mobile: double-tap team",
+                                  "Cycle placement",
+                                ],
+                                [
+                                  "bg-yellow-300/15 text-yellow-100 border-yellow-200/40",
+                                  "Drag W / L connector",
+                                  "W — Winners · L — Losers",
+                                ],
+                                [
+                                  "bg-red-400/15 text-red-100 border-red-300/30",
+                                  "Select connection, press Del",
+                                  "Remove connection",
+                                ],
+                              ] satisfies [string, string, ReactNode][]
+                            ).map(([classes, action, detail]) => (
+                              <div
+                                key={action}
+                                className={`rounded border px-2.5 py-2 ${classes}`}
+                              >
+                                <span className="block text-[10px] font-black uppercase tracking-wider">
+                                  {action}
+                                </span>
+                                <span className="text-white/65">{detail}</span>
+                              </div>
                             ))}
                           </div>
                         )}
@@ -2406,8 +2632,7 @@ export default function TournamentControlRoom() {
                                 setSelectedGameId(game.id);
                                 setSelectedConnectionId(null);
                                 setSelectedAssignmentId(null);
-                                if (selectionMode || event.shiftKey) {
-                                  setSelectionMode(true);
+                                if (event.ctrlKey || event.shiftKey) {
                                   setSelectedRoundGameIds(current => {
                                     const next = new Set(current);
                                     if (next.has(game.id)) next.delete(game.id);

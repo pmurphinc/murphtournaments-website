@@ -19,6 +19,15 @@ import { getSafeTournamentControlErrorMessage } from "@/lib/tcrError";
 const goldButtonClass =
   "border border-[#FFD700] bg-[#FFD700] px-5 font-mono font-black uppercase tracking-wider text-black shadow-[0_0_18px_rgba(255,215,0,0.28)] hover:bg-[#D4AF37] hover:text-black";
 
+const alphaBadge = (
+  <span
+    className="inline-flex rounded-full border border-[#FFD700]/60 bg-[#FFD700]/10 px-2.5 py-1 align-middle font-mono text-xs font-black uppercase tracking-[0.22em] text-[#FFD700] shadow-[0_0_14px_rgba(255,215,0,0.18)]"
+    title="Tournament Control Room is a work in progress"
+  >
+    ALPHA
+  </span>
+);
+
 type Visibility = "private" | "public";
 
 export default function PersonalTcrIndex() {
@@ -103,9 +112,12 @@ export default function PersonalTcrIndex() {
             <p className="font-mono text-xs uppercase tracking-[0.35em] text-neon-gold">
               Tournament Organizer
             </p>
-            <h1 className="mt-2 font-mono text-4xl font-black uppercase">
-              Tournament Control Rooms
-            </h1>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <h1 className="font-mono text-4xl font-black uppercase">
+                Tournament Control Rooms
+              </h1>
+              {alphaBadge}
+            </div>
             <p className="mt-3 max-w-2xl text-sm text-white/60">
               Create and manage your own tournaments with Discord sign-in.
             </p>
