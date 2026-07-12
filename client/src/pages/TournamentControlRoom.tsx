@@ -55,7 +55,7 @@ import {
   type ViewportSize,
 } from "@/lib/tournamentControlBoard";
 export { resolveConnectionDropTargetGameId } from "@/lib/tournamentControlBoard";
-import { THE_FINALS_MAPS } from "@/lib/finalsMaps";
+import { DEFAULT_COMPETITIVE_MAP_IDS, THE_FINALS_MAPS } from "@/lib/finalsMaps";
 import { Input } from "@/components/ui/input";
 import {
   ContextMenu,
@@ -191,10 +191,20 @@ const controlRoomOverlayStorageKey = "murph:tournament-control-room:overlays";
 const defaultControlKeyPosition: CanvasPoint = { x: 16, y: 16 };
 const defaultZoomRailY = 160;
 const keyboardPanSpeedPixelsPerSecond = 520;
+const competitiveTcrMaps = THE_FINALS_MAPS.filter(map =>
+  DEFAULT_COMPETITIVE_MAP_IDS.includes(map.id)
+);
+const competitiveTcrMapIds: ReadonlySet<string> = new Set(
+  DEFAULT_COMPETITIVE_MAP_IDS
+);
+const mapsById: ReadonlyMap<string, string> = new Map(
+  THE_FINALS_MAPS.map(map => [map.id, map.name])
+);
 
 type ControlRoomOverlayPreferences = {
   controlKeyPosition: CanvasPoint;
   zoomRailY: number;
+  controlKeyMinimized: boolean;
 };
 
 function readControlRoomOverlayPreferences(): Partial<ControlRoomOverlayPreferences> {
@@ -211,6 +221,10 @@ function readControlRoomOverlayPreferences(): Partial<ControlRoomOverlayPreferen
           : undefined,
       zoomRailY:
         typeof parsed.zoomRailY === "number" ? parsed.zoomRailY : undefined,
+      controlKeyMinimized:
+        typeof parsed.controlKeyMinimized === "boolean"
+          ? parsed.controlKeyMinimized
+          : undefined,
     };
   } catch {
     return {};
@@ -402,7 +416,9 @@ export default function TournamentControlRoom() {
   >(() => new Map());
   const [zoom, setZoom] = useState(1);
   const [isPanning, setIsPanning] = useState(false);
-  const [controlKeyMinimized, setControlKeyMinimized] = useState(false);
+  const [controlKeyMinimized, setControlKeyMinimized] = useState(
+    () => readControlRoomOverlayPreferences().controlKeyMinimized ?? false
+  );
   const [controlKeyLocked, setControlKeyLocked] = useState(true);
   const [mobileTeamsOpen, setMobileTeamsOpen] = useState(false);
   const [touchHelpOpen, setTouchHelpOpen] = useState(false);
@@ -441,6 +457,17 @@ export default function TournamentControlRoom() {
         Number.isFinite(tournamentId) && auth.user?.loginMethod === "discord",
       retry: false,
     }
+  );
+  const canManageStaff = Boolean(
+    isPersonalTcr &&
+      auth.user &&
+      query.data &&
+      (auth.user.role === "admin" ||
+        query.data.tournament.ownerUserId === auth.user.id)
+  );
+  const staffQuery = trpc.personalTcr.listStaff.useQuery(
+    { tournamentId },
+    { enabled: canManageStaff, retry: false }
   );
   const invalidate = () =>
     isPersonalTcr
@@ -525,6 +552,51 @@ export default function TournamentControlRoom() {
         `${window.location.origin}${data.path}`
       );
       toast.success("Viewer link copied");
+    },
+    onError: (error: { message: string }) => toast.error(error.message),
+  });
+  const createStaffInviteLink = trpc.personalTcr.getStaffInviteLink.useMutation(
+    {
+      onSuccess: async data => {
+        if (!data.path) {
+          toast.error("Regenerate the staff invite to copy a fresh link.");
+          return;
+        }
+        try {
+          await navigator.clipboard.writeText(
+            `${window.location.origin}${data.path}`
+          );
+          toast.success("Staff invite link copied");
+        } catch {
+          toast.error("Staff invite was created, but copying failed.");
+        }
+      },
+      onError: (error: { message: string }) => toast.error(error.message),
+    }
+  );
+  const regenerateStaffInviteLink =
+    trpc.personalTcr.regenerateStaffInviteLink.useMutation({
+      onSuccess: async data => {
+        if (data.path)
+          await navigator.clipboard.writeText(
+            `${window.location.origin}${data.path}`
+          );
+        toast.success("Staff invite regenerated and copied");
+      },
+      onError: (error: { message: string }) => toast.error(error.message),
+    });
+  const revokeStaffInviteLink =
+    trpc.personalTcr.revokeStaffInviteLink.useMutation({
+      onSuccess: () => {
+        void utils.personalTcr.listStaff.invalidate({ tournamentId });
+        toast.success("Staff invite revoked");
+      },
+      onError: (error: { message: string }) => toast.error(error.message),
+    });
+  const removeStaffMember = trpc.personalTcr.removeStaffMember.useMutation({
+    onSuccess: () => {
+      void utils.personalTcr.listStaff.invalidate({ tournamentId });
+      toast.success("Collaborator removed");
     },
     onError: (error: { message: string }) => toast.error(error.message),
   });
@@ -793,8 +865,12 @@ export default function TournamentControlRoom() {
   }, [assignments, games, minimizedGameIds, nodeDrag, query.data, zoom]);
 
   useEffect(() => {
-    writeControlRoomOverlayPreferences({ controlKeyPosition, zoomRailY });
-  }, [controlKeyPosition, zoomRailY]);
+    writeControlRoomOverlayPreferences({
+      controlKeyPosition,
+      zoomRailY,
+      controlKeyMinimized,
+    });
+  }, [controlKeyPosition, zoomRailY, controlKeyMinimized]);
 
   useEffect(() => {
     if (selectedAssignmentId === null) return;
@@ -1427,6 +1503,63 @@ export default function TournamentControlRoom() {
             >
               Copy Viewer Link
             </Button>
+            {canManageStaff && (
+              <div className="flex flex-wrap gap-2 rounded border border-neon-gold/30 bg-black/50 p-1">
+                <Button
+                  variant="outline"
+                  className="border-neon-gold/40 text-neon-gold hover:bg-neon-gold/10"
+                  onClick={() => createStaffInviteLink.mutate({ tournamentId })}
+                >
+                  Staff Invite
+                </Button>
+                <Button
+                  variant="outline"
+                  className="border-white/20 text-white hover:bg-white/10"
+                  onClick={() =>
+                    regenerateStaffInviteLink.mutate({ tournamentId })
+                  }
+                >
+                  Regenerate
+                </Button>
+                <Button
+                  variant="outline"
+                  className="border-red-400/30 text-red-200 hover:bg-red-950/40"
+                  onClick={() => revokeStaffInviteLink.mutate({ tournamentId })}
+                >
+                  Revoke
+                </Button>
+                <div className="basis-full px-2 py-1 font-mono text-[10px] uppercase text-white/45">
+                  Active invite:{" "}
+                  {staffQuery.data?.activeInvite ? "yes" : "none"}
+                </div>
+                {staffQuery.data?.members.map(member => (
+                  <div
+                    key={member.id}
+                    className="flex basis-full items-center justify-between gap-2 rounded border border-white/10 px-2 py-1 text-xs text-white/70"
+                  >
+                    <span>
+                      {member.user.discordDisplayName ||
+                        member.user.discordUsername ||
+                        member.user.name ||
+                        `User ${member.user.id}`}{" "}
+                      · {new Date(member.createdAt).toLocaleDateString()}
+                    </span>
+                    <button
+                      type="button"
+                      className="font-mono uppercase text-red-200 hover:text-red-100"
+                      onClick={() =>
+                        removeStaffMember.mutate({
+                          tournamentId,
+                          memberId: member.id,
+                        })
+                      }
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
             <Button
               variant="outline"
               className="border-neon-gold/40 text-neon-gold hover:bg-neon-gold/10"
@@ -2509,7 +2642,15 @@ export default function TournamentControlRoom() {
                                     <option value="__random">
                                       Randomize Map
                                     </option>
-                                    {THE_FINALS_MAPS.map(map => (
+                                    {game.mapId &&
+                                      !competitiveTcrMapIds.has(game.mapId) && (
+                                        <option value={game.mapId}>
+                                          Legacy map:{" "}
+                                          {mapsById.get(game.mapId) ??
+                                            game.mapId}
+                                        </option>
+                                      )}
+                                    {competitiveTcrMaps.map(map => (
                                       <option key={map.id} value={map.id}>
                                         {map.name}
                                       </option>
@@ -2863,10 +3004,10 @@ export default function TournamentControlRoom() {
                 : dialogState?.type === "rename-tournament"
                   ? "Edit Tournament Name"
                   : dialogState?.type === "rename"
-                  ? "Rename Game"
-                  : dialogState?.type === "broadcast"
-                    ? "Set Broadcast Link"
-                    : "Set Lobby Code"}
+                    ? "Rename Game"
+                    : dialogState?.type === "broadcast"
+                      ? "Set Broadcast Link"
+                      : "Set Lobby Code"}
             </DialogTitle>
             <DialogDescription>
               {dialogState?.type === "lobby"
@@ -2876,27 +3017,38 @@ export default function TournamentControlRoom() {
                   : "Changes persist immediately to the control room."}
             </DialogDescription>
           </DialogHeader>
-          {formError && dialogState?.type === "rename-tournament" && <p className="text-sm text-red-200">{formError}</p>}
+          {formError && dialogState?.type === "rename-tournament" && (
+            <p className="text-sm text-red-200">{formError}</p>
+          )}
           <div className="space-y-3">
             <Input
               value={formName}
-              onChange={event => { setFormName(event.target.value); setFormError(null); }}
+              onChange={event => {
+                setFormName(event.target.value);
+                setFormError(null);
+              }}
               placeholder={
                 dialogState?.type === "create-team"
                   ? "Team name"
                   : dialogState?.type === "rename-tournament"
                     ? "Tournament name"
                     : dialogState?.type === "rename"
-                    ? "Game label"
-                    : dialogState?.type === "broadcast"
-                      ? "https://twitch.tv/channel"
-                      : "Lobby code"
+                      ? "Game label"
+                      : dialogState?.type === "broadcast"
+                        ? "https://twitch.tv/channel"
+                        : "Lobby code"
               }
             />
           </div>
           <DialogFooter>
             <Button
-              disabled={dialogState?.type === "rename-tournament" ? formName.trim().length < 2 || renameTournament.isPending || formName.trim() === dialogState.currentValue : undefined}
+              disabled={
+                dialogState?.type === "rename-tournament"
+                  ? formName.trim().length < 2 ||
+                    renameTournament.isPending ||
+                    formName.trim() === dialogState.currentValue
+                  : undefined
+              }
               onClick={() => {
                 if (dialogState?.type === "rename-tournament") {
                   renameTournament.mutate({ tournamentId, name: formName });
@@ -2926,7 +3078,10 @@ export default function TournamentControlRoom() {
                 setDialogState(null);
               }}
             >
-              {dialogState?.type === "rename-tournament" && renameTournament.isPending ? "Saving…" : "Save"}
+              {dialogState?.type === "rename-tournament" &&
+              renameTournament.isPending
+                ? "Saving…"
+                : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2961,10 +3116,43 @@ export default function TournamentControlRoom() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      <AlertDialog open={dialogState?.type === "delete-team"} onOpenChange={open => !open && setDialogState(null)}>
+      <AlertDialog
+        open={dialogState?.type === "delete-team"}
+        onOpenChange={open => !open && setDialogState(null)}
+      >
         <AlertDialogContent className="border-[#FFD700]/35 bg-black text-white shadow-[0_0_30px_rgba(255,215,0,0.18)]">
-          <AlertDialogHeader><AlertDialogTitle className="font-mono text-[#FFD700]">Delete {dialogState?.type === "delete-team" ? dialogState.teamName : "team"}?</AlertDialogTitle><AlertDialogDescription className="text-white/65">This permanently deletes the team and clears its bracket assignments, claim links, and lobby-code delivery records. Tournament submissions for its managed team are preserved.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel className="border-white/20 bg-white/10 text-white hover:bg-white/15">Cancel</AlertDialogCancel><AlertDialogAction disabled={deleteTeam.isPending} className="bg-red-600 font-mono font-black uppercase text-white hover:bg-red-500" onClick={() => { if (dialogState?.type === "delete-team") deleteTeam.mutate({ tournamentId, teamId: dialogState.teamId }); }}>{deleteTeam.isPending ? "Deleting…" : "Delete Team"}</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-mono text-[#FFD700]">
+              Delete{" "}
+              {dialogState?.type === "delete-team"
+                ? dialogState.teamName
+                : "team"}
+              ?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-white/65">
+              This permanently deletes the team and clears its bracket
+              assignments, claim links, and lobby-code delivery records.
+              Tournament submissions for its managed team are preserved.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-white/20 bg-white/10 text-white hover:bg-white/15">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleteTeam.isPending}
+              className="bg-red-600 font-mono font-black uppercase text-white hover:bg-red-500"
+              onClick={() => {
+                if (dialogState?.type === "delete-team")
+                  deleteTeam.mutate({
+                    tournamentId,
+                    teamId: dialogState.teamId,
+                  });
+              }}
+            >
+              {deleteTeam.isPending ? "Deleting…" : "Delete Team"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
       <AlertDialog
@@ -3052,6 +3240,7 @@ function LobbyCodeTools({
   onSendTeam: (teamId: number) => void;
   onSendLobby: () => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const hasCode = Boolean(game.privateLobbyCode?.trim());
   const assignedTeams = assignments
     .map(assignment => teamsById.get(assignment.teamId))
@@ -3087,106 +3276,126 @@ function LobbyCodeTools({
       data-no-canvas-pan="true"
       className="mt-3 rounded border border-[#FFD700]/20 bg-black/45 p-2"
     >
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#FFD700]">
-          Lobby code DMs
-        </p>
-        <Button
-          size="sm"
-          variant="secondary"
-          className="h-7 px-2 font-mono text-[10px] uppercase"
-          disabled={Boolean(sendDisabledReason) || sendingLobby}
-          onClick={onSendLobby}
-          title={sendDisabledReason ?? "Send to all assigned team captains."}
-        >
-          {sendingLobby ? "Sending…" : "Send Code to Lobby"}
-        </Button>
-      </div>
-      {sendDisabledReason && (
-        <p className="mb-2 text-[11px] text-amber-200/80">
-          {sendDisabledReason}
-        </p>
-      )}
-      {assignedTeams.length > 0 && hasCode && (
-        <button
-          type="button"
-          className="mb-2 rounded border border-white/15 px-2 py-1 font-mono text-[10px] uppercase text-white/65 transition hover:border-[#FFD700]/60 hover:text-[#FFD700]"
-          onClick={() => copyText(lobbyMessage)}
-        >
-          Copy Lobby Messages
-        </button>
-      )}
-      <div className="space-y-1.5">
-        {assignedTeams.length === 0 ? (
-          <p className="text-[11px] text-white/40">
-            Assign teams to send or copy lobby-code messages.
-          </p>
-        ) : (
-          assignedTeams.map(team => {
-            const warning = getRecipientWarning(team);
-            const message = getLobbyCodeMessage(
-              tournamentName,
-              game.displayLabel,
-              team.name,
-              game.privateLobbyCode ?? ""
-            );
-            return (
-              <div
-                key={team.id}
-                className="rounded border border-white/10 bg-zinc-950/80 p-1.5"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="min-w-0 truncate font-mono text-[11px] text-white/80">
-                    {team.name}
-                  </span>
-                  <div className="flex shrink-0 gap-1">
-                    <button
-                      type="button"
-                      className="rounded border border-white/15 px-1.5 py-0.5 font-mono text-[9px] uppercase text-white/65 hover:border-[#FFD700]/60 hover:text-[#FFD700]"
-                      disabled={!hasCode}
-                      onClick={() => copyText(message)}
-                    >
-                      Copy Message
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded border border-[#FFD700]/40 bg-[#FFD700]/10 px-1.5 py-0.5 font-mono text-[9px] uppercase text-[#FFD700] disabled:cursor-not-allowed disabled:border-white/10 disabled:text-white/30"
-                      disabled={
-                        !hasCode ||
-                        !discordConfigured ||
-                        Boolean(warning) ||
-                        sendingTeamId === team.id
-                      }
-                      onClick={() => onSendTeam(team.id)}
-                      title={
-                        !discordConfigured
-                          ? "Discord sending is not configured on the server. Use Copy Message."
-                          : (warning ?? "Send code to this team's captain.")
-                      }
-                    >
-                      {sendingTeamId === team.id ? "Sending…" : "Send Code"}
-                    </button>
+      <button
+        type="button"
+        data-no-node-drag="true"
+        className="flex w-full items-center justify-between gap-2 rounded border border-[#FFD700]/20 bg-zinc-950/70 px-2 py-1.5 text-left transition hover:border-[#FFD700]/60"
+        onClick={event => {
+          event.stopPropagation();
+          setExpanded(value => !value);
+        }}
+        aria-expanded={expanded}
+      >
+        <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#FFD700]">
+          {expanded ? "−" : "+"} Lobby code DMs ({assignedTeams.length})
+        </span>
+        <span className="font-mono text-[10px] uppercase text-white/45">
+          {expanded ? "Hide" : "Show"}
+        </span>
+      </button>
+      {expanded && (
+        <div className="mt-2">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              className="h-7 px-2 font-mono text-[10px] uppercase"
+              disabled={Boolean(sendDisabledReason) || sendingLobby}
+              onClick={onSendLobby}
+              title={
+                sendDisabledReason ?? "Send to all assigned team captains."
+              }
+            >
+              {sendingLobby ? "Sending…" : "Send Code to Lobby"}
+            </Button>
+          </div>
+          {sendDisabledReason && (
+            <p className="mb-2 text-[11px] text-amber-200/80">
+              {sendDisabledReason}
+            </p>
+          )}
+          {assignedTeams.length > 0 && hasCode && (
+            <button
+              type="button"
+              className="mb-2 rounded border border-white/15 px-2 py-1 font-mono text-[10px] uppercase text-white/65 transition hover:border-[#FFD700]/60 hover:text-[#FFD700]"
+              onClick={() => copyText(lobbyMessage)}
+            >
+              Copy Lobby Messages
+            </button>
+          )}
+          <div className="max-h-44 space-y-1.5 overflow-y-auto pr-1">
+            {assignedTeams.length === 0 ? (
+              <p className="text-[11px] text-white/40">
+                Assign teams to send or copy lobby-code messages.
+              </p>
+            ) : (
+              assignedTeams.map(team => {
+                const warning = getRecipientWarning(team);
+                const message = getLobbyCodeMessage(
+                  tournamentName,
+                  game.displayLabel,
+                  team.name,
+                  game.privateLobbyCode ?? ""
+                );
+                return (
+                  <div
+                    key={team.id}
+                    className="rounded border border-white/10 bg-zinc-950/80 p-1.5"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="min-w-0 truncate font-mono text-[11px] text-white/80">
+                        {team.name}
+                      </span>
+                      <div className="flex shrink-0 gap-1">
+                        <button
+                          type="button"
+                          className="rounded border border-white/15 px-1.5 py-0.5 font-mono text-[9px] uppercase text-white/65 hover:border-[#FFD700]/60 hover:text-[#FFD700]"
+                          disabled={!hasCode}
+                          onClick={() => copyText(message)}
+                        >
+                          Copy Message
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded border border-[#FFD700]/40 bg-[#FFD700]/10 px-1.5 py-0.5 font-mono text-[9px] uppercase text-[#FFD700] disabled:cursor-not-allowed disabled:border-white/10 disabled:text-white/30"
+                          disabled={
+                            !hasCode ||
+                            !discordConfigured ||
+                            Boolean(warning) ||
+                            sendingTeamId === team.id
+                          }
+                          onClick={() => onSendTeam(team.id)}
+                          title={
+                            !discordConfigured
+                              ? "Discord sending is not configured on the server. Use Copy Message."
+                              : (warning ?? "Send code to this team's captain.")
+                          }
+                        >
+                          {sendingTeamId === team.id ? "Sending…" : "Send Code"}
+                        </button>
+                      </div>
+                    </div>
+                    {(warning || !hasCode || !discordConfigured) && (
+                      <p className="mt-1 text-[10px] text-amber-200/75">
+                        {!hasCode
+                          ? "No lobby code set."
+                          : !discordConfigured
+                            ? "Discord sending not configured; use Copy Message."
+                            : warning}
+                      </p>
+                    )}
+                    {!warning && team.captainDisplayName && (
+                      <p className="mt-1 text-[10px] text-white/35">
+                        Captain: {team.captainDisplayName}
+                      </p>
+                    )}
                   </div>
-                </div>
-                {(warning || !hasCode || !discordConfigured) && (
-                  <p className="mt-1 text-[10px] text-amber-200/75">
-                    {!hasCode
-                      ? "No lobby code set."
-                      : !discordConfigured
-                        ? "Discord sending not configured; use Copy Message."
-                        : warning}
-                  </p>
-                )}
-                {!warning && team.captainDisplayName && (
-                  <p className="mt-1 text-[10px] text-white/35">
-                    Captain: {team.captainDisplayName}
-                  </p>
-                )}
-              </div>
-            );
-          })
-        )}
-      </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -3363,7 +3572,10 @@ function TeamCard({
           type="button"
           className="mt-2 w-full rounded border border-red-400/30 bg-red-950/30 px-2 py-1 font-mono text-[10px] uppercase text-red-200 transition hover:border-red-300 hover:bg-red-900/60 disabled:cursor-not-allowed disabled:opacity-50"
           disabled={deleteDisabled}
-          onClick={event => { event.stopPropagation(); onDelete(); }}
+          onClick={event => {
+            event.stopPropagation();
+            onDelete();
+          }}
         >
           Delete Team
         </button>
