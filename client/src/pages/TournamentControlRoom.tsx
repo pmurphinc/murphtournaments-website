@@ -167,6 +167,14 @@ type ZoomRailDragStart = {
   startY: number;
   dragged: boolean;
 };
+type RoundRailDragStart = {
+  pointerId: number;
+  clientX: number;
+  clientY: number;
+  startX: number;
+  startY: number;
+  dragged: boolean;
+};
 type BoardUndoSnapshot = {
   games: ControlGameView[];
   assignments: AssignmentView[];
@@ -201,6 +209,7 @@ const activeStatuses = new Set<GameStatus>(["draft", "ready", "live"]);
 const controlRoomOverlayStorageKey = "murph:tournament-control-room:overlays";
 const defaultControlKeyPosition: CanvasPoint = { x: 16, y: 16 };
 const defaultZoomRailY = 160;
+const defaultRoundRailPosition: CanvasPoint = { x: 92, y: 160 };
 const keyboardPanSpeedPixelsPerSecond = 520;
 const competitiveTcrMaps = THE_FINALS_MAPS.filter(map =>
   DEFAULT_COMPETITIVE_MAP_IDS.includes(map.id)
@@ -216,6 +225,8 @@ type ControlRoomOverlayPreferences = {
   controlKeyPosition: CanvasPoint;
   zoomRailY: number;
   controlKeyMinimized: boolean;
+  roundRailPosition: CanvasPoint;
+  roundRailCollapsed: boolean;
 };
 
 function readControlRoomOverlayPreferences(): Partial<ControlRoomOverlayPreferences> {
@@ -235,6 +246,15 @@ function readControlRoomOverlayPreferences(): Partial<ControlRoomOverlayPreferen
       controlKeyMinimized:
         typeof parsed.controlKeyMinimized === "boolean"
           ? parsed.controlKeyMinimized
+          : undefined,
+      roundRailPosition:
+        typeof parsed.roundRailPosition?.x === "number" &&
+        typeof parsed.roundRailPosition?.y === "number"
+          ? parsed.roundRailPosition
+          : undefined,
+      roundRailCollapsed:
+        typeof parsed.roundRailCollapsed === "boolean"
+          ? parsed.roundRailCollapsed
           : undefined,
     };
   } catch {
@@ -440,12 +460,22 @@ export default function TournamentControlRoom() {
     () => readControlRoomOverlayPreferences().zoomRailY ?? defaultZoomRailY
   );
   const [zoomRailMenuOpen, setZoomRailMenuOpen] = useState(false);
+  const [roundRailPosition, setRoundRailPosition] = useState<CanvasPoint>(
+    () =>
+      readControlRoomOverlayPreferences().roundRailPosition ??
+      defaultRoundRailPosition
+  );
+  const [roundRailCollapsed, setRoundRailCollapsed] = useState(
+    () => readControlRoomOverlayPreferences().roundRailCollapsed ?? false
+  );
   const suppressZoomRailClickRef = useRef(false);
+  const suppressRoundRailClickRef = useRef(false);
   const [undoSnapshot, setUndoSnapshot] = useState<BoardUndoSnapshot | null>(
     null
   );
   const controlKeyDragRef = useRef<ControlKeyDragStart | null>(null);
   const zoomRailDragRef = useRef<ZoomRailDragStart | null>(null);
+  const roundRailDragRef = useRef<RoundRailDragStart | null>(null);
   const canvasPanRef = useRef<(CanvasPanStart & { pointerId: number }) | null>(
     null
   );
@@ -923,8 +953,16 @@ export default function TournamentControlRoom() {
       controlKeyPosition,
       zoomRailY,
       controlKeyMinimized,
+      roundRailPosition,
+      roundRailCollapsed,
     });
-  }, [controlKeyPosition, zoomRailY, controlKeyMinimized]);
+  }, [
+    controlKeyPosition,
+    zoomRailY,
+    controlKeyMinimized,
+    roundRailPosition,
+    roundRailCollapsed,
+  ]);
 
   useEffect(() => {
     if (selectedAssignmentId === null) return;
@@ -1312,6 +1350,27 @@ export default function TournamentControlRoom() {
     );
   }, [applyBoardView, games, minimizedGameIds]);
 
+  const clampRoundRailPosition = useCallback(
+    (position: CanvasPoint) => {
+      const canvasRect = canvasRef.current?.getBoundingClientRect();
+      const viewportWidth = canvasRect?.width ?? window.innerWidth;
+      const viewportHeight = canvasRect?.height ?? window.innerHeight;
+      const railWidth = roundRailCollapsed ? 88 : 228;
+      const railHeight = roundRailCollapsed ? 74 : 380;
+      return {
+        x: Math.min(
+          Math.max(8, position.x),
+          Math.max(8, viewportWidth - railWidth - 8)
+        ),
+        y: Math.min(
+          Math.max(8, position.y),
+          Math.max(8, viewportHeight - railHeight - 8)
+        ),
+      };
+    },
+    [roundRailCollapsed]
+  );
+
   const clampZoomRailY = useCallback((value: number) => {
     const canvasRect = canvasRef.current?.getBoundingClientRect();
     const railHeight = 250;
@@ -1383,6 +1442,73 @@ export default function TournamentControlRoom() {
         return;
       }
       setZoomRailMenuOpen(open => !open);
+    },
+    []
+  );
+
+  const startRoundRailDrag = useCallback(
+    (event: ReactPointerEvent<HTMLButtonElement>) => {
+      if (event.button !== 0) return;
+      event.stopPropagation();
+      roundRailDragRef.current = {
+        pointerId: event.pointerId,
+        clientX: event.clientX,
+        clientY: event.clientY,
+        startX: roundRailPosition.x,
+        startY: roundRailPosition.y,
+        dragged: false,
+      };
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+    },
+    [roundRailPosition]
+  );
+
+  const dragRoundRail = useCallback(
+    (event: ReactPointerEvent<HTMLButtonElement>) => {
+      const dragStart = roundRailDragRef.current;
+      if (!dragStart || dragStart.pointerId !== event.pointerId) return;
+      const deltaX = event.clientX - dragStart.clientX;
+      const deltaY = event.clientY - dragStart.clientY;
+      if (hasPointerExceededDragThreshold(dragStart, event)) {
+        dragStart.dragged = true;
+        suppressRoundRailClickRef.current = true;
+      }
+      if (!dragStart.dragged) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setRoundRailPosition(
+        clampRoundRailPosition({
+          x: dragStart.startX + deltaX,
+          y: dragStart.startY + deltaY,
+        })
+      );
+    },
+    [clampRoundRailPosition]
+  );
+
+  const finishRoundRailDrag = useCallback(
+    (event: ReactPointerEvent<HTMLButtonElement>) => {
+      const dragStart = roundRailDragRef.current;
+      if (dragStart?.pointerId !== event.pointerId) return;
+      event.stopPropagation();
+      if (dragStart.dragged) suppressRoundRailClickRef.current = true;
+      if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+      roundRailDragRef.current = null;
+    },
+    []
+  );
+
+  const toggleRoundRailCollapsed = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      if (suppressRoundRailClickRef.current) {
+        event.preventDefault();
+        event.stopPropagation();
+        suppressRoundRailClickRef.current = false;
+        return;
+      }
+      setRoundRailCollapsed(value => !value);
     },
     []
   );
@@ -1973,111 +2099,155 @@ export default function TournamentControlRoom() {
                   );
                 }}
               >
-                <div className="pointer-events-none sticky left-24 top-3 z-[54] h-0 w-0">
+                <div className="pointer-events-none sticky left-0 top-0 z-[62] h-0 w-0">
                   <div
-                    className="pointer-events-auto flex w-[min(42rem,calc(100vw-8rem))] flex-wrap items-center gap-2 rounded-xl border border-[#FFD700]/30 bg-zinc-950/90 p-2 font-mono text-[10px] uppercase text-yellow-50 shadow-[0_0_24px_rgba(255,215,0,0.14)] backdrop-blur"
+                    className={`pointer-events-auto overflow-hidden rounded-xl border border-[#FFD700]/35 bg-zinc-950/95 font-mono text-yellow-50 shadow-[0_0_24px_rgba(255,215,0,0.14)] backdrop-blur ${roundRailCollapsed ? "w-20" : "w-56"}`}
+                    style={{
+                      transform: `translate(${roundRailPosition.x}px, ${roundRailPosition.y}px)`,
+                    }}
                     data-no-canvas-pan="true"
+                    onContextMenu={event => event.stopPropagation()}
                   >
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      className="h-7 px-2 text-[10px]"
-                      onClick={() => setSelectionMode(value => !value)}
+                    <button
+                      type="button"
+                      className="flex min-h-12 w-full touch-none items-center justify-between gap-2 border-b border-white/10 px-2 py-2 text-left text-[#FFD700] transition hover:bg-[#FFD700]/10"
+                      title="Rounds rail · drag to move, click to collapse or expand"
+                      aria-label="Rounds rail, drag to move or click to collapse or expand"
+                      onPointerDownCapture={event => event.preventDefault()}
+                      onPointerDown={startRoundRailDrag}
+                      onPointerMove={dragRoundRail}
+                      onPointerUp={finishRoundRailDrag}
+                      onPointerCancel={finishRoundRailDrag}
+                      onClick={toggleRoundRailCollapsed}
                     >
-                      {selectionMode ? "Selection On" : "Select Rounds"}
-                    </Button>
-                    <span className="text-white/45">
-                      {selectedRoundGameIds.size} selected
-                    </span>
-                    <Button
-                      size="sm"
-                      className="h-7 bg-[#FFD700] px-2 text-[10px] font-black text-black hover:bg-yellow-300"
-                      disabled={selectedRoundGameIds.size < 2}
-                      onClick={() =>
-                        openDialog({ type: "round", mode: "create" }, "Round")
-                      }
-                    >
-                      Create Round From Selection
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      className="h-7 px-2 text-[10px]"
-                      disabled={
-                        selectedRoundGameIds.size === 0 ||
-                        !games.find(game => selectedRoundGameIds.has(game.id))
-                          ?.roundGroupId
-                      }
-                      onClick={() => {
-                        const game = games.find(
-                          item =>
-                            selectedRoundGameIds.has(item.id) &&
-                            item.roundGroupId
-                        );
-                        if (game?.roundGroupId)
-                          openDialog(
-                            {
-                              type: "round",
-                              mode: "rename",
-                              roundGroupId: game.roundGroupId,
-                              currentValue: game.roundLabel ?? "Round",
-                            },
-                            game.roundLabel ?? "Round"
-                          );
-                      }}
-                    >
-                      Rename Round
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      className="h-7 px-2 text-[10px]"
-                      disabled={
-                        selectedRoundGameIds.size === 0 ||
-                        !games.find(game => selectedRoundGameIds.has(game.id))
-                          ?.roundGroupId
-                      }
-                      onClick={() => {
-                        const roundGame = games.find(
-                          game =>
-                            selectedRoundGameIds.has(game.id) &&
-                            game.roundGroupId
-                        );
-                        if (!roundGame?.roundGroupId) return;
-                        updateRoundGroup.mutate({
-                          tournamentId,
-                          gameIds: Array.from(selectedRoundGameIds),
-                          mode: "add",
-                          roundGroupId: roundGame.roundGroupId,
-                          label: roundGame.roundLabel ?? "Round",
-                        });
-                      }}
-                    >
-                      Add Selected to Round
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      className="h-7 px-2 text-[10px]"
-                      disabled={selectedRoundGameIds.size === 0}
-                      onClick={() =>
-                        updateRoundGroup.mutate({
-                          tournamentId,
-                          gameIds: Array.from(selectedRoundGameIds),
-                          mode: "remove",
-                        })
-                      }
-                    >
-                      Remove From Round
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 px-2 text-[10px]"
-                      onClick={() => setSelectedRoundGameIds(new Set())}
-                    >
-                      Clear Selection
-                    </Button>
+                      <Grip
+                        className="h-4 w-4 shrink-0 text-white/45"
+                        aria-hidden="true"
+                      />
+                      <span className="min-w-0 flex-1 text-xs font-black uppercase tracking-widest">
+                        Rounds
+                      </span>
+                      {selectedRoundGameIds.size > 0 && (
+                        <span className="rounded bg-[#FFD700] px-1.5 py-0.5 text-[10px] font-black text-black">
+                          {selectedRoundGameIds.size}
+                        </span>
+                      )}
+                    </button>
+                    {!roundRailCollapsed && (
+                      <div className="flex flex-col gap-2 p-2 text-[10px] uppercase">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="h-8 justify-start px-2 text-[10px]"
+                          title="Toggle round game selection"
+                          onClick={() => setSelectionMode(value => !value)}
+                        >
+                          {selectionMode ? "Selection On" : "Select Rounds"}
+                        </Button>
+                        <span className="rounded border border-white/10 bg-white/5 px-2 py-1 text-white/55">
+                          {selectedRoundGameIds.size} selected
+                        </span>
+                        <Button
+                          size="sm"
+                          className="h-8 justify-start bg-[#FFD700] px-2 text-[10px] font-black text-black hover:bg-yellow-300"
+                          title="Create a round from selected games"
+                          disabled={selectedRoundGameIds.size < 2}
+                          onClick={() =>
+                            openDialog(
+                              { type: "round", mode: "create" },
+                              "Round"
+                            )
+                          }
+                        >
+                          Create Round
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="h-8 justify-start px-2 text-[10px]"
+                          title="Rename the selected round"
+                          disabled={
+                            selectedRoundGameIds.size === 0 ||
+                            !games.find(game =>
+                              selectedRoundGameIds.has(game.id)
+                            )?.roundGroupId
+                          }
+                          onClick={() => {
+                            const game = games.find(
+                              item =>
+                                selectedRoundGameIds.has(item.id) &&
+                                item.roundGroupId
+                            );
+                            if (game?.roundGroupId)
+                              openDialog(
+                                {
+                                  type: "round",
+                                  mode: "rename",
+                                  roundGroupId: game.roundGroupId,
+                                  currentValue: game.roundLabel ?? "Round",
+                                },
+                                game.roundLabel ?? "Round"
+                              );
+                          }}
+                        >
+                          Rename Round
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="h-8 justify-start px-2 text-[10px]"
+                          title="Add selected games to their selected round"
+                          disabled={
+                            selectedRoundGameIds.size === 0 ||
+                            !games.find(game =>
+                              selectedRoundGameIds.has(game.id)
+                            )?.roundGroupId
+                          }
+                          onClick={() => {
+                            const roundGame = games.find(
+                              game =>
+                                selectedRoundGameIds.has(game.id) &&
+                                game.roundGroupId
+                            );
+                            if (!roundGame?.roundGroupId) return;
+                            updateRoundGroup.mutate({
+                              tournamentId,
+                              gameIds: Array.from(selectedRoundGameIds),
+                              mode: "add",
+                              roundGroupId: roundGame.roundGroupId,
+                              label: roundGame.roundLabel ?? "Round",
+                            });
+                          }}
+                        >
+                          Add Selected
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="h-8 justify-start px-2 text-[10px]"
+                          title="Remove selected games from their round"
+                          disabled={selectedRoundGameIds.size === 0}
+                          onClick={() =>
+                            updateRoundGroup.mutate({
+                              tournamentId,
+                              gameIds: Array.from(selectedRoundGameIds),
+                              mode: "remove",
+                            })
+                          }
+                        >
+                          Remove From Round
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 justify-start px-2 text-[10px]"
+                          title="Clear round selection"
+                          onClick={() => setSelectedRoundGameIds(new Set())}
+                        >
+                          Clear Selection
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="pointer-events-none sticky left-3 top-0 z-[65] h-0 w-0 sm:left-4">
@@ -2491,7 +2661,7 @@ export default function TournamentControlRoom() {
                     {roundFrames.map(frame => (
                       <div
                         key={frame.groupId}
-                        className="pointer-events-none absolute z-0 rounded-xl border-2 border-[#FFD700]/55 bg-[#FFD700]/5 shadow-[inset_0_0_28px_rgba(255,215,0,0.08),0_0_22px_rgba(255,215,0,0.08)]"
+                        className={`pointer-events-none absolute z-0 rounded-xl border-2 ${frame.theme.frame}`}
                         style={{
                           left: frame.x,
                           top: frame.y,
@@ -2499,7 +2669,9 @@ export default function TournamentControlRoom() {
                           height: frame.height,
                         }}
                       >
-                        <span className="absolute -top-4 left-4 rounded border border-[#FFD700]/50 bg-black px-2 py-0.5 font-mono text-[10px] font-black uppercase tracking-widest text-[#FFD700]">
+                        <span
+                          className={`absolute -top-7 left-5 rounded-md border-2 px-3 py-1.5 font-mono text-sm font-black uppercase tracking-[0.18em] ${frame.theme.label}`}
+                        >
                           {frame.label}
                         </span>
                       </div>

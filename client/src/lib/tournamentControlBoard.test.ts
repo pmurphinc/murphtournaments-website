@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { getRoundFrameBounds, getRoundFrames } from "./tournamentControlBoard";
+import {
+  getRoundFrameBounds,
+  getRoundFrames,
+  getRoundFrameTheme,
+  roundFrameThemes,
+} from "./tournamentControlBoard";
 
 describe("round frame geometry", () => {
   it("calculates padded bounds using minimized and measured heights", () => {
@@ -35,6 +40,39 @@ describe("round frame geometry", () => {
       width: 760,
       height: 640,
     });
+  });
+
+  it("assigns deterministic distinct themes to visible round frames", () => {
+    const frames = getRoundFrames(
+      [
+        {
+          id: 1,
+          gameType: "cashout",
+          canvasX: 0,
+          canvasY: 0,
+          roundGroupId: "alpha",
+          roundLabel: "Alpha",
+        },
+        {
+          id: 2,
+          gameType: "cashout",
+          canvasX: 500,
+          canvasY: 0,
+          roundGroupId: "bravo",
+          roundLabel: "Bravo",
+        },
+      ],
+      new Set()
+    );
+
+    expect(frames.map(frame => frame.theme)).toEqual([
+      getRoundFrameTheme(0),
+      getRoundFrameTheme(1),
+    ]);
+    expect(frames[0]?.theme).not.toEqual(frames[1]?.theme);
+    expect(getRoundFrameTheme(roundFrameThemes.length)).toEqual(
+      getRoundFrameTheme(0)
+    );
   });
 
   it("updates frame bounds when visual positions move", () => {
