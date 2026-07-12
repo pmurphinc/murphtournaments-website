@@ -204,3 +204,41 @@ describe("group frame helpers", () => {
     expect(Array.from(next)).toEqual([9]);
   });
 });
+
+describe("group header pointer lifecycle helpers", () => {
+  it("uses release coordinates for final member positions only", async () => {
+    const mod = await import("./tournamentControlBoard");
+    const finalPositions = mod.getGroupDragPositionsFromStart(
+      {
+        clientX: 10,
+        clientY: 20,
+        startPositions: new Map([
+          [1, { x: 100, y: 100 }],
+          [2, { x: 240, y: 160 }],
+        ]),
+      },
+      { clientX: 70, clientY: 5 },
+      0.5
+    );
+
+    expect(Array.from(finalPositions.keys())).toEqual([1, 2]);
+    expect(finalPositions.get(1)).toEqual({ x: 220, y: 70 });
+    expect(finalPositions.get(2)).toEqual({ x: 360, y: 130 });
+  });
+
+  it("does not move until the drag threshold is exceeded", async () => {
+    const mod = await import("./tournamentControlBoard");
+    expect(
+      mod.hasPointerExceededDragThreshold(
+        { clientX: 100, clientY: 100 },
+        { clientX: 101, clientY: 101 }
+      )
+    ).toBe(false);
+    expect(
+      mod.hasPointerExceededDragThreshold(
+        { clientX: 100, clientY: 100 },
+        { clientX: 112, clientY: 100 }
+      )
+    ).toBe(true);
+  });
+});

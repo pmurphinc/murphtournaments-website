@@ -314,6 +314,29 @@ export function getCanvasDeltaFromPointerDelta(
   };
 }
 
+export type GroupDragPositionStart = {
+  clientX: number;
+  clientY: number;
+  startPositions: ReadonlyMap<number, CanvasPoint>;
+};
+
+export function getGroupDragPositionsFromStart(
+  start: GroupDragPositionStart,
+  pointer: { clientX: number; clientY: number },
+  zoom: number
+) {
+  const delta = getCanvasDeltaFromPointerDelta(start, pointer, zoom);
+  return new Map(
+    Array.from(start.startPositions.entries()).map(([gameId, position]) => [
+      gameId,
+      {
+        x: Math.max(0, Math.round(position.x + delta.x)),
+        y: Math.max(0, Math.round(position.y + delta.y)),
+      },
+    ])
+  );
+}
+
 export function organizeGroupLobbyPositions(
   games: readonly GroupDragMember[],
   groupId: string,
