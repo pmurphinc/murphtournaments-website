@@ -271,7 +271,9 @@ describe("Tournament Control Room round lobby selection", () => {
   it("renders group headers as a separate interactive layer above connection lines", () => {
     expect(adminSource).toContain('data-round-group-header="true"');
     expect(adminSource).toContain("absolute z-0 rounded-xl");
-    expect(adminSource).toContain('className="absolute inset-0 z-[1] overflow-visible"');
+    expect(adminSource).toContain(
+      'className="absolute inset-0 z-[1] overflow-visible"'
+    );
     expect(adminSource).toContain("absolute z-[2] touch-none");
     expect(adminSource).toContain("frame.x + 20");
     expect(adminSource).toContain("frame.y - 28");
@@ -288,7 +290,9 @@ describe("Tournament Control Room round lobby selection", () => {
   });
 
   it("prevents group context menus from falling through to the board menu", () => {
-    expect(adminSource).toContain("event.target.closest('[data-round-group-header=\"true\"]')");
+    expect(adminSource).toContain(
+      "event.target.closest('[data-round-group-header=\"true\"]')"
+    );
     expect(adminSource).toContain("Select Color");
     expect(adminSource).toContain("Organize Lobbies");
     expect(adminSource).toContain("Delete Group");
@@ -302,5 +306,29 @@ describe("Tournament Control Room alpha badge", () => {
       expect(source).toContain("Tournament Control Room is a work in progress");
       expect(source).toContain("border-[#FFD700]/60");
     }
+  });
+});
+
+describe("Tournament Control Room zoom persistence", () => {
+  it("initializes zoom from overlay preferences and persists every zoom state change centrally", () => {
+    expect(adminSource).toContain(
+      "const [zoom, setZoom] = useState(\n    () => readControlRoomOverlayPreferences().zoom ?? defaultZoom\n  );"
+    );
+    expect(adminSource).toContain(
+      "writeControlRoomOverlayPreferences({ zoom });"
+    );
+    expect(adminSource).toContain("}, [zoom]);");
+  });
+
+  it("merges overlay preference writes so zoom and zoomRailY do not erase each other", () => {
+    expect(adminSource).toContain(
+      "const current = readControlRoomOverlayPreferences();"
+    );
+    expect(adminSource).toContain(
+      "JSON.stringify({ ...current, ...preferences })"
+    );
+    expect(adminSource).toContain(
+      "writeControlRoomOverlayPreferences({ zoomRailY });"
+    );
   });
 });

@@ -242,3 +242,135 @@ describe("group header pointer lifecycle helpers", () => {
     ).toBe(true);
   });
 });
+
+describe("measured connector geometry", () => {
+  it("translates a measured connector center by the lobby visual movement delta", async () => {
+    const mod = await import("./tournamentControlBoard");
+    expect(
+      mod.getTranslatedMeasuredPortCenter(
+        {
+          center: { x: 160, y: 240 },
+          measuredNodePosition: { x: 100, y: 200 },
+        },
+        { x: 135, y: 150 }
+      )
+    ).toEqual({ x: 195, y: 190 });
+  });
+
+  it("moves only the source endpoint when only the source lobby moves", async () => {
+    const mod = await import("./tournamentControlBoard");
+    const source = {
+      center: { x: 200, y: 300 },
+      measuredNodePosition: { x: 100, y: 100 },
+    };
+    const target = {
+      center: { x: 500, y: 120 },
+      measuredNodePosition: { x: 420, y: 80 },
+    };
+    expect(
+      mod.getTranslatedMeasuredPortCenter(source, { x: 140, y: 125 })
+    ).toEqual({ x: 240, y: 325 });
+    expect(
+      mod.getTranslatedMeasuredPortCenter(target, { x: 420, y: 80 })
+    ).toEqual({ x: 500, y: 120 });
+  });
+
+  it("moves only the target endpoint when only the target lobby moves", async () => {
+    const mod = await import("./tournamentControlBoard");
+    const source = {
+      center: { x: 200, y: 300 },
+      measuredNodePosition: { x: 100, y: 100 },
+    };
+    const target = {
+      center: { x: 500, y: 120 },
+      measuredNodePosition: { x: 420, y: 80 },
+    };
+    expect(
+      mod.getTranslatedMeasuredPortCenter(source, { x: 100, y: 100 })
+    ).toEqual({ x: 200, y: 300 });
+    expect(
+      mod.getTranslatedMeasuredPortCenter(target, { x: 380, y: 140 })
+    ).toEqual({ x: 460, y: 180 });
+  });
+
+  it("translates both endpoints by the same group movement delta", async () => {
+    const mod = await import("./tournamentControlBoard");
+    const delta = { x: 70, y: -30 };
+    const source = {
+      center: { x: 200, y: 300 },
+      measuredNodePosition: { x: 100, y: 100 },
+    };
+    const target = {
+      center: { x: 500, y: 120 },
+      measuredNodePosition: { x: 420, y: 80 },
+    };
+    expect(
+      mod.getTranslatedMeasuredPortCenter(source, {
+        x: 100 + delta.x,
+        y: 100 + delta.y,
+      })
+    ).toEqual({ x: 270, y: 270 });
+    expect(
+      mod.getTranslatedMeasuredPortCenter(target, {
+        x: 420 + delta.x,
+        y: 80 + delta.y,
+      })
+    ).toEqual({ x: 570, y: 90 });
+  });
+
+  it("keeps measured connector translation in logical canvas coordinates without zoom scaling", async () => {
+    const mod = await import("./tournamentControlBoard");
+    expect(
+      mod.getTranslatedMeasuredPortCenter(
+        { center: { x: 100, y: 100 }, measuredNodePosition: { x: 40, y: 40 } },
+        { x: 50, y: 55 }
+      )
+    ).toEqual({ x: 110, y: 115 });
+  });
+
+  it("uses optimistic group movement positions before persistence completes", async () => {
+    const mod = await import("./tournamentControlBoard");
+    const optimistic = mod.applyGroupMovementDelta(
+      [
+        { id: 1, canvasX: 100, canvasY: 100, roundGroupId: "g" },
+        { id: 2, canvasX: 500, canvasY: 120, roundGroupId: "other" },
+      ],
+      "g",
+      { x: 80, y: 40 }
+    );
+    const source = {
+      center: { x: 260, y: 538 },
+      measuredNodePosition: { x: 100, y: 100 },
+    };
+    const target = {
+      center: { x: 660, y: 120 },
+      measuredNodePosition: { x: 500, y: 120 },
+    };
+    expect(
+      mod.getTranslatedMeasuredPortCenter(
+        source,
+        optimistic.get(1) ?? { x: 100, y: 100 }
+      )
+    ).toEqual({ x: 340, y: 578 });
+    expect(
+      mod.getTranslatedMeasuredPortCenter(target, { x: 500, y: 120 })
+    ).toEqual({ x: 660, y: 120 });
+  });
+});
+
+describe("zoom preference helpers", () => {
+  it("restores valid zoom, defaults missing and invalid values, and clamps bounds", async () => {
+    const mod = await import("./tournamentControlBoard");
+    expect(mod.getInitialZoomPreference(1.25)).toBe(1.25);
+    expect(mod.getInitialZoomPreference(undefined)).toBe(mod.defaultZoom);
+    expect(mod.getInitialZoomPreference("1.25")).toBe(mod.defaultZoom);
+    expect(mod.getInitialZoomPreference({ zoom: 1.25 })).toBe(mod.defaultZoom);
+    expect(mod.getInitialZoomPreference(Number.NaN)).toBe(mod.defaultZoom);
+    expect(mod.getInitialZoomPreference(Number.POSITIVE_INFINITY)).toBe(
+      mod.defaultZoom
+    );
+    expect(mod.getInitialZoomPreference(null)).toBe(mod.defaultZoom);
+    expect(mod.getInitialZoomPreference(mod.minZoom - 1)).toBe(mod.minZoom);
+    expect(mod.getInitialZoomPreference(mod.maxZoom + 1)).toBe(mod.maxZoom);
+  });
+});
