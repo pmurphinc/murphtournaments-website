@@ -43,7 +43,16 @@ export type BoardGame = {
   gameType: GameType;
   canvasX: number;
   canvasY: number;
+  roundGroupId?: string | null;
+  roundLabel?: string | null;
 };
+export type RoundFrameBounds = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+export type RoundFrame = RoundFrameBounds & { groupId: string; label: string };
 export type CanvasPanStart = {
   clientX: number;
   clientY: number;
@@ -71,6 +80,75 @@ export function getNodeHeight(gameType: GameType, minimized: boolean) {
   return gameType === "cashout"
     ? expandedCashoutNodeHeight
     : expandedFinalNodeHeight;
+}
+
+export function getRoundFrameBounds(
+  games: BoardGame[],
+  minimizedGameIds: ReadonlySet<number>,
+  positions: ReadonlyMap<number, CanvasPoint> = new Map(),
+  measuredHeights: ReadonlyMap<number, number> = new Map(),
+  padding = 36
+): RoundFrameBounds | null {
+  if (games.length === 0) return null;
+  const bounds = games.map(game => {
+    const position = positions.get(game.id) ?? {
+      x: game.canvasX,
+      y: game.canvasY,
+    };
+    return {
+      left: position.x,
+      top: position.y,
+      right: position.x + nodeWidth,
+      bottom:
+        position.y +
+        (measuredHeights.get(game.id) ??
+          getNodeHeight(game.gameType, minimizedGameIds.has(game.id))),
+    };
+  });
+  const left = Math.min(...bounds.map(bound => bound.left));
+  const top = Math.min(...bounds.map(bound => bound.top));
+  const right = Math.max(...bounds.map(bound => bound.right));
+  const bottom = Math.max(...bounds.map(bound => bound.bottom));
+  return {
+    x: left - padding,
+    y: top - padding,
+    width: right - left + padding * 2,
+    height: bottom - top + padding * 2,
+  };
+}
+
+export function getRoundFrames(
+  games: BoardGame[],
+  minimizedGameIds: ReadonlySet<number>,
+  positions: ReadonlyMap<number, CanvasPoint> = new Map(),
+  measuredHeights: ReadonlyMap<number, number> = new Map()
+): RoundFrame[] {
+  const groups = new Map<string, BoardGame[]>();
+  for (const game of games) {
+    if (!game.roundGroupId) continue;
+    groups.set(game.roundGroupId, [
+      ...(groups.get(game.roundGroupId) ?? []),
+      game,
+    ]);
+  }
+  return Array.from(groups.entries()).flatMap(([groupId, groupGames]) => {
+    const bounds = getRoundFrameBounds(
+      groupGames,
+      minimizedGameIds,
+      positions,
+      measuredHeights
+    );
+    return bounds
+      ? [
+          {
+            ...bounds,
+            groupId,
+            label:
+              groupGames.find(game => game.roundLabel)?.roundLabel ?? "Round",
+          },
+        ]
+      : [];
+  });
 }
 
 export function getConnectorCenter(
