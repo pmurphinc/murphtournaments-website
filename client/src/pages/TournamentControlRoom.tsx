@@ -32,6 +32,11 @@ import {
   getFitToContentView,
   getKeyboardPanVector,
   getRoundFrames,
+  roundFrameColorIds,
+  roundFrameThemes,
+  applyGroupMovementDelta,
+  getCanvasDeltaFromPointerDelta,
+  organizeGroupLobbyPositions,
   getMidpoint,
   getNodeHeight,
   getPointerDistance,
@@ -54,6 +59,8 @@ import {
   type GameType,
   type KeyboardPanKeyCode,
   type ViewportSize,
+  type RoundFrame,
+  type RoundFrameColorId,
 } from "@/lib/tournamentControlBoard";
 export { resolveConnectionDropTargetGameId } from "@/lib/tournamentControlBoard";
 import { DEFAULT_COMPETITIVE_MAP_IDS, THE_FINALS_MAPS } from "@/lib/finalsMaps";
@@ -101,6 +108,13 @@ type NodeDragState = {
   x: number;
   y: number;
 };
+type GroupDragState = {
+  groupId: string;
+  pointerId: number;
+  clientX: number;
+  clientY: number;
+  dragged: boolean;
+};
 type ConnectionDragState = {
   sourceGameId: number;
   flowType: ConnectionFlowType;
@@ -129,6 +143,7 @@ type ControlGameView = {
   broadcastUrl?: string | null;
   roundGroupId?: string | null;
   roundLabel?: string | null;
+  roundColor?: RoundFrameColorId | null;
 };
 type AssignmentView = {
   id: number;
@@ -179,6 +194,7 @@ type DialogState =
       roundGroupId?: string;
       currentValue?: string;
     }
+  | { type: "delete-round"; roundGroupId: string; label: string }
   | {
       type:
         | "bulk-delete-connections"
@@ -393,6 +409,7 @@ export default function TournamentControlRoom() {
   const [nodeDrag, setNodeDrag] = useState<NodeDragState | null>(null);
   const [connectionDrag, setConnectionDrag] =
     useState<ConnectionDragState | null>(null);
+  const [groupDrag, setGroupDrag] = useState<GroupDragState | null>(null);
   const [canvasMenuPosition, setCanvasMenuPosition] = useState({
     x: 160,
     y: 120,
@@ -522,6 +539,14 @@ export default function TournamentControlRoom() {
   });
   const updateRoundGroup =
     controlApi.updateRoundGroup.useMutation(mutationOptions);
+  const persistGroupPositions = useCallback(
+    (positions: ReadonlyMap<number, CanvasPoint>) => {
+      positions.forEach((position, gameId) => {
+        moveGame.mutate({ gameId, position });
+      });
+    },
+    [moveGame]
+  );
   const deleteTeam = controlApi.deleteTeam.useMutation({
     onSuccess: () => {
       setDialogState(null);
@@ -690,6 +715,61 @@ export default function TournamentControlRoom() {
     },
     [captureUndoSnapshot]
   );
+
+  const submitDialog = useCallback(() => {
+    if (!dialogState) return;
+    if (dialogState.type === "rename-tournament") {
+      if (
+        formName.trim().length < 2 ||
+        renameTournament.isPending ||
+        formName.trim() === dialogState.currentValue
+      )
+        return;
+      renameTournament.mutate({ tournamentId, name: formName });
+      return;
+    }
+    if (dialogState.type === "create-team") {
+      createTeam.mutate({ tournamentId, name: formName, frp: 0 });
+    }
+    if (dialogState.type === "rename") {
+      renameGame.mutate({ gameId: dialogState.gameId, displayLabel: formName });
+    }
+    if (dialogState.type === "lobby") {
+      if (setLobbyCode.isPending) return;
+      setLobbyCode.mutate({
+        gameId: dialogState.gameId,
+        lobbyCode: formName.trim() ? formName.trim() : null,
+      });
+    }
+    if (dialogState.type === "broadcast") {
+      setBroadcastUrl.mutate({
+        gameId: dialogState.gameId,
+        broadcastUrl: formName.trim() ? formName.trim() : null,
+      });
+    }
+    if (dialogState.type === "round") {
+      if (updateRoundGroup.isPending || formName.trim().length === 0) return;
+      updateRoundGroup.mutate({
+        tournamentId,
+        gameIds: Array.from(selectedRoundGameIds),
+        label: formName.trim(),
+        roundGroupId: dialogState.roundGroupId,
+        mode: dialogState.mode,
+      });
+    }
+    setDialogState(null);
+  }, [
+    createTeam,
+    dialogState,
+    formName,
+    renameGame,
+    renameTournament,
+    selectedRoundGameIds,
+    setBroadcastUrl,
+    setLobbyCode,
+    tournamentId,
+    updateRoundGroup,
+  ]);
 
   const gamesById = useMemo(
     () =>
@@ -1197,6 +1277,50 @@ export default function TournamentControlRoom() {
     nodeDrag?.offsetY,
     snapWindowsToGrid,
   ]);
+
+  useEffect(() => {
+    if (!groupDrag) return;
+    const start = groupDrag;
+    const handlePointerMove = (event: PointerEvent) => {
+      if (event.pointerId !== start.pointerId) return;
+      event.preventDefault();
+      const dragged =
+        start.dragged || hasPointerExceededDragThreshold(start, event);
+      const delta = getCanvasDeltaFromPointerDelta(start, event, zoom);
+      const positions = applyGroupMovementDelta(games, start.groupId, delta);
+      setGroupDrag(current =>
+        current?.groupId === start.groupId ? { ...current, dragged } : current
+      );
+      setOptimisticGamePositions(current => {
+        const next = new Map(current);
+        positions.forEach((position, gameId) => next.set(gameId, position));
+        return next;
+      });
+    };
+    const finishDrag = (event: PointerEvent) => {
+      if (event.pointerId !== start.pointerId) return;
+      const delta = getCanvasDeltaFromPointerDelta(start, event, zoom);
+      const positions = applyGroupMovementDelta(games, start.groupId, delta);
+      if (hasPointerExceededDragThreshold(start, event)) {
+        setOptimisticGamePositions(current => {
+          const next = new Map(current);
+          positions.forEach((position, gameId) => next.set(gameId, position));
+          return next;
+        });
+        persistGroupPositions(positions);
+      }
+      setGroupDrag(null);
+    };
+    const cancelDrag = () => setGroupDrag(null);
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", finishDrag, { once: true });
+    window.addEventListener("pointercancel", cancelDrag, { once: true });
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", finishDrag);
+      window.removeEventListener("pointercancel", cancelDrag);
+    };
+  }, [games, groupDrag, persistGroupPositions, zoom]);
 
   useEffect(() => {
     if (!connectionDrag) return;
@@ -2067,8 +2191,8 @@ export default function TournamentControlRoom() {
                       aria-controls="zoom-rail-shared-panel"
                       aria-expanded={zoomRailActivePanel === "rounds"}
                       className={`relative flex min-h-12 w-full flex-col items-center justify-center gap-0.5 border-t border-white/10 transition hover:bg-[#FFD700]/10 hover:text-[#FFD700] ${zoomRailActivePanel === "rounds" ? "bg-[#FFD700]/15 text-[#FFD700]" : "text-white/70"}`}
-                      title="Rounds"
-                      aria-label={`Rounds panel, ${selectedRoundGameIds.size} games selected`}
+                      title="Groups"
+                      aria-label={`Groups panel, ${selectedRoundGameIds.size} games selected`}
                       onPointerDown={event => event.stopPropagation()}
                       onClick={event => {
                         event.stopPropagation();
@@ -2078,7 +2202,7 @@ export default function TournamentControlRoom() {
                       }}
                     >
                       <span className="text-[9px] font-black uppercase leading-none">
-                        Rounds
+                        Groups
                       </span>
                       {selectedRoundGameIds.size > 0 && (
                         <span className="absolute right-1 top-1 rounded bg-[#FFD700] px-1.5 py-0.5 text-[10px] font-black text-black">
@@ -2125,7 +2249,7 @@ export default function TournamentControlRoom() {
                             {zoomRailActivePanel === "options"
                               ? "Board Options"
                               : zoomRailActivePanel === "rounds"
-                                ? "Rounds"
+                                ? "Groups"
                                 : "PC Controls"}
                           </p>
                           <button
@@ -2184,8 +2308,8 @@ export default function TournamentControlRoom() {
                         {zoomRailActivePanel === "rounds" && (
                           <div className="flex flex-col gap-2 text-[10px] uppercase">
                             <p className="rounded border border-[#FFD700]/30 bg-[#FFD700]/10 px-2 py-1 text-white/70 normal-case">
-                              Ctrl/Shift + click lobby to select lobbies for
-                              rounds. Click empty board to clear lobby
+                              Ctrl/Shift + click lobby to Select lobbies for
+                              groups. Click empty board to clear lobby
                               selection.
                             </p>
                             <span className="rounded border border-white/10 bg-white/5 px-2 py-1 text-white/55">
@@ -2194,22 +2318,22 @@ export default function TournamentControlRoom() {
                             <Button
                               size="sm"
                               className="h-8 justify-start bg-[#FFD700] px-2 text-[10px] font-black text-black hover:bg-yellow-300"
-                              title="Create a round from selected games"
+                              title="Create a group from selected lobbies"
                               disabled={selectedRoundGameIds.size < 2}
                               onClick={() =>
                                 openDialog(
                                   { type: "round", mode: "create" },
-                                  "Round"
+                                  "Group"
                                 )
                               }
                             >
-                              Create Round
+                              Create Group
                             </Button>
                             <Button
                               size="sm"
                               variant="secondary"
                               className="h-8 justify-start px-2 text-[10px]"
-                              title="Rename the selected round"
+                              title="Rename the selected group"
                               disabled={
                                 selectedRoundGameIds.size === 0 ||
                                 !games.find(game =>
@@ -2228,19 +2352,19 @@ export default function TournamentControlRoom() {
                                       type: "round",
                                       mode: "rename",
                                       roundGroupId: game.roundGroupId,
-                                      currentValue: game.roundLabel ?? "Round",
+                                      currentValue: game.roundLabel ?? "Group",
                                     },
-                                    game.roundLabel ?? "Round"
+                                    game.roundLabel ?? "Group"
                                   );
                               }}
                             >
-                              Rename Round
+                              Rename Group
                             </Button>
                             <Button
                               size="sm"
                               variant="secondary"
                               className="h-8 justify-start px-2 text-[10px]"
-                              title="Add selected games to their selected round"
+                              title="Add selected lobbies to their selected group"
                               disabled={
                                 selectedRoundGameIds.size === 0 ||
                                 !games.find(game =>
@@ -2259,7 +2383,7 @@ export default function TournamentControlRoom() {
                                   gameIds: Array.from(selectedRoundGameIds),
                                   mode: "add",
                                   roundGroupId: roundGame.roundGroupId,
-                                  label: roundGame.roundLabel ?? "Round",
+                                  label: roundGame.roundLabel ?? "Group",
                                 });
                               }}
                             >
@@ -2269,7 +2393,7 @@ export default function TournamentControlRoom() {
                               size="sm"
                               variant="secondary"
                               className="h-8 justify-start px-2 text-[10px]"
-                              title="Remove selected games from their round"
+                              title="Remove selected lobbies from their group"
                               disabled={selectedRoundGameIds.size === 0}
                               onClick={() =>
                                 updateRoundGroup.mutate({
@@ -2279,13 +2403,13 @@ export default function TournamentControlRoom() {
                                 })
                               }
                             >
-                              Remove From Round
+                              Remove From Group
                             </Button>
                             <Button
                               size="sm"
                               variant="ghost"
                               className="h-8 justify-start px-2 text-[10px]"
-                              title="Clear round selection"
+                              title="Clear group selection"
                               onClick={() => setSelectedRoundGameIds(new Set())}
                             >
                               Clear Selection
@@ -2324,7 +2448,7 @@ export default function TournamentControlRoom() {
                                 [
                                   "bg-amber-300/15 text-amber-100 border-amber-200/40",
                                   "Ctrl/Shift + click lobby",
-                                  "Select lobbies for rounds",
+                                  "Select lobbies for groups",
                                 ],
                                 [
                                   "bg-zinc-300/15 text-zinc-100 border-zinc-200/30",
@@ -2430,7 +2554,7 @@ export default function TournamentControlRoom() {
                     }}
                     ref={boardRef}
                   >
-                    {roundFrames.map(frame => (
+                    {roundFrames.map((frame: RoundFrame) => (
                       <div
                         key={frame.groupId}
                         className={`pointer-events-none absolute z-0 rounded-xl border-2 ${frame.theme.frame}`}
@@ -2441,11 +2565,94 @@ export default function TournamentControlRoom() {
                           height: frame.height,
                         }}
                       >
-                        <span
-                          className={`absolute -top-7 left-5 rounded-md border-2 px-3 py-1.5 font-mono text-sm font-black uppercase tracking-[0.18em] ${frame.theme.label}`}
-                        >
-                          {frame.label}
-                        </span>
+                        <ContextMenu>
+                          <ContextMenuTrigger asChild>
+                            <button
+                              type="button"
+                              data-no-canvas-pan="true"
+                              className={`pointer-events-auto absolute -top-7 left-5 touch-none select-none rounded-md border-2 px-3 py-1.5 font-mono text-sm font-black uppercase tracking-[0.18em] ${frame.theme.label} ${groupDrag?.groupId === frame.groupId ? "cursor-grabbing" : "cursor-grab"}`}
+                              aria-label={`${frame.label} group actions and drag handle`}
+                              onContextMenu={event => event.stopPropagation()}
+                              onPointerDown={event => {
+                                if (event.button !== 0) return;
+                                event.preventDefault();
+                                event.stopPropagation();
+                                setGroupDrag({
+                                  groupId: frame.groupId,
+                                  pointerId: event.pointerId,
+                                  clientX: event.clientX,
+                                  clientY: event.clientY,
+                                  dragged: false,
+                                });
+                              }}
+                            >
+                              {frame.label}
+                            </button>
+                          </ContextMenuTrigger>
+                          <ContextMenuContent
+                            onPointerDown={event => event.stopPropagation()}
+                          >
+                            <DropdownMenuLabel className="text-[#FFD700]">
+                              Select Color
+                            </DropdownMenuLabel>
+                            {roundFrameColorIds.map(colorId => (
+                              <ContextMenuItem
+                                key={colorId}
+                                onClick={() =>
+                                  updateRoundGroup.mutate({
+                                    tournamentId,
+                                    gameIds: games
+                                      .filter(
+                                        game =>
+                                          game.roundGroupId === frame.groupId
+                                      )
+                                      .map(game => game.id),
+                                    roundGroupId: frame.groupId,
+                                    color: colorId,
+                                    mode: "color",
+                                  })
+                                }
+                              >
+                                <span
+                                  className={`mr-2 inline-block h-3 w-3 rounded-full border ${roundFrameThemes[colorId].label}`}
+                                />
+                                {colorId === frame.colorId ? "✓ " : ""}
+                                {colorId}
+                              </ContextMenuItem>
+                            ))}
+                            <ContextMenuSeparator />
+                            <ContextMenuItem
+                              onClick={() => {
+                                const positions = organizeGroupLobbyPositions(
+                                  games,
+                                  frame.groupId
+                                );
+                                setOptimisticGamePositions(current => {
+                                  const next = new Map(current);
+                                  positions.forEach((position, gameId) =>
+                                    next.set(gameId, position)
+                                  );
+                                  return next;
+                                });
+                                persistGroupPositions(positions);
+                              }}
+                            >
+                              Organize Lobbies
+                            </ContextMenuItem>
+                            <ContextMenuItem
+                              className="text-red-300"
+                              onClick={() =>
+                                setDialogState({
+                                  type: "delete-round",
+                                  roundGroupId: frame.groupId,
+                                  label: frame.label,
+                                })
+                              }
+                            >
+                              Delete Group
+                            </ContextMenuItem>
+                          </ContextMenuContent>
+                        </ContextMenu>
                       </div>
                     ))}
                     <svg
@@ -3232,8 +3439,8 @@ export default function TournamentControlRoom() {
                       ? "Set Broadcast Link"
                       : dialogState?.type === "round"
                         ? dialogState.mode === "rename"
-                          ? "Rename Round"
-                          : "Create Round From Selection"
+                          ? "Rename Group"
+                          : "Create Group From Selection"
                         : "Set Lobby Code"}
             </DialogTitle>
             <DialogDescription>
@@ -3254,6 +3461,12 @@ export default function TournamentControlRoom() {
                 setFormName(event.target.value);
                 setFormError(null);
               }}
+              onKeyDown={event => {
+                if (event.key !== "Enter") return;
+                event.preventDefault();
+                event.stopPropagation();
+                submitDialog();
+              }}
               placeholder={
                 dialogState?.type === "create-team"
                   ? "Team name"
@@ -3264,7 +3477,7 @@ export default function TournamentControlRoom() {
                       : dialogState?.type === "broadcast"
                         ? "https://twitch.tv/channel"
                         : dialogState?.type === "round"
-                          ? "Round label"
+                          ? "Group label"
                           : "Lobby code"
               }
             />
@@ -3278,43 +3491,7 @@ export default function TournamentControlRoom() {
                     formName.trim() === dialogState.currentValue
                   : undefined
               }
-              onClick={() => {
-                if (dialogState?.type === "rename-tournament") {
-                  renameTournament.mutate({ tournamentId, name: formName });
-                  return;
-                }
-                if (dialogState?.type === "create-team") {
-                  createTeam.mutate({ tournamentId, name: formName, frp: 0 });
-                }
-                if (dialogState?.type === "rename") {
-                  renameGame.mutate({
-                    gameId: dialogState.gameId,
-                    displayLabel: formName,
-                  });
-                }
-                if (dialogState?.type === "lobby") {
-                  setLobbyCode.mutate({
-                    gameId: dialogState.gameId,
-                    lobbyCode: formName.trim() ? formName.trim() : null,
-                  });
-                }
-                if (dialogState?.type === "broadcast") {
-                  setBroadcastUrl.mutate({
-                    gameId: dialogState.gameId,
-                    broadcastUrl: formName.trim() ? formName.trim() : null,
-                  });
-                }
-                if (dialogState?.type === "round") {
-                  updateRoundGroup.mutate({
-                    tournamentId,
-                    gameIds: Array.from(selectedRoundGameIds),
-                    label: formName.trim(),
-                    roundGroupId: dialogState.roundGroupId,
-                    mode: dialogState.mode,
-                  });
-                }
-                setDialogState(null);
-              }}
+              onClick={submitDialog}
             >
               {dialogState?.type === "rename-tournament" &&
               renameTournament.isPending
@@ -3350,6 +3527,52 @@ export default function TournamentControlRoom() {
             >
               Delete{" "}
               {dialogState?.type === "delete" ? dialogState.label : "lobby"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog
+        open={dialogState?.type === "delete-round"}
+        onOpenChange={open => !open && setDialogState(null)}
+      >
+        <AlertDialogContent className="border-[#FFD700]/35 bg-black text-white shadow-[0_0_30px_rgba(255,215,0,0.18)]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-mono text-[#FFD700]">
+              Delete{" "}
+              {dialogState?.type === "delete-round"
+                ? dialogState.label
+                : "group"}
+              ?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-white/65">
+              This deletes only the visual group. Its lobbies remain on the
+              canvas as ungrouped lobbies with teams, codes, statuses, maps, and
+              connections unchanged.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-white/20 bg-white/10 text-white hover:bg-white/15">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 font-mono font-black uppercase text-white hover:bg-red-500"
+              onClick={() => {
+                if (dialogState?.type === "delete-round") {
+                  updateRoundGroup.mutate({
+                    tournamentId,
+                    gameIds: games
+                      .filter(
+                        game => game.roundGroupId === dialogState.roundGroupId
+                      )
+                      .map(game => game.id),
+                    roundGroupId: dialogState.roundGroupId,
+                    mode: "remove",
+                  });
+                }
+                setDialogState(null);
+              }}
+            >
+              Delete Group
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

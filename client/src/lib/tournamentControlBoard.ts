@@ -45,6 +45,7 @@ export type BoardGame = {
   canvasY: number;
   roundGroupId?: string | null;
   roundLabel?: string | null;
+  roundColor?: RoundFrameColorId | null;
 };
 export type RoundFrameBounds = {
   x: number;
@@ -60,55 +61,78 @@ export type RoundFrame = RoundFrameBounds & {
   groupId: string;
   label: string;
   theme: RoundFrameTheme;
+  colorId: RoundFrameColorId;
 };
 
-export const roundFrameThemes = [
-  {
+export type RoundFrameColorId =
+  | "gold"
+  | "cyan"
+  | "violet"
+  | "orange"
+  | "blue"
+  | "fuchsia"
+  | "emerald";
+
+export const roundFrameThemes: Record<RoundFrameColorId, RoundFrameTheme> = {
+  gold: {
     frame:
       "border-[#FFD700]/65 bg-[#FFD700]/7 shadow-[inset_0_0_34px_rgba(255,215,0,0.10),0_0_28px_rgba(255,215,0,0.14)]",
     label:
       "border-[#FFD700]/75 bg-black text-[#FFD700] shadow-[0_0_18px_rgba(255,215,0,0.28)]",
   },
-  {
+  cyan: {
     frame:
       "border-cyan-300/65 bg-cyan-300/7 shadow-[inset_0_0_34px_rgba(103,232,249,0.10),0_0_28px_rgba(103,232,249,0.14)]",
     label:
       "border-cyan-300/75 bg-black text-cyan-100 shadow-[0_0_18px_rgba(103,232,249,0.26)]",
   },
-  {
+  violet: {
     frame:
       "border-violet-300/65 bg-violet-400/7 shadow-[inset_0_0_34px_rgba(196,181,253,0.10),0_0_28px_rgba(196,181,253,0.14)]",
     label:
       "border-violet-300/75 bg-black text-violet-100 shadow-[0_0_18px_rgba(196,181,253,0.26)]",
   },
-  {
+  orange: {
     frame:
       "border-orange-300/65 bg-orange-400/7 shadow-[inset_0_0_34px_rgba(253,186,116,0.10),0_0_28px_rgba(253,186,116,0.14)]",
     label:
       "border-orange-300/75 bg-black text-orange-100 shadow-[0_0_18px_rgba(253,186,116,0.26)]",
   },
-  {
+  blue: {
     frame:
       "border-blue-300/65 bg-blue-400/7 shadow-[inset_0_0_34px_rgba(147,197,253,0.10),0_0_28px_rgba(147,197,253,0.14)]",
     label:
       "border-blue-300/75 bg-black text-blue-100 shadow-[0_0_18px_rgba(147,197,253,0.26)]",
   },
-  {
+  fuchsia: {
     frame:
       "border-fuchsia-300/65 bg-fuchsia-400/7 shadow-[inset_0_0_34px_rgba(240,171,252,0.10),0_0_28px_rgba(240,171,252,0.14)]",
     label:
       "border-fuchsia-300/75 bg-black text-fuchsia-100 shadow-[0_0_18px_rgba(240,171,252,0.26)]",
   },
-  {
+  emerald: {
     frame:
       "border-emerald-300/65 bg-emerald-400/7 shadow-[inset_0_0_34px_rgba(110,231,183,0.10),0_0_28px_rgba(110,231,183,0.14)]",
     label:
       "border-emerald-300/75 bg-black text-emerald-100 shadow-[0_0_18px_rgba(110,231,183,0.26)]",
   },
-] as const satisfies readonly RoundFrameTheme[];
+} as const satisfies Record<RoundFrameColorId, RoundFrameTheme>;
+
+export const roundFrameColorIds = Object.keys(
+  roundFrameThemes
+) as RoundFrameColorId[];
 
 export function getRoundFrameTheme(roundIndex: number): RoundFrameTheme {
-  return roundFrameThemes[Math.abs(roundIndex) % roundFrameThemes.length];
+  return roundFrameThemes[
+    roundFrameColorIds[Math.abs(roundIndex) % roundFrameColorIds.length] ??
+      "gold"
+  ];
+}
+
+export function isRoundFrameColorId(
+  value: unknown
+): value is RoundFrameColorId {
+  return typeof value === "string" && value in roundFrameThemes;
 }
 export type CanvasPanStart = {
   clientX: number;
@@ -202,13 +226,100 @@ export function getRoundFrames(
               ...bounds,
               groupId,
               label:
-                groupGames.find(game => game.roundLabel)?.roundLabel ?? "Round",
-              theme: getRoundFrameTheme(index),
+                groupGames.find(game => game.roundLabel)?.roundLabel ??
+                `Group ${index + 1}`,
+              colorId: isRoundFrameColorId(groupGames[0]?.roundColor)
+                ? groupGames[0].roundColor
+                : (roundFrameColorIds[index % roundFrameColorIds.length] ??
+                  "gold"),
+              theme:
+                roundFrameThemes[
+                  isRoundFrameColorId(groupGames[0]?.roundColor)
+                    ? groupGames[0].roundColor
+                    : (roundFrameColorIds[index % roundFrameColorIds.length] ??
+                      "gold")
+                ],
             },
           ]
         : [];
     }
   );
+}
+
+export type GroupDragMember = {
+  id: number;
+  canvasX: number;
+  canvasY: number;
+  roundGroupId?: string | null;
+};
+
+export function applyGroupMovementDelta<T extends GroupDragMember>(
+  games: readonly T[],
+  groupId: string,
+  delta: CanvasPoint
+): Map<number, CanvasPoint> {
+  const positions = new Map<number, CanvasPoint>();
+  for (const game of games) {
+    if (game.roundGroupId !== groupId) continue;
+    positions.set(game.id, {
+      x: Math.max(0, Math.round(game.canvasX + delta.x)),
+      y: Math.max(0, Math.round(game.canvasY + delta.y)),
+    });
+  }
+  return positions;
+}
+
+export function getCanvasDeltaFromPointerDelta(
+  start: Pick<PointerEvent, "clientX" | "clientY">,
+  current: Pick<PointerEvent, "clientX" | "clientY">,
+  zoom: number
+): CanvasPoint {
+  return {
+    x: (current.clientX - start.clientX) / zoom,
+    y: (current.clientY - start.clientY) / zoom,
+  };
+}
+
+export function organizeGroupLobbyPositions(
+  games: readonly GroupDragMember[],
+  groupId: string,
+  options: {
+    cardWidth?: number;
+    cardHeight?: number;
+    gap?: number;
+    padding?: number;
+    maxColumns?: number;
+  } = {}
+): Map<number, CanvasPoint> {
+  const members = games
+    .filter(game => game.roundGroupId === groupId)
+    .sort(
+      (first, second) =>
+        first.canvasY - second.canvasY ||
+        first.canvasX - second.canvasX ||
+        first.id - second.id
+    );
+  const positions = new Map<number, CanvasPoint>();
+  if (members.length === 0) return positions;
+  const cardWidth = options.cardWidth ?? nodeWidth;
+  const cardHeight = options.cardHeight ?? expandedCashoutNodeHeight;
+  const gap = options.gap ?? controlRoomGridSize;
+  const padding = options.padding ?? controlRoomGridSize;
+  const columns = Math.min(
+    options.maxColumns ?? 4,
+    Math.max(1, Math.ceil(Math.sqrt(members.length)))
+  );
+  const minX = Math.min(...members.map(game => game.canvasX));
+  const minY = Math.min(...members.map(game => game.canvasY));
+  members.forEach((game, index) => {
+    positions.set(game.id, {
+      x: Math.round(minX + padding + (index % columns) * (cardWidth + gap)),
+      y: Math.round(
+        minY + padding + Math.floor(index / columns) * (cardHeight + gap)
+      ),
+    });
+  });
+  return positions;
 }
 
 export function getConnectorCenter(

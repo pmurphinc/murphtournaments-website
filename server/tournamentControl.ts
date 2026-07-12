@@ -260,6 +260,7 @@ type BoardSnapshotInput = {
     broadcastUrl?: string | null;
     roundGroupId?: string | null;
     roundLabel?: string | null;
+    roundColor?: string | null;
   }>;
   assignments: Array<{
     id: number;
@@ -358,6 +359,7 @@ const boardSnapshotSchema = z.object({
       broadcastUrl: broadcastUrlSchema.optional(),
       roundGroupId: z.string().trim().max(64).nullable().optional(),
       roundLabel: z.string().trim().max(80).nullable().optional(),
+      roundColor: z.string().trim().max(24).nullable().optional(),
     })
   ),
   assignments: z.array(
@@ -838,13 +840,23 @@ async function autoFillLobby(gameId: number) {
 
 const roundLabelSchema = z.string().trim().min(1).max(80);
 const roundGroupIdSchema = z.string().trim().min(1).max(64);
+const roundColorSchema = z.enum([
+  "gold",
+  "cyan",
+  "violet",
+  "orange",
+  "blue",
+  "fuchsia",
+  "emerald",
+]);
 
 async function updateRoundGroup(input: {
   tournamentId: number;
   gameIds: number[];
   label?: string;
   roundGroupId?: string;
-  mode: "create" | "add" | "rename" | "remove";
+  color?: z.infer<typeof roundColorSchema>;
+  mode: "create" | "add" | "rename" | "remove" | "color";
 }) {
   const db = await requireDb();
   return db.transaction(async tx => {
@@ -880,18 +892,22 @@ async function updateRoundGroup(input: {
     if (input.mode === "remove") {
       await tx
         .update(tournamentGames)
-        .set({ roundGroupId: null, roundLabel: null })
+        .set({ roundGroupId: null, roundLabel: null, roundColor: null })
         .where(inArray(tournamentGames.id, uniqueGameIds));
-    } else if (input.mode === "rename") {
+    } else if (input.mode === "rename" || input.mode === "color") {
       const groupId = input.roundGroupId ?? selectedGames[0]?.roundGroupId;
       if (!groupId)
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "Round group not found.",
+          message: "Group not found.",
         });
       await tx
         .update(tournamentGames)
-        .set({ roundLabel: input.label ?? "Round" })
+        .set(
+          input.mode === "color"
+            ? { roundColor: input.color ?? "gold" }
+            : { roundLabel: input.label ?? "Group" }
+        )
         .where(
           and(
             eq(tournamentGames.tournamentId, input.tournamentId),
@@ -903,7 +919,8 @@ async function updateRoundGroup(input: {
         .update(tournamentGames)
         .set({
           roundGroupId: input.roundGroupId ?? randomUUID(),
-          roundLabel: input.label ?? "Round",
+          roundLabel: input.label ?? "Group",
+          roundColor: input.color ?? null,
         })
         .where(inArray(tournamentGames.id, uniqueGameIds));
     }
@@ -998,6 +1015,7 @@ async function restoreTournamentBoardSnapshot(
         broadcastUrl: game.broadcastUrl ?? null,
         roundGroupId: game.roundGroupId ?? null,
         roundLabel: game.roundLabel ?? null,
+        roundColor: game.roundColor ?? null,
       });
       gameIdMap.set(
         game.id,
@@ -1147,6 +1165,7 @@ async function getViewerDataByToken(token: string) {
       broadcastUrl: game.broadcastUrl,
       roundGroupId: game.roundGroupId,
       roundLabel: game.roundLabel,
+      roundColor: game.roundColor,
     })),
     assignments: data.assignments,
     connections: data.connections,
@@ -1199,6 +1218,7 @@ async function saveTemplateFromTournament(
           mapId: game.mapId,
           roundGroupId: game.roundGroupId,
           roundLabel: game.roundLabel,
+          roundColor: game.roundColor,
         });
       const templateGameId = requireInsertId(
         gameInsertResult,
@@ -1270,6 +1290,7 @@ async function createTournamentFromTemplate(
           ? `${game.roundGroupId}-${randomUUID()}`.slice(0, 64)
           : null,
         roundLabel: game.roundLabel,
+        roundColor: game.roundColor,
       });
       const tournamentGameId = requireInsertId(
         gameInsertResult,
@@ -2841,7 +2862,8 @@ export const personalTcrRouter = router({
         gameIds: z.array(idSchema).min(1),
         label: roundLabelSchema.optional(),
         roundGroupId: roundGroupIdSchema.optional(),
-        mode: z.enum(["create", "add", "rename", "remove"]),
+        color: roundColorSchema.optional(),
+        mode: z.enum(["create", "add", "rename", "remove", "color"]),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -3644,7 +3666,8 @@ export const tournamentControlRouter = router({
         gameIds: z.array(idSchema).min(1),
         label: roundLabelSchema.optional(),
         roundGroupId: roundGroupIdSchema.optional(),
-        mode: z.enum(["create", "add", "rename", "remove"]),
+        color: roundColorSchema.optional(),
+        mode: z.enum(["create", "add", "rename", "remove", "color"]),
       })
     )
     .mutation(({ input }) => updateRoundGroup(input)),

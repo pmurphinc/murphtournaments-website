@@ -176,6 +176,13 @@
       "when": 1784505600000,
       "tag": "0024_add_tournament_round_groups",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "5",
+      "when": 1784592000000,
+      "tag": "0025_add_tournament_round_group_colors",
+      "breakpoints": true
     }
   ]
 }

@@ -139,6 +139,7 @@ export async function ensureTournamentControlColumns(db: AppDb) {
     "varchar(64)"
   );
   await addColumnIfMissing(db, "tournament_games", "roundLabel", "varchar(80)");
+  await addColumnIfMissing(db, "tournament_games", "roundColor", "varchar(24)");
   await addColumnIfMissing(
     db,
     "tournament_control_template_games",
@@ -150,6 +151,12 @@ export async function ensureTournamentControlColumns(db: AppDb) {
     "tournament_control_template_games",
     "roundLabel",
     "varchar(80)"
+  );
+  await addColumnIfMissing(
+    db,
+    "tournament_control_template_games",
+    "roundColor",
+    "varchar(24)"
   );
   await addIndexIfMissing(
     db,
