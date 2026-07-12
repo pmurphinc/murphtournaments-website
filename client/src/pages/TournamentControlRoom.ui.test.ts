@@ -46,7 +46,7 @@ describe("Tournament Control Room guide and zoom rail UI", () => {
     expect(adminSource).not.toContain("W winners · L losers");
   });
 
-  it("launches Options, Rounds, and PC Controls from one zoom rail shared panel", () => {
+  it("launches Options, Groups, and PC Controls from one zoom rail shared panel", () => {
     expect(adminSource).toContain(
       "onPointerDownCapture={event => event.preventDefault()}"
     );
@@ -60,11 +60,11 @@ describe("Tournament Control Room guide and zoom rail UI", () => {
     expect(adminSource).toContain('panel === "controls" ? null : "controls"');
   });
 
-  it("places Rounds and PC Controls after the W/L legend and keeps the selected count badge", () => {
+  it("places Groups and PC Controls after the W/L legend and keeps the selected count badge", () => {
     const legendIndex = adminSource.indexOf(
       'aria-label="Admin connector legend"'
     );
-    const roundsIndex = adminSource.indexOf('title="Rounds"', legendIndex);
+    const roundsIndex = adminSource.indexOf('title="Groups"', legendIndex);
     const controlsIndex = adminSource.indexOf(
       'title="PC Controls"',
       roundsIndex
@@ -74,7 +74,7 @@ describe("Tournament Control Room guide and zoom rail UI", () => {
     expect(controlsIndex).toBeGreaterThan(roundsIndex);
     expect(adminSource).toContain("selectedRoundGameIds.size > 0");
     expect(adminSource).toContain(
-      "Rounds panel, ${selectedRoundGameIds.size} games selected"
+      "Groups panel, ${selectedRoundGameIds.size} games selected"
     );
   });
 
@@ -121,10 +121,10 @@ describe("Tournament Control Room guide and zoom rail UI", () => {
     expect(adminSource).toContain("Delete All Connections");
     expect(adminSource).toContain("Return All Teams to Available");
     expect(adminSource).toContain("Wipe Canvas");
-    expect(adminSource).toContain("Create Round");
-    expect(adminSource).toContain("Rename Round");
+    expect(adminSource).toContain("Create Group");
+    expect(adminSource).toContain("Rename Group");
     expect(adminSource).toContain("Add Selected");
-    expect(adminSource).toContain("Remove From Round");
+    expect(adminSource).toContain("Remove From Group");
     expect(adminSource).toContain("Clear Selection");
   });
 });
@@ -243,16 +243,16 @@ describe("Tournament Control Room round lobby selection", () => {
 
   it("keeps selected count and all round-management actions", () => {
     expect(adminSource).toContain("selectedRoundGameIds.size} selected");
-    expect(adminSource).toContain("Create Round");
-    expect(adminSource).toContain("Rename Round");
+    expect(adminSource).toContain("Create Group");
+    expect(adminSource).toContain("Rename Group");
     expect(adminSource).toContain("Add Selected");
-    expect(adminSource).toContain("Remove From Round");
+    expect(adminSource).toContain("Remove From Group");
     expect(adminSource).toContain("Clear Selection");
   });
 
-  it("documents the new round-selection controls in the guide and Rounds panel", () => {
+  it("documents the new group-selection controls in the guide and Groups panel", () => {
     expect(adminSource).toContain("Ctrl/Shift + click lobby");
-    expect(adminSource).toContain("Select lobbies for rounds");
+    expect(adminSource).toContain("Select lobbies for groups");
     expect(adminSource).toContain("Click empty board");
     expect(adminSource).toContain("Clear lobby selection");
   });

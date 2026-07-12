@@ -35,10 +35,11 @@ describe("Tournament round-group migration", () => {
         entry => entry.tag === "0024_add_tournament_round_groups"
       )
     ).toHaveLength(1);
-    expect(journal.entries.at(-1)).toMatchObject({
-      idx: 24,
-      tag: "0024_add_tournament_round_groups",
-    });
+    expect(
+      journal.entries.find(
+        entry => entry.tag === "0024_add_tournament_round_groups"
+      )
+    ).toMatchObject({ idx: 24 });
   });
 
   it("adds all round fields and the round-group index", () => {
