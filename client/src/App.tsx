@@ -35,6 +35,7 @@ import TournamentControlViewer from "./pages/TournamentControlViewer";
 import TournamentControlRoom from "./pages/TournamentControlRoom";
 import TournamentControlIndex from "./pages/TournamentControlIndex";
 import PersonalTcrIndex from "./pages/PersonalTcrIndex";
+import TournamentStaffInviteJoin from "./pages/TournamentStaffInviteJoin";
 import CommunityTournaments from "./pages/CommunityTournaments";
 import { useEffect } from "react";
 
@@ -67,10 +68,19 @@ function Router() {
             path={"/tournaments/june-2026"}
             component={JuneTournament2026}
           />
-          <Route path={"/tournaments/community/:slug"} component={CommunityTournaments} />
-          <Route path={"/tournaments/community"} component={CommunityTournaments} />
+          <Route
+            path={"/tournaments/community/:slug"}
+            component={CommunityTournaments}
+          />
+          <Route
+            path={"/tournaments/community"}
+            component={CommunityTournaments}
+          />
           <Route path={"/tournaments"} component={TournamentHistory} />
-          <Route path={"/bracket/:viewerToken"} component={TournamentControlViewer} />
+          <Route
+            path={"/bracket/:viewerToken"}
+            component={TournamentControlViewer}
+          />
           <Route path={"/bracket"} component={LiveBracket} />
           <Route path={"/dev-division"} component={DevDivision} />
           <Route path={"/about"} component={About} />
@@ -98,11 +108,28 @@ function Router() {
           <Route path={"/teams/claim/:token"} component={TeamClaimLink} />
           <Route path={"/teams/join/:token"} component={TeamJoinInvite} />
           <Route path={"/teams"} component={TeamManagement} />
-          <Route path={"/TCR/:tournamentId"} component={TournamentControlRoom} />
-          <Route path={"/tcr/:tournamentId"} component={TournamentControlRoom} />
+          <Route
+            path={"/TCR/staff/join/:token"}
+            component={TournamentStaffInviteJoin}
+          />
+          <Route
+            path={"/tcr/staff/join/:token"}
+            component={TournamentStaffInviteJoin}
+          />
+          <Route
+            path={"/TCR/:tournamentId"}
+            component={TournamentControlRoom}
+          />
+          <Route
+            path={"/tcr/:tournamentId"}
+            component={TournamentControlRoom}
+          />
           <Route path={"/TCR"} component={PersonalTcrIndex} />
           <Route path={"/tcr"} component={PersonalTcrIndex} />
-          <Route path={"/admin/tournaments/control"} component={TournamentControlIndex} />
+          <Route
+            path={"/admin/tournaments/control"}
+            component={TournamentControlIndex}
+          />
           <Route
             path={"/admin/tournaments/:tournamentId/control"}
             component={TournamentControlRoom}
