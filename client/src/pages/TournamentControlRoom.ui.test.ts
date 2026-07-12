@@ -82,3 +82,80 @@ describe("Tournament Control Room guide and zoom rail UI", () => {
     expect(adminSource).toContain("Wipe Canvas");
   });
 });
+
+describe("Tournament Control Room staff invite toolbar", () => {
+  it("replaces the inline staff panel with the required compact toolbar order", () => {
+    expect(adminSource).toContain("Invite Staff");
+    expect(adminSource).toContain("Copy Viewer Link");
+    expect(adminSource).toContain("Save Template");
+    expect(adminSource).toContain("← Tournament Rooms");
+    expect(adminSource).not.toContain("Staff Invite</Button>");
+    expect(adminSource).not.toContain('Active invite:{" "}');
+
+    const inviteIndex = adminSource.indexOf("Invite Staff");
+    const viewerIndex = adminSource.indexOf("Copy Viewer Link", inviteIndex);
+    const templateIndex = adminSource.indexOf("Save Template", viewerIndex);
+    const roomsIndex = adminSource.indexOf("← Tournament Rooms", templateIndex);
+    expect(inviteIndex).toBeGreaterThan(-1);
+    expect(viewerIndex).toBeGreaterThan(inviteIndex);
+    expect(templateIndex).toBeGreaterThan(viewerIndex);
+    expect(roomsIndex).toBeGreaterThan(templateIndex);
+  });
+
+  it("keeps invite management hidden behind a compact Radix dropdown", () => {
+    const staffTriggerIndex = adminSource.indexOf("Invite Staff");
+    const contentIndex = adminSource.indexOf(
+      "DropdownMenuContent",
+      staffTriggerIndex
+    );
+    expect(adminSource).toContain("DropdownMenuTrigger asChild");
+    expect(contentIndex).toBeGreaterThan(staffTriggerIndex);
+    expect(adminSource).toContain("w-80 border-neon-gold/30 bg-black p-3");
+    expect(adminSource).toContain("max-h-44 space-y-2 overflow-y-auto");
+  });
+
+  it("shows the correct staff invite actions for inactive and active invite states", () => {
+    expect(adminSource).toContain("Create & Copy Invite Link");
+    expect(adminSource).toContain("Staff invite active");
+    expect(adminSource).toContain("Regenerate & Copy Link");
+    expect(adminSource).toContain("Revoke Invite");
+    expect(adminSource).toContain("invalidates the previous unclaimed invite");
+  });
+
+  it("keeps staff members and empty state inside the management surface", () => {
+    const contentIndex = adminSource.indexOf("DropdownMenuContent");
+    expect(adminSource.indexOf("Staff Members", contentIndex)).toBeGreaterThan(
+      contentIndex
+    );
+    expect(adminSource.indexOf("Remove", contentIndex)).toBeGreaterThan(
+      contentIndex
+    );
+    expect(
+      adminSource.indexOf("No staff members have joined yet", contentIndex)
+    ).toBeGreaterThan(contentIndex);
+  });
+
+  it("moves the score and drag instructions onto a full-width row", () => {
+    expect(adminSource).toContain(
+      "basis-full rounded border border-white/10 bg-white/5"
+    );
+    expect(adminSource).toContain("Click team + 1–4 score");
+  });
+});
+
+const serverSource = readFileSync(
+  new URL("../../../server/tournamentControl.ts", import.meta.url),
+  "utf8"
+);
+
+describe("Tournament Control Room staff invite permissions and security", () => {
+  it("keeps staff management owner-only and does not expose stored raw tokens", () => {
+    expect(serverSource).toContain(
+      "await getOwnedTournamentOrThrow(db, tournamentId, user)"
+    );
+    expect(serverSource).toContain("tokenHash: hashToken(token)");
+    expect(serverSource).toContain("path: null");
+    expect(serverSource).toContain("hasActiveInvite: true");
+    expect(serverSource).toContain("const STAFF_INVITE_TTL_DAYS = 7");
+  });
+});
