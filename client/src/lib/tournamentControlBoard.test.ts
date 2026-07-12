@@ -155,4 +155,52 @@ describe("group frame helpers", () => {
       new Set(Array.from(positions.values()).map(p => `${p.x}:${p.y}`)).size
     ).toBe(3);
   });
+
+  it("selects group members, replaces selection, and preserves outsiders", async () => {
+    const mod = await import("./tournamentControlBoard");
+    const games = [
+      { id: 1, roundGroupId: "alpha" },
+      { id: 2, roundGroupId: "alpha" },
+      { id: 3, roundGroupId: "bravo" },
+      { id: 4, roundGroupId: null },
+    ];
+
+    const alphaIds = mod.getRoundGroupGameIds(games, "alpha");
+    const bravoIds = mod.getRoundGroupGameIds(games, "bravo");
+    expect(alphaIds).toEqual([1, 2]);
+
+    const alphaSelection = mod.getNextRoundGroupSelection(
+      new Set([4]),
+      alphaIds,
+      false
+    );
+    expect(Array.from(alphaSelection).sort()).toEqual([1, 2]);
+    expect(alphaSelection.has(4)).toBe(false);
+    expect(mod.isRoundGroupSelected(alphaSelection, alphaIds)).toBe(true);
+    expect(mod.isRoundGroupSelected(alphaSelection, bravoIds)).toBe(false);
+
+    const additiveSelection = mod.getNextRoundGroupSelection(
+      alphaSelection,
+      bravoIds,
+      true
+    );
+    expect(Array.from(additiveSelection).sort()).toEqual([1, 2, 3]);
+
+    const replacedSelection = mod.getNextRoundGroupSelection(
+      additiveSelection,
+      bravoIds,
+      false
+    );
+    expect(Array.from(replacedSelection)).toEqual([3]);
+  });
+
+  it("toggles an already-selected group during additive group selection", async () => {
+    const mod = await import("./tournamentControlBoard");
+    const next = mod.getNextRoundGroupSelection(
+      new Set([1, 2, 9]),
+      [1, 2],
+      true
+    );
+    expect(Array.from(next)).toEqual([9]);
+  });
 });

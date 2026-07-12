@@ -30,8 +30,11 @@ import {
   getConnectorPoint,
   getEmptyBoardResetView,
   getFitToContentView,
+  getNextRoundGroupSelection,
+  getRoundGroupGameIds,
   getKeyboardPanVector,
   getRoundFrames,
+  isRoundGroupSelected,
   roundFrameColorIds,
   roundFrameThemes,
   applyGroupMovementDelta,
@@ -1224,6 +1227,18 @@ export default function TournamentControlRoom() {
     [zoom]
   );
 
+  const selectRoundGroup = useCallback(
+    (groupId: string, additive: boolean) => {
+      const groupGameIds = getRoundGroupGameIds(games, groupId);
+      setSelectedRoundGameIds(current =>
+        getNextRoundGroupSelection(current, groupGameIds, additive)
+      );
+      setSelectedConnectionId(null);
+      setSelectedGameId(null);
+    },
+    [games]
+  );
+
   useEffect(() => {
     if (!nodeDrag) return;
 
@@ -1283,9 +1298,10 @@ export default function TournamentControlRoom() {
     const start = groupDrag;
     const handlePointerMove = (event: PointerEvent) => {
       if (event.pointerId !== start.pointerId) return;
-      event.preventDefault();
       const dragged =
         start.dragged || hasPointerExceededDragThreshold(start, event);
+      if (!dragged) return;
+      event.preventDefault();
       const delta = getCanvasDeltaFromPointerDelta(start, event, zoom);
       const positions = applyGroupMovementDelta(games, start.groupId, delta);
       setGroupDrag(current =>
@@ -1301,7 +1317,7 @@ export default function TournamentControlRoom() {
       if (event.pointerId !== start.pointerId) return;
       const delta = getCanvasDeltaFromPointerDelta(start, event, zoom);
       const positions = applyGroupMovementDelta(games, start.groupId, delta);
-      if (hasPointerExceededDragThreshold(start, event)) {
+      if (start.dragged || hasPointerExceededDragThreshold(start, event)) {
         setOptimisticGamePositions(current => {
           const next = new Map(current);
           positions.forEach((position, gameId) => next.set(gameId, position));
@@ -2051,6 +2067,12 @@ export default function TournamentControlRoom() {
                   }
                 }}
                 onContextMenu={event => {
+                  if (
+                    event.target instanceof Element &&
+                    event.target.closest('[data-round-group-header="true"]')
+                  ) {
+                    return;
+                  }
                   setCanvasMenuPosition(
                     canvasPoint(event.clientX, event.clientY)
                   );
@@ -2451,6 +2473,26 @@ export default function TournamentControlRoom() {
                                   "Select lobbies for groups",
                                 ],
                                 [
+                                  "bg-yellow-300/15 text-yellow-100 border-yellow-200/40",
+                                  "Click group header",
+                                  "Select group",
+                                ],
+                                [
+                                  "bg-yellow-300/15 text-yellow-100 border-yellow-200/40",
+                                  "Ctrl/Shift + click group header",
+                                  "Add/remove group selection",
+                                ],
+                                [
+                                  "bg-orange-400/15 text-orange-100 border-orange-300/30",
+                                  "Drag group header",
+                                  "Move group",
+                                ],
+                                [
+                                  "bg-emerald-400/15 text-emerald-100 border-emerald-300/30",
+                                  "Right-click group header",
+                                  "Group options",
+                                ],
+                                [
                                   "bg-zinc-300/15 text-zinc-100 border-zinc-200/30",
                                   "Click empty board",
                                   "Clear lobby selection",
@@ -2554,25 +2596,54 @@ export default function TournamentControlRoom() {
                     }}
                     ref={boardRef}
                   >
-                    {roundFrames.map((frame: RoundFrame) => (
-                      <div
-                        key={frame.groupId}
-                        className={`pointer-events-none absolute z-0 rounded-xl border-2 ${frame.theme.frame}`}
-                        style={{
-                          left: frame.x,
-                          top: frame.y,
-                          width: frame.width,
-                          height: frame.height,
-                        }}
-                      >
-                        <ContextMenu>
+                    {roundFrames.map((frame: RoundFrame) => {
+                      const groupGameIds = getRoundGroupGameIds(
+                        games,
+                        frame.groupId
+                      );
+                      const groupSelected = isRoundGroupSelected(
+                        selectedRoundGameIds,
+                        groupGameIds
+                      );
+                      return (
+                        <div
+                          key={`${frame.groupId}-frame`}
+                          className={`pointer-events-none absolute z-0 rounded-xl border-2 ${frame.theme.frame} ${groupSelected ? "ring-2 ring-[#FFD700] ring-offset-2 ring-offset-black/80" : ""}`}
+                          style={{
+                            left: frame.x,
+                            top: frame.y,
+                            width: frame.width,
+                            height: frame.height,
+                          }}
+                        />
+                      );
+                    })}
+                    {roundFrames.map((frame: RoundFrame) => {
+                      const groupGameIds = getRoundGroupGameIds(
+                        games,
+                        frame.groupId
+                      );
+                      const groupSelected = isRoundGroupSelected(
+                        selectedRoundGameIds,
+                        groupGameIds
+                      );
+                      return (
+                        <ContextMenu key={`${frame.groupId}-header-menu`}>
                           <ContextMenuTrigger asChild>
                             <button
                               type="button"
                               data-no-canvas-pan="true"
-                              className={`pointer-events-auto absolute -top-7 left-5 touch-none select-none rounded-md border-2 px-3 py-1.5 font-mono text-sm font-black uppercase tracking-[0.18em] ${frame.theme.label} ${groupDrag?.groupId === frame.groupId ? "cursor-grabbing" : "cursor-grab"}`}
+                              data-round-group-header="true"
+                              className={`pointer-events-auto absolute z-[2] touch-none select-none rounded-md border-2 px-3 py-1.5 font-mono text-sm font-black uppercase tracking-[0.18em] ${frame.theme.label} ${groupSelected ? "ring-4 ring-[#FFD700]/80 shadow-[0_0_26px_rgba(255,215,0,0.34)]" : ""} ${groupDrag?.groupId === frame.groupId ? "cursor-grabbing" : "cursor-grab"}`}
+                              style={{
+                                left: frame.x + 20,
+                                top: frame.y - 28,
+                              }}
                               aria-label={`${frame.label} group actions and drag handle`}
-                              onContextMenu={event => event.stopPropagation()}
+                              aria-pressed={groupSelected}
+                              onContextMenu={event => {
+                                event.stopPropagation();
+                              }}
                               onPointerDown={event => {
                                 if (event.button !== 0) return;
                                 event.preventDefault();
@@ -2584,6 +2655,27 @@ export default function TournamentControlRoom() {
                                   clientY: event.clientY,
                                   dragged: false,
                                 });
+                              }}
+                              onPointerUp={event => {
+                                if (event.button !== 0) return;
+                                event.preventDefault();
+                                event.stopPropagation();
+                                const dragStart = groupDrag;
+                                if (
+                                  dragStart?.groupId !== frame.groupId ||
+                                  dragStart.pointerId !== event.pointerId ||
+                                  dragStart.dragged ||
+                                  hasPointerExceededDragThreshold(
+                                    dragStart,
+                                    event.nativeEvent
+                                  )
+                                ) {
+                                  return;
+                                }
+                                selectRoundGroup(
+                                  frame.groupId,
+                                  event.ctrlKey || event.shiftKey
+                                );
                               }}
                             >
                               {frame.label}
@@ -2653,8 +2745,8 @@ export default function TournamentControlRoom() {
                             </ContextMenuItem>
                           </ContextMenuContent>
                         </ContextMenu>
-                      </div>
-                    ))}
+                      );
+                    })}
                     <svg
                       className="absolute inset-0 z-[1] overflow-visible"
                       width={logicalCanvasSize.width}

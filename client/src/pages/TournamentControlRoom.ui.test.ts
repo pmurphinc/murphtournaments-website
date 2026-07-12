@@ -22,6 +22,14 @@ describe("Tournament Control Room guide and zoom rail UI", () => {
     expect(adminSource).toContain("Move around the canvas");
     expect(adminSource).toContain("Right-click empty board");
     expect(adminSource).toContain("Add a team or lobby");
+    expect(adminSource).toContain("Click group header");
+    expect(adminSource).toContain("Select group");
+    expect(adminSource).toContain("Ctrl/Shift + click group header");
+    expect(adminSource).toContain("Add/remove group selection");
+    expect(adminSource).toContain("Drag group header");
+    expect(adminSource).toContain("Move group");
+    expect(adminSource).toContain("Right-click group header");
+    expect(adminSource).toContain("Group options");
     expect(adminSource).toContain("Select connection, press Del");
     expect(adminSource).toContain("Remove connection");
     expect(adminSource).toContain(
@@ -255,6 +263,35 @@ describe("Tournament Control Room round lobby selection", () => {
     expect(adminSource).toContain("Select lobbies for groups");
     expect(adminSource).toContain("Click empty board");
     expect(adminSource).toContain("Clear lobby selection");
+    expect(adminSource).toContain("Click group header");
+    expect(adminSource).toContain("Ctrl/Shift + click group header");
+    expect(adminSource).toContain("Right-click group header");
+  });
+
+  it("renders group headers as a separate interactive layer above connection lines", () => {
+    expect(adminSource).toContain('data-round-group-header="true"');
+    expect(adminSource).toContain("absolute z-0 rounded-xl");
+    expect(adminSource).toContain('className="absolute inset-0 z-[1] overflow-visible"');
+    expect(adminSource).toContain("absolute z-[2] touch-none");
+    expect(adminSource).toContain("frame.x + 20");
+    expect(adminSource).toContain("frame.y - 28");
+  });
+
+  it("uses real group selection state and separates group click from drag", () => {
+    expect(adminSource).toContain("getNextRoundGroupSelection");
+    expect(adminSource).toContain("setSelectedRoundGameIds(current =>");
+    expect(adminSource).toContain("selectRoundGroup(");
+    expect(adminSource).toContain("event.ctrlKey || event.shiftKey");
+    expect(adminSource).toContain("dragStart.dragged");
+    expect(adminSource).toContain("hasPointerExceededDragThreshold(");
+    expect(adminSource).toContain("if (!dragged) return;");
+  });
+
+  it("prevents group context menus from falling through to the board menu", () => {
+    expect(adminSource).toContain("event.target.closest('[data-round-group-header=\"true\"]')");
+    expect(adminSource).toContain("Select Color");
+    expect(adminSource).toContain("Organize Lobbies");
+    expect(adminSource).toContain("Delete Group");
   });
 });
 
