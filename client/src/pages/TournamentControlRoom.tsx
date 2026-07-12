@@ -87,6 +87,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
@@ -558,6 +559,7 @@ export default function TournamentControlRoom() {
   const createStaffInviteLink = trpc.personalTcr.getStaffInviteLink.useMutation(
     {
       onSuccess: async data => {
+        void utils.personalTcr.listStaff.invalidate({ tournamentId });
         if (!data.path) {
           toast.error("Regenerate the staff invite to copy a fresh link.");
           return;
@@ -577,11 +579,21 @@ export default function TournamentControlRoom() {
   const regenerateStaffInviteLink =
     trpc.personalTcr.regenerateStaffInviteLink.useMutation({
       onSuccess: async data => {
-        if (data.path)
+        void utils.personalTcr.listStaff.invalidate({ tournamentId });
+        if (!data.path) {
+          toast.error(
+            "Staff invite regenerated, but no fresh link was returned."
+          );
+          return;
+        }
+        try {
           await navigator.clipboard.writeText(
             `${window.location.origin}${data.path}`
           );
-        toast.success("Staff invite regenerated and copied");
+          toast.success("Staff invite regenerated and copied");
+        } catch {
+          toast.error("Staff invite was regenerated, but copying failed.");
+        }
       },
       onError: (error: { message: string }) => toast.error(error.message),
     });
@@ -1496,73 +1508,134 @@ export default function TournamentControlRoom() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
+            {canManageStaff && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="h-10 border-neon-gold/40 text-neon-gold hover:bg-neon-gold/10"
+                  >
+                    Invite Staff
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  className="w-80 border-neon-gold/30 bg-black p-3 text-white shadow-[0_0_24px_rgba(255,215,0,0.16)]"
+                >
+                  <DropdownMenuLabel className="px-0 font-mono text-xs uppercase tracking-[0.25em] text-neon-gold">
+                    Staff Invite
+                  </DropdownMenuLabel>
+                  {staffQuery.data?.activeInvite ? (
+                    <div className="space-y-2 py-2">
+                      <p className="rounded border border-neon-gold/25 bg-neon-gold/10 px-2 py-1.5 font-mono text-xs uppercase text-neon-gold">
+                        Staff invite active
+                      </p>
+                      <p className="text-xs text-white/55">
+                        Regenerating creates a new single-use link and
+                        invalidates the previous unclaimed invite.
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="border-neon-gold/40 text-neon-gold hover:bg-neon-gold/10"
+                          disabled={regenerateStaffInviteLink.isPending}
+                          onClick={() =>
+                            regenerateStaffInviteLink.mutate({ tournamentId })
+                          }
+                        >
+                          Regenerate & Copy Link
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="border-red-400/30 text-red-200 hover:bg-red-950/40"
+                          disabled={revokeStaffInviteLink.isPending}
+                          onClick={() =>
+                            revokeStaffInviteLink.mutate({ tournamentId })
+                          }
+                        >
+                          Revoke Invite
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 py-2">
+                      <p className="text-xs text-white/55">
+                        Create a single-use staff invite and copy the fresh
+                        link.
+                      </p>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="border-neon-gold/40 text-neon-gold hover:bg-neon-gold/10"
+                        disabled={createStaffInviteLink.isPending}
+                        onClick={() =>
+                          createStaffInviteLink.mutate({ tournamentId })
+                        }
+                      >
+                        Create & Copy Invite Link
+                      </Button>
+                    </div>
+                  )}
+                  <DropdownMenuSeparator className="bg-white/10" />
+                  <div className="space-y-2 pt-2">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/45">
+                      Staff Members
+                    </p>
+                    <div className="max-h-44 space-y-2 overflow-y-auto pr-1">
+                      {staffQuery.data?.members.length ? (
+                        staffQuery.data.members.map(member => (
+                          <div
+                            key={member.id}
+                            className="flex items-center justify-between gap-2 rounded border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-white/70"
+                          >
+                            <span className="min-w-0 truncate">
+                              {member.user.discordDisplayName ||
+                                member.user.discordUsername ||
+                                member.user.name ||
+                                `User ${member.user.id}`}{" "}
+                              {""}·{" "}
+                              {new Date(member.createdAt).toLocaleDateString()}
+                            </span>
+                            <button
+                              type="button"
+                              className="shrink-0 font-mono uppercase text-red-200 hover:text-red-100 disabled:opacity-50"
+                              disabled={removeStaffMember.isPending}
+                              onClick={() =>
+                                removeStaffMember.mutate({
+                                  tournamentId,
+                                  memberId: member.id,
+                                })
+                              }
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="rounded border border-white/10 bg-white/5 px-2 py-2 text-xs text-white/50">
+                          No staff members have joined yet
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
             <Button
               variant="outline"
-              className="border-neon-gold/40 text-neon-gold hover:bg-neon-gold/10"
+              className="h-10 border-neon-gold/40 text-neon-gold hover:bg-neon-gold/10"
               onClick={() => enableViewerLink.mutate({ tournamentId })}
             >
               Copy Viewer Link
             </Button>
-            {canManageStaff && (
-              <div className="flex flex-wrap gap-2 rounded border border-neon-gold/30 bg-black/50 p-1">
-                <Button
-                  variant="outline"
-                  className="border-neon-gold/40 text-neon-gold hover:bg-neon-gold/10"
-                  onClick={() => createStaffInviteLink.mutate({ tournamentId })}
-                >
-                  Staff Invite
-                </Button>
-                <Button
-                  variant="outline"
-                  className="border-white/20 text-white hover:bg-white/10"
-                  onClick={() =>
-                    regenerateStaffInviteLink.mutate({ tournamentId })
-                  }
-                >
-                  Regenerate
-                </Button>
-                <Button
-                  variant="outline"
-                  className="border-red-400/30 text-red-200 hover:bg-red-950/40"
-                  onClick={() => revokeStaffInviteLink.mutate({ tournamentId })}
-                >
-                  Revoke
-                </Button>
-                <div className="basis-full px-2 py-1 font-mono text-[10px] uppercase text-white/45">
-                  Active invite:{" "}
-                  {staffQuery.data?.activeInvite ? "yes" : "none"}
-                </div>
-                {staffQuery.data?.members.map(member => (
-                  <div
-                    key={member.id}
-                    className="flex basis-full items-center justify-between gap-2 rounded border border-white/10 px-2 py-1 text-xs text-white/70"
-                  >
-                    <span>
-                      {member.user.discordDisplayName ||
-                        member.user.discordUsername ||
-                        member.user.name ||
-                        `User ${member.user.id}`}{" "}
-                      · {new Date(member.createdAt).toLocaleDateString()}
-                    </span>
-                    <button
-                      type="button"
-                      className="font-mono uppercase text-red-200 hover:text-red-100"
-                      onClick={() =>
-                        removeStaffMember.mutate({
-                          tournamentId,
-                          memberId: member.id,
-                        })
-                      }
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
             <Button
               variant="outline"
-              className="border-neon-gold/40 text-neon-gold hover:bg-neon-gold/10"
+              className="h-10 border-neon-gold/40 text-neon-gold hover:bg-neon-gold/10"
               onClick={() => {
                 const name = window.prompt(
                   "Template name",
@@ -1586,14 +1659,14 @@ export default function TournamentControlRoom() {
             </Button>
             <Link
               href={isPersonalTcr ? "/TCR" : "/admin/tournaments/control"}
-              className="inline-flex rounded border border-[#FFD700]/70 bg-[#FFD700] px-4 py-2 font-mono text-xs font-black uppercase tracking-wider text-black shadow-[0_0_18px_rgba(255,215,0,0.22)] transition hover:bg-[#D4AF37]"
+              className="inline-flex h-10 items-center rounded border border-[#FFD700]/70 bg-[#FFD700] px-4 py-2 font-mono text-xs font-black uppercase tracking-wider text-black shadow-[0_0_18px_rgba(255,215,0,0.22)] transition hover:bg-[#D4AF37]"
             >
               ← Tournament Rooms
             </Link>
-            <div className="rounded border border-white/10 bg-white/5 px-3 py-2 font-mono text-xs text-white/55">
-              Click team + 1–4 score · drag lobby frame to move · drag bottom
-              node onto a lobby to connect
-            </div>
+          </div>
+          <div className="basis-full rounded border border-white/10 bg-white/5 px-3 py-2 font-mono text-xs text-white/55">
+            Click team + 1–4 score · drag lobby frame to move · drag bottom node
+            onto a lobby to connect
           </div>
         </div>
       </header>
