@@ -37,8 +37,7 @@ import {
   isRoundGroupSelected,
   roundFrameColorIds,
   roundFrameThemes,
-  applyGroupMovementDelta,
-  getCanvasDeltaFromPointerDelta,
+  getGroupDragPositionsFromStart,
   organizeGroupLobbyPositions,
   getMidpoint,
   getNodeHeight,
@@ -114,9 +113,17 @@ type NodeDragState = {
 type GroupDragState = {
   groupId: string;
   pointerId: number;
+  dragged: boolean;
+};
+type GroupDragSession = {
+  groupId: string;
+  pointerId: number;
   clientX: number;
   clientY: number;
+  additiveSelection: boolean;
   dragged: boolean;
+  persisted: boolean;
+  startPositions: Map<number, CanvasPoint>;
 };
 type ConnectionDragState = {
   sourceGameId: number;
@@ -413,6 +420,8 @@ export default function TournamentControlRoom() {
   const [connectionDrag, setConnectionDrag] =
     useState<ConnectionDragState | null>(null);
   const [groupDrag, setGroupDrag] = useState<GroupDragState | null>(null);
+  const groupDragRef = useRef<GroupDragSession | null>(null);
+  const suppressGroupHeaderClickRef = useRef(false);
   const [canvasMenuPosition, setCanvasMenuPosition] = useState({
     x: 160,
     y: 120,
@@ -1293,50 +1302,36 @@ export default function TournamentControlRoom() {
     snapWindowsToGrid,
   ]);
 
-  useEffect(() => {
-    if (!groupDrag) return;
-    const start = groupDrag;
-    const handlePointerMove = (event: PointerEvent) => {
-      if (event.pointerId !== start.pointerId) return;
-      const dragged =
-        start.dragged || hasPointerExceededDragThreshold(start, event);
-      if (!dragged) return;
-      event.preventDefault();
-      const delta = getCanvasDeltaFromPointerDelta(start, event, zoom);
-      const positions = applyGroupMovementDelta(games, start.groupId, delta);
-      setGroupDrag(current =>
-        current?.groupId === start.groupId ? { ...current, dragged } : current
-      );
+  const getGroupDragPositions = useCallback(
+    (start: GroupDragSession, clientX: number, clientY: number) => {
+      return getGroupDragPositionsFromStart(start, { clientX, clientY }, zoom);
+    },
+    [zoom]
+  );
+
+  const applyGroupDragPositions = useCallback(
+    (positions: ReadonlyMap<number, CanvasPoint>) => {
       setOptimisticGamePositions(current => {
         const next = new Map(current);
         positions.forEach((position, gameId) => next.set(gameId, position));
         return next;
       });
-    };
-    const finishDrag = (event: PointerEvent) => {
-      if (event.pointerId !== start.pointerId) return;
-      const delta = getCanvasDeltaFromPointerDelta(start, event, zoom);
-      const positions = applyGroupMovementDelta(games, start.groupId, delta);
-      if (start.dragged || hasPointerExceededDragThreshold(start, event)) {
-        setOptimisticGamePositions(current => {
-          const next = new Map(current);
-          positions.forEach((position, gameId) => next.set(gameId, position));
-          return next;
-        });
-        persistGroupPositions(positions);
+    },
+    []
+  );
+
+  const clearGroupDrag = useCallback((pointerTarget?: Element | null) => {
+    const start = groupDragRef.current;
+    if (start && pointerTarget instanceof HTMLElement) {
+      try {
+        pointerTarget.releasePointerCapture?.(start.pointerId);
+      } catch {
+        // Pointer capture may already be released by the browser.
       }
-      setGroupDrag(null);
-    };
-    const cancelDrag = () => setGroupDrag(null);
-    window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointerup", finishDrag, { once: true });
-    window.addEventListener("pointercancel", cancelDrag, { once: true });
-    return () => {
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerup", finishDrag);
-      window.removeEventListener("pointercancel", cancelDrag);
-    };
-  }, [games, groupDrag, persistGroupPositions, zoom]);
+    }
+    groupDragRef.current = null;
+    setGroupDrag(null);
+  }, []);
 
   useEffect(() => {
     if (!connectionDrag) return;
@@ -2648,34 +2643,135 @@ export default function TournamentControlRoom() {
                                 if (event.button !== 0) return;
                                 event.preventDefault();
                                 event.stopPropagation();
-                                setGroupDrag({
+                                const startPositions = new Map(
+                                  games
+                                    .filter(
+                                      game =>
+                                        game.roundGroupId === frame.groupId
+                                    )
+                                    .map(game => [
+                                      game.id,
+                                      getVisualPosition(game),
+                                    ] as const)
+                                );
+                                if (startPositions.size === 0) return;
+                                event.currentTarget.setPointerCapture?.(
+                                  event.pointerId
+                                );
+                                const nextGroupDrag: GroupDragSession = {
                                   groupId: frame.groupId,
                                   pointerId: event.pointerId,
                                   clientX: event.clientX,
                                   clientY: event.clientY,
+                                  additiveSelection:
+                                    event.ctrlKey || event.shiftKey,
+                                  dragged: false,
+                                  persisted: false,
+                                  startPositions,
+                                };
+                                groupDragRef.current = nextGroupDrag;
+                                suppressGroupHeaderClickRef.current = false;
+                                setGroupDrag({
+                                  groupId: frame.groupId,
+                                  pointerId: event.pointerId,
                                   dragged: false,
                                 });
                               }}
-                              onPointerUp={event => {
-                                if (event.button !== 0) return;
-                                event.preventDefault();
-                                event.stopPropagation();
-                                const dragStart = groupDrag;
+                              onPointerMove={event => {
+                                const dragStart = groupDragRef.current;
                                 if (
                                   dragStart?.groupId !== frame.groupId ||
-                                  dragStart.pointerId !== event.pointerId ||
+                                  dragStart.pointerId !== event.pointerId
+                                ) {
+                                  return;
+                                }
+                                const dragged =
                                   dragStart.dragged ||
                                   hasPointerExceededDragThreshold(
                                     dragStart,
                                     event.nativeEvent
+                                  );
+                                if (!dragged) return;
+                                event.preventDefault();
+                                event.stopPropagation();
+                                if (!dragStart.dragged) {
+                                  dragStart.dragged = true;
+                                  setGroupDrag(current =>
+                                    current?.groupId === dragStart.groupId
+                                      ? { ...current, dragged: true }
+                                      : current
+                                  );
+                                }
+                                applyGroupDragPositions(
+                                  getGroupDragPositions(
+                                    dragStart,
+                                    event.clientX,
+                                    event.clientY
                                   )
+                                );
+                              }}
+                              onPointerUp={event => {
+                                const dragStart = groupDragRef.current;
+                                if (
+                                  dragStart?.groupId !== frame.groupId ||
+                                  dragStart.pointerId !== event.pointerId
                                 ) {
                                   return;
                                 }
-                                selectRoundGroup(
-                                  frame.groupId,
-                                  event.ctrlKey || event.shiftKey
-                                );
+                                event.preventDefault();
+                                event.stopPropagation();
+                                const dragged =
+                                  dragStart.dragged ||
+                                  hasPointerExceededDragThreshold(
+                                    dragStart,
+                                    event.nativeEvent
+                                  );
+                                if (dragged) {
+                                  const positions = getGroupDragPositions(
+                                    dragStart,
+                                    event.clientX,
+                                    event.clientY
+                                  );
+                                  applyGroupDragPositions(positions);
+                                  if (!dragStart.persisted) {
+                                    dragStart.persisted = true;
+                                    persistGroupPositions(positions);
+                                  }
+                                  suppressGroupHeaderClickRef.current = true;
+                                } else {
+                                  selectRoundGroup(
+                                    frame.groupId,
+                                    dragStart.additiveSelection
+                                  );
+                                }
+                                clearGroupDrag(event.currentTarget);
+                              }}
+                              onPointerCancel={event => {
+                                const dragStart = groupDragRef.current;
+                                if (
+                                  dragStart?.groupId === frame.groupId &&
+                                  dragStart.pointerId === event.pointerId
+                                ) {
+                                  event.stopPropagation();
+                                  clearGroupDrag(event.currentTarget);
+                                }
+                              }}
+                              onLostPointerCapture={event => {
+                                const dragStart = groupDragRef.current;
+                                if (
+                                  dragStart?.groupId === frame.groupId &&
+                                  dragStart.pointerId === event.pointerId
+                                ) {
+                                  clearGroupDrag();
+                                }
+                              }}
+                              onClick={event => {
+                                if (!suppressGroupHeaderClickRef.current) {
+                                  return;
+                                }
+                                event.preventDefault();
+                                event.stopPropagation();
+                                suppressGroupHeaderClickRef.current = false;
                               }}
                             >
                               {frame.label}
