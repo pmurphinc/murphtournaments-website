@@ -21,7 +21,6 @@ import {
   clampZoom,
   connectorRadius,
   controlRoomGridSize,
-  getBoundedControlKeyPosition,
   getCanvasPanScroll,
   getCenterZoomView,
   getConnectionEndpoint,
@@ -153,25 +152,10 @@ type PinchZoomStart = {
   focalCanvasX: number;
   focalCanvasY: number;
 };
-type ControlKeyDragStart = {
-  pointerId: number;
-  clientX: number;
-  clientY: number;
-  startX: number;
-  startY: number;
-};
 type ZoomRailDragStart = {
   pointerId: number;
   clientX: number;
   clientY: number;
-  startY: number;
-  dragged: boolean;
-};
-type RoundRailDragStart = {
-  pointerId: number;
-  clientX: number;
-  clientY: number;
-  startX: number;
   startY: number;
   dragged: boolean;
 };
@@ -207,9 +191,7 @@ const statuses: GameStatus[] = ["draft", "ready", "live", "complete"];
 const activeStatuses = new Set<GameStatus>(["draft", "ready", "live"]);
 
 const controlRoomOverlayStorageKey = "murph:tournament-control-room:overlays";
-const defaultControlKeyPosition: CanvasPoint = { x: 16, y: 16 };
 const defaultZoomRailY = 160;
-const defaultRoundRailPosition: CanvasPoint = { x: 92, y: 160 };
 const keyboardPanSpeedPixelsPerSecond = 520;
 const competitiveTcrMaps = THE_FINALS_MAPS.filter(map =>
   DEFAULT_COMPETITIVE_MAP_IDS.includes(map.id)
@@ -222,12 +204,10 @@ const mapsById: ReadonlyMap<string, string> = new Map(
 );
 
 type ControlRoomOverlayPreferences = {
-  controlKeyPosition: CanvasPoint;
   zoomRailY: number;
-  controlKeyMinimized: boolean;
-  roundRailPosition: CanvasPoint;
-  roundRailCollapsed: boolean;
 };
+
+type ZoomRailActivePanel = "options" | "rounds" | "controls" | null;
 
 function readControlRoomOverlayPreferences(): Partial<ControlRoomOverlayPreferences> {
   if (typeof window === "undefined") return {};
@@ -236,26 +216,8 @@ function readControlRoomOverlayPreferences(): Partial<ControlRoomOverlayPreferen
     if (!raw) return {};
     const parsed = JSON.parse(raw) as Partial<ControlRoomOverlayPreferences>;
     return {
-      controlKeyPosition:
-        typeof parsed.controlKeyPosition?.x === "number" &&
-        typeof parsed.controlKeyPosition?.y === "number"
-          ? parsed.controlKeyPosition
-          : undefined,
       zoomRailY:
         typeof parsed.zoomRailY === "number" ? parsed.zoomRailY : undefined,
-      controlKeyMinimized:
-        typeof parsed.controlKeyMinimized === "boolean"
-          ? parsed.controlKeyMinimized
-          : undefined,
-      roundRailPosition:
-        typeof parsed.roundRailPosition?.x === "number" &&
-        typeof parsed.roundRailPosition?.y === "number"
-          ? parsed.roundRailPosition
-          : undefined,
-      roundRailCollapsed:
-        typeof parsed.roundRailCollapsed === "boolean"
-          ? parsed.roundRailCollapsed
-          : undefined,
     };
   } catch {
     return {};
@@ -417,7 +379,7 @@ export default function TournamentControlRoom() {
   const utils = trpc.useUtils();
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const boardRef = useRef<HTMLDivElement | null>(null);
-  const controlKeyRef = useRef<HTMLDivElement | null>(null);
+  const zoomRailRef = useRef<HTMLDivElement | null>(null);
   const [dragPayload, setDragPayload] = useState<DragPayload | null>(null);
   const [nodeDrag, setNodeDrag] = useState<NodeDragState | null>(null);
   const [connectionDrag, setConnectionDrag] =
@@ -445,37 +407,18 @@ export default function TournamentControlRoom() {
   >(() => new Map());
   const [zoom, setZoom] = useState(1);
   const [isPanning, setIsPanning] = useState(false);
-  const [controlKeyMinimized, setControlKeyMinimized] = useState(
-    () => readControlRoomOverlayPreferences().controlKeyMinimized ?? false
-  );
-  const [controlKeyLocked, setControlKeyLocked] = useState(true);
   const [mobileTeamsOpen, setMobileTeamsOpen] = useState(false);
   const [touchHelpOpen, setTouchHelpOpen] = useState(false);
-  const [controlKeyPosition, setControlKeyPosition] = useState<CanvasPoint>(
-    () =>
-      readControlRoomOverlayPreferences().controlKeyPosition ??
-      defaultControlKeyPosition
-  );
   const [zoomRailY, setZoomRailY] = useState(
     () => readControlRoomOverlayPreferences().zoomRailY ?? defaultZoomRailY
   );
-  const [zoomRailMenuOpen, setZoomRailMenuOpen] = useState(false);
-  const [roundRailPosition, setRoundRailPosition] = useState<CanvasPoint>(
-    () =>
-      readControlRoomOverlayPreferences().roundRailPosition ??
-      defaultRoundRailPosition
-  );
-  const [roundRailCollapsed, setRoundRailCollapsed] = useState(
-    () => readControlRoomOverlayPreferences().roundRailCollapsed ?? false
-  );
+  const [zoomRailActivePanel, setZoomRailActivePanel] =
+    useState<ZoomRailActivePanel>(null);
   const suppressZoomRailClickRef = useRef(false);
-  const suppressRoundRailClickRef = useRef(false);
   const [undoSnapshot, setUndoSnapshot] = useState<BoardUndoSnapshot | null>(
     null
   );
-  const controlKeyDragRef = useRef<ControlKeyDragStart | null>(null);
   const zoomRailDragRef = useRef<ZoomRailDragStart | null>(null);
-  const roundRailDragRef = useRef<RoundRailDragStart | null>(null);
   const canvasPanRef = useRef<(CanvasPanStart & { pointerId: number }) | null>(
     null
   );
@@ -949,20 +892,8 @@ export default function TournamentControlRoom() {
   }, [assignments, games, minimizedGameIds, nodeDrag, query.data, zoom]);
 
   useEffect(() => {
-    writeControlRoomOverlayPreferences({
-      controlKeyPosition,
-      zoomRailY,
-      controlKeyMinimized,
-      roundRailPosition,
-      roundRailCollapsed,
-    });
-  }, [
-    controlKeyPosition,
-    zoomRailY,
-    controlKeyMinimized,
-    roundRailPosition,
-    roundRailCollapsed,
-  ]);
+    writeControlRoomOverlayPreferences({ zoomRailY });
+  }, [zoomRailY]);
 
   useEffect(() => {
     if (selectedAssignmentId === null) return;
@@ -1163,6 +1094,23 @@ export default function TournamentControlRoom() {
     setPlacement,
   ]);
 
+  useEffect(() => {
+    if (zoomRailActivePanel === null) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (zoomRailRef.current?.contains(event.target as Node)) return;
+      setZoomRailActivePanel(null);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setZoomRailActivePanel(null);
+    };
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [zoomRailActivePanel]);
+
   const canvasPoint = useCallback(
     (clientX: number, clientY: number) => {
       const rect = canvasRef.current?.getBoundingClientRect();
@@ -1350,27 +1298,6 @@ export default function TournamentControlRoom() {
     );
   }, [applyBoardView, games, minimizedGameIds]);
 
-  const clampRoundRailPosition = useCallback(
-    (position: CanvasPoint) => {
-      const canvasRect = canvasRef.current?.getBoundingClientRect();
-      const viewportWidth = canvasRect?.width ?? window.innerWidth;
-      const viewportHeight = canvasRect?.height ?? window.innerHeight;
-      const railWidth = roundRailCollapsed ? 88 : 228;
-      const railHeight = roundRailCollapsed ? 74 : 380;
-      return {
-        x: Math.min(
-          Math.max(8, position.x),
-          Math.max(8, viewportWidth - railWidth - 8)
-        ),
-        y: Math.min(
-          Math.max(8, position.y),
-          Math.max(8, viewportHeight - railHeight - 8)
-        ),
-      };
-    },
-    [roundRailCollapsed]
-  );
-
   const clampZoomRailY = useCallback((value: number) => {
     const canvasRect = canvasRef.current?.getBoundingClientRect();
     const railHeight = 250;
@@ -1385,7 +1312,7 @@ export default function TournamentControlRoom() {
     (event: ReactPointerEvent<HTMLButtonElement>) => {
       if (event.button !== 0) return;
       event.stopPropagation();
-      setZoomRailMenuOpen(false);
+      setZoomRailActivePanel(null);
       zoomRailDragRef.current = {
         pointerId: event.pointerId,
         clientX: event.clientX,
@@ -1407,7 +1334,7 @@ export default function TournamentControlRoom() {
       if (hasPointerExceededDragThreshold(dragStart, event)) {
         dragStart.dragged = true;
         suppressZoomRailClickRef.current = true;
-        setZoomRailMenuOpen(false);
+        setZoomRailActivePanel(null);
       }
       if (!dragStart.dragged) return;
       event.preventDefault();
@@ -1441,74 +1368,7 @@ export default function TournamentControlRoom() {
         suppressZoomRailClickRef.current = false;
         return;
       }
-      setZoomRailMenuOpen(open => !open);
-    },
-    []
-  );
-
-  const startRoundRailDrag = useCallback(
-    (event: ReactPointerEvent<HTMLButtonElement>) => {
-      if (event.button !== 0) return;
-      event.stopPropagation();
-      roundRailDragRef.current = {
-        pointerId: event.pointerId,
-        clientX: event.clientX,
-        clientY: event.clientY,
-        startX: roundRailPosition.x,
-        startY: roundRailPosition.y,
-        dragged: false,
-      };
-      event.currentTarget.setPointerCapture?.(event.pointerId);
-    },
-    [roundRailPosition]
-  );
-
-  const dragRoundRail = useCallback(
-    (event: ReactPointerEvent<HTMLButtonElement>) => {
-      const dragStart = roundRailDragRef.current;
-      if (!dragStart || dragStart.pointerId !== event.pointerId) return;
-      const deltaX = event.clientX - dragStart.clientX;
-      const deltaY = event.clientY - dragStart.clientY;
-      if (hasPointerExceededDragThreshold(dragStart, event)) {
-        dragStart.dragged = true;
-        suppressRoundRailClickRef.current = true;
-      }
-      if (!dragStart.dragged) return;
-      event.preventDefault();
-      event.stopPropagation();
-      setRoundRailPosition(
-        clampRoundRailPosition({
-          x: dragStart.startX + deltaX,
-          y: dragStart.startY + deltaY,
-        })
-      );
-    },
-    [clampRoundRailPosition]
-  );
-
-  const finishRoundRailDrag = useCallback(
-    (event: ReactPointerEvent<HTMLButtonElement>) => {
-      const dragStart = roundRailDragRef.current;
-      if (dragStart?.pointerId !== event.pointerId) return;
-      event.stopPropagation();
-      if (dragStart.dragged) suppressRoundRailClickRef.current = true;
-      if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
-        event.currentTarget.releasePointerCapture(event.pointerId);
-      }
-      roundRailDragRef.current = null;
-    },
-    []
-  );
-
-  const toggleRoundRailCollapsed = useCallback(
-    (event: React.MouseEvent<HTMLButtonElement>) => {
-      if (suppressRoundRailClickRef.current) {
-        event.preventDefault();
-        event.stopPropagation();
-        suppressRoundRailClickRef.current = false;
-        return;
-      }
-      setRoundRailCollapsed(value => !value);
+      setZoomRailActivePanel(panel => (panel === "options" ? null : "options"));
     },
     []
   );
@@ -1537,60 +1397,6 @@ export default function TournamentControlRoom() {
       });
     },
     [setPlacement]
-  );
-
-  const startControlKeyDrag = useCallback(
-    (event: ReactPointerEvent<HTMLElement>) => {
-      if (controlKeyLocked || event.button !== 0) return;
-      event.preventDefault();
-      event.stopPropagation();
-      controlKeyDragRef.current = {
-        pointerId: event.pointerId,
-        clientX: event.clientX,
-        clientY: event.clientY,
-        startX: controlKeyPosition.x,
-        startY: controlKeyPosition.y,
-      };
-      event.currentTarget.setPointerCapture?.(event.pointerId);
-    },
-    [controlKeyLocked, controlKeyPosition.x, controlKeyPosition.y]
-  );
-
-  const dragControlKey = useCallback(
-    (event: ReactPointerEvent<HTMLElement>) => {
-      const dragStart = controlKeyDragRef.current;
-      if (!dragStart || dragStart.pointerId !== event.pointerId) return;
-      event.preventDefault();
-      event.stopPropagation();
-      const canvasRect = canvasRef.current?.getBoundingClientRect();
-      const keyRect = controlKeyRef.current?.getBoundingClientRect();
-      const nextPosition = {
-        x: dragStart.startX + event.clientX - dragStart.clientX,
-        y: dragStart.startY + event.clientY - dragStart.clientY,
-      };
-      setControlKeyPosition(
-        canvasRect && keyRect
-          ? getBoundedControlKeyPosition(
-              nextPosition,
-              { width: canvasRect.width, height: canvasRect.height },
-              { width: keyRect.width, height: keyRect.height }
-            )
-          : nextPosition
-      );
-    },
-    []
-  );
-
-  const finishControlKeyDrag = useCallback(
-    (event: ReactPointerEvent<HTMLElement>) => {
-      if (controlKeyDragRef.current?.pointerId !== event.pointerId) return;
-      controlKeyDragRef.current = null;
-      event.stopPropagation();
-      if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
-        event.currentTarget.releasePointerCapture(event.pointerId);
-      }
-    },
-    []
   );
 
   const toggleMinimizedGame = (gameId: number) => {
@@ -2099,239 +1905,37 @@ export default function TournamentControlRoom() {
                   );
                 }}
               >
-                <div className="pointer-events-none sticky left-0 top-0 z-[62] h-0 w-0">
+                <div className="pointer-events-none sticky left-3 top-0 z-[65] h-0 w-0 sm:left-4">
                   <div
-                    className={`pointer-events-auto overflow-hidden rounded-xl border border-[#FFD700]/35 bg-zinc-950/95 font-mono text-yellow-50 shadow-[0_0_24px_rgba(255,215,0,0.14)] backdrop-blur ${roundRailCollapsed ? "w-20" : "w-56"}`}
-                    style={{
-                      transform: `translate(${roundRailPosition.x}px, ${roundRailPosition.y}px)`,
-                    }}
+                    ref={zoomRailRef}
                     data-no-canvas-pan="true"
+                    className="pointer-events-auto relative flex w-16 flex-col items-center rounded-xl sm:w-20 border border-[#FFD700]/35 bg-zinc-950/95 font-mono text-white shadow-[0_0_24px_rgba(255,215,0,0.14)] backdrop-blur"
+                    style={{ transform: `translateY(${zoomRailY}px)` }}
                     onContextMenu={event => event.stopPropagation()}
                   >
                     <button
                       type="button"
-                      className="flex min-h-12 w-full touch-none items-center justify-between gap-2 border-b border-white/10 px-2 py-2 text-left text-[#FFD700] transition hover:bg-[#FFD700]/10"
-                      title="Rounds rail · drag to move, click to collapse or expand"
-                      aria-label="Rounds rail, drag to move or click to collapse or expand"
+                      data-no-canvas-pan="true"
+                      aria-controls="zoom-rail-shared-panel"
+                      aria-expanded={zoomRailActivePanel === "options"}
+                      className={`flex min-h-12 w-full touch-none flex-col items-center justify-center gap-0.5 border-b border-white/10 transition hover:bg-[#FFD700]/10 hover:text-[#FFD700] ${zoomRailActivePanel === "options" ? "bg-[#FFD700]/15 text-[#FFD700]" : "text-white/45"}`}
+                      title="Board options · drag to move zoom controls"
+                      aria-label="Board options and draggable zoom controls"
                       onPointerDownCapture={event => event.preventDefault()}
-                      onPointerDown={startRoundRailDrag}
-                      onPointerMove={dragRoundRail}
-                      onPointerUp={finishRoundRailDrag}
-                      onPointerCancel={finishRoundRailDrag}
-                      onClick={toggleRoundRailCollapsed}
+                      onPointerDown={startZoomRailDrag}
+                      onPointerMove={dragZoomRail}
+                      onPointerUp={finishZoomRailDrag}
+                      onPointerCancel={finishZoomRailDrag}
+                      onClick={handleZoomRailGripClick}
                     >
-                      <Grip
-                        className="h-4 w-4 shrink-0 text-white/45"
-                        aria-hidden="true"
-                      />
-                      <span className="min-w-0 flex-1 text-xs font-black uppercase tracking-widest">
-                        Rounds
+                      <Grip className="h-4 w-4" aria-hidden="true" />
+                      <span className="text-[9px] font-black uppercase leading-none tracking-tight">
+                        Options
                       </span>
-                      {selectedRoundGameIds.size > 0 && (
-                        <span className="rounded bg-[#FFD700] px-1.5 py-0.5 text-[10px] font-black text-black">
-                          {selectedRoundGameIds.size}
-                        </span>
-                      )}
+                      <span className="text-[8px] uppercase leading-none text-white/40">
+                        Move
+                      </span>
                     </button>
-                    {!roundRailCollapsed && (
-                      <div className="flex flex-col gap-2 p-2 text-[10px] uppercase">
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          className="h-8 justify-start px-2 text-[10px]"
-                          title="Toggle round game selection"
-                          onClick={() => setSelectionMode(value => !value)}
-                        >
-                          {selectionMode ? "Selection On" : "Select Rounds"}
-                        </Button>
-                        <span className="rounded border border-white/10 bg-white/5 px-2 py-1 text-white/55">
-                          {selectedRoundGameIds.size} selected
-                        </span>
-                        <Button
-                          size="sm"
-                          className="h-8 justify-start bg-[#FFD700] px-2 text-[10px] font-black text-black hover:bg-yellow-300"
-                          title="Create a round from selected games"
-                          disabled={selectedRoundGameIds.size < 2}
-                          onClick={() =>
-                            openDialog(
-                              { type: "round", mode: "create" },
-                              "Round"
-                            )
-                          }
-                        >
-                          Create Round
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          className="h-8 justify-start px-2 text-[10px]"
-                          title="Rename the selected round"
-                          disabled={
-                            selectedRoundGameIds.size === 0 ||
-                            !games.find(game =>
-                              selectedRoundGameIds.has(game.id)
-                            )?.roundGroupId
-                          }
-                          onClick={() => {
-                            const game = games.find(
-                              item =>
-                                selectedRoundGameIds.has(item.id) &&
-                                item.roundGroupId
-                            );
-                            if (game?.roundGroupId)
-                              openDialog(
-                                {
-                                  type: "round",
-                                  mode: "rename",
-                                  roundGroupId: game.roundGroupId,
-                                  currentValue: game.roundLabel ?? "Round",
-                                },
-                                game.roundLabel ?? "Round"
-                              );
-                          }}
-                        >
-                          Rename Round
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          className="h-8 justify-start px-2 text-[10px]"
-                          title="Add selected games to their selected round"
-                          disabled={
-                            selectedRoundGameIds.size === 0 ||
-                            !games.find(game =>
-                              selectedRoundGameIds.has(game.id)
-                            )?.roundGroupId
-                          }
-                          onClick={() => {
-                            const roundGame = games.find(
-                              game =>
-                                selectedRoundGameIds.has(game.id) &&
-                                game.roundGroupId
-                            );
-                            if (!roundGame?.roundGroupId) return;
-                            updateRoundGroup.mutate({
-                              tournamentId,
-                              gameIds: Array.from(selectedRoundGameIds),
-                              mode: "add",
-                              roundGroupId: roundGame.roundGroupId,
-                              label: roundGame.roundLabel ?? "Round",
-                            });
-                          }}
-                        >
-                          Add Selected
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          className="h-8 justify-start px-2 text-[10px]"
-                          title="Remove selected games from their round"
-                          disabled={selectedRoundGameIds.size === 0}
-                          onClick={() =>
-                            updateRoundGroup.mutate({
-                              tournamentId,
-                              gameIds: Array.from(selectedRoundGameIds),
-                              mode: "remove",
-                            })
-                          }
-                        >
-                          Remove From Round
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 justify-start px-2 text-[10px]"
-                          title="Clear round selection"
-                          onClick={() => setSelectedRoundGameIds(new Set())}
-                        >
-                          Clear Selection
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="pointer-events-none sticky left-3 top-0 z-[65] h-0 w-0 sm:left-4">
-                  <div
-                    data-no-canvas-pan="true"
-                    className="pointer-events-auto flex w-16 flex-col items-center overflow-hidden rounded-xl sm:w-20 border border-[#FFD700]/35 bg-zinc-950/95 font-mono text-white shadow-[0_0_24px_rgba(255,215,0,0.14)] backdrop-blur"
-                    style={{ transform: `translateY(${zoomRailY}px)` }}
-                    onContextMenu={event => event.stopPropagation()}
-                  >
-                    <DropdownMenu
-                      open={zoomRailMenuOpen}
-                      onOpenChange={setZoomRailMenuOpen}
-                    >
-                      <DropdownMenuTrigger asChild>
-                        <button
-                          type="button"
-                          data-no-canvas-pan="true"
-                          className="flex min-h-12 w-full touch-none flex-col items-center justify-center gap-0.5 border-b border-white/10 text-white/45 transition hover:bg-[#FFD700]/10 hover:text-[#FFD700]"
-                          title="Board options · drag to move zoom controls"
-                          aria-label="Board options and draggable zoom controls"
-                          onPointerDownCapture={event => event.preventDefault()}
-                          onPointerDown={startZoomRailDrag}
-                          onPointerMove={dragZoomRail}
-                          onPointerUp={finishZoomRailDrag}
-                          onPointerCancel={finishZoomRailDrag}
-                          onClick={handleZoomRailGripClick}
-                        >
-                          <Grip className="h-4 w-4" aria-hidden="true" />
-                          <span className="text-[9px] font-black uppercase leading-none tracking-tight">
-                            Options
-                          </span>
-                          <span className="text-[8px] uppercase leading-none text-white/40">
-                            Move
-                          </span>
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent
-                        align="start"
-                        side="right"
-                        className="border-[#FFD700]/35 bg-black/95 font-mono text-yellow-50 shadow-[0_0_24px_rgba(255,215,0,0.16)]"
-                      >
-                        <DropdownMenuItem
-                          className="flex cursor-pointer items-center justify-between gap-3 focus:bg-[#FFD700]/15 focus:text-[#FFD700]"
-                          onSelect={event => event.preventDefault()}
-                          onClick={() =>
-                            setSnapWindowsToGrid(current => !current)
-                          }
-                        >
-                          <span>Snap to Grid</span>
-                          <Switch
-                            checked={snapWindowsToGrid}
-                            onCheckedChange={setSnapWindowsToGrid}
-                            onClick={event => event.stopPropagation()}
-                            aria-label="Toggle snap to grid"
-                            className="border-[#FFD700]/40 bg-zinc-800 data-[state=checked]:bg-[#FFD700]"
-                          />
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="text-red-200 focus:bg-red-950/60 focus:text-red-100"
-                          onClick={() =>
-                            setDialogState({ type: "bulk-delete-connections" })
-                          }
-                        >
-                          Delete All Connections
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-red-200 focus:bg-red-950/60 focus:text-red-100"
-                          onClick={() =>
-                            setDialogState({ type: "bulk-return-teams" })
-                          }
-                        >
-                          Return All Teams to Available
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-red-200 focus:bg-red-950/60 focus:text-red-100"
-                          onClick={() =>
-                            setDialogState({ type: "bulk-wipe-canvas" })
-                          }
-                        >
-                          Wipe Canvas
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
                     <button
                       type="button"
                       data-no-canvas-pan="true"
@@ -2430,175 +2034,117 @@ export default function TournamentControlRoom() {
                         Losers
                       </p>
                     </div>
-                  </div>
-                </div>
-                <div className="pointer-events-none sticky left-0 top-0 z-[55] hidden h-0 w-0 lg:block">
-                  <div
-                    ref={controlKeyRef}
-                    data-no-canvas-pan="true"
-                    className={`pointer-events-none absolute rounded-xl border bg-black/90 font-mono shadow-[0_0_28px_rgba(255,215,0,0.16)] backdrop-blur ${
-                      controlKeyMinimized
-                        ? "w-max border-[#FFD700]/50"
-                        : "w-[min(26rem,calc(100vw-2rem))] border-[#FFD700]/35 p-4"
-                    }`}
-                    style={{
-                      transform: `translate(${controlKeyPosition.x}px, ${controlKeyPosition.y}px)`,
-                    }}
-                    onContextMenu={event => event.stopPropagation()}
-                  >
-                    {controlKeyMinimized ? (
-                      <button
-                        type="button"
+                    <button
+                      type="button"
+                      data-no-canvas-pan="true"
+                      aria-controls="zoom-rail-shared-panel"
+                      aria-expanded={zoomRailActivePanel === "rounds"}
+                      className={`relative flex min-h-12 w-full flex-col items-center justify-center gap-0.5 border-t border-white/10 transition hover:bg-[#FFD700]/10 hover:text-[#FFD700] ${zoomRailActivePanel === "rounds" ? "bg-[#FFD700]/15 text-[#FFD700]" : "text-white/70"}`}
+                      title="Rounds"
+                      aria-label={`Rounds panel, ${selectedRoundGameIds.size} games selected`}
+                      onPointerDown={event => event.stopPropagation()}
+                      onClick={event => {
+                        event.stopPropagation();
+                        setZoomRailActivePanel(panel =>
+                          panel === "rounds" ? null : "rounds"
+                        );
+                      }}
+                    >
+                      <span className="text-[9px] font-black uppercase leading-none">Rounds</span>
+                      {selectedRoundGameIds.size > 0 && (
+                        <span className="absolute right-1 top-1 rounded bg-[#FFD700] px-1.5 py-0.5 text-[10px] font-black text-black">
+                          {selectedRoundGameIds.size}
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      data-no-canvas-pan="true"
+                      aria-controls="zoom-rail-shared-panel"
+                      aria-expanded={zoomRailActivePanel === "controls"}
+                      className={`flex min-h-12 w-full flex-col items-center justify-center gap-0.5 border-t border-white/10 transition hover:bg-[#FFD700]/10 hover:text-[#FFD700] ${zoomRailActivePanel === "controls" ? "bg-[#FFD700]/15 text-[#FFD700]" : "text-white/70"}`}
+                      title="PC Controls"
+                      aria-label="PC Controls panel"
+                      onPointerDown={event => event.stopPropagation()}
+                      onClick={event => {
+                        event.stopPropagation();
+                        setZoomRailActivePanel(panel =>
+                          panel === "controls" ? null : "controls"
+                        );
+                      }}
+                    >
+                      <span className="text-[9px] font-black uppercase leading-none">PC</span>
+                      <span className="text-[9px] font-black uppercase leading-none">Controls</span>
+                    </button>
+
+                    {zoomRailActivePanel !== null && (
+                      <div
+                        id="zoom-rail-shared-panel"
                         data-no-canvas-pan="true"
-                        className="pointer-events-auto flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-black uppercase tracking-[0.2em] text-[#FFD700] transition hover:bg-[#FFD700]/10"
-                        onClick={event => {
-                          event.stopPropagation();
-                          setControlKeyMinimized(false);
-                        }}
+                        className="absolute left-[calc(100%+0.5rem)] top-0 max-h-[min(36rem,calc(100dvh-2rem))] w-[min(22rem,calc(100vw-7rem))] overflow-auto rounded-xl border border-[#FFD700]/35 bg-zinc-950/95 p-3 font-mono text-yellow-50 shadow-[0_0_24px_rgba(255,215,0,0.16)] backdrop-blur data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95"
+                        role="region"
+                        aria-label={`${zoomRailActivePanel} control panel`}
+                        data-state="open"
+                        onPointerDown={event => event.stopPropagation()}
                       >
-                        <span className="h-2 w-2 rounded-full bg-[#FFD700] shadow-[0_0_12px_#FFD700]" />
-                        Controls · {Math.round(zoom * 100)}%
-                      </button>
-                    ) : (
-                      <>
-                        <div
-                          data-no-canvas-pan="true"
-                          className="pointer-events-auto mb-3 flex items-center justify-between gap-3 rounded border border-white/10 bg-white/5 px-2 py-2"
-                        >
-                          <div
-                            data-no-canvas-pan="true"
-                            data-control-key-drag-handle="true"
-                            className={`flex min-w-0 flex-1 items-center gap-2 ${
-                              controlKeyLocked
-                                ? "cursor-default"
-                                : "cursor-grab active:cursor-grabbing"
-                            }`}
-                            onPointerDown={startControlKeyDrag}
-                            onPointerMove={dragControlKey}
-                            onPointerUp={finishControlKeyDrag}
-                            onPointerCancel={finishControlKeyDrag}
+                        <div className="mb-3 flex h-10 items-center justify-between gap-3 rounded border border-white/10 bg-white/5 px-2">
+                          <p className="text-xs font-black uppercase tracking-[0.28em] text-[#FFD700]">
+                            {zoomRailActivePanel === "options"
+                              ? "Board Options"
+                              : zoomRailActivePanel === "rounds"
+                                ? "Rounds"
+                                : "PC Controls"}
+                          </p>
+                          <button
+                            type="button"
+                            className="rounded border border-white/15 bg-white/10 px-2 py-1 text-[10px] font-black uppercase text-white/70 transition hover:border-[#FFD700]/60 hover:text-[#FFD700]"
+                            aria-label="Close control panel"
+                            onClick={() => setZoomRailActivePanel(null)}
                           >
-                            <span className="h-2 w-2 rounded-full bg-[#FFD700] shadow-[0_0_12px_#FFD700]" />
-                            <div>
-                              <p className="text-xs font-black uppercase tracking-[0.28em] text-[#FFD700]">
-                                PC Controls
-                              </p>
-                              <p className="text-[10px] uppercase tracking-wider text-white/45">
-                                {controlKeyLocked
-                                  ? "Locked — click Unlock to reposition"
-                                  : "Unlocked — drag this header to reposition"}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex shrink-0 items-center gap-1">
-                            <button
-                              type="button"
-                              data-no-canvas-pan="true"
-                              data-control-key-action="true"
-                              className={`rounded border px-2 py-1 text-[10px] font-black uppercase transition ${
-                                controlKeyLocked
-                                  ? "border-[#FFD700]/50 bg-[#FFD700]/15 text-[#FFD700]"
-                                  : "border-cyan-300/40 bg-cyan-300/10 text-cyan-100"
-                              }`}
-                              onPointerDown={event => event.stopPropagation()}
-                              onClick={event => {
-                                event.stopPropagation();
-                                setControlKeyLocked(current => !current);
-                              }}
-                            >
-                              {controlKeyLocked ? "Unlock" : "Lock"}
-                            </button>
-                            <button
-                              type="button"
-                              data-no-canvas-pan="true"
-                              data-control-key-action="true"
-                              className="rounded border border-white/15 bg-white/10 px-2 py-1 text-[10px] font-black uppercase text-white/70 transition hover:border-[#FFD700]/60 hover:text-[#FFD700]"
-                              onPointerDown={event => event.stopPropagation()}
-                              onClick={event => {
-                                event.stopPropagation();
-                                setControlKeyMinimized(true);
-                              }}
-                            >
-                              Min
-                            </button>
-                          </div>
+                            Close
+                          </button>
                         </div>
-                        <div className="grid gap-2 text-[11px] text-white/75 sm:grid-cols-2">
-                          {(
-                            [
-                              [
-                                "bg-cyan-400/15 text-cyan-100 border-cyan-300/30",
-                                "Drag empty board",
-                                "Pan around the bracket",
-                              ],
-                              [
-                                "bg-fuchsia-400/15 text-fuchsia-100 border-fuchsia-300/30",
-                                "+ / − or Shift + wheel",
-                                "Zoom in and out",
-                              ],
-                              [
-                                "bg-blue-400/15 text-blue-100 border-blue-300/30",
-                                "W A S D",
-                                "Move around the canvas",
-                              ],
-                              [
-                                "bg-emerald-400/15 text-emerald-100 border-emerald-300/30",
-                                "Right-click empty board",
-                                "Add a team or lobby",
-                              ],
-                              [
-                                "bg-orange-400/15 text-orange-100 border-orange-300/30",
-                                "Drag lobby header",
-                                "Reposition a lobby",
-                              ],
-                              [
-                                "bg-sky-400/15 text-sky-100 border-sky-300/30",
-                                "Drag a team card",
-                                "Place or move a team",
-                              ],
-                              [
-                                "bg-lime-400/15 text-lime-100 border-lime-300/30",
-                                "Select team, press 1–4",
-                                "Set final placement",
-                              ],
-                              [
-                                "bg-purple-400/15 text-purple-100 border-purple-300/30",
-                                "Mobile: double-tap team",
-                                "Cycle placement",
-                              ],
-                              [
-                                "bg-yellow-300/15 text-yellow-100 border-yellow-200/40",
-                                "Drag W / L connector",
-                                <span>
-                                  <span className="font-black text-[#FFD700]">
-                                    W
-                                  </span>{" "}
-                                  — Winners ·{" "}
-                                  <span className="font-black text-slate-100">
-                                    L
-                                  </span>{" "}
-                                  — Losers
-                                </span>,
-                              ],
-                              [
-                                "bg-red-400/15 text-red-100 border-red-300/30",
-                                "Select connection, press Del",
-                                "Remove connection",
-                              ],
-                            ] satisfies [string, string, ReactNode][]
-                          ).map(([classes, action, detail]) => (
-                            <div
-                              key={action}
-                              className={`rounded border px-2.5 py-2 ${classes}`}
-                            >
-                              <span className="block text-[10px] font-black uppercase tracking-wider">
-                                {action}
-                              </span>
-                              <span className="text-white/65">{detail}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </>
+                        {zoomRailActivePanel === "options" && (
+                          <div className="flex flex-col gap-2 text-xs">
+                            <button className="flex items-center justify-between rounded border border-white/10 bg-white/5 px-3 py-2 text-left hover:bg-[#FFD700]/10" onClick={() => setSnapWindowsToGrid(current => !current)}>
+                              <span>Snap to Grid</span>
+                              <Switch checked={snapWindowsToGrid} onCheckedChange={setSnapWindowsToGrid} aria-label="Toggle snap to grid" className="border-[#FFD700]/40 bg-zinc-800 data-[state=checked]:bg-[#FFD700]" />
+                            </button>
+                            <button className="rounded border border-red-400/25 bg-red-950/30 px-3 py-2 text-left font-black text-red-200 hover:bg-red-950/60" onClick={() => setDialogState({ type: "bulk-delete-connections" })}>Delete All Connections</button>
+                            <button className="rounded border border-red-400/25 bg-red-950/30 px-3 py-2 text-left font-black text-red-200 hover:bg-red-950/60" onClick={() => setDialogState({ type: "bulk-return-teams" })}>Return All Teams to Available</button>
+                            <button className="rounded border border-red-400/25 bg-red-950/30 px-3 py-2 text-left font-black text-red-200 hover:bg-red-950/60" onClick={() => setDialogState({ type: "bulk-wipe-canvas" })}>Wipe Canvas</button>
+                          </div>
+                        )}
+                        {zoomRailActivePanel === "rounds" && (
+                          <div className="flex flex-col gap-2 text-[10px] uppercase">
+                            <Button size="sm" variant="secondary" className="h-8 justify-start px-2 text-[10px]" title="Toggle round game selection" onClick={() => setSelectionMode(value => !value)}>{selectionMode ? "Selection On" : "Select Rounds"}</Button>
+                            <span className="rounded border border-white/10 bg-white/5 px-2 py-1 text-white/55">{selectedRoundGameIds.size} selected</span>
+                            <Button size="sm" className="h-8 justify-start bg-[#FFD700] px-2 text-[10px] font-black text-black hover:bg-yellow-300" title="Create a round from selected games" disabled={selectedRoundGameIds.size < 2} onClick={() => openDialog({ type: "round", mode: "create" }, "Round")}>Create Round</Button>
+                            <Button size="sm" variant="secondary" className="h-8 justify-start px-2 text-[10px]" title="Rename the selected round" disabled={selectedRoundGameIds.size === 0 || !games.find(game => selectedRoundGameIds.has(game.id))?.roundGroupId} onClick={() => { const game = games.find(item => selectedRoundGameIds.has(item.id) && item.roundGroupId); if (game?.roundGroupId) openDialog({ type: "round", mode: "rename", roundGroupId: game.roundGroupId, currentValue: game.roundLabel ?? "Round" }, game.roundLabel ?? "Round"); }}>Rename Round</Button>
+                            <Button size="sm" variant="secondary" className="h-8 justify-start px-2 text-[10px]" title="Add selected games to their selected round" disabled={selectedRoundGameIds.size === 0 || !games.find(game => selectedRoundGameIds.has(game.id))?.roundGroupId} onClick={() => { const roundGame = games.find(game => selectedRoundGameIds.has(game.id) && game.roundGroupId); if (!roundGame?.roundGroupId) return; updateRoundGroup.mutate({ tournamentId, gameIds: Array.from(selectedRoundGameIds), mode: "add", roundGroupId: roundGame.roundGroupId, label: roundGame.roundLabel ?? "Round" }); }}>Add Selected</Button>
+                            <Button size="sm" variant="secondary" className="h-8 justify-start px-2 text-[10px]" title="Remove selected games from their round" disabled={selectedRoundGameIds.size === 0} onClick={() => updateRoundGroup.mutate({ tournamentId, gameIds: Array.from(selectedRoundGameIds), mode: "remove" })}>Remove From Round</Button>
+                            <Button size="sm" variant="ghost" className="h-8 justify-start px-2 text-[10px]" title="Clear round selection" onClick={() => setSelectedRoundGameIds(new Set())}>Clear Selection</Button>
+                          </div>
+                        )}
+                        {zoomRailActivePanel === "controls" && (
+                          <div className="grid gap-2 text-[11px] text-white/75 sm:grid-cols-2">
+                            {([
+                              ["bg-cyan-400/15 text-cyan-100 border-cyan-300/30", "Drag empty board", "Pan around the bracket"],
+                              ["bg-fuchsia-400/15 text-fuchsia-100 border-fuchsia-300/30", "+ / − or Shift + wheel", "Zoom in and out"],
+                              ["bg-blue-400/15 text-blue-100 border-blue-300/30", "W A S D", "Move around the canvas"],
+                              ["bg-emerald-400/15 text-emerald-100 border-emerald-300/30", "Right-click empty board", "Add a team or lobby"],
+                              ["bg-orange-400/15 text-orange-100 border-orange-300/30", "Drag lobby header", "Reposition a lobby"],
+                              ["bg-sky-400/15 text-sky-100 border-sky-300/30", "Drag a team card", "Place or move a team"],
+                              ["bg-lime-400/15 text-lime-100 border-lime-300/30", "Select team, press 1–4", "Set final placement"],
+                              ["bg-purple-400/15 text-purple-100 border-purple-300/30", "Mobile: double-tap team", "Cycle placement"],
+                              ["bg-yellow-300/15 text-yellow-100 border-yellow-200/40", "Drag W / L connector", "W — Winners · L — Losers"],
+                              ["bg-red-400/15 text-red-100 border-red-300/30", "Select connection, press Del", "Remove connection"],
+                            ] satisfies [string, string, ReactNode][]).map(([classes, action, detail]) => (
+                              <div key={action} className={`rounded border px-2.5 py-2 ${classes}`}><span className="block text-[10px] font-black uppercase tracking-wider">{action}</span><span className="text-white/65">{detail}</span></div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>

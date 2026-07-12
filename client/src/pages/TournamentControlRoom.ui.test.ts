@@ -24,8 +24,9 @@ describe("Tournament Control Room guide and zoom rail UI", () => {
     expect(adminSource).toContain("Add a team or lobby");
     expect(adminSource).toContain("Select connection, press Del");
     expect(adminSource).toContain("Remove connection");
-    expect(adminSource).toContain("Locked — click Unlock to reposition");
-    expect(adminSource).toContain("Unlocked — drag this header to reposition");
+    expect(adminSource).toContain('type ZoomRailActivePanel = "options" | "rounds" | "controls" | null');
+    expect(adminSource).toContain('const [zoomRailActivePanel, setZoomRailActivePanel]');
+    expect(adminSource).toContain('zoomRailActivePanel === "controls"');
   });
 
   it("keeps colored W/L legends in viewer and admin experiences", () => {
@@ -41,14 +42,42 @@ describe("Tournament Control Room guide and zoom rail UI", () => {
     expect(adminSource).not.toContain("W winners · L losers");
   });
 
-  it("anchors the controlled options menu without using the drag button as a Radix trigger", () => {
+  it("launches Options, Rounds, and PC Controls from one zoom rail shared panel", () => {
     expect(adminSource).toContain(
       "onPointerDownCapture={event => event.preventDefault()}"
     );
-    expect(adminSource).toContain("open={zoomRailMenuOpen}");
     expect(adminSource).toContain("suppressZoomRailClickRef");
     expect(adminSource).toContain("hasPointerExceededDragThreshold");
-    expect(adminSource).toContain("setZoomRailMenuOpen(open => !open)");
+    expect(adminSource).toContain('aria-controls="zoom-rail-shared-panel"');
+    expect(adminSource).toContain('zoomRailActivePanel === "options"');
+    expect(adminSource).toContain('zoomRailActivePanel === "rounds"');
+    expect(adminSource).toContain('zoomRailActivePanel === "controls"');
+    expect(adminSource).toContain('panel === "rounds" ? null : "rounds"');
+    expect(adminSource).toContain('panel === "controls" ? null : "controls"');
+  });
+
+
+  it("places Rounds and PC Controls after the W/L legend and keeps the selected count badge", () => {
+    const legendIndex = adminSource.indexOf('aria-label="Admin connector legend"');
+    const roundsIndex = adminSource.indexOf('title="Rounds"', legendIndex);
+    const controlsIndex = adminSource.indexOf('title="PC Controls"', roundsIndex);
+    expect(legendIndex).toBeGreaterThan(-1);
+    expect(roundsIndex).toBeGreaterThan(legendIndex);
+    expect(controlsIndex).toBeGreaterThan(roundsIndex);
+    expect(adminSource).toContain('selectedRoundGameIds.size > 0');
+    expect(adminSource).toContain('Rounds panel, ${selectedRoundGameIds.size} games selected');
+  });
+
+  it("removes obsolete independent Rounds rail and draggable/minimizable PC Controls window", () => {
+    expect(adminSource).not.toContain("roundRailPosition");
+    expect(adminSource).not.toContain("roundRailCollapsed");
+    expect(adminSource).not.toContain("startRoundRailDrag");
+    expect(adminSource).not.toContain("controlKeyPosition");
+    expect(adminSource).not.toContain("controlKeyLocked");
+    expect(adminSource).not.toContain("controlKeyMinimized");
+    expect(adminSource).not.toContain("startControlKeyDrag");
+    expect(adminSource).not.toContain("Locked — click Unlock to reposition");
+    expect(adminSource).not.toContain("Unlocked — drag this header to reposition");
   });
 
   it("keeps existing keyboard shortcuts alongside WASD movement handling", () => {
@@ -80,6 +109,11 @@ describe("Tournament Control Room guide and zoom rail UI", () => {
     expect(adminSource).toContain("Delete All Connections");
     expect(adminSource).toContain("Return All Teams to Available");
     expect(adminSource).toContain("Wipe Canvas");
+    expect(adminSource).toContain("Create Round");
+    expect(adminSource).toContain("Rename Round");
+    expect(adminSource).toContain("Add Selected");
+    expect(adminSource).toContain("Remove From Round");
+    expect(adminSource).toContain("Clear Selection");
   });
 });
 
