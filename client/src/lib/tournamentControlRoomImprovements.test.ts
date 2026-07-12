@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
+import {
+  storedMapIdSchema,
+  userSelectedMapIdSchema,
+} from "../../../server/tournamentControl";
 
 describe("Tournament Control Room improvements", () => {
   it("persists final-round seriesBestOf while rejecting BO3/BO5 for cashout in server code", async () => {
@@ -100,7 +104,9 @@ describe("Tournament Control Room improvements", () => {
       "utf8"
     );
     expect(schema).toContain('mapId: varchar("mapId", { length: 64 })');
-    expect(server).toContain("validMapIds");
+    expect(userSelectedMapIdSchema.safeParse("monaco").success).toBe(true);
+    expect(userSelectedMapIdSchema.safeParse("seoul").success).toBe(false);
+    expect(storedMapIdSchema.safeParse("seoul").success).toBe(true);
     expect(server).toContain("setGameMap");
     expect(server).toContain("randomizeGameMap");
     expect(server).toContain("DEFAULT_COMPETITIVE_MAP_IDS");
