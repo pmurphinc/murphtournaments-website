@@ -141,8 +141,14 @@ export type CanvasPanStart = {
   scrollTop: number;
 };
 
+export type MeasuredConnectorPort = {
+  center: CanvasPoint;
+  measuredNodePosition: CanvasPoint;
+};
+
 export const minZoom = 0.1;
 export const maxZoom = 1.8;
+export const defaultZoom = 1;
 export const baseCanvasSize = { width: 2200, height: 1400 };
 export const nodeWidth = 320;
 const connectorHorizontalOffset = 44;
@@ -154,6 +160,15 @@ const minimizedNodeHeight = 132;
 
 export function clampZoom(value: number) {
   return Math.min(maxZoom, Math.max(minZoom, Number(value.toFixed(2))));
+}
+
+export function getInitialZoomPreference(
+  value: unknown,
+  fallback = defaultZoom
+) {
+  return typeof value === "number" && Number.isFinite(value)
+    ? clampZoom(value)
+    : fallback;
 }
 
 export function getNodeHeight(gameType: GameType, minimized: boolean) {
@@ -253,10 +268,9 @@ export type GroupDragMember = {
   roundGroupId?: string | null;
 };
 
-export function getRoundGroupGameIds<T extends Pick<GroupDragMember, "id" | "roundGroupId">>(
-  games: readonly T[],
-  groupId: string
-): number[] {
+export function getRoundGroupGameIds<
+  T extends Pick<GroupDragMember, "id" | "roundGroupId">,
+>(games: readonly T[], groupId: string): number[] {
   return games
     .filter(game => game.roundGroupId === groupId)
     .map(game => game.id);
@@ -524,7 +538,7 @@ export function getCenterZoomView(
 }
 
 export function getEmptyBoardResetView() {
-  return { zoom: 1, scrollLeft: 0, scrollTop: 0 };
+  return { zoom: defaultZoom, scrollLeft: 0, scrollTop: 0 };
 }
 
 export function getFitToContentView(
@@ -624,6 +638,20 @@ export function getConnectorPoint(
     getConnectorCenter(game, port, minimized, position, flowType),
     port
   );
+}
+
+export function getTranslatedMeasuredPortCenter(
+  measuredPort: MeasuredConnectorPort,
+  currentNodePosition: CanvasPoint
+): CanvasPoint {
+  return {
+    x:
+      measuredPort.center.x +
+      (currentNodePosition.x - measuredPort.measuredNodePosition.x),
+    y:
+      measuredPort.center.y +
+      (currentNodePosition.y - measuredPort.measuredNodePosition.y),
+  };
 }
 
 const canvasPanBlockedSelector =

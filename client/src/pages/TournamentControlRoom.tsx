@@ -21,6 +21,7 @@ import {
   clampZoom,
   connectorRadius,
   controlRoomGridSize,
+  defaultZoom,
   getCanvasPanScroll,
   getCenterZoomView,
   getConnectionEndpoint,
@@ -28,6 +29,8 @@ import {
   getConnectorCenter,
   getConnectorEndpoints,
   getConnectorPoint,
+  getInitialZoomPreference,
+  getTranslatedMeasuredPortCenter,
   getEmptyBoardResetView,
   getFitToContentView,
   getNextRoundGroupSelection,
@@ -54,6 +57,7 @@ import {
   snapCanvasPointToGrid,
   type CanvasPanStart,
   type CanvasPoint,
+  type MeasuredConnectorPort,
   type ConnectionFlowType,
   getGameStatusClasses,
   type GameStatus,
@@ -240,33 +244,47 @@ const mapsById: ReadonlyMap<string, string> = new Map(
 
 type ControlRoomOverlayPreferences = {
   zoomRailY: number;
+  zoom: number;
 };
 
 type ZoomRailActivePanel = "options" | "rounds" | "controls" | null;
 
-function readControlRoomOverlayPreferences(): Partial<ControlRoomOverlayPreferences> {
+export function readControlRoomOverlayPreferences(): Partial<ControlRoomOverlayPreferences> {
   if (typeof window === "undefined") return {};
   try {
     const raw = window.localStorage.getItem(controlRoomOverlayStorageKey);
     if (!raw) return {};
-    const parsed = JSON.parse(raw) as Partial<ControlRoomOverlayPreferences>;
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return {};
+    const preferences = parsed as Partial<
+      Record<keyof ControlRoomOverlayPreferences, unknown>
+    >;
     return {
       zoomRailY:
-        typeof parsed.zoomRailY === "number" ? parsed.zoomRailY : undefined,
+        typeof preferences.zoomRailY === "number" &&
+        Number.isFinite(preferences.zoomRailY)
+          ? preferences.zoomRailY
+          : undefined,
+      zoom:
+        typeof preferences.zoom === "number" &&
+        Number.isFinite(preferences.zoom)
+          ? getInitialZoomPreference(preferences.zoom)
+          : undefined,
     };
   } catch {
     return {};
   }
 }
 
-function writeControlRoomOverlayPreferences(
-  preferences: ControlRoomOverlayPreferences
+export function writeControlRoomOverlayPreferences(
+  preferences: Partial<ControlRoomOverlayPreferences>
 ) {
   if (typeof window === "undefined") return;
   try {
+    const current = readControlRoomOverlayPreferences();
     window.localStorage.setItem(
       controlRoomOverlayStorageKey,
-      JSON.stringify(preferences)
+      JSON.stringify({ ...current, ...preferences })
     );
   } catch {
     // Ignore unavailable or full local storage so controls remain usable.
@@ -443,7 +461,9 @@ export default function TournamentControlRoom() {
   const [optimisticGamePositions, setOptimisticGamePositions] = useState<
     Map<number, CanvasPoint>
   >(() => new Map());
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(
+    () => readControlRoomOverlayPreferences().zoom ?? defaultZoom
+  );
   const [isPanning, setIsPanning] = useState(false);
   const [mobileTeamsOpen, setMobileTeamsOpen] = useState(false);
   const [touchHelpOpen, setTouchHelpOpen] = useState(false);
@@ -467,7 +487,7 @@ export default function TournamentControlRoom() {
   const keyboardPanAnimationRef = useRef<number | null>(null);
   const keyboardPanPreviousTimestampRef = useRef<number | null>(null);
   const [measuredPortCenters, setMeasuredPortCenters] = useState<
-    Map<string, CanvasPoint>
+    Map<string, MeasuredConnectorPort>
   >(() => new Map());
   const [measuredNodeHeights, setMeasuredNodeHeights] = useState<
     Map<number, number>
@@ -868,17 +888,21 @@ export default function TournamentControlRoom() {
       game: ControlGameView,
       port: "top" | "bottom",
       flowType: ConnectionFlowType = "winner"
-    ) =>
-      measuredPortCenters.get(
+    ) => {
+      const visualPosition = getVisualPosition(game);
+      const measuredPort = measuredPortCenters.get(
         `${game.id}:${port}${port === "bottom" ? `:${flowType}` : ""}`
-      ) ??
-      getConnectorCenter(
-        game,
-        port,
-        minimizedGameIds.has(game.id),
-        getVisualPosition(game),
-        flowType
-      ),
+      );
+      return measuredPort
+        ? getTranslatedMeasuredPortCenter(measuredPort, visualPosition)
+        : getConnectorCenter(
+            game,
+            port,
+            minimizedGameIds.has(game.id),
+            visualPosition,
+            flowType
+          );
+    },
     [getVisualPosition, measuredPortCenters, minimizedGameIds]
   );
 
@@ -933,7 +957,7 @@ export default function TournamentControlRoom() {
       const board = boardRef.current;
       if (!canvas || !board) return;
       const canvasRect = canvas.getBoundingClientRect();
-      const next = new Map<string, CanvasPoint>();
+      const next = new Map<string, MeasuredConnectorPort>();
       board
         .querySelectorAll<HTMLElement>(
           "[data-connector-port='true'][data-game-id][data-port]"
@@ -944,21 +968,26 @@ export default function TournamentControlRoom() {
           const flowType = port.dataset.flowType;
           if (!gameId || (portName !== "top" && portName !== "bottom")) return;
           const rect = port.getBoundingClientRect();
+          const game = games.find(candidate => candidate.id === Number(gameId));
+          if (!game) return;
           next.set(
             `${gameId}:${portName}${portName === "bottom" ? `:${flowType === "loser" ? "loser" : "winner"}` : ""}`,
             {
-              x:
-                (rect.left +
-                  rect.width / 2 -
-                  canvasRect.left +
-                  canvas.scrollLeft) /
-                zoom,
-              y:
-                (rect.top +
-                  rect.height / 2 -
-                  canvasRect.top +
-                  canvas.scrollTop) /
-                zoom,
+              center: {
+                x:
+                  (rect.left +
+                    rect.width / 2 -
+                    canvasRect.left +
+                    canvas.scrollLeft) /
+                  zoom,
+                y:
+                  (rect.top +
+                    rect.height / 2 -
+                    canvasRect.top +
+                    canvas.scrollTop) /
+                  zoom,
+              },
+              measuredNodePosition: getVisualPosition(game),
             }
           );
         });
@@ -969,8 +998,14 @@ export default function TournamentControlRoom() {
             const previous = current.get(key);
             return (
               previous &&
-              Math.abs(previous.x - value.x) < 0.5 &&
-              Math.abs(previous.y - value.y) < 0.5
+              Math.abs(previous.center.x - value.center.x) < 0.5 &&
+              Math.abs(previous.center.y - value.center.y) < 0.5 &&
+              Math.abs(
+                previous.measuredNodePosition.x - value.measuredNodePosition.x
+              ) < 0.5 &&
+              Math.abs(
+                previous.measuredNodePosition.y - value.measuredNodePosition.y
+              ) < 0.5
             );
           })
         )
@@ -989,11 +1024,23 @@ export default function TournamentControlRoom() {
       observer.disconnect();
       window.removeEventListener("resize", measurePorts);
     };
-  }, [assignments, games, minimizedGameIds, nodeDrag, query.data, zoom]);
+  }, [
+    assignments,
+    games,
+    getVisualPosition,
+    minimizedGameIds,
+    nodeDrag,
+    query.data,
+    zoom,
+  ]);
 
   useEffect(() => {
     writeControlRoomOverlayPreferences({ zoomRailY });
   }, [zoomRailY]);
+
+  useEffect(() => {
+    writeControlRoomOverlayPreferences({ zoom });
+  }, [zoom]);
 
   useEffect(() => {
     if (selectedAssignmentId === null) return;
@@ -2649,10 +2696,13 @@ export default function TournamentControlRoom() {
                                       game =>
                                         game.roundGroupId === frame.groupId
                                     )
-                                    .map(game => [
-                                      game.id,
-                                      getVisualPosition(game),
-                                    ] as const)
+                                    .map(
+                                      game =>
+                                        [
+                                          game.id,
+                                          getVisualPosition(game),
+                                        ] as const
+                                    )
                                 );
                                 if (startPositions.size === 0) return;
                                 event.currentTarget.setPointerCapture?.(
