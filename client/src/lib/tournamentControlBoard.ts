@@ -52,7 +52,64 @@ export type RoundFrameBounds = {
   width: number;
   height: number;
 };
-export type RoundFrame = RoundFrameBounds & { groupId: string; label: string };
+export type RoundFrameTheme = {
+  frame: string;
+  label: string;
+};
+export type RoundFrame = RoundFrameBounds & {
+  groupId: string;
+  label: string;
+  theme: RoundFrameTheme;
+};
+
+export const roundFrameThemes = [
+  {
+    frame:
+      "border-[#FFD700]/65 bg-[#FFD700]/7 shadow-[inset_0_0_34px_rgba(255,215,0,0.10),0_0_28px_rgba(255,215,0,0.14)]",
+    label:
+      "border-[#FFD700]/75 bg-black text-[#FFD700] shadow-[0_0_18px_rgba(255,215,0,0.28)]",
+  },
+  {
+    frame:
+      "border-cyan-300/65 bg-cyan-300/7 shadow-[inset_0_0_34px_rgba(103,232,249,0.10),0_0_28px_rgba(103,232,249,0.14)]",
+    label:
+      "border-cyan-300/75 bg-black text-cyan-100 shadow-[0_0_18px_rgba(103,232,249,0.26)]",
+  },
+  {
+    frame:
+      "border-violet-300/65 bg-violet-400/7 shadow-[inset_0_0_34px_rgba(196,181,253,0.10),0_0_28px_rgba(196,181,253,0.14)]",
+    label:
+      "border-violet-300/75 bg-black text-violet-100 shadow-[0_0_18px_rgba(196,181,253,0.26)]",
+  },
+  {
+    frame:
+      "border-orange-300/65 bg-orange-400/7 shadow-[inset_0_0_34px_rgba(253,186,116,0.10),0_0_28px_rgba(253,186,116,0.14)]",
+    label:
+      "border-orange-300/75 bg-black text-orange-100 shadow-[0_0_18px_rgba(253,186,116,0.26)]",
+  },
+  {
+    frame:
+      "border-blue-300/65 bg-blue-400/7 shadow-[inset_0_0_34px_rgba(147,197,253,0.10),0_0_28px_rgba(147,197,253,0.14)]",
+    label:
+      "border-blue-300/75 bg-black text-blue-100 shadow-[0_0_18px_rgba(147,197,253,0.26)]",
+  },
+  {
+    frame:
+      "border-fuchsia-300/65 bg-fuchsia-400/7 shadow-[inset_0_0_34px_rgba(240,171,252,0.10),0_0_28px_rgba(240,171,252,0.14)]",
+    label:
+      "border-fuchsia-300/75 bg-black text-fuchsia-100 shadow-[0_0_18px_rgba(240,171,252,0.26)]",
+  },
+  {
+    frame:
+      "border-emerald-300/65 bg-emerald-400/7 shadow-[inset_0_0_34px_rgba(110,231,183,0.10),0_0_28px_rgba(110,231,183,0.14)]",
+    label:
+      "border-emerald-300/75 bg-black text-emerald-100 shadow-[0_0_18px_rgba(110,231,183,0.26)]",
+  },
+] as const satisfies readonly RoundFrameTheme[];
+
+export function getRoundFrameTheme(roundIndex: number): RoundFrameTheme {
+  return roundFrameThemes[Math.abs(roundIndex) % roundFrameThemes.length];
+}
 export type CanvasPanStart = {
   clientX: number;
   clientY: number;
@@ -131,24 +188,27 @@ export function getRoundFrames(
       game,
     ]);
   }
-  return Array.from(groups.entries()).flatMap(([groupId, groupGames]) => {
-    const bounds = getRoundFrameBounds(
-      groupGames,
-      minimizedGameIds,
-      positions,
-      measuredHeights
-    );
-    return bounds
-      ? [
-          {
-            ...bounds,
-            groupId,
-            label:
-              groupGames.find(game => game.roundLabel)?.roundLabel ?? "Round",
-          },
-        ]
-      : [];
-  });
+  return Array.from(groups.entries()).flatMap(
+    ([groupId, groupGames], index) => {
+      const bounds = getRoundFrameBounds(
+        groupGames,
+        minimizedGameIds,
+        positions,
+        measuredHeights
+      );
+      return bounds
+        ? [
+            {
+              ...bounds,
+              groupId,
+              label:
+                groupGames.find(game => game.roundLabel)?.roundLabel ?? "Round",
+              theme: getRoundFrameTheme(index),
+            },
+          ]
+        : [];
+    }
+  );
 }
 
 export function getConnectorCenter(

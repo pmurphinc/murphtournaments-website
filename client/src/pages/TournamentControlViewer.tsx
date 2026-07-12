@@ -545,7 +545,7 @@ export default function TournamentControlViewer() {
             {roundFrames.map(frame => (
               <div
                 key={frame.groupId}
-                className="pointer-events-none absolute z-0 rounded-xl border-2 border-[#FFD700]/55 bg-[#FFD700]/5 shadow-[inset_0_0_28px_rgba(255,215,0,0.08),0_0_22px_rgba(255,215,0,0.08)]"
+                className={`pointer-events-none absolute z-0 rounded-xl border-2 ${frame.theme.frame}`}
                 style={{
                   left: frame.x,
                   top: frame.y,
@@ -553,7 +553,9 @@ export default function TournamentControlViewer() {
                   height: frame.height,
                 }}
               >
-                <span className="absolute -top-4 left-4 rounded border border-[#FFD700]/50 bg-black px-2 py-0.5 font-mono text-[10px] font-black uppercase tracking-widest text-[#FFD700]">
+                <span
+                  className={`absolute -top-7 left-5 rounded-md border-2 px-3 py-1.5 font-mono text-sm font-black uppercase tracking-[0.18em] ${frame.theme.label}`}
+                >
                   {frame.label}
                 </span>
               </div>

@@ -898,7 +898,7 @@
     "damageDropoffMinRange": 20,
     "damageDropoffMaxRange": 30,
     "damageDropoffModifierAtMaxRange": 65,
-    "sourceNotes": "Firing the weapon will cancel the reload animation. Tactical reload intro animation duration is 1.5s.",
+    "sourceNotes": "Attack DMG is the archive total body damage value; Season 11 patch history tracks the official pellet damage increase from 12 to 13. Firing the weapon will cancel the reload animation. Tactical reload intro animation duration is 1.5s.",
     "rawValues": "{\"bodyDamageRaw\":\"117\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"7\",\"damagePerMagazineRaw\":\"819\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"(varies)\",\"emptyReloadRaw\":\"4.3\",\"damageDropoffMinRange\":\"20m\",\"damageDropoffMaxRange\":\"30m\",\"damageDropoffModifierAtMaxRange\":\"~65%\"}"
   },
   {
