@@ -169,6 +169,13 @@
       "when": 1784419200000,
       "tag": "0023_tournament_staff_invites",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "5",
+      "when": 1784505600000,
+      "tag": "0024_add_tournament_round_groups",
+      "breakpoints": true
     }
   ]
 }

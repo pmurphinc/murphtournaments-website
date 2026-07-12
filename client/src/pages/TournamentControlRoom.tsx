@@ -11,6 +11,7 @@ import { Link, useLocation, useParams } from "wouter";
 import { Grip, Maximize2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { isPersonalTcrPath } from "@/lib/tcrRouteMode";
 import { getSafeTournamentControlErrorMessage } from "@/lib/tcrError";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getDiscordLoginUrl } from "@/lib/discordLogin";
@@ -389,9 +390,7 @@ function shouldSkipNodeDrag(target: EventTarget | null) {
 export default function TournamentControlRoom() {
   const params = useParams<{ tournamentId: string }>();
   const [location] = useLocation();
-  const isPersonalTcr =
-    location === `/TCR/${params.tournamentId}` ||
-    location === `/tcr/${params.tournamentId}`;
+  const isPersonalTcr = isPersonalTcrPath(location, params.tournamentId);
   const controlApi = isPersonalTcr ? trpc.personalTcr : trpc.tournamentControl;
   const tournamentId = Number(params.tournamentId);
   const auth = useAuth();
