@@ -31,6 +31,7 @@ import {
   getEmptyBoardResetView,
   getFitToContentView,
   getKeyboardPanVector,
+  getRoundFrames,
   getMidpoint,
   getNodeHeight,
   getPointerDistance,
@@ -126,6 +127,8 @@ type ControlGameView = {
   seriesBestOf?: 1 | 3 | 5;
   mapId?: string | null;
   broadcastUrl?: string | null;
+  roundGroupId?: string | null;
+  roundLabel?: string | null;
 };
 type AssignmentView = {
   id: number;
@@ -177,6 +180,12 @@ type DialogState =
   | { type: "lobby"; gameId: number; currentValue: string }
   | { type: "broadcast"; gameId: number; currentValue: string }
   | { type: "delete"; gameId: number; label: string }
+  | {
+      type: "round";
+      mode: "create" | "rename" | "add";
+      roundGroupId?: string;
+      currentValue?: string;
+    }
   | {
       type:
         | "bulk-delete-connections"
@@ -450,6 +459,13 @@ export default function TournamentControlRoom() {
   const [measuredPortCenters, setMeasuredPortCenters] = useState<
     Map<string, CanvasPoint>
   >(() => new Map());
+  const [measuredNodeHeights, setMeasuredNodeHeights] = useState<
+    Map<number, number>
+  >(() => new Map());
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedRoundGameIds, setSelectedRoundGameIds] = useState<Set<number>>(
+    () => new Set()
+  );
 
   const query = controlApi.get.useQuery(
     { tournamentId },
@@ -511,6 +527,21 @@ export default function TournamentControlRoom() {
   const removeTeam = controlApi.removeTeam.useMutation(mutationOptions);
   const removeAssignedTeams =
     controlApi.removeAssignedTeams.useMutation(mutationOptions);
+  const autoFillLobby = controlApi.autoFillLobby.useMutation({
+    onSuccess: result => {
+      invalidate();
+      const partial =
+        result.slotsOpen > 0
+          ? ` (${result.slotsOpen} slot${result.slotsOpen === 1 ? "" : "s"} still open)`
+          : "";
+      toast.success(
+        `Auto-filled ${result.assignedCount} team${result.assignedCount === 1 ? "" : "s"}${partial}`
+      );
+    },
+    onError: (error: { message: string }) => toast.error(error.message),
+  });
+  const updateRoundGroup =
+    controlApi.updateRoundGroup.useMutation(mutationOptions);
   const deleteTeam = controlApi.deleteTeam.useMutation({
     onSuccess: () => {
       setDialogState(null);
@@ -747,6 +778,18 @@ export default function TournamentControlRoom() {
     },
     [nodeDrag, optimisticGamePositions]
   );
+
+  const roundFrames = useMemo(() => {
+    const positions = new Map(
+      games.map(game => [game.id, getVisualPosition(game)] as const)
+    );
+    return getRoundFrames(
+      games,
+      minimizedGameIds,
+      positions,
+      measuredNodeHeights
+    );
+  }, [games, getVisualPosition, measuredNodeHeights, minimizedGameIds]);
 
   const getPortCenter = useCallback(
     (
@@ -1931,6 +1974,113 @@ export default function TournamentControlRoom() {
                   );
                 }}
               >
+                <div className="pointer-events-none sticky left-24 top-3 z-[54] h-0 w-0">
+                  <div
+                    className="pointer-events-auto flex w-[min(42rem,calc(100vw-8rem))] flex-wrap items-center gap-2 rounded-xl border border-[#FFD700]/30 bg-zinc-950/90 p-2 font-mono text-[10px] uppercase text-yellow-50 shadow-[0_0_24px_rgba(255,215,0,0.14)] backdrop-blur"
+                    data-no-canvas-pan="true"
+                  >
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="h-7 px-2 text-[10px]"
+                      onClick={() => setSelectionMode(value => !value)}
+                    >
+                      {selectionMode ? "Selection On" : "Select Rounds"}
+                    </Button>
+                    <span className="text-white/45">
+                      {selectedRoundGameIds.size} selected
+                    </span>
+                    <Button
+                      size="sm"
+                      className="h-7 bg-[#FFD700] px-2 text-[10px] font-black text-black hover:bg-yellow-300"
+                      disabled={selectedRoundGameIds.size < 2}
+                      onClick={() =>
+                        openDialog({ type: "round", mode: "create" }, "Round")
+                      }
+                    >
+                      Create Round From Selection
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="h-7 px-2 text-[10px]"
+                      disabled={
+                        selectedRoundGameIds.size === 0 ||
+                        !games.find(game => selectedRoundGameIds.has(game.id))
+                          ?.roundGroupId
+                      }
+                      onClick={() => {
+                        const game = games.find(
+                          item =>
+                            selectedRoundGameIds.has(item.id) &&
+                            item.roundGroupId
+                        );
+                        if (game?.roundGroupId)
+                          openDialog(
+                            {
+                              type: "round",
+                              mode: "rename",
+                              roundGroupId: game.roundGroupId,
+                              currentValue: game.roundLabel ?? "Round",
+                            },
+                            game.roundLabel ?? "Round"
+                          );
+                      }}
+                    >
+                      Rename Round
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="h-7 px-2 text-[10px]"
+                      disabled={
+                        selectedRoundGameIds.size === 0 ||
+                        !games.find(game => selectedRoundGameIds.has(game.id))
+                          ?.roundGroupId
+                      }
+                      onClick={() => {
+                        const roundGame = games.find(
+                          game =>
+                            selectedRoundGameIds.has(game.id) &&
+                            game.roundGroupId
+                        );
+                        if (!roundGame?.roundGroupId) return;
+                        updateRoundGroup.mutate({
+                          tournamentId,
+                          gameIds: Array.from(selectedRoundGameIds),
+                          mode: "add",
+                          roundGroupId: roundGame.roundGroupId,
+                          label: roundGame.roundLabel ?? "Round",
+                        });
+                      }}
+                    >
+                      Add Selected to Round
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="h-7 px-2 text-[10px]"
+                      disabled={selectedRoundGameIds.size === 0}
+                      onClick={() =>
+                        updateRoundGroup.mutate({
+                          tournamentId,
+                          gameIds: Array.from(selectedRoundGameIds),
+                          mode: "remove",
+                        })
+                      }
+                    >
+                      Remove From Round
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-[10px]"
+                      onClick={() => setSelectedRoundGameIds(new Set())}
+                    >
+                      Clear Selection
+                    </Button>
+                  </div>
+                </div>
                 <div className="pointer-events-none sticky left-3 top-0 z-[65] h-0 w-0 sm:left-4">
                   <div
                     data-no-canvas-pan="true"
@@ -2339,8 +2489,24 @@ export default function TournamentControlRoom() {
                     }}
                     ref={boardRef}
                   >
+                    {roundFrames.map(frame => (
+                      <div
+                        key={frame.groupId}
+                        className="pointer-events-none absolute z-0 rounded-xl border-2 border-[#FFD700]/55 bg-[#FFD700]/5 shadow-[inset_0_0_28px_rgba(255,215,0,0.08),0_0_22px_rgba(255,215,0,0.08)]"
+                        style={{
+                          left: frame.x,
+                          top: frame.y,
+                          width: frame.width,
+                          height: frame.height,
+                        }}
+                      >
+                        <span className="absolute -top-4 left-4 rounded border border-[#FFD700]/50 bg-black px-2 py-0.5 font-mono text-[10px] font-black uppercase tracking-widest text-[#FFD700]">
+                          {frame.label}
+                        </span>
+                      </div>
+                    ))}
                     <svg
-                      className="absolute inset-0 z-0 overflow-visible"
+                      className="absolute inset-0 z-[1] overflow-visible"
                       width={logicalCanvasSize.width}
                       height={logicalCanvasSize.height}
                     >
@@ -2523,6 +2689,15 @@ export default function TournamentControlRoom() {
                                 setSelectedGameId(game.id);
                                 setSelectedConnectionId(null);
                                 setSelectedAssignmentId(null);
+                                if (selectionMode || event.shiftKey) {
+                                  setSelectionMode(true);
+                                  setSelectedRoundGameIds(current => {
+                                    const next = new Set(current);
+                                    if (next.has(game.id)) next.delete(game.id);
+                                    else next.add(game.id);
+                                    return next;
+                                  });
+                                }
                               }}
                               onPointerDown={event => {
                                 if (
@@ -2573,10 +2748,21 @@ export default function TournamentControlRoom() {
                                 );
                               }}
                               data-connection-target-game-id={game.id}
-                              className={`absolute z-10 w-80 cursor-default rounded-lg border bg-zinc-950/95 p-4 shadow-2xl ${statusClasses.nodeBorder} ${statusClasses.accent} ${nodeDrag?.gameId === game.id || selectedGameId === game.id ? "z-50 ring-2 ring-[#FFD700]/80 shadow-[0_0_28px_rgba(255,215,0,0.22)]" : ""}`}
+                              className={`absolute z-10 w-80 cursor-default rounded-lg border bg-zinc-950/95 p-4 shadow-2xl ${statusClasses.nodeBorder} ${statusClasses.accent} ${selectedRoundGameIds.has(game.id) ? "ring-4 ring-[#FFD700]" : ""} ${nodeDrag?.gameId === game.id || selectedGameId === game.id ? "z-50 ring-2 ring-[#FFD700]/80 shadow-[0_0_28px_rgba(255,215,0,0.22)]" : ""}`}
                               style={{
                                 left: visualPosition.x,
                                 top: visualPosition.y,
+                              }}
+                              ref={element => {
+                                if (!element) return;
+                                const height = Math.ceil(
+                                  element.getBoundingClientRect().height / zoom
+                                );
+                                setMeasuredNodeHeights(current =>
+                                  current.get(game.id) === height
+                                    ? current
+                                    : new Map(current).set(game.id, height)
+                                );
                               }}
                             >
                               <button
@@ -2777,6 +2963,27 @@ export default function TournamentControlRoom() {
                                     );
                                   }}
                                 >
+                                  {!isComplete && (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      data-no-node-drag="true"
+                                      className="w-full border border-[#FFD700]/40 bg-[#FFD700]/10 font-mono text-[10px] font-black uppercase tracking-widest text-[#FFD700] hover:bg-[#FFD700]/20"
+                                      disabled={autoFillLobby.isPending}
+                                      onClick={event => {
+                                        event.stopPropagation();
+                                        autoFillLobby.mutate({
+                                          gameId: game.id,
+                                        });
+                                      }}
+                                    >
+                                      {autoFillLobby.isPending &&
+                                      autoFillLobby.variables?.gameId ===
+                                        game.id
+                                        ? "Auto-filling…"
+                                        : "Auto-fill Lobby"}
+                                    </Button>
+                                  )}
                                   {Array.from(
                                     { length: capacity },
                                     (_, index) => {
@@ -3065,7 +3272,8 @@ export default function TournamentControlRoom() {
           dialogState?.type === "rename-tournament" ||
           dialogState?.type === "rename" ||
           dialogState?.type === "lobby" ||
-          dialogState?.type === "broadcast"
+          dialogState?.type === "broadcast" ||
+          dialogState?.type === "round"
         }
         onOpenChange={open => !open && setDialogState(null)}
       >
@@ -3080,7 +3288,11 @@ export default function TournamentControlRoom() {
                     ? "Rename Game"
                     : dialogState?.type === "broadcast"
                       ? "Set Broadcast Link"
-                      : "Set Lobby Code"}
+                      : dialogState?.type === "round"
+                        ? dialogState.mode === "rename"
+                          ? "Rename Round"
+                          : "Create Round From Selection"
+                        : "Set Lobby Code"}
             </DialogTitle>
             <DialogDescription>
               {dialogState?.type === "lobby"
@@ -3109,7 +3321,9 @@ export default function TournamentControlRoom() {
                       ? "Game label"
                       : dialogState?.type === "broadcast"
                         ? "https://twitch.tv/channel"
-                        : "Lobby code"
+                        : dialogState?.type === "round"
+                          ? "Round label"
+                          : "Lobby code"
               }
             />
           </div>
@@ -3146,6 +3360,15 @@ export default function TournamentControlRoom() {
                   setBroadcastUrl.mutate({
                     gameId: dialogState.gameId,
                     broadcastUrl: formName.trim() ? formName.trim() : null,
+                  });
+                }
+                if (dialogState?.type === "round") {
+                  updateRoundGroup.mutate({
+                    tournamentId,
+                    gameIds: Array.from(selectedRoundGameIds),
+                    label: formName.trim(),
+                    roundGroupId: dialogState.roundGroupId,
+                    mode: dialogState.mode,
                   });
                 }
                 setDialogState(null);
@@ -3396,7 +3619,7 @@ function LobbyCodeTools({
               Copy Lobby Messages
             </button>
           )}
-          <div className="max-h-44 space-y-1.5 overflow-y-auto pr-1">
+          <div className="space-y-1.5 pr-1">
             {assignedTeams.length === 0 ? (
               <p className="text-[11px] text-white/40">
                 Assign teams to send or copy lobby-code messages.

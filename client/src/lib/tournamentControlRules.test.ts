@@ -2,7 +2,21 @@ import { describe, expect, it, vi } from "vitest";
 import { TRPCError } from "@trpc/server";
 import { appRouter } from "../../../server/routers";
 import type { TrpcContext } from "../../../server/_core/context";
-import { assertGameIsMutable, getActiveAssignedTeamIds, getNextAvailableSlot, resolveAssignmentSlot, validateAssignmentPlan, validateMovePlan, validateReopenPlan, type ControlAssignment, type ControlGame, type ControlTeam } from "../../../server/tournamentControlRules";
+import {
+  assertGameIsMutable,
+  getActiveAssignedTeamIds,
+  getEmptySlotsForGame,
+  selectAutoFillLobbyAssignments,
+  shuffleTournamentTeams,
+  getNextAvailableSlot,
+  resolveAssignmentSlot,
+  validateAssignmentPlan,
+  validateMovePlan,
+  validateReopenPlan,
+  type ControlAssignment,
+  type ControlGame,
+  type ControlTeam,
+} from "../../../server/tournamentControlRules";
 
 const teams: ControlTeam[] = [
   { id: 1, tournamentId: 10, name: "Alpha" },
@@ -17,45 +31,130 @@ const games: ControlGame[] = [
 ];
 
 function publicContext(): TrpcContext {
-  return { user: null, req: { protocol: "https", headers: {}, get: () => "localhost" }, res: { clearCookie: vi.fn(), cookie: vi.fn() } } as unknown as TrpcContext;
+  return {
+    user: null,
+    req: { protocol: "https", headers: {}, get: () => "localhost" },
+    res: { clearCookie: vi.fn(), cookie: vi.fn() },
+  } as unknown as TrpcContext;
 }
 
 function expectTrpcCode(fn: () => unknown, code: string) {
-  try { fn(); } catch (error) { expect(error).toBeInstanceOf(TRPCError); expect((error as TRPCError).code).toBe(code); return; }
+  try {
+    fn();
+  } catch (error) {
+    expect(error).toBeInstanceOf(TRPCError);
+    expect((error as TRPCError).code).toBe(code);
+    return;
+  }
   throw new Error("Expected TRPCError");
 }
 
 describe("tournament control Discord organizer guard", () => {
   it("blocks unauthenticated callers before organizer data access", async () => {
     const caller = appRouter.createCaller(publicContext());
-    await expect(caller.tournamentControl.get({ tournamentId: 10 })).rejects.toThrow("Discord sign-in");
+    await expect(
+      caller.tournamentControl.get({ tournamentId: 10 })
+    ).rejects.toThrow("Discord sign-in");
   });
 });
 
 describe("tournament control assignment rules", () => {
   it("allows valid Cashout and Final Round placements within capacity", () => {
-    expect(validateAssignmentPlan({ games, teams, assignments: [], targetGameId: 100, teamId: 1, slotIndex: 4 }).id).toBe(100);
-    expect(validateAssignmentPlan({ games, teams, assignments: [], targetGameId: 101, teamId: 1, slotIndex: 2 }).id).toBe(101);
+    expect(
+      validateAssignmentPlan({
+        games,
+        teams,
+        assignments: [],
+        targetGameId: 100,
+        teamId: 1,
+        slotIndex: 4,
+      }).id
+    ).toBe(100);
+    expect(
+      validateAssignmentPlan({
+        games,
+        teams,
+        assignments: [],
+        targetGameId: 101,
+        teamId: 1,
+        slotIndex: 2,
+      }).id
+    ).toBe(101);
   });
 
   it("enforces Cashout capacity of 4 and Final Round capacity of 2", () => {
-    expectTrpcCode(() => validateAssignmentPlan({ games, teams, assignments: [], targetGameId: 100, teamId: 1, slotIndex: 5 }), "BAD_REQUEST");
-    expectTrpcCode(() => validateAssignmentPlan({ games, teams, assignments: [], targetGameId: 101, teamId: 1, slotIndex: 3 }), "BAD_REQUEST");
+    expectTrpcCode(
+      () =>
+        validateAssignmentPlan({
+          games,
+          teams,
+          assignments: [],
+          targetGameId: 100,
+          teamId: 1,
+          slotIndex: 5,
+        }),
+      "BAD_REQUEST"
+    );
+    expectTrpcCode(
+      () =>
+        validateAssignmentPlan({
+          games,
+          teams,
+          assignments: [],
+          targetGameId: 101,
+          teamId: 1,
+          slotIndex: 3,
+        }),
+      "BAD_REQUEST"
+    );
   });
 
   it("prevents assigning a team across active games in the same tournament", () => {
-    const assignments: ControlAssignment[] = [{ gameId: 100, teamId: 1, slotIndex: 1 }];
-    expectTrpcCode(() => validateAssignmentPlan({ games, teams, assignments, targetGameId: 101, teamId: 1, slotIndex: 1 }), "CONFLICT");
+    const assignments: ControlAssignment[] = [
+      { gameId: 100, teamId: 1, slotIndex: 1 },
+    ];
+    expectTrpcCode(
+      () =>
+        validateAssignmentPlan({
+          games,
+          teams,
+          assignments,
+          targetGameId: 101,
+          teamId: 1,
+          slotIndex: 1,
+        }),
+      "CONFLICT"
+    );
   });
 
   it("rejects teams from a different tournament", () => {
-    expectTrpcCode(() => validateAssignmentPlan({ games, teams, assignments: [], targetGameId: 100, teamId: 3, slotIndex: 1 }), "BAD_REQUEST");
+    expectTrpcCode(
+      () =>
+        validateAssignmentPlan({
+          games,
+          teams,
+          assignments: [],
+          targetGameId: 100,
+          teamId: 3,
+          slotIndex: 1,
+        }),
+      "BAD_REQUEST"
+    );
   });
 
   it("resolves an occupied preferred slot to the next available slot server-side", () => {
-    const assignments: ControlAssignment[] = [{ gameId: 100, teamId: 1, slotIndex: 1 }];
+    const assignments: ControlAssignment[] = [
+      { gameId: 100, teamId: 1, slotIndex: 1 },
+    ];
     const game = games.find(item => item.id === 100)!;
-    expect(resolveAssignmentSlot({ game, assignments, preferredSlotIndex: 1, teamId: 2 })).toBe(2);
+    expect(
+      resolveAssignmentSlot({
+        game,
+        assignments,
+        preferredSlotIndex: 1,
+        teamId: 2,
+      })
+    ).toBe(2);
     expect(getNextAvailableSlot(assignments, 4, undefined, 2)).toBe(2);
   });
 
@@ -66,31 +165,92 @@ describe("tournament control assignment rules", () => {
     ];
     const game = games.find(item => item.id === 101)!;
     expect(getNextAvailableSlot(assignments, 2, 1, 3)).toBeNull();
-    expectTrpcCode(() => resolveAssignmentSlot({ game, assignments, preferredSlotIndex: 1, teamId: 3 }), "CONFLICT");
+    expectTrpcCode(
+      () =>
+        resolveAssignmentSlot({
+          game,
+          assignments,
+          preferredSlotIndex: 1,
+          teamId: 3,
+        }),
+      "CONFLICT"
+    );
   });
 
   it("server-side assignment slot resolution does not duplicate teams", () => {
-    const assignments: ControlAssignment[] = [{ gameId: 100, teamId: 1, slotIndex: 1 }];
+    const assignments: ControlAssignment[] = [
+      { gameId: 100, teamId: 1, slotIndex: 1 },
+    ];
     const game = games.find(item => item.id === 100)!;
     expect(getNextAvailableSlot(assignments, 4, 2, 1)).toBeNull();
-    expectTrpcCode(() => resolveAssignmentSlot({ game, assignments, preferredSlotIndex: 2, teamId: 1 }), "CONFLICT");
+    expectTrpcCode(
+      () =>
+        resolveAssignmentSlot({
+          game,
+          assignments,
+          preferredSlotIndex: 2,
+          teamId: 1,
+        }),
+      "CONFLICT"
+    );
   });
 
   it("rejects occupied slots without displacing the current occupant", () => {
-    const assignments: ControlAssignment[] = [{ gameId: 100, teamId: 1, slotIndex: 1 }];
-    expectTrpcCode(() => validateAssignmentPlan({ games, teams, assignments, targetGameId: 100, teamId: 2, slotIndex: 1 }), "CONFLICT");
+    const assignments: ControlAssignment[] = [
+      { gameId: 100, teamId: 1, slotIndex: 1 },
+    ];
+    expectTrpcCode(
+      () =>
+        validateAssignmentPlan({
+          games,
+          teams,
+          assignments,
+          targetGameId: 100,
+          teamId: 2,
+          slotIndex: 1,
+        }),
+      "CONFLICT"
+    );
     expect(assignments).toEqual([{ gameId: 100, teamId: 1, slotIndex: 1 }]);
   });
 
   it("validates failed cross-game moves without changing the original assignment", () => {
-    const assignments: ControlAssignment[] = [{ gameId: 100, teamId: 1, slotIndex: 1 }, { gameId: 101, teamId: 2, slotIndex: 1 }];
-    expectTrpcCode(() => validateMovePlan({ games, teams, assignments, sourceGameId: 100, targetGameId: 101, teamId: 1, slotIndex: 1 }), "CONFLICT");
-    expect(assignments.find(a => a.gameId === 100 && a.teamId === 1)).toBeDefined();
+    const assignments: ControlAssignment[] = [
+      { gameId: 100, teamId: 1, slotIndex: 1 },
+      { gameId: 101, teamId: 2, slotIndex: 1 },
+    ];
+    expectTrpcCode(
+      () =>
+        validateMovePlan({
+          games,
+          teams,
+          assignments,
+          sourceGameId: 100,
+          targetGameId: 101,
+          teamId: 1,
+          slotIndex: 1,
+        }),
+      "CONFLICT"
+    );
+    expect(
+      assignments.find(a => a.gameId === 100 && a.teamId === 1)
+    ).toBeDefined();
   });
 
   it("completed games do not block a team's next active assignment", () => {
-    const assignments: ControlAssignment[] = [{ gameId: 102, teamId: 1, slotIndex: 1 }];
-    expect(validateAssignmentPlan({ games, teams, assignments, targetGameId: 100, teamId: 1, slotIndex: 1 }).id).toBe(100);
+    const assignments: ControlAssignment[] = [
+      { gameId: 102, teamId: 1, slotIndex: 1 },
+    ];
+    expect(
+      validateAssignmentPlan({
+        games,
+        teams,
+        assignments,
+        targetGameId: 100,
+        teamId: 1,
+        slotIndex: 1,
+      }).id
+    ).toBe(100);
     expect([...getActiveAssignedTeamIds(games, assignments)]).toEqual([]);
   });
 
@@ -99,10 +259,13 @@ describe("tournament control assignment rules", () => {
     await expect(caller.auth.me()).resolves.toBeNull();
   });
 
-
   it("allows reopening a completed game when assigned teams are not active elsewhere", () => {
-    const assignments: ControlAssignment[] = [{ gameId: 102, teamId: 1, slotIndex: 1 }];
-    expect(() => validateReopenPlan({ games, assignments, gameId: 102 })).not.toThrow();
+    const assignments: ControlAssignment[] = [
+      { gameId: 102, teamId: 1, slotIndex: 1 },
+    ];
+    expect(() =>
+      validateReopenPlan({ games, assignments, gameId: 102 })
+    ).not.toThrow();
   });
 
   it("rejects reopening a completed game when assigned teams are active elsewhere", () => {
@@ -110,12 +273,27 @@ describe("tournament control assignment rules", () => {
       { gameId: 102, teamId: 1, slotIndex: 1 },
       { gameId: 100, teamId: 1, slotIndex: 2 },
     ];
-    expectTrpcCode(() => validateReopenPlan({ games, assignments, gameId: 102 }), "CONFLICT");
+    expectTrpcCode(
+      () => validateReopenPlan({ games, assignments, gameId: 102 }),
+      "CONFLICT"
+    );
   });
 
   it("allows moving a team between slots within the same Cashout lobby", () => {
-    const assignments: ControlAssignment[] = [{ gameId: 100, teamId: 1, slotIndex: 1 }];
-    expect(validateMovePlan({ games, teams, assignments, sourceGameId: 100, targetGameId: 100, teamId: 1, slotIndex: 2 }).targetGame.id).toBe(100);
+    const assignments: ControlAssignment[] = [
+      { gameId: 100, teamId: 1, slotIndex: 1 },
+    ];
+    expect(
+      validateMovePlan({
+        games,
+        teams,
+        assignments,
+        sourceGameId: 100,
+        targetGameId: 100,
+        teamId: 1,
+        slotIndex: 2,
+      }).targetGame.id
+    ).toBe(100);
   });
 
   it("rejects occupied same-game target slots without changing either team", () => {
@@ -123,7 +301,19 @@ describe("tournament control assignment rules", () => {
       { gameId: 100, teamId: 1, slotIndex: 1 },
       { gameId: 100, teamId: 2, slotIndex: 2 },
     ];
-    expectTrpcCode(() => validateMovePlan({ games, teams, assignments, sourceGameId: 100, targetGameId: 100, teamId: 1, slotIndex: 2 }), "CONFLICT");
+    expectTrpcCode(
+      () =>
+        validateMovePlan({
+          games,
+          teams,
+          assignments,
+          sourceGameId: 100,
+          targetGameId: 100,
+          teamId: 1,
+          slotIndex: 2,
+        }),
+      "CONFLICT"
+    );
     expect(assignments).toEqual([
       { gameId: 100, teamId: 1, slotIndex: 1 },
       { gameId: 100, teamId: 2, slotIndex: 2 },
@@ -141,6 +331,105 @@ describe("tournament control assignment rules", () => {
 
   it("admin Create Team duplicate rule is case-insensitive within a tournament", () => {
     const existing = [{ id: 1, tournamentId: 10, name: "Alpha" }];
-    expect(existing.some(team => team.tournamentId === 10 && team.name.toLowerCase() === "alpha")).toBe(true);
+    expect(
+      existing.some(
+        team => team.tournamentId === 10 && team.name.toLowerCase() === "alpha"
+      )
+    ).toBe(true);
+  });
+});
+
+const autoFillTeams: ControlTeam[] = [1, 2, 3, 4, 5, 6].map(id => ({
+  id,
+  tournamentId: 10,
+  name: `Team ${id}`,
+}));
+const autoFillTarget: ControlGame = {
+  id: 100,
+  tournamentId: 10,
+  gameType: "cashout",
+  status: "draft",
+};
+const autoFillFinalTarget: ControlGame = {
+  ...autoFillTarget,
+  id: 101,
+  gameType: "final_round",
+};
+
+function selectAutoFill(
+  assignments: ControlAssignment[],
+  game: ControlGame = autoFillTarget
+) {
+  return selectAutoFillLobbyAssignments({
+    teams: autoFillTeams,
+    games: [
+      game,
+      { id: 200, tournamentId: 10, gameType: "cashout", status: "live" },
+      { id: 201, tournamentId: 10, gameType: "cashout", status: "complete" },
+    ],
+    assignments,
+    targetGame: game,
+    random: () => 0,
+  });
+}
+
+describe("tournament auto-fill helpers", () => {
+  it("calculates empty slots and preserves existing assignments", () => {
+    expect(
+      getEmptySlotsForGame(autoFillTarget, [
+        { gameId: 100, teamId: 1, slotIndex: 2 },
+      ])
+    ).toEqual([1, 3, 4]);
+    expect(
+      selectAutoFill([{ gameId: 100, teamId: 1, slotIndex: 2 }]).map(
+        item => item.slotIndex
+      )
+    ).toEqual([1, 3, 4]);
+  });
+
+  it("excludes teams assigned to another active game but allows completed history", () => {
+    const result = selectAutoFill([
+      { gameId: 200, teamId: 2, slotIndex: 1 },
+      { gameId: 201, teamId: 3, slotIndex: 1 },
+    ]);
+    expect(result.map(item => item.teamId)).not.toContain(2);
+    expect(result.map(item => item.teamId)).toContain(3);
+  });
+
+  it("does not duplicate teams or exceed cashout/final capacities", () => {
+    expect(
+      selectAutoFill([{ gameId: 100, teamId: 1, slotIndex: 1 }])
+    ).toHaveLength(3);
+    expect(selectAutoFill([], autoFillFinalTarget)).toHaveLength(2);
+  });
+
+  it("handles fewer eligible teams than open slots", () => {
+    const result = selectAutoFillLobbyAssignments({
+      teams: autoFillTeams.slice(0, 2),
+      games: [autoFillTarget],
+      assignments: [],
+      targetGame: autoFillTarget,
+      random: () => 0,
+    });
+    expect(result).toHaveLength(2);
+  });
+
+  it("uses injectable randomization deterministically", () => {
+    expect(shuffleTournamentTeams([1, 2, 3], () => 0)).toEqual([2, 3, 1]);
+    expect(shuffleTournamentTeams([1, 2, 3], () => 0.99)).toEqual([1, 2, 3]);
+  });
+
+  it("rejects completed and already-full games", () => {
+    expect(() =>
+      selectAutoFill([], { ...autoFillTarget, status: "complete" })
+    ).toThrow(/Completed/);
+    expect(() =>
+      selectAutoFill([
+        { gameId: 100, teamId: 1, slotIndex: 1 },
+        { gameId: 100, teamId: 2, slotIndex: 2 },
+        { gameId: 100, teamId: 3, slotIndex: 3 },
+        { gameId: 100, teamId: 4, slotIndex: 4 },
+      ])
+    ).toThrow(/already full/);
   });
 });

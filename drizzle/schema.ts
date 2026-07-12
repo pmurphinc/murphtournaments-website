@@ -423,6 +423,8 @@ export const tournamentGames = mysqlTable(
     canvasX: int("canvasX").default(120).notNull(),
     canvasY: int("canvasY").default(120).notNull(),
     privateLobbyCode: varchar("privateLobbyCode", { length: 64 }),
+    roundGroupId: varchar("roundGroupId", { length: 64 }),
+    roundLabel: varchar("roundLabel", { length: 80 }),
     broadcastUrl: varchar("broadcastUrl", { length: 1024 }),
     mapId: varchar("mapId", { length: 64 }),
     seriesBestOf: int("seriesBestOf").default(1).notNull(),
@@ -432,6 +434,10 @@ export const tournamentGames = mysqlTable(
   table => [
     index("tournament_games_tournament_idx").on(table.tournamentId),
     index("tournament_games_status_idx").on(table.status),
+    index("tournament_games_round_group_idx").on(
+      table.tournamentId,
+      table.roundGroupId
+    ),
   ]
 );
 
@@ -534,6 +540,8 @@ export const tournamentControlTemplateGames = mysqlTable(
     canvasY: int("canvasY").default(120).notNull(),
     seriesBestOf: int("seriesBestOf").default(1).notNull(),
     mapId: varchar("mapId", { length: 64 }),
+    roundGroupId: varchar("roundGroupId", { length: 64 }),
+    roundLabel: varchar("roundLabel", { length: 80 }),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },

@@ -22,6 +22,7 @@ import {
   getMidpoint,
   getNodeHeight,
   getPointerDistance,
+  getRoundFrames,
   getViewportPreservingScroll,
   maxZoom,
   minZoom,
@@ -43,6 +44,8 @@ type ViewerGame = {
   seriesBestOf?: number | null;
   mapId?: string | null;
   broadcastUrl?: string | null;
+  roundGroupId?: string | null;
+  roundLabel?: string | null;
 };
 
 export type NodeDragState = {
@@ -144,7 +147,11 @@ export default function TournamentControlViewer() {
   const [nodeDrag, setNodeDrag] = useState<NodeDragState | null>(null);
   const query = trpc.tournamentControl.getViewer.useQuery(
     { token: params.viewerToken ?? "" },
-    { enabled: Boolean(params.viewerToken), retry: false, refetchInterval: 5000 }
+    {
+      enabled: Boolean(params.viewerToken),
+      retry: false,
+      refetchInterval: 5000,
+    }
   );
   const games = (query.data?.games ?? []) as ViewerGame[];
   const teamsById = useMemo(
@@ -226,6 +233,19 @@ export default function TournamentControlViewer() {
     },
     [applyBoardView, zoom]
   );
+
+  const roundFrames = useMemo(() => {
+    const positions = new Map(
+      games.map(
+        game =>
+          [
+            game.id,
+            getViewerVisualPosition(game, localPositions, nodeDrag),
+          ] as const
+      )
+    );
+    return getRoundFrames(games, minimizedGameIds, positions);
+  }, [games, localPositions, minimizedGameIds, nodeDrag]);
 
   const canvasPoint = useCallback(
     (clientX: number, clientY: number) => {
@@ -522,8 +542,24 @@ export default function TournamentControlViewer() {
               transformOrigin: "top left",
             }}
           >
+            {roundFrames.map(frame => (
+              <div
+                key={frame.groupId}
+                className="pointer-events-none absolute z-0 rounded-xl border-2 border-[#FFD700]/55 bg-[#FFD700]/5 shadow-[inset_0_0_28px_rgba(255,215,0,0.08),0_0_22px_rgba(255,215,0,0.08)]"
+                style={{
+                  left: frame.x,
+                  top: frame.y,
+                  width: frame.width,
+                  height: frame.height,
+                }}
+              >
+                <span className="absolute -top-4 left-4 rounded border border-[#FFD700]/50 bg-black px-2 py-0.5 font-mono text-[10px] font-black uppercase tracking-widest text-[#FFD700]">
+                  {frame.label}
+                </span>
+              </div>
+            ))}
             <svg
-              className="absolute inset-0 overflow-visible"
+              className="absolute inset-0 z-[1] overflow-visible"
               width={logicalCanvasSize.width}
               height={logicalCanvasSize.height}
             >
@@ -653,7 +689,9 @@ export default function TournamentControlViewer() {
                     </button>
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <p className={`inline-flex rounded border px-2 py-1 font-mono text-xs uppercase ${statusClasses.statusPill}`}>
+                    <p
+                      className={`inline-flex rounded border px-2 py-1 font-mono text-xs uppercase ${statusClasses.statusPill}`}
+                    >
                       {game.status}
                     </p>
                     <p className="rounded border border-[#FFD700]/25 bg-[#FFD700]/10 px-2 py-1 font-mono text-xs uppercase text-[#FFD700]">

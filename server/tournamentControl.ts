@@ -1,5 +1,5 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { getDb } from "./db";
@@ -43,6 +43,7 @@ import {
   validateMovePlan,
   validateReopenPlan,
   resolveAssignmentSlot,
+  selectAutoFillLobbyAssignments,
   type ControlAssignment,
   type ControlGame,
   type ControlTeam,
@@ -257,6 +258,8 @@ type BoardSnapshotInput = {
     seriesBestOf?: number;
     mapId?: string | null;
     broadcastUrl?: string | null;
+    roundGroupId?: string | null;
+    roundLabel?: string | null;
   }>;
   assignments: Array<{
     id: number;
@@ -353,6 +356,8 @@ const boardSnapshotSchema = z.object({
       seriesBestOf: seriesBestOfSchema.optional(),
       mapId: storedMapIdSchema.optional(),
       broadcastUrl: broadcastUrlSchema.optional(),
+      roundGroupId: z.string().trim().max(64).nullable().optional(),
+      roundLabel: z.string().trim().max(80).nullable().optional(),
     })
   ),
   assignments: z.array(
@@ -786,6 +791,126 @@ async function returnTournamentTeamsToAvailable(tournamentId: number) {
   return fetchTournamentControlData(tournamentId);
 }
 
+async function autoFillLobby(gameId: number) {
+  const db = await requireDb();
+  return db.transaction(async tx => {
+    await tx.execute(
+      sql`SELECT id FROM tournament_games WHERE id = ${gameId} FOR UPDATE`
+    );
+    const targetGame = await getGameOrThrow(tx, gameId);
+    if (targetGame.status === "complete")
+      throw new TRPCError({
+        code: "CONFLICT",
+        message:
+          "Completed games are historical. Reopen the game before auto-filling it.",
+      });
+    await tx.execute(
+      sql`SELECT id FROM tournament_games WHERE tournamentId = ${targetGame.tournamentId} FOR UPDATE`
+    );
+    await tx.execute(
+      sql`SELECT tournament_game_assignments.id FROM tournament_game_assignments INNER JOIN tournament_games ON tournament_game_assignments.gameId = tournament_games.id WHERE tournament_games.tournamentId = ${targetGame.tournamentId} FOR UPDATE`
+    );
+    const context = await fetchGameContext(tx, targetGame.tournamentId);
+    const assignments = selectAutoFillLobbyAssignments({
+      teams: context.teams,
+      games: context.games,
+      assignments: context.assignments,
+      targetGame,
+    });
+    for (const assignment of assignments) {
+      await tx.insert(tournamentGameAssignments).values({
+        gameId: targetGame.id,
+        teamId: assignment.teamId,
+        slotIndex: assignment.slotIndex,
+      });
+    }
+    const updatedAssignments = await getAssignmentsForGame(tx, targetGame.id);
+    const slotsOpen =
+      gameCapacity[targetGame.gameType] - updatedAssignments.length;
+    return {
+      assignedCount: assignments.length,
+      slotsOpen: Math.max(0, slotsOpen),
+      assignments: updatedAssignments,
+      board: await fetchTournamentRows(tx, targetGame.tournamentId),
+    };
+  });
+}
+
+const roundLabelSchema = z.string().trim().min(1).max(80);
+const roundGroupIdSchema = z.string().trim().min(1).max(64);
+
+async function updateRoundGroup(input: {
+  tournamentId: number;
+  gameIds: number[];
+  label?: string;
+  roundGroupId?: string;
+  mode: "create" | "add" | "rename" | "remove";
+}) {
+  const db = await requireDb();
+  return db.transaction(async tx => {
+    await fetchTournamentRows(tx, input.tournamentId);
+    const uniqueGameIds = Array.from(new Set(input.gameIds));
+    if (
+      (input.mode === "create" || input.mode === "add") &&
+      uniqueGameIds.length < 2
+    )
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Select at least two lobbies.",
+      });
+    if (uniqueGameIds.length === 0)
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Select at least one lobby.",
+      });
+    const selectedGames = await tx
+      .select()
+      .from(tournamentGames)
+      .where(inArray(tournamentGames.id, uniqueGameIds));
+    if (selectedGames.length !== uniqueGameIds.length)
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "One or more lobbies were not found.",
+      });
+    if (selectedGames.some(game => game.tournamentId !== input.tournamentId))
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Selected lobbies must belong to this tournament.",
+      });
+    if (input.mode === "remove") {
+      await tx
+        .update(tournamentGames)
+        .set({ roundGroupId: null, roundLabel: null })
+        .where(inArray(tournamentGames.id, uniqueGameIds));
+    } else if (input.mode === "rename") {
+      const groupId = input.roundGroupId ?? selectedGames[0]?.roundGroupId;
+      if (!groupId)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Round group not found.",
+        });
+      await tx
+        .update(tournamentGames)
+        .set({ roundLabel: input.label ?? "Round" })
+        .where(
+          and(
+            eq(tournamentGames.tournamentId, input.tournamentId),
+            eq(tournamentGames.roundGroupId, groupId)
+          )
+        );
+    } else {
+      await tx
+        .update(tournamentGames)
+        .set({
+          roundGroupId: input.roundGroupId ?? randomUUID(),
+          roundLabel: input.label ?? "Round",
+        })
+        .where(inArray(tournamentGames.id, uniqueGameIds));
+    }
+    return fetchTournamentRows(tx, input.tournamentId);
+  });
+}
+
 async function clearTournamentCanvas(tournamentId: number) {
   const db = await requireDb();
   return db.transaction(async tx => {
@@ -871,6 +996,8 @@ async function restoreTournamentBoardSnapshot(
         seriesBestOf: game.seriesBestOf ?? 1,
         mapId: game.mapId ?? null,
         broadcastUrl: game.broadcastUrl ?? null,
+        roundGroupId: game.roundGroupId ?? null,
+        roundLabel: game.roundLabel ?? null,
       });
       gameIdMap.set(
         game.id,
@@ -1018,6 +1145,8 @@ async function getViewerDataByToken(token: string) {
       seriesBestOf: game.seriesBestOf,
       mapId: game.mapId,
       broadcastUrl: game.broadcastUrl,
+      roundGroupId: game.roundGroupId,
+      roundLabel: game.roundLabel,
     })),
     assignments: data.assignments,
     connections: data.connections,
@@ -1068,6 +1197,8 @@ async function saveTemplateFromTournament(
           canvasY: game.canvasY,
           seriesBestOf: game.gameType === "final_round" ? game.seriesBestOf : 1,
           mapId: game.mapId,
+          roundGroupId: game.roundGroupId,
+          roundLabel: game.roundLabel,
         });
       const templateGameId = requireInsertId(
         gameInsertResult,
@@ -1135,6 +1266,10 @@ async function createTournamentFromTemplate(
         canvasY: game.canvasY,
         seriesBestOf: game.gameType === "final_round" ? game.seriesBestOf : 1,
         mapId: game.mapId,
+        roundGroupId: game.roundGroupId
+          ? `${game.roundGroupId}-${randomUUID()}`.slice(0, 64)
+          : null,
+        roundLabel: game.roundLabel,
       });
       const tournamentGameId = requireInsertId(
         gameInsertResult,
@@ -2692,6 +2827,28 @@ export const personalTcrRouter = router({
       });
       return fetchTournamentControlData(targetGame.tournamentId);
     }),
+
+  autoFillLobby: personalTcrProcedure
+    .input(gameIdSchema)
+    .mutation(async ({ input, ctx }) => {
+      const db = await requireDb();
+      await assertGameBelongsToOwnedTournament(db, input.gameId, ctx.user);
+      return autoFillLobby(input.gameId);
+    }),
+  updateRoundGroup: personalTcrProcedure
+    .input(
+      tournamentIdSchema.extend({
+        gameIds: z.array(idSchema).min(1),
+        label: roundLabelSchema.optional(),
+        roundGroupId: roundGroupIdSchema.optional(),
+        mode: z.enum(["create", "add", "rename", "remove"]),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const db = await requireDb();
+      await getManageableTournamentOrThrow(db, input.tournamentId, ctx.user);
+      return updateRoundGroup(input);
+    }),
   removeTeam: personalTcrProcedure
     .input(gameIdSchema.extend({ teamId: idSchema }))
     .mutation(async ({ input, ctx }) => {
@@ -3477,6 +3634,20 @@ export const tournamentControlRouter = router({
         .where(eq(tournamentTeamClaimLinks.id, input.linkId));
       return { success: true } as const;
     }),
+
+  autoFillLobby: discordTournamentStaffProcedure
+    .input(gameIdSchema)
+    .mutation(({ input }) => autoFillLobby(input.gameId)),
+  updateRoundGroup: discordTournamentStaffProcedure
+    .input(
+      tournamentIdSchema.extend({
+        gameIds: z.array(idSchema).min(1),
+        label: roundLabelSchema.optional(),
+        roundGroupId: roundGroupIdSchema.optional(),
+        mode: z.enum(["create", "add", "rename", "remove"]),
+      })
+    )
+    .mutation(({ input }) => updateRoundGroup(input)),
   removeTeam: discordTournamentStaffProcedure
     .input(gameIdSchema.extend({ teamId: idSchema }))
     .mutation(async ({ input }) => {
