@@ -297,14 +297,15 @@ const templateVisibilitySchema = z.enum(["private", "public"]);
 const tokenSchema = z.string().trim().min(16).max(256);
 const adminNoteSchema = z.string().trim().max(1000).nullable().optional();
 const resultPlacementSchema = z.number().int().min(1).max(4).nullable();
-const validMapIds = new Set<string>(DEFAULT_COMPETITIVE_MAP_IDS);
-const mapIdSchema = z
+const competitiveMapIds = new Set<string>(DEFAULT_COMPETITIVE_MAP_IDS);
+const legacySafeMapIds = new Set<string>(THE_FINALS_MAPS.map(map => map.id));
+export const userSelectedMapIdSchema = z
   .string()
   .trim()
   .max(64)
   .nullable()
   .refine(
-    value => value === null || validMapIds.has(value),
+    value => value === null || competitiveMapIds.has(value),
     "Map must be in the competitive pool"
   );
 export const broadcastUrlSchema = z.preprocess(
@@ -328,6 +329,16 @@ export const broadcastUrlSchema = z.preprocess(
       }
     }, "Broadcast URL must be a valid http or https URL")
 );
+export const storedMapIdSchema = z
+  .string()
+  .trim()
+  .max(64)
+  .nullable()
+  .refine(
+    value => value === null || legacySafeMapIds.has(value),
+    "Stored map must be a known Finals map"
+  );
+
 const boardSnapshotSchema = z.object({
   games: z.array(
     z.object({
@@ -340,7 +351,7 @@ const boardSnapshotSchema = z.object({
       canvasY: z.number().int().min(-10000).max(10000),
       privateLobbyCode: z.string().trim().max(64).nullable().optional(),
       seriesBestOf: seriesBestOfSchema.optional(),
-      mapId: mapIdSchema.optional(),
+      mapId: storedMapIdSchema.optional(),
       broadcastUrl: broadcastUrlSchema.optional(),
     })
   ),
@@ -382,6 +393,17 @@ export function extractInsertId(result: unknown): number | null {
   const insertId =
     typeof rawInsertId === "bigint" ? Number(rawInsertId) : Number(rawInsertId);
   return Number.isSafeInteger(insertId) && insertId > 0 ? insertId : null;
+}
+
+function getAffectedRows(result: unknown): number {
+  if (Array.isArray(result)) {
+    return result.reduce((total, item) => total + getAffectedRows(item), 0);
+  }
+  if (isRecord(result) && "affectedRows" in result) {
+    const affectedRows = Number(result.affectedRows);
+    return Number.isFinite(affectedRows) ? affectedRows : 0;
+  }
+  return 0;
 }
 
 function requireInsertId(result: unknown, message: string): number {
@@ -1759,63 +1781,53 @@ async function getOrCreateStaffInviteLink(
 ) {
   const db = await requireDb();
   await getOwnedTournamentOrThrow(db, tournamentId, user);
-  const now = new Date();
-  const [existing] = await db
-    .select({
-      id: tournamentStaffInviteLinks.id,
-      expiresAt: tournamentStaffInviteLinks.expiresAt,
-    })
-    .from(tournamentStaffInviteLinks)
-    .where(
-      and(
-        eq(tournamentStaffInviteLinks.tournamentId, tournamentId),
-        eq(tournamentStaffInviteLinks.status, "active"),
-        sql`${tournamentStaffInviteLinks.expiresAt} > NOW()`
+  return db.transaction(async tx => {
+    const [existing] = await tx
+      .execute(
+        sql`
+      SELECT id, expiresAt
+      FROM tournament_staff_invite_links
+      WHERE tournamentId = ${tournamentId}
+        AND status = 'active'
+        AND expiresAt > NOW()
+      ORDER BY id DESC
+      LIMIT 1
+      FOR UPDATE
+    `
       )
-    )
-    .limit(1);
-  if (existing)
+      .then(result => readRows<{ id: number; expiresAt: Date }>(result));
+    if (existing)
+      return {
+        path: null,
+        url: null,
+        expiresAt: existing.expiresAt,
+        hasActiveInvite: true,
+      } as const;
+
+    await tx.execute(sql`
+      UPDATE tournament_staff_invite_links
+      SET status = 'revoked', updatedAt = NOW()
+      WHERE tournamentId = ${tournamentId}
+        AND status = 'active'
+    `);
+
+    const token = randomBytes(32).toString("base64url");
+    const expiresAt = new Date(
+      Date.now() + STAFF_INVITE_TTL_DAYS * 24 * 60 * 60 * 1000
+    );
+    await tx.insert(tournamentStaffInviteLinks).values({
+      tournamentId,
+      createdByUserId: user.id,
+      tokenHash: hashToken(token),
+      expiresAt,
+    });
     return {
-      path: null,
-      url: null,
-      expiresAt: existing.expiresAt,
+      path: createTokenPath("/TCR/staff/join", token),
+      url: createTokenPath("/TCR/staff/join", token),
+      expiresAt,
       hasActiveInvite: true,
     } as const;
-  const active = await db
-    .select({ id: tournamentStaffInviteLinks.id })
-    .from(tournamentStaffInviteLinks)
-    .where(
-      and(
-        eq(tournamentStaffInviteLinks.tournamentId, tournamentId),
-        eq(tournamentStaffInviteLinks.status, "active")
-      )
-    );
-  if (active.length >= PERSONAL_TCR_LIMITS.activeStaffLinksPerTournament)
-    await db
-      .update(tournamentStaffInviteLinks)
-      .set({ status: "revoked", updatedAt: sql`now()` })
-      .where(
-        and(
-          eq(tournamentStaffInviteLinks.tournamentId, tournamentId),
-          eq(tournamentStaffInviteLinks.status, "active")
-        )
-      );
-  const token = randomBytes(32).toString("base64url");
-  const expiresAt = new Date(
-    now.getTime() + STAFF_INVITE_TTL_DAYS * 24 * 60 * 60 * 1000
-  );
-  await db.insert(tournamentStaffInviteLinks).values({
-    tournamentId,
-    createdByUserId: user.id,
-    tokenHash: hashToken(token),
-    expiresAt,
   });
-  return {
-    path: createTokenPath("/TCR/staff/join", token),
-    url: createTokenPath("/TCR/staff/join", token),
-    expiresAt,
-    hasActiveInvite: true,
-  } as const;
 }
 
 async function revokeStaffInviteLink(
@@ -1882,57 +1894,77 @@ async function acceptStaffInvite(
 ) {
   const db = await requireDb();
   const tokenHash = hashToken(token);
-  const [row] = await db
-    .select({ invite: tournamentStaffInviteLinks, tournament: tournaments })
-    .from(tournamentStaffInviteLinks)
-    .innerJoin(
-      tournaments,
-      eq(tournamentStaffInviteLinks.tournamentId, tournaments.id)
-    )
-    .where(eq(tournamentStaffInviteLinks.tokenHash, tokenHash))
-    .limit(1);
-  if (
-    !row ||
-    row.invite.status !== "active" ||
-    row.invite.expiresAt <= new Date()
-  )
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message:
-        "This staff invite is invalid, expired, revoked, or already used.",
+  return db.transaction(async tx => {
+    const [row] = await tx
+      .select({ invite: tournamentStaffInviteLinks, tournament: tournaments })
+      .from(tournamentStaffInviteLinks)
+      .innerJoin(
+        tournaments,
+        eq(tournamentStaffInviteLinks.tournamentId, tournaments.id)
+      )
+      .where(eq(tournamentStaffInviteLinks.tokenHash, tokenHash))
+      .limit(1);
+    if (!row)
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "This staff invite is invalid.",
+      });
+    if (row.invite.status === "revoked")
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "This staff invite has been revoked.",
+      });
+    if (row.invite.status === "accepted")
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "This staff invite has already been used.",
+      });
+    if (row.invite.expiresAt <= new Date())
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "This staff invite has expired.",
+      });
+    if (row.tournament.ownerUserId === user.id)
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Tournament owners cannot accept their own staff invite.",
+      });
+    if (await hasTournamentStaffMembership(tx, row.tournament.id, user.id))
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: "You are already a collaborator for this tournament.",
+      });
+
+    const claimResult = await tx.execute(sql`
+      UPDATE tournament_staff_invite_links
+      SET status = 'accepted', acceptedByUserId = ${user.id}, updatedAt = NOW()
+      WHERE id = ${row.invite.id}
+        AND tokenHash = ${tokenHash}
+        AND status = 'active'
+        AND expiresAt > NOW()
+    `);
+    if (getAffectedRows(claimResult) !== 1)
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: "This staff invite has already been used.",
+      });
+
+    await tx.insert(tournamentStaffMembers).values({
+      tournamentId: row.tournament.id,
+      userId: user.id,
+      role: "collaborator",
+      addedByUserId: row.invite.createdByUserId,
     });
-  if (row.tournament.ownerUserId === user.id)
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "Tournament owners cannot accept their own staff invite.",
-    });
-  if (await hasTournamentStaffMembership(db, row.tournament.id, user.id))
-    throw new TRPCError({
-      code: "CONFLICT",
-      message: "You are already a collaborator for this tournament.",
-    });
-  await db.insert(tournamentStaffMembers).values({
-    tournamentId: row.tournament.id,
-    userId: user.id,
-    role: "collaborator",
-    addedByUserId: row.invite.createdByUserId,
+    return { tournamentId: row.tournament.id } as const;
   });
-  await db
-    .update(tournamentStaffInviteLinks)
-    .set({
-      status: "accepted",
-      acceptedByUserId: user.id,
-      updatedAt: sql`now()`,
-    })
-    .where(eq(tournamentStaffInviteLinks.id, row.invite.id));
-  return { tournamentId: row.tournament.id } as const;
 }
+
 async function getOrCreatePrivateInviteLink(
   tournamentId: number,
   user: { id: number; role: "user" | "admin" }
 ) {
   const db = await requireDb();
-  await getOwnedTournamentOrThrow(db, tournamentId, user);
+  await getManageableTournamentOrThrow(db, tournamentId, user);
   const existing = await getActivePrivateInviteLink(db, tournamentId);
   if (existing)
     return {
@@ -1968,7 +2000,7 @@ async function revokePrivateInviteLink(
   user: { id: number; role: "user" | "admin" }
 ) {
   const db = await requireDb();
-  await getOwnedTournamentOrThrow(db, tournamentId, user);
+  await getManageableTournamentOrThrow(db, tournamentId, user);
   await db
     .update(tournamentPrivateInviteLinks)
     .set({ status: "revoked", updatedAt: sql`now()` })
@@ -1987,7 +2019,11 @@ async function setTournamentVisibility(
   user: { id: number; role: "user" | "admin" }
 ) {
   const db = await requireDb();
-  const tournament = await getOwnedTournamentOrThrow(db, tournamentId, user);
+  const tournament = await getManageableTournamentOrThrow(
+    db,
+    tournamentId,
+    user
+  );
   const publicSlug =
     visibility === "public"
       ? (tournament.publicSlug ??
@@ -2006,7 +2042,11 @@ async function publishTournament(
   user: { id: number; role: "user" | "admin" }
 ) {
   const db = await requireDb();
-  const tournament = await getOwnedTournamentOrThrow(db, tournamentId, user);
+  const tournament = await getManageableTournamentOrThrow(
+    db,
+    tournamentId,
+    user
+  );
   let publicSlug = tournament.publicSlug;
   if (publish && tournament.visibility !== "public")
     throw new TRPCError({
@@ -2144,7 +2184,7 @@ export const personalTcrRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
-      await getOwnedTournamentOrThrow(db, input.tournamentId, ctx.user);
+      await getManageableTournamentOrThrow(db, input.tournamentId, ctx.user);
       return updateTournamentName(input.tournamentId, input.name);
     }),
   deleteTournament: personalTcrProcedure
@@ -2234,9 +2274,17 @@ export const personalTcrRouter = router({
       if (input?.tournamentId)
         await getManageableTournamentOrThrow(db, input.tournamentId, ctx.user);
       const rows = await listSubmissionRows(db, input?.tournamentId);
-      return ctx.user.role === "admin"
-        ? rows
-        : rows.filter(row => row.tournament.ownerUserId === ctx.user.id);
+      if (ctx.user.role === "admin") return rows;
+      const staffRows = await db
+        .select({ tournamentId: tournamentStaffMembers.tournamentId })
+        .from(tournamentStaffMembers)
+        .where(eq(tournamentStaffMembers.userId, ctx.user.id));
+      const staffedIds = new Set(staffRows.map(row => row.tournamentId));
+      return rows.filter(
+        row =>
+          row.tournament.ownerUserId === ctx.user.id ||
+          staffedIds.has(row.tournament.id)
+      );
     }),
   approveTeamSubmission: personalTcrProcedure
     .input(z.object({ submissionId: idSchema }))
@@ -2384,7 +2432,7 @@ export const personalTcrRouter = router({
       return fetchTournamentControlData(game.tournamentId);
     }),
   setGameMap: personalTcrProcedure
-    .input(gameIdSchema.extend({ mapId: mapIdSchema }))
+    .input(gameIdSchema.extend({ mapId: userSelectedMapIdSchema }))
     .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
       const game = await assertGameBelongsToOwnedTournament(
@@ -3253,7 +3301,7 @@ export const tournamentControlRouter = router({
       return fetchTournamentControlData(game.tournamentId);
     }),
   setGameMap: discordTournamentStaffProcedure
-    .input(gameIdSchema.extend({ mapId: mapIdSchema }))
+    .input(gameIdSchema.extend({ mapId: userSelectedMapIdSchema }))
     .mutation(async ({ input }) => {
       const db = await requireDb();
       const game = await getGameOrThrow(db, input.gameId);

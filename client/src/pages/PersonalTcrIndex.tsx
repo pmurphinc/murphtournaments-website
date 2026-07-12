@@ -183,71 +183,62 @@ export default function PersonalTcrIndex() {
                       Open Control Room
                     </Link>
                   </Button>
-                  {tournament.staffRole !== "collaborator" && (
+                  <Button
+                    variant="outline"
+                    className="border-white/20 text-white"
+                    onClick={() =>
+                      toggleRegistration.mutate({
+                        tournamentId: tournament.id,
+                        registrationOpen: tournament.registrationOpen !== 1,
+                      })
+                    }
+                  >
+                    {tournament.registrationOpen === 1
+                      ? "Close Registration"
+                      : "Open Registration"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="border-white/20 text-white"
+                    onClick={() =>
+                      setTournamentVisibility.mutate({
+                        tournamentId: tournament.id,
+                        visibility:
+                          tournament.visibility === "public"
+                            ? "private"
+                            : "public",
+                      })
+                    }
+                  >
+                    Make{" "}
+                    {tournament.visibility === "public" ? "Private" : "Public"}
+                  </Button>
+                  {tournament.visibility === "public" && (
                     <Button
                       variant="outline"
                       className="border-white/20 text-white"
                       onClick={() =>
-                        toggleRegistration.mutate({
+                        publishTournament.mutate({
                           tournamentId: tournament.id,
-                          registrationOpen: tournament.registrationOpen !== 1,
+                          publish: !tournament.publishedAt,
                         })
                       }
                     >
-                      {tournament.registrationOpen === 1
-                        ? "Close Registration"
-                        : "Open Registration"}
+                      {tournament.publishedAt ? "Unpublish" : "Publish"}
                     </Button>
                   )}
-                  {tournament.staffRole !== "collaborator" && (
-                    <Button
-                      variant="outline"
-                      className="border-white/20 text-white"
-                      onClick={() =>
-                        setTournamentVisibility.mutate({
-                          tournamentId: tournament.id,
-                          visibility:
-                            tournament.visibility === "public"
-                              ? "private"
-                              : "public",
-                        })
-                      }
-                    >
-                      Make{" "}
-                      {tournament.visibility === "public"
-                        ? "Private"
-                        : "Public"}
-                    </Button>
-                  )}
-                  {tournament.staffRole !== "collaborator" &&
-                    tournament.visibility === "public" && (
-                      <Button
-                        variant="outline"
-                        className="border-white/20 text-white"
-                        onClick={() =>
-                          publishTournament.mutate({
-                            tournamentId: tournament.id,
-                            publish: !tournament.publishedAt,
-                          })
-                        }
-                      >
-                        {tournament.publishedAt ? "Unpublish" : "Publish"}
-                      </Button>
-                    )}
-                  {tournament.staffRole !== "collaborator" && (
-                    <Button
-                      variant="outline"
-                      className="border-white/20 text-white"
-                      onClick={() => {
-                        void utils.personalTcr.getPrivateInviteLink
-                          .fetch({ tournamentId: tournament.id })
-                          .then(data => copyText(data.url));
-                      }}
-                    >
-                      Copy Invite Link
-                    </Button>
-                  )}
-                  {tournament.staffRole !== "collaborator" && publicUrl && (
+                  <Button
+                    variant="outline"
+                    className="border-white/20 text-white"
+                    onClick={() => {
+                      void utils.personalTcr.getPrivateInviteLink
+                        .fetch({ tournamentId: tournament.id })
+                        .then(data => copyText(data.url));
+                    }}
+                  >
+                    Copy Invite Link
+                  </Button>
+                  {publicUrl && (
                     <Button
                       variant="outline"
                       className="border-white/20 text-white"
@@ -268,21 +259,19 @@ export default function PersonalTcrIndex() {
                   >
                     Copy Viewer Link
                   </Button>
-                  {tournament.staffRole !== "collaborator" && (
-                    <Button
-                      variant="outline"
-                      className="border-white/20 text-white"
-                      onClick={() => {
-                        setRenameTarget({
-                          id: tournament.id,
-                          name: tournament.name,
-                        });
-                        setRenameValue(tournament.name);
-                      }}
-                    >
-                      Rename
-                    </Button>
-                  )}
+                  <Button
+                    variant="outline"
+                    className="border-white/20 text-white"
+                    onClick={() => {
+                      setRenameTarget({
+                        id: tournament.id,
+                        name: tournament.name,
+                      });
+                      setRenameValue(tournament.name);
+                    }}
+                  >
+                    Rename
+                  </Button>
                   {tournament.staffRole !== "collaborator" && (
                     <Button
                       variant="destructive"
