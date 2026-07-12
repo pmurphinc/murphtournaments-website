@@ -1,7 +1,17 @@
 import { desc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, tournaments, teams, Tournament, Team, patchNotes, InsertPatchNote, PatchNote } from "../drizzle/schema";
-import { ENV } from './_core/env';
+import {
+  InsertUser,
+  users,
+  tournaments,
+  teams,
+  Tournament,
+  Team,
+  patchNotes,
+  InsertPatchNote,
+  PatchNote,
+} from "../drizzle/schema";
+import { ENV } from "./_core/env";
 
 type AppDb = ReturnType<typeof drizzle>;
 
@@ -27,7 +37,18 @@ function readExecutionRows(result: unknown): Array<Record<string, unknown>> {
 }
 
 function isDuplicateColumnError(error: unknown) {
-  return error instanceof Error && error.message.toLowerCase().includes("duplicate column");
+  return (
+    error instanceof Error &&
+    error.message.toLowerCase().includes("duplicate column")
+  );
+}
+
+function isDuplicateIndexError(error: unknown) {
+  return (
+    error instanceof Error &&
+    (error.message.toLowerCase().includes("duplicate key name") ||
+      error.message.toLowerCase().includes("duplicate index"))
+  );
 }
 
 async function columnExists(db: AppDb, tableName: string, columnName: string) {
@@ -44,29 +65,108 @@ async function columnExists(db: AppDb, tableName: string, columnName: string) {
   return rows.length > 0;
 }
 
-async function addColumnIfMissing(db: AppDb, tableName: string, columnName: string, definition: string) {
+export async function addColumnIfMissing(
+  db: AppDb,
+  tableName: string,
+  columnName: string,
+  definition: string
+) {
   if (await columnExists(db, tableName, columnName)) return;
 
   try {
-    await db.execute(sql.raw(`ALTER TABLE \`${tableName}\` ADD COLUMN \`${columnName}\` ${definition}`));
+    await db.execute(
+      sql.raw(
+        `ALTER TABLE \`${tableName}\` ADD COLUMN \`${columnName}\` ${definition}`
+      )
+    );
   } catch (error) {
     if (isDuplicateColumnError(error)) return;
     throw error;
   }
 }
 
-async function ensureTournamentControlColumns(db: AppDb) {
+async function indexExists(db: AppDb, tableName: string, indexName: string) {
+  const rows = readExecutionRows(
+    await db.execute(sql`
+      SELECT INDEX_NAME
+      FROM information_schema.STATISTICS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = ${tableName}
+        AND INDEX_NAME = ${indexName}
+      LIMIT 1
+    `)
+  );
+  return rows.length > 0;
+}
+
+export async function addIndexIfMissing(
+  db: AppDb,
+  tableName: string,
+  indexName: string,
+  definition: string
+) {
+  if (await indexExists(db, tableName, indexName)) return;
+
+  try {
+    await db.execute(
+      sql.raw(`CREATE INDEX \`${indexName}\` ON \`${tableName}\` ${definition}`)
+    );
+  } catch (error) {
+    if (isDuplicateIndexError(error)) return;
+    throw error;
+  }
+}
+
+export async function ensureTournamentControlColumns(db: AppDb) {
   await addColumnIfMissing(db, "tournaments", "ownerUserId", "int");
   await addColumnIfMissing(db, "tournament_games", "mapId", "varchar(64)");
-  await addColumnIfMissing(db, "tournament_games", "broadcastUrl", "varchar(1024)");
-  await addColumnIfMissing(db, "tournament_control_template_games", "mapId", "varchar(64)");
+  await addColumnIfMissing(
+    db,
+    "tournament_games",
+    "broadcastUrl",
+    "varchar(1024)"
+  );
+  await addColumnIfMissing(
+    db,
+    "tournament_control_template_games",
+    "mapId",
+    "varchar(64)"
+  );
+  await addColumnIfMissing(
+    db,
+    "tournament_games",
+    "roundGroupId",
+    "varchar(64)"
+  );
+  await addColumnIfMissing(db, "tournament_games", "roundLabel", "varchar(80)");
+  await addColumnIfMissing(
+    db,
+    "tournament_control_template_games",
+    "roundGroupId",
+    "varchar(64)"
+  );
+  await addColumnIfMissing(
+    db,
+    "tournament_control_template_games",
+    "roundLabel",
+    "varchar(80)"
+  );
+  await addIndexIfMissing(
+    db,
+    "tournament_games",
+    "tournament_games_round_group_idx",
+    "(`tournamentId`, `roundGroupId`)"
+  );
 }
 
 async function ensureDatabaseSchema(db: AppDb) {
   if (!_schemaEnsurePromise) {
     _schemaEnsurePromise = ensureTournamentControlColumns(db).catch(error => {
       _schemaEnsurePromise = null;
-      console.error("[Database] Failed to ensure tournament control columns:", error);
+      console.error(
+        "[Database] Failed to ensure tournament control columns:",
+        error
+      );
       throw error;
     });
   }
@@ -109,7 +209,14 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     };
     const updateSet: Record<string, unknown> = {};
 
-    const textFields = ["name", "email", "loginMethod", "discordDisplayName", "discordUsername", "discordAvatarUrl"] as const;
+    const textFields = [
+      "name",
+      "email",
+      "loginMethod",
+      "discordDisplayName",
+      "discordUsername",
+      "discordAvatarUrl",
+    ] as const;
     type TextField = (typeof textFields)[number];
 
     const assignNullable = (field: TextField) => {
@@ -130,8 +237,8 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       values.role = user.role;
       updateSet.role = user.role;
     } else if (user.openId === ENV.ownerOpenId) {
-      values.role = 'admin';
-      updateSet.role = 'admin';
+      values.role = "admin";
+      updateSet.role = "admin";
     }
 
     if (!values.lastSignedIn) {
@@ -158,7 +265,11 @@ export async function getUserByOpenId(openId: string) {
     return undefined;
   }
 
-  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+  const result = await db
+    .select()
+    .from(users)
+    .where(eq(users.openId, openId))
+    .limit(1);
 
   return result.length > 0 ? result[0] : undefined;
 }
@@ -173,8 +284,12 @@ export async function getOrCreateDevDivisionTournament() {
 
   try {
     // Try to find existing Dev Division tournament
-    const existing = await db.select().from(tournaments).where(eq(tournaments.name, "Development Division")).limit(1);
-    
+    const existing = await db
+      .select()
+      .from(tournaments)
+      .where(eq(tournaments.name, "Development Division"))
+      .limit(1);
+
     if (existing.length > 0) {
       return existing[0];
     }
@@ -190,7 +305,11 @@ export async function getOrCreateDevDivisionTournament() {
     });
 
     // Return the created tournament
-    const created = await db.select().from(tournaments).where(eq(tournaments.name, "Development Division")).limit(1);
+    const created = await db
+      .select()
+      .from(tournaments)
+      .where(eq(tournaments.name, "Development Division"))
+      .limit(1);
     return created[0];
   } catch (error) {
     console.error("[Database] Failed to get/create tournament:", error);
@@ -198,7 +317,10 @@ export async function getOrCreateDevDivisionTournament() {
   }
 }
 
-export async function updateTournamentStatus(tournamentId: number, updates: Partial<Tournament>) {
+export async function updateTournamentStatus(
+  tournamentId: number,
+  updates: Partial<Tournament>
+) {
   const db = await getDb();
   if (!db) {
     console.warn("[Database] Cannot update tournament: database not available");
@@ -206,8 +328,15 @@ export async function updateTournamentStatus(tournamentId: number, updates: Part
   }
 
   try {
-    await db.update(tournaments).set(updates).where(eq(tournaments.id, tournamentId));
-    const result = await db.select().from(tournaments).where(eq(tournaments.id, tournamentId)).limit(1);
+    await db
+      .update(tournaments)
+      .set(updates)
+      .where(eq(tournaments.id, tournamentId));
+    const result = await db
+      .select()
+      .from(tournaments)
+      .where(eq(tournaments.id, tournamentId))
+      .limit(1);
     return result[0];
   } catch (error) {
     console.error("[Database] Failed to update tournament:", error);
@@ -223,7 +352,10 @@ export async function getTeamsByTournament(tournamentId: number) {
   }
 
   try {
-    return await db.select().from(teams).where(eq(teams.tournamentId, tournamentId));
+    return await db
+      .select()
+      .from(teams)
+      .where(eq(teams.tournamentId, tournamentId));
   } catch (error) {
     console.error("[Database] Failed to get teams:", error);
     throw error;
@@ -239,7 +371,11 @@ export async function updateTeamFRP(teamId: number, frp: number) {
 
   try {
     await db.update(teams).set({ frp }).where(eq(teams.id, teamId));
-    const result = await db.select().from(teams).where(eq(teams.id, teamId)).limit(1);
+    const result = await db
+      .select()
+      .from(teams)
+      .where(eq(teams.id, teamId))
+      .limit(1);
     return result[0];
   } catch (error) {
     console.error("[Database] Failed to update team FRP:", error);
@@ -247,7 +383,10 @@ export async function updateTeamFRP(teamId: number, frp: number) {
   }
 }
 
-export async function upsertTeams(tournamentId: number, teamList: Array<{ name: string; frp: number }>) {
+export async function upsertTeams(
+  tournamentId: number,
+  teamList: Array<{ name: string; frp: number }>
+) {
   const db = await getDb();
   if (!db) {
     console.warn("[Database] Cannot upsert teams: database not available");
@@ -270,7 +409,10 @@ export async function upsertTeams(tournamentId: number, teamList: Array<{ name: 
     }
 
     // Return all teams
-    return await db.select().from(teams).where(eq(teams.tournamentId, tournamentId));
+    return await db
+      .select()
+      .from(teams)
+      .where(eq(teams.tournamentId, tournamentId));
   } catch (error) {
     console.error("[Database] Failed to upsert teams:", error);
     throw error;
@@ -287,8 +429,12 @@ export async function getOrCreateSeventhCircleTournament() {
 
   try {
     // Try to find existing 7th Circle tournament
-    const existing = await db.select().from(tournaments).where(eq(tournaments.name, "7th Circle")).limit(1);
-    
+    const existing = await db
+      .select()
+      .from(tournaments)
+      .where(eq(tournaments.name, "7th Circle"))
+      .limit(1);
+
     if (existing.length > 0) {
       return existing[0];
     }
@@ -304,26 +450,37 @@ export async function getOrCreateSeventhCircleTournament() {
     });
 
     // Return the created tournament
-    const created = await db.select().from(tournaments).where(eq(tournaments.name, "7th Circle")).limit(1);
+    const created = await db
+      .select()
+      .from(tournaments)
+      .where(eq(tournaments.name, "7th Circle"))
+      .limit(1);
     return created[0];
   } catch (error) {
-    console.error("[Database] Failed to get/create 7th Circle tournament:", error);
+    console.error(
+      "[Database] Failed to get/create 7th Circle tournament:",
+      error
+    );
     throw error;
   }
 }
-
 
 // Tournament history functions
 export async function getTournamentHistory() {
   const db = await getDb();
   if (!db) {
-    console.warn("[Database] Cannot get tournament history: database not available");
+    console.warn(
+      "[Database] Cannot get tournament history: database not available"
+    );
     return [];
   }
 
   try {
     const { tournamentHistory } = await import("../drizzle/schema");
-    return await db.select().from(tournamentHistory).orderBy(desc(tournamentHistory.completedAt));
+    return await db
+      .select()
+      .from(tournamentHistory)
+      .orderBy(desc(tournamentHistory.completedAt));
   } catch (error) {
     console.error("[Database] Failed to get tournament history:", error);
     throw error;
@@ -339,7 +496,9 @@ export async function addTournamentToHistory(
 ) {
   const db = await getDb();
   if (!db) {
-    console.warn("[Database] Cannot add tournament history: database not available");
+    console.warn(
+      "[Database] Cannot add tournament history: database not available"
+    );
     return undefined;
   }
 
@@ -368,7 +527,11 @@ export async function getAllPatchNotes() {
   }
 
   try {
-    return await db.select().from(patchNotes).where(eq(patchNotes.isGameUpdate, 1)).orderBy(desc(patchNotes.date));
+    return await db
+      .select()
+      .from(patchNotes)
+      .where(eq(patchNotes.isGameUpdate, 1))
+      .orderBy(desc(patchNotes.date));
   } catch (error) {
     console.error("[Database] Failed to get patch notes:", error);
     throw error;
@@ -384,7 +547,11 @@ export async function addPatchNote(patch: InsertPatchNote) {
 
   try {
     await db.insert(patchNotes).values(patch);
-    const result = await db.select().from(patchNotes).orderBy(desc(patchNotes.id)).limit(1);
+    const result = await db
+      .select()
+      .from(patchNotes)
+      .orderBy(desc(patchNotes.id))
+      .limit(1);
     return result[0];
   } catch (error) {
     console.error("[Database] Failed to add patch note:", error);
@@ -400,7 +567,11 @@ export async function getPatchNoteByVersion(version: string) {
   }
 
   try {
-    const result = await db.select().from(patchNotes).where(eq(patchNotes.version, version)).limit(1);
+    const result = await db
+      .select()
+      .from(patchNotes)
+      .where(eq(patchNotes.version, version))
+      .limit(1);
     return result.length > 0 ? result[0] : undefined;
   } catch (error) {
     console.error("[Database] Failed to get patch note by version:", error);
