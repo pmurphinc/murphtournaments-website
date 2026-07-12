@@ -253,6 +253,40 @@ export type GroupDragMember = {
   roundGroupId?: string | null;
 };
 
+export function getRoundGroupGameIds<T extends Pick<GroupDragMember, "id" | "roundGroupId">>(
+  games: readonly T[],
+  groupId: string
+): number[] {
+  return games
+    .filter(game => game.roundGroupId === groupId)
+    .map(game => game.id);
+}
+
+export function isRoundGroupSelected(
+  selectedGameIds: ReadonlySet<number>,
+  groupGameIds: readonly number[]
+) {
+  return (
+    groupGameIds.length > 0 &&
+    groupGameIds.every(gameId => selectedGameIds.has(gameId))
+  );
+}
+
+export function getNextRoundGroupSelection(
+  selectedGameIds: ReadonlySet<number>,
+  groupGameIds: readonly number[],
+  additive: boolean
+): Set<number> {
+  if (!additive) return new Set(groupGameIds);
+  const groupSelected = isRoundGroupSelected(selectedGameIds, groupGameIds);
+  const next = new Set(selectedGameIds);
+  for (const gameId of groupGameIds) {
+    if (groupSelected) next.delete(gameId);
+    else next.add(gameId);
+  }
+  return next;
+}
+
 export function applyGroupMovementDelta<T extends GroupDragMember>(
   games: readonly T[],
   groupId: string,
