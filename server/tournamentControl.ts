@@ -592,17 +592,17 @@ async function runBoardMutation<T>(
 
 async function runBoardMutationAndFetch(
   tournamentId: number,
-  mutate: (tx: QueryExecutor) => Promise<void>,
+  mutate: (tx: QueryExecutor) => Promise<boolean | void>,
   options: { increment?: boolean } = {}
 ) {
-  return runBoardMutation(
-    tournamentId,
-    async tx => {
-      await mutate(tx);
-      return fetchTournamentRows(tx, tournamentId);
-    },
-    options
-  );
+  const db = await requireDb();
+  return db.transaction(async tx => {
+    await lockTournamentForBoardMutation(tx, tournamentId);
+    const changed = await mutate(tx);
+    if (options.increment !== false && changed !== false)
+      await incrementBoardRevision(tx, tournamentId);
+    return fetchTournamentRows(tx, tournamentId);
+  });
 }
 
 async function getGameOrThrow(db: QueryExecutor, gameId: number) {
@@ -614,6 +614,86 @@ async function getGameOrThrow(db: QueryExecutor, gameId: number) {
   if (!game)
     throw new TRPCError({ code: "NOT_FOUND", message: "Game not found" });
   return game;
+}
+
+async function updateGameFieldAndFetch(
+  gameId: number,
+  getPatch: (
+    game: Awaited<ReturnType<typeof getGameOrThrow>>
+  ) => Partial<typeof tournamentGames.$inferInsert>,
+  options: { requireMutable?: boolean; requireFinalRound?: boolean } = {}
+) {
+  const db = await requireDb();
+  const game = await getGameOrThrow(db, gameId);
+  return runBoardMutationAndFetch(game.tournamentId, async tx => {
+    const gameInTx = await getGameOrThrow(tx, gameId);
+    if (gameInTx.tournamentId !== game.tournamentId)
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Lobby belongs to another tournament.",
+      });
+    if (options.requireFinalRound && gameInTx.gameType !== "final_round")
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Only Final Round matches can use BO3 or BO5.",
+      });
+    if (options.requireMutable) assertGameIsMutable(gameInTx);
+    const patch = getPatch(gameInTx);
+    const changed = Object.entries(patch).some(
+      ([key, value]) => (gameInTx as Record<string, unknown>)[key] !== value
+    );
+    if (!changed) return false;
+    await tx
+      .update(tournamentGames)
+      .set(patch)
+      .where(eq(tournamentGames.id, gameId));
+  });
+}
+
+async function deleteGameAssignmentAndFetch(gameId: number, teamId?: number) {
+  const db = await requireDb();
+  const game = await getGameOrThrow(db, gameId);
+  return runBoardMutationAndFetch(game.tournamentId, async tx => {
+    const gameInTx = await getGameOrThrow(tx, gameId);
+    if (gameInTx.status === "complete")
+      throw new TRPCError({
+        code: "CONFLICT",
+        message:
+          "Completed games are historical. Mark the game active before changing assignments.",
+      });
+    const rows = await tx
+      .select({ id: tournamentGameAssignments.id })
+      .from(tournamentGameAssignments)
+      .where(
+        teamId === undefined
+          ? eq(tournamentGameAssignments.gameId, gameId)
+          : and(
+              eq(tournamentGameAssignments.gameId, gameId),
+              eq(tournamentGameAssignments.teamId, teamId)
+            )
+      );
+    if (rows.length === 0) return false;
+    await tx
+      .delete(tournamentGameAssignments)
+      .where(
+        teamId === undefined
+          ? eq(tournamentGameAssignments.gameId, gameId)
+          : and(
+              eq(tournamentGameAssignments.gameId, gameId),
+              eq(tournamentGameAssignments.teamId, teamId)
+            )
+      );
+  });
+}
+
+async function deleteGameAndFetch(gameId: number) {
+  const db = await requireDb();
+  const game = await getGameOrThrow(db, gameId);
+  return runBoardMutationAndFetch(game.tournamentId, async tx => {
+    const gameInTx = await getGameOrThrow(tx, gameId);
+    assertGameIsMutable(gameInTx);
+    await tx.delete(tournamentGames).where(eq(tournamentGames.id, gameId));
+  });
 }
 
 async function fetchTournamentRows(db: QueryExecutor, tournamentId: number) {
@@ -926,24 +1006,29 @@ async function getEligibleMapIdsForGameRandomization(
 
 async function randomizeGameMap(db: QueryExecutor, gameId: number) {
   const game = await getGameOrThrow(db, gameId);
-  const data = await fetchTournamentRows(db, game.tournamentId);
-  assertTournamentUnlocked(data.tournament);
-  const eligibleMapIds = await getEligibleMapIdsForGameRandomization(
-    db,
-    gameId
-  );
-  if (eligibleMapIds.length === 0)
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "No eligible maps remain after assigned team map bans.",
-    });
-  const [mapId] = drawUniqueMaps(eligibleMapIds, 1);
-  await db
-    .update(tournamentGames)
-    .set({ mapId })
-    .where(eq(tournamentGames.id, gameId));
-  await incrementBoardRevision(db, game.tournamentId);
-  return fetchTournamentControlData(game.tournamentId);
+  return runBoardMutationAndFetch(game.tournamentId, async tx => {
+    const gameInTx = await getGameOrThrow(tx, gameId);
+    if (gameInTx.tournamentId !== game.tournamentId)
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Lobby belongs to another tournament.",
+      });
+    const eligibleMapIds = await getEligibleMapIdsForGameRandomization(
+      tx,
+      gameId
+    );
+    if (eligibleMapIds.length === 0)
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "No eligible maps remain after assigned team map bans.",
+      });
+    const [mapId] = drawUniqueMaps(eligibleMapIds, 1);
+    if (gameInTx.mapId === mapId) return false;
+    await tx
+      .update(tournamentGames)
+      .set({ mapId })
+      .where(eq(tournamentGames.id, gameId));
+  });
 }
 
 async function moveGames(input: {
@@ -988,17 +1073,20 @@ async function connectGames(
   targetGameId: number,
   flowType: ConnectionFlowType = "winner"
 ) {
-  const db = await requireDb();
-  const data = await fetchTournamentRows(db, tournamentId);
-  assertTournamentUnlocked(data.tournament);
-  await assertConnectionGames(db, tournamentId, sourceGameId, targetGameId);
-  await db.execute(sql`
-    INSERT INTO tournament_game_connections (tournamentId, sourceGameId, targetGameId, flowType)
-    VALUES (${tournamentId}, ${sourceGameId}, ${targetGameId}, ${flowType})
-    ON DUPLICATE KEY UPDATE updatedAt = CURRENT_TIMESTAMP
-  `);
-  await incrementBoardRevision(db, tournamentId);
-  return fetchTournamentControlData(tournamentId);
+  return runBoardMutationAndFetch(tournamentId, async tx => {
+    await assertConnectionGames(tx, tournamentId, sourceGameId, targetGameId);
+    const existing = readRows<{ id: number; flowType: ConnectionFlowType }>(
+      await tx.execute(
+        sql`SELECT id, flowType FROM tournament_game_connections WHERE tournamentId = ${tournamentId} AND sourceGameId = ${sourceGameId} AND targetGameId = ${targetGameId} LIMIT 1 FOR UPDATE`
+      )
+    )[0];
+    if (existing?.flowType === flowType) return false;
+    await tx.execute(sql`
+      INSERT INTO tournament_game_connections (tournamentId, sourceGameId, targetGameId, flowType)
+      VALUES (${tournamentId}, ${sourceGameId}, ${targetGameId}, ${flowType})
+      ON DUPLICATE KEY UPDATE flowType = VALUES(flowType), updatedAt = CURRENT_TIMESTAMP
+    `);
+  });
 }
 
 async function deleteGameConnection(connectionId: number) {
@@ -1014,37 +1102,61 @@ async function deleteGameConnection(connectionId: number) {
       code: "NOT_FOUND",
       message: "Lobby connection not found",
     });
-  await db.execute(
-    sql`DELETE FROM tournament_game_connections WHERE id = ${connectionId}`
-  );
-  return fetchTournamentControlData(connection.tournamentId);
+  return runBoardMutationAndFetch(connection.tournamentId, async tx => {
+    const rows = readRows<{ id: number }>(
+      await tx.execute(
+        sql`SELECT id FROM tournament_game_connections WHERE id = ${connectionId} AND tournamentId = ${connection.tournamentId} LIMIT 1 FOR UPDATE`
+      )
+    );
+    if (rows.length === 0) return false;
+    await tx.execute(
+      sql`DELETE FROM tournament_game_connections WHERE id = ${connectionId} AND tournamentId = ${connection.tournamentId}`
+    );
+  });
 }
 
 async function clearTournamentConnections(tournamentId: number) {
-  const db = await requireDb();
-  await fetchTournamentRows(db, tournamentId);
-  await db.execute(
-    sql`DELETE FROM tournament_game_connections WHERE tournamentId = ${tournamentId}`
-  );
-  return fetchTournamentControlData(tournamentId);
+  return runBoardMutationAndFetch(tournamentId, async tx => {
+    const rows = readRows<{ id: number }>(
+      await tx.execute(
+        sql`SELECT id FROM tournament_game_connections WHERE tournamentId = ${tournamentId} FOR UPDATE`
+      )
+    );
+    if (rows.length === 0) return false;
+    await tx.execute(
+      sql`DELETE FROM tournament_game_connections WHERE tournamentId = ${tournamentId}`
+    );
+  });
 }
 
 async function returnTournamentTeamsToAvailable(tournamentId: number) {
-  const db = await requireDb();
-  await fetchTournamentRows(db, tournamentId);
-  await db.execute(
-    sql`DELETE tournament_game_assignments FROM tournament_game_assignments INNER JOIN tournament_games ON tournament_game_assignments.gameId = tournament_games.id WHERE tournament_games.tournamentId = ${tournamentId}`
-  );
-  return fetchTournamentControlData(tournamentId);
+  return runBoardMutationAndFetch(tournamentId, async tx => {
+    const rows = readRows<{ id: number }>(
+      await tx.execute(
+        sql`SELECT tournament_game_assignments.id FROM tournament_game_assignments INNER JOIN tournament_games ON tournament_game_assignments.gameId = tournament_games.id WHERE tournament_games.tournamentId = ${tournamentId} FOR UPDATE`
+      )
+    );
+    if (rows.length === 0) return false;
+    await tx.execute(
+      sql`DELETE tournament_game_assignments FROM tournament_game_assignments INNER JOIN tournament_games ON tournament_game_assignments.gameId = tournament_games.id WHERE tournament_games.tournamentId = ${tournamentId}`
+    );
+  });
 }
 
 async function autoFillLobby(gameId: number) {
   const db = await requireDb();
+  const game = await getGameOrThrow(db, gameId);
   return db.transaction(async tx => {
+    await lockTournamentForBoardMutation(tx, game.tournamentId);
     await tx.execute(
-      sql`SELECT id FROM tournament_games WHERE id = ${gameId} FOR UPDATE`
+      sql`SELECT id FROM tournament_games WHERE id = ${gameId} AND tournamentId = ${game.tournamentId} FOR UPDATE`
     );
     const targetGame = await getGameOrThrow(tx, gameId);
+    if (targetGame.tournamentId !== game.tournamentId)
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Lobby belongs to another tournament.",
+      });
     if (targetGame.status === "complete")
       throw new TRPCError({
         code: "CONFLICT",
@@ -1134,10 +1246,7 @@ async function updateRoundGroup(input: {
   color?: z.infer<typeof roundColorSchema>;
   mode: "create" | "add" | "rename" | "remove" | "color";
 }) {
-  const db = await requireDb();
-  return db.transaction(async tx => {
-    const data = await fetchTournamentRows(tx, input.tournamentId);
-    assertTournamentUnlocked(data.tournament);
+  return runBoardMutationAndFetch(input.tournamentId, async tx => {
     const uniqueGameIds = Array.from(new Set(input.gameIds));
     if (
       (input.mode === "create" || input.mode === "add") &&
@@ -1209,16 +1318,31 @@ async function updateRoundGroup(input: {
         })
         .where(inArray(tournamentGames.id, uniqueGameIds));
     }
-    await incrementBoardRevision(tx, input.tournamentId);
-    return fetchTournamentRows(tx, input.tournamentId);
   });
 }
 
 async function clearTournamentCanvas(tournamentId: number) {
-  const db = await requireDb();
-  return db.transaction(async tx => {
-    const data = await fetchTournamentRows(tx, tournamentId);
-    assertTournamentUnlocked(data.tournament);
+  return runBoardMutationAndFetch(tournamentId, async tx => {
+    const existingGames = await tx
+      .select({ id: tournamentGames.id })
+      .from(tournamentGames)
+      .where(eq(tournamentGames.tournamentId, tournamentId));
+    const existingConnections = readRows<{ id: number }>(
+      await tx.execute(
+        sql`SELECT id FROM tournament_game_connections WHERE tournamentId = ${tournamentId} FOR UPDATE`
+      )
+    );
+    const existingAssignments = readRows<{ id: number }>(
+      await tx.execute(
+        sql`SELECT tournament_game_assignments.id FROM tournament_game_assignments INNER JOIN tournament_games ON tournament_game_assignments.gameId = tournament_games.id WHERE tournament_games.tournamentId = ${tournamentId} FOR UPDATE`
+      )
+    );
+    if (
+      existingGames.length === 0 &&
+      existingConnections.length === 0 &&
+      existingAssignments.length === 0
+    )
+      return false;
     await tx.execute(
       sql`DELETE FROM tournament_game_connections WHERE tournamentId = ${tournamentId}`
     );
@@ -1228,8 +1352,6 @@ async function clearTournamentCanvas(tournamentId: number) {
     await tx
       .delete(tournamentGames)
       .where(eq(tournamentGames.tournamentId, tournamentId));
-    await incrementBoardRevision(tx, tournamentId);
-    return fetchTournamentRows(tx, tournamentId);
   });
 }
 
@@ -2387,7 +2509,23 @@ async function setAssignmentResultPlacement(
   resultPlacement: number | null
 ) {
   const db = await requireDb();
-  return db.transaction(async tx => {
+  const [existing] = await db
+    .select({ game: tournamentGames })
+    .from(tournamentGameAssignments)
+    .innerJoin(
+      tournamentGames,
+      eq(tournamentGameAssignments.gameId, tournamentGames.id)
+    )
+    .where(eq(tournamentGameAssignments.id, assignmentId))
+    .limit(1);
+
+  if (!existing)
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Team assignment not found",
+    });
+
+  return runBoardMutationAndFetch(existing.game.tournamentId, async tx => {
     const [row] = await tx
       .select({ assignment: tournamentGameAssignments, game: tournamentGames })
       .from(tournamentGameAssignments)
@@ -2398,15 +2536,17 @@ async function setAssignmentResultPlacement(
       .where(eq(tournamentGameAssignments.id, assignmentId))
       .limit(1);
 
-    if (!row) {
+    if (!row)
       throw new TRPCError({
         code: "NOT_FOUND",
         message: "Team assignment not found",
       });
-    }
+    if (row.game.tournamentId !== existing.game.tournamentId)
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Assignment belongs to another tournament.",
+      });
 
-    const data = await fetchTournamentRows(tx, row.game.tournamentId);
-    assertTournamentUnlocked(data.tournament);
     const capacity = gameCapacity[row.game.gameType];
     if (resultPlacement !== null && resultPlacement > capacity) {
       throw new TRPCError({
@@ -2414,6 +2554,8 @@ async function setAssignmentResultPlacement(
         message: `${row.game.gameType === "cashout" ? "Cashout lobbies" : "Final Round matches"} only support placements 1-${capacity}`,
       });
     }
+
+    if (row.assignment.resultPlacement === resultPlacement) return false;
 
     if (resultPlacement !== null) {
       await tx.execute(
@@ -2424,8 +2566,6 @@ async function setAssignmentResultPlacement(
     await tx.execute(
       sql`UPDATE tournament_game_assignments SET resultPlacement = ${resultPlacement} WHERE id = ${assignmentId}`
     );
-    await incrementBoardRevision(tx, row.game.tournamentId);
-    return fetchTournamentRows(tx, row.game.tournamentId);
   });
 }
 
@@ -3400,31 +3540,22 @@ export const personalTcrRouter = router({
     .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
       await assertGameBelongsToOwnedTournament(db, input.gameId, ctx.user);
-      const game = await getGameOrThrow(db, input.gameId);
-      assertGameIsMutable(game);
-      await db
-        .update(tournamentGames)
-        .set({ displayLabel: input.displayLabel })
-        .where(eq(tournamentGames.id, input.gameId));
-      await incrementBoardRevision(db, game.tournamentId);
-      return fetchTournamentControlData(game.tournamentId);
+      return updateGameFieldAndFetch(
+        input.gameId,
+        () => ({ displayLabel: input.displayLabel }),
+        { requireMutable: true }
+      );
     }),
   moveGame: personalTcrProcedure
     .input(gameIdSchema.extend({ position: positionSchema }))
     .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
-      const game = await assertGameBelongsToOwnedTournament(
-        db,
-        input.gameId,
-        ctx.user
-      );
-      assertGamePositionUnlocked(game);
-      const safePosition = clampCanvasPosition(input.position);
-      await db
-        .update(tournamentGames)
-        .set({ canvasX: safePosition.x, canvasY: safePosition.y })
-        .where(eq(tournamentGames.id, input.gameId));
-      return fetchTournamentControlData(game.tournamentId);
+      await assertGameBelongsToOwnedTournament(db, input.gameId, ctx.user);
+      return updateGameFieldAndFetch(input.gameId, game => {
+        assertGamePositionUnlocked(game);
+        const safePosition = clampCanvasPosition(input.position);
+        return { canvasX: safePosition.x, canvasY: safePosition.y };
+      });
     }),
   moveGames: personalTcrProcedure
     .input(
@@ -3443,70 +3574,41 @@ export const personalTcrRouter = router({
     .input(gameIdSchema.extend({ lobbyCode: lobbyCodeSchema }))
     .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
-      const game = await assertGameBelongsToOwnedTournament(
-        db,
+      await assertGameBelongsToOwnedTournament(db, input.gameId, ctx.user);
+      return updateGameFieldAndFetch(
         input.gameId,
-        ctx.user
+        () => ({ privateLobbyCode: input.lobbyCode }),
+        { requireMutable: true }
       );
-      assertGameIsMutable(game);
-      await db
-        .update(tournamentGames)
-        .set({ privateLobbyCode: input.lobbyCode })
-        .where(eq(tournamentGames.id, input.gameId));
-      await incrementBoardRevision(db, game.tournamentId);
-      return fetchTournamentControlData(game.tournamentId);
     }),
   setGameMap: personalTcrProcedure
     .input(gameIdSchema.extend({ mapId: userSelectedMapIdSchema }))
     .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
-      const game = await assertGameBelongsToOwnedTournament(
-        db,
-        input.gameId,
-        ctx.user
-      );
-      await db
-        .update(tournamentGames)
-        .set({ mapId: input.mapId })
-        .where(eq(tournamentGames.id, input.gameId));
-      return fetchTournamentControlData(game.tournamentId);
+      await assertGameBelongsToOwnedTournament(db, input.gameId, ctx.user);
+      return updateGameFieldAndFetch(input.gameId, () => ({
+        mapId: input.mapId,
+      }));
     }),
   setBroadcastUrl: personalTcrProcedure
     .input(gameIdSchema.extend({ broadcastUrl: broadcastUrlSchema }))
     .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
-      const game = await assertGameBelongsToOwnedTournament(
-        db,
-        input.gameId,
-        ctx.user
-      );
-      await db
-        .update(tournamentGames)
-        .set({ broadcastUrl: input.broadcastUrl })
-        .where(eq(tournamentGames.id, input.gameId));
-      return fetchTournamentControlData(game.tournamentId);
+      await assertGameBelongsToOwnedTournament(db, input.gameId, ctx.user);
+      return updateGameFieldAndFetch(input.gameId, () => ({
+        broadcastUrl: input.broadcastUrl,
+      }));
     }),
   setFinalRoundSeriesBestOf: personalTcrProcedure
     .input(gameIdSchema.extend({ seriesBestOf: seriesBestOfSchema }))
     .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
-      const game = await assertGameBelongsToOwnedTournament(
-        db,
+      await assertGameBelongsToOwnedTournament(db, input.gameId, ctx.user);
+      return updateGameFieldAndFetch(
         input.gameId,
-        ctx.user
+        () => ({ seriesBestOf: input.seriesBestOf }),
+        { requireMutable: true, requireFinalRound: true }
       );
-      if (game.gameType !== "final_round")
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Only Final Round matches can use BO3 or BO5.",
-        });
-      assertGameIsMutable(game);
-      await db
-        .update(tournamentGames)
-        .set({ seriesBestOf: input.seriesBestOf })
-        .where(eq(tournamentGames.id, input.gameId));
-      await incrementBoardRevision(db, game.tournamentId);
-      return fetchTournamentControlData(game.tournamentId);
     }),
   randomizeGameMap: personalTcrProcedure
     .input(gameIdSchema)
@@ -3756,48 +3858,21 @@ export const personalTcrRouter = router({
     .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
       await assertGameBelongsToOwnedTournament(db, input.gameId, ctx.user);
-      const game = await getGameOrThrow(db, input.gameId);
-      await db
-        .delete(tournamentGameAssignments)
-        .where(
-          and(
-            eq(tournamentGameAssignments.gameId, input.gameId),
-            eq(tournamentGameAssignments.teamId, input.teamId)
-          )
-        );
-      await incrementBoardRevision(db, game.tournamentId);
-      return fetchTournamentControlData(game.tournamentId);
+      return deleteGameAssignmentAndFetch(input.gameId, input.teamId);
     }),
   removeAssignedTeams: personalTcrProcedure
     .input(gameIdSchema)
     .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
-      const game = await assertGameBelongsToOwnedTournament(
-        db,
-        input.gameId,
-        ctx.user
-      );
-      await db
-        .delete(tournamentGameAssignments)
-        .where(eq(tournamentGameAssignments.gameId, input.gameId));
-      await incrementBoardRevision(db, game.tournamentId);
-      return fetchTournamentControlData(game.tournamentId);
+      await assertGameBelongsToOwnedTournament(db, input.gameId, ctx.user);
+      return deleteGameAssignmentAndFetch(input.gameId);
     }),
   deleteGame: personalTcrProcedure
     .input(gameIdSchema)
     .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
-      const game = await assertGameBelongsToOwnedTournament(
-        db,
-        input.gameId,
-        ctx.user
-      );
-      assertGameIsMutable(game);
-      await db
-        .delete(tournamentGames)
-        .where(eq(tournamentGames.id, input.gameId));
-      await incrementBoardRevision(db, game.tournamentId);
-      return fetchTournamentControlData(game.tournamentId);
+      await assertGameBelongsToOwnedTournament(db, input.gameId, ctx.user);
+      return deleteGameAndFetch(input.gameId);
     }),
   saveTemplateFromTournament: personalTcrProcedure
     .input(
@@ -4318,35 +4393,22 @@ export const tournamentControlRouter = router({
     ),
   renameGame: discordTournamentStaffProcedure
     .input(gameIdSchema.extend({ displayLabel: labelSchema }))
-    .mutation(async ({ input }) => {
-      const db = await requireDb();
-      const game = await getGameOrThrow(db, input.gameId);
-      assertGameIsMutable(game);
-      await db
-        .update(tournamentGames)
-        .set({ displayLabel: input.displayLabel })
-        .where(eq(tournamentGames.id, input.gameId));
-      await incrementBoardRevision(db, game.tournamentId);
-      return fetchTournamentControlData(game.tournamentId);
-    }),
+    .mutation(({ input }) =>
+      updateGameFieldAndFetch(
+        input.gameId,
+        () => ({ displayLabel: input.displayLabel }),
+        { requireMutable: true }
+      )
+    ),
   setFinalRoundSeriesBestOf: discordTournamentStaffProcedure
     .input(gameIdSchema.extend({ seriesBestOf: seriesBestOfSchema }))
-    .mutation(async ({ input }) => {
-      const db = await requireDb();
-      const game = await getGameOrThrow(db, input.gameId);
-      if (game.gameType !== "final_round")
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Only Final Round matches can use BO3 or BO5.",
-        });
-      assertGameIsMutable(game);
-      await db
-        .update(tournamentGames)
-        .set({ seriesBestOf: input.seriesBestOf })
-        .where(eq(tournamentGames.id, input.gameId));
-      await incrementBoardRevision(db, game.tournamentId);
-      return fetchTournamentControlData(game.tournamentId);
-    }),
+    .mutation(({ input }) =>
+      updateGameFieldAndFetch(
+        input.gameId,
+        () => ({ seriesBestOf: input.seriesBestOf }),
+        { requireMutable: true, requireFinalRound: true }
+      )
+    ),
   moveGame: discordTournamentStaffProcedure
     .input(gameIdSchema.extend({ position: positionSchema }))
     .mutation(async ({ input }) => {
@@ -4492,17 +4554,13 @@ export const tournamentControlRouter = router({
     }),
   setLobbyCode: discordTournamentStaffProcedure
     .input(gameIdSchema.extend({ lobbyCode: lobbyCodeSchema }))
-    .mutation(async ({ input }) => {
-      const db = await requireDb();
-      const game = await getGameOrThrow(db, input.gameId);
-      assertGameIsMutable(game);
-      await db
-        .update(tournamentGames)
-        .set({ privateLobbyCode: input.lobbyCode })
-        .where(eq(tournamentGames.id, input.gameId));
-      await incrementBoardRevision(db, game.tournamentId);
-      return fetchTournamentControlData(game.tournamentId);
-    }),
+    .mutation(({ input }) =>
+      updateGameFieldAndFetch(
+        input.gameId,
+        () => ({ privateLobbyCode: input.lobbyCode }),
+        { requireMutable: true }
+      )
+    ),
   setAssignmentResultPlacement: discordTournamentStaffProcedure
     .input(
       z.object({
@@ -4653,55 +4711,15 @@ export const tournamentControlRouter = router({
     .mutation(({ input }) => setRoundGroupLocked(input)),
   removeTeam: discordTournamentStaffProcedure
     .input(gameIdSchema.extend({ teamId: idSchema }))
-    .mutation(async ({ input }) => {
-      const db = await requireDb();
-      const game = await getGameOrThrow(db, input.gameId);
-      if (game.status === "complete")
-        throw new TRPCError({
-          code: "CONFLICT",
-          message:
-            "Completed games are historical. Mark the game active before changing assignments.",
-        });
-      await db
-        .delete(tournamentGameAssignments)
-        .where(
-          and(
-            eq(tournamentGameAssignments.gameId, input.gameId),
-            eq(tournamentGameAssignments.teamId, input.teamId)
-          )
-        );
-      await incrementBoardRevision(db, game.tournamentId);
-      return fetchTournamentControlData(game.tournamentId);
-    }),
+    .mutation(({ input }) =>
+      deleteGameAssignmentAndFetch(input.gameId, input.teamId)
+    ),
   removeAssignedTeams: discordTournamentStaffProcedure
     .input(gameIdSchema)
-    .mutation(async ({ input }) => {
-      const db = await requireDb();
-      const game = await getGameOrThrow(db, input.gameId);
-      if (game.status === "complete")
-        throw new TRPCError({
-          code: "CONFLICT",
-          message:
-            "Completed games are historical. Mark the game active before changing assignments.",
-        });
-      await db
-        .delete(tournamentGameAssignments)
-        .where(eq(tournamentGameAssignments.gameId, input.gameId));
-      await incrementBoardRevision(db, game.tournamentId);
-      return fetchTournamentControlData(game.tournamentId);
-    }),
+    .mutation(({ input }) => deleteGameAssignmentAndFetch(input.gameId)),
   deleteGame: discordTournamentStaffProcedure
     .input(gameIdSchema)
-    .mutation(async ({ input }) => {
-      const db = await requireDb();
-      const game = await getGameOrThrow(db, input.gameId);
-      assertGameIsMutable(game);
-      await db
-        .delete(tournamentGames)
-        .where(eq(tournamentGames.id, input.gameId));
-      await incrementBoardRevision(db, game.tournamentId);
-      return fetchTournamentControlData(game.tournamentId);
-    }),
+    .mutation(({ input }) => deleteGameAndFetch(input.gameId)),
 });
 
 export { getActiveAssignedTeamIds, gameCapacity };
