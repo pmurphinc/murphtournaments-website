@@ -75,7 +75,10 @@ export type RoundFrameColorId =
   | "fuchsia"
   | "emerald";
 
-export function hasOpenLobbySlot(game: { gameType: GameType; status: GameStatus }, assignedCount: number) {
+export function hasOpenLobbySlot(
+  game: { gameType: GameType; status: GameStatus },
+  assignedCount: number
+) {
   const capacity = game.gameType === "final_round" ? 2 : 4;
   return game.status !== "complete" && assignedCount < capacity;
 }
@@ -708,4 +711,81 @@ export function getMidpoint(
 export function getConnectionPath(source: CanvasPoint, target: CanvasPoint) {
   const distance = Math.max(80, Math.abs(target.y - source.y) * 0.55);
   return `M ${source.x} ${source.y} C ${source.x} ${source.y + distance}, ${target.x} ${target.y - distance}, ${target.x} ${target.y}`;
+}
+
+export type EliminationInput = {
+  gameType: GameType;
+  status: GameStatus;
+  placement?: number | null;
+  hasOutgoingLoserConnection: boolean;
+};
+
+export function isTeamEliminated(input: EliminationInput): boolean {
+  if (input.status !== "complete" || input.hasOutgoingLoserConnection)
+    return false;
+  if (input.placement == null) return false;
+  if (input.gameType === "cashout")
+    return input.placement === 3 || input.placement === 4;
+  return input.gameType === "final_round" && input.placement === 2;
+}
+
+export type ScoreboardTeam = { id: number; name: string };
+export type ScoreboardGame = {
+  id: number;
+  gameType: GameType;
+  status: GameStatus;
+};
+export type ScoreboardAssignment = {
+  gameId: number;
+  teamId: number;
+  resultPlacement?: number | null;
+};
+export type ScoreboardRow = {
+  teamId: number;
+  teamName: string;
+  wins: number;
+  losses: number;
+};
+
+export function calculateTournamentScoreboard(
+  teams: readonly ScoreboardTeam[],
+  games: readonly ScoreboardGame[],
+  assignments: readonly ScoreboardAssignment[]
+): ScoreboardRow[] {
+  const gamesById = new Map(games.map(game => [game.id, game] as const));
+  const rows = new Map<number, ScoreboardRow>(
+    teams.map(
+      team =>
+        [
+          team.id,
+          { teamId: team.id, teamName: team.name, wins: 0, losses: 0 },
+        ] as const
+    )
+  );
+  for (const assignment of assignments) {
+    const game = gamesById.get(assignment.gameId);
+    const row = rows.get(assignment.teamId);
+    if (
+      !game ||
+      !row ||
+      game.status !== "complete" ||
+      assignment.resultPlacement == null
+    )
+      continue;
+    if (game.gameType === "cashout") {
+      if (assignment.resultPlacement === 1 || assignment.resultPlacement === 2)
+        row.wins += 1;
+      if (assignment.resultPlacement === 3 || assignment.resultPlacement === 4)
+        row.losses += 1;
+    } else if (game.gameType === "final_round") {
+      if (assignment.resultPlacement === 1) row.wins += 1;
+      if (assignment.resultPlacement === 2) row.losses += 1;
+    }
+  }
+  return Array.from(rows.values()).sort(
+    (a, b) =>
+      b.wins - a.wins ||
+      a.losses - b.losses ||
+      a.teamName.localeCompare(b.teamName)
+  );
 }

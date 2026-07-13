@@ -246,6 +246,15 @@ type AssignmentResultRow = {
   resultPlacement: number | null;
 };
 type BoardSnapshotInput = {
+  tournament?: { name: string };
+  teams?: Array<{
+    id: number;
+    name: string;
+    managedTeamId?: number | null;
+    captainUserId?: number | null;
+    captainDiscordId?: string | null;
+    captainDisplayName?: string | null;
+  }>;
   games: Array<{
     id: number;
     tournamentId: number;
@@ -345,6 +354,19 @@ export const storedMapIdSchema = z
   );
 
 const boardSnapshotSchema = z.object({
+  tournament: z.object({ name: z.string().trim().min(2).max(255) }).optional(),
+  teams: z
+    .array(
+      z.object({
+        id: idSchema,
+        name: teamNameSchema,
+        managedTeamId: idSchema.nullable().optional(),
+        captainUserId: idSchema.nullable().optional(),
+        captainDiscordId: z.string().nullable().optional(),
+        captainDisplayName: z.string().nullable().optional(),
+      })
+    )
+    .optional(),
   games: z.array(
     z.object({
       id: idSchema,
@@ -742,27 +764,50 @@ async function assertConnectionGames(
   }
 }
 
-export function getEligibleCompetitiveMapIds(defaultPool: readonly string[], bannedMapIds: readonly (string | null | undefined)[]) {
-  const bans = new Set(bannedMapIds.filter((id): id is string => typeof id === "string" && id.length > 0));
+export function getEligibleCompetitiveMapIds(
+  defaultPool: readonly string[],
+  bannedMapIds: readonly (string | null | undefined)[]
+) {
+  const bans = new Set(
+    bannedMapIds.filter(
+      (id): id is string => typeof id === "string" && id.length > 0
+    )
+  );
   return defaultPool.filter(mapId => !bans.has(mapId));
 }
 
-async function getEligibleMapIdsForGameRandomization(db: QueryExecutor, gameId: number) {
+async function getEligibleMapIdsForGameRandomization(
+  db: QueryExecutor,
+  gameId: number
+) {
   const rows = await db
     .select({ mapBanId: managedTeams.mapBanId })
     .from(tournamentGameAssignments)
     .innerJoin(teams, eq(tournamentGameAssignments.teamId, teams.id))
     .leftJoin(managedTeams, eq(teams.managedTeamId, managedTeams.id))
     .where(eq(tournamentGameAssignments.gameId, gameId));
-  return getEligibleCompetitiveMapIds(DEFAULT_COMPETITIVE_MAP_IDS, rows.map(row => row.mapBanId));
+  return getEligibleCompetitiveMapIds(
+    DEFAULT_COMPETITIVE_MAP_IDS,
+    rows.map(row => row.mapBanId)
+  );
 }
 
 async function randomizeGameMap(db: QueryExecutor, gameId: number) {
   const game = await getGameOrThrow(db, gameId);
-  const eligibleMapIds = await getEligibleMapIdsForGameRandomization(db, gameId);
-  if (eligibleMapIds.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No eligible maps remain after assigned team map bans." });
+  const eligibleMapIds = await getEligibleMapIdsForGameRandomization(
+    db,
+    gameId
+  );
+  if (eligibleMapIds.length === 0)
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "No eligible maps remain after assigned team map bans.",
+    });
   const [mapId] = drawUniqueMaps(eligibleMapIds, 1);
-  await db.update(tournamentGames).set({ mapId }).where(eq(tournamentGames.id, gameId));
+  await db
+    .update(tournamentGames)
+    .set({ mapId })
+    .where(eq(tournamentGames.id, gameId));
   return fetchTournamentControlData(game.tournamentId);
 }
 
@@ -876,15 +921,34 @@ const roundColorSchema = z.enum([
   "emerald",
 ]);
 
-async function setRoundGroupLocked(input: { tournamentId: number; roundGroupId: string; locked: boolean }) {
+async function setRoundGroupLocked(input: {
+  tournamentId: number;
+  roundGroupId: string;
+  locked: boolean;
+}) {
   const db = await requireDb();
   await fetchTournamentRows(db, input.tournamentId);
-  await db.update(tournamentGames).set({ roundLocked: input.locked ? 1 : 0 }).where(and(eq(tournamentGames.tournamentId, input.tournamentId), eq(tournamentGames.roundGroupId, input.roundGroupId)));
+  await db
+    .update(tournamentGames)
+    .set({ roundLocked: input.locked ? 1 : 0 })
+    .where(
+      and(
+        eq(tournamentGames.tournamentId, input.tournamentId),
+        eq(tournamentGames.roundGroupId, input.roundGroupId)
+      )
+    );
   return fetchTournamentControlData(input.tournamentId);
 }
 
-function assertGamePositionUnlocked(game: { roundGroupId: string | null; roundLocked: number }) {
-  if (game.roundGroupId && game.roundLocked === 1) throw new TRPCError({ code: "FORBIDDEN", message: "Unlock this group before moving its lobbies." });
+function assertGamePositionUnlocked(game: {
+  roundGroupId: string | null;
+  roundLocked: number;
+}) {
+  if (game.roundGroupId && game.roundLocked === 1)
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Unlock this group before moving its lobbies.",
+    });
 }
 
 async function updateRoundGroup(input: {
@@ -929,7 +993,12 @@ async function updateRoundGroup(input: {
     if (input.mode === "remove") {
       await tx
         .update(tournamentGames)
-        .set({ roundGroupId: null, roundLabel: null, roundColor: null, roundLocked: 0 })
+        .set({
+          roundGroupId: null,
+          roundLabel: null,
+          roundColor: null,
+          roundLocked: 0,
+        })
         .where(inArray(tournamentGames.id, uniqueGameIds));
     } else if (input.mode === "rename" || input.mode === "color") {
       const groupId = input.roundGroupId ?? selectedGames[0]?.roundGroupId;
@@ -958,7 +1027,9 @@ async function updateRoundGroup(input: {
           roundGroupId: input.roundGroupId ?? randomUUID(),
           roundLabel: input.label ?? "Group",
           roundColor: input.color ?? null,
-          roundLocked: selectedGames.find(game => game.roundGroupId === input.roundGroupId)?.roundLocked ?? 0,
+          roundLocked:
+            selectedGames.find(game => game.roundGroupId === input.roundGroupId)
+              ?.roundLocked ?? 0,
         })
         .where(inArray(tournamentGames.id, uniqueGameIds));
     }
@@ -994,7 +1065,8 @@ async function restoreTournamentBoardSnapshot(
       .select({ id: teams.id })
       .from(teams)
       .where(eq(teams.tournamentId, tournamentId));
-    const tournamentTeamIds = new Set(tournamentTeamRows.map(team => team.id));
+    let tournamentTeamIds = new Set(tournamentTeamRows.map(team => team.id));
+    const teamIdMap = new Map<number, number>();
     for (const game of snapshot.games) {
       if (game.tournamentId !== tournamentId)
         throw new TRPCError({
@@ -1003,13 +1075,20 @@ async function restoreTournamentBoardSnapshot(
         });
     }
     const snapshotGameIds = new Set(snapshot.games.map(game => game.id));
+    const snapshotTeamIds = snapshot.teams
+      ? new Set(snapshot.teams.map(team => team.id))
+      : null;
     for (const assignment of snapshot.assignments) {
       if (!snapshotGameIds.has(assignment.gameId))
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Snapshot assignment references an unknown lobby",
         });
-      if (!tournamentTeamIds.has(assignment.teamId))
+      if (
+        snapshotTeamIds
+          ? !snapshotTeamIds.has(assignment.teamId)
+          : !tournamentTeamIds.has(assignment.teamId)
+      )
         throw new TRPCError({
           code: "BAD_REQUEST",
           message:
@@ -1026,6 +1105,30 @@ async function restoreTournamentBoardSnapshot(
           code: "BAD_REQUEST",
           message: "Snapshot connection references an unknown lobby",
         });
+    }
+
+    if (snapshot.tournament?.name) {
+      await tx
+        .update(tournaments)
+        .set({ name: snapshot.tournament.name })
+        .where(eq(tournaments.id, tournamentId));
+    }
+
+    if (snapshot.teams) {
+      await tx.delete(teams).where(eq(teams.tournamentId, tournamentId));
+      for (const team of snapshot.teams) {
+        const result = await tx.insert(teams).values({
+          tournamentId,
+          name: team.name,
+          managedTeamId: team.managedTeamId ?? null,
+          frp: 0,
+        });
+        teamIdMap.set(
+          team.id,
+          requireInsertId(result, "Failed to restore team")
+        );
+      }
+      tournamentTeamIds = new Set(teamIdMap.values());
     }
 
     await tx.execute(
@@ -1067,7 +1170,7 @@ async function restoreTournamentBoardSnapshot(
       if (!newGameId) continue;
       const result = await tx.insert(tournamentGameAssignments).values({
         gameId: newGameId,
-        teamId: assignment.teamId,
+        teamId: teamIdMap.get(assignment.teamId) ?? assignment.teamId,
         slotIndex: assignment.slotIndex,
       });
       const newAssignmentId = requireInsertId(
@@ -2909,7 +3012,12 @@ export const personalTcrRouter = router({
       return updateRoundGroup(input);
     }),
   setRoundGroupLocked: personalTcrProcedure
-    .input(tournamentIdSchema.extend({ roundGroupId: roundGroupIdSchema, locked: z.boolean() }))
+    .input(
+      tournamentIdSchema.extend({
+        roundGroupId: roundGroupIdSchema,
+        locked: z.boolean(),
+      })
+    )
     .mutation(({ input }) => setRoundGroupLocked(input)),
   removeTeam: personalTcrProcedure
     .input(gameIdSchema.extend({ teamId: idSchema }))
@@ -3701,7 +3809,12 @@ export const tournamentControlRouter = router({
     )
     .mutation(({ input }) => updateRoundGroup(input)),
   setRoundGroupLocked: discordTournamentStaffProcedure
-    .input(tournamentIdSchema.extend({ roundGroupId: roundGroupIdSchema, locked: z.boolean() }))
+    .input(
+      tournamentIdSchema.extend({
+        roundGroupId: roundGroupIdSchema,
+        locked: z.boolean(),
+      })
+    )
     .mutation(({ input }) => setRoundGroupLocked(input)),
   removeTeam: discordTournamentStaffProcedure
     .input(gameIdSchema.extend({ teamId: idSchema }))

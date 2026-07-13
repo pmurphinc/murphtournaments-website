@@ -33,12 +33,14 @@ describe("Tournament Control Room guide and zoom rail UI", () => {
     expect(adminSource).toContain("Select connection, press Del");
     expect(adminSource).toContain("Remove connection");
     expect(adminSource).toContain(
-      'type ZoomRailActivePanel = "options" | "rounds" | "controls" | null'
+      'type ZoomRailActivePanel = "options" | "rounds" | "controls" | "score" | null'
     );
     expect(adminSource).toContain(
       "const [zoomRailActivePanel, setZoomRailActivePanel]"
     );
     expect(adminSource).toContain('zoomRailActivePanel === "controls"');
+    expect(adminSource).toContain('zoomRailActivePanel === "score"');
+    expect(adminSource).toContain("Scoreboard");
   });
 
   it("keeps colored W/L legends in viewer and admin experiences", () => {
@@ -64,8 +66,11 @@ describe("Tournament Control Room guide and zoom rail UI", () => {
     expect(adminSource).toContain('zoomRailActivePanel === "options"');
     expect(adminSource).toContain('zoomRailActivePanel === "rounds"');
     expect(adminSource).toContain('zoomRailActivePanel === "controls"');
+    expect(adminSource).toContain('zoomRailActivePanel === "score"');
+    expect(adminSource).toContain("Scoreboard");
     expect(adminSource).toContain('panel === "rounds" ? null : "rounds"');
     expect(adminSource).toContain('panel === "controls" ? null : "controls"');
+    expect(adminSource).toContain('panel === "score" ? null : "score"');
   });
 
   it("places Groups and PC Controls after the W/L legend and keeps the selected count badge", () => {
