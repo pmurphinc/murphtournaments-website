@@ -35,6 +35,7 @@ import TournamentControlViewer from "./pages/TournamentControlViewer";
 import TournamentControlRoom from "./pages/TournamentControlRoom";
 import TournamentControlIndex from "./pages/TournamentControlIndex";
 import PersonalTcrIndex from "./pages/PersonalTcrIndex";
+import TcrTemplatesPage from "./pages/TcrTemplates";
 import TournamentStaffInviteJoin from "./pages/TournamentStaffInviteJoin";
 import CommunityTournaments from "./pages/CommunityTournaments";
 import { useEffect } from "react";
@@ -124,6 +125,8 @@ function Router() {
             path={"/tcr/staff/join/:token"}
             component={TournamentStaffInviteJoin}
           />
+          <Route path={"/TCR/templates"} component={TcrTemplatesPage} />
+          <Route path={"/tcr/templates"} component={TcrTemplatesPage} />
           <Route
             path={"/TCR/:tournamentId"}
             component={PersonalTournamentControlRoomRoute}

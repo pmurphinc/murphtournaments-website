@@ -15,6 +15,7 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getDiscordLoginUrl } from "@/lib/discordLogin";
 import { getSafeTournamentControlErrorMessage } from "@/lib/tcrError";
+import { TcrTemplateBrowser } from "./TcrTemplates";
 
 const goldButtonClass =
   "border border-[#FFD700] bg-[#FFD700] px-5 font-mono font-black uppercase tracking-wider text-black shadow-[0_0_18px_rgba(255,215,0,0.28)] hover:bg-[#D4AF37] hover:text-black";
@@ -129,12 +130,24 @@ export default function PersonalTcrIndex() {
                 "Discord user"}
             </p>
           </div>
-          <Button
-            className={goldButtonClass}
-            onClick={() => setCreateOpen(true)}
-          >
-            Create Tournament
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              className="border-white/20 text-white"
+              asChild
+            >
+              <Link href="/TCR/templates">Manage Templates</Link>
+            </Button>
+            <Button
+              className={goldButtonClass}
+              onClick={() => setCreateOpen(true)}
+            >
+              Create Tournament
+            </Button>
+          </div>
+        </div>
+        <div className="mt-8">
+          <TcrTemplateBrowser compact />
         </div>
         <div className="mt-8 grid gap-4 md:grid-cols-2">
           {(query.data ?? []).map(tournament => {

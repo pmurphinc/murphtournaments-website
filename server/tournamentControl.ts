@@ -1219,11 +1219,119 @@ function createManagedTeamSlug(name: string) {
 }
 
 async function listTemplates(db: QueryExecutor, userId: number) {
-  const rows = await db.select().from(tournamentControlTemplates);
-  return rows.filter(
-    template =>
-      template.visibility === "public" || template.createdByUserId === userId
-  );
+  const rows = await db
+    .select({
+      id: tournamentControlTemplates.id,
+      name: tournamentControlTemplates.name,
+      visibility: tournamentControlTemplates.visibility,
+      createdByUserId: tournamentControlTemplates.createdByUserId,
+      sourceTournamentId: tournamentControlTemplates.sourceTournamentId,
+      createdAt: tournamentControlTemplates.createdAt,
+      updatedAt: tournamentControlTemplates.updatedAt,
+      creator: {
+        id: users.id,
+        name: users.name,
+        discordDisplayName: users.discordDisplayName,
+        discordUsername: users.discordUsername,
+      },
+      lobbyCount: sql<number>`count(${tournamentControlTemplateGames.id})`,
+    })
+    .from(tournamentControlTemplates)
+    .leftJoin(users, eq(tournamentControlTemplates.createdByUserId, users.id))
+    .leftJoin(
+      tournamentControlTemplateGames,
+      eq(
+        tournamentControlTemplateGames.templateId,
+        tournamentControlTemplates.id
+      )
+    )
+    .where(
+      sql`${tournamentControlTemplates.visibility} = 'public' OR ${tournamentControlTemplates.createdByUserId} = ${userId}`
+    )
+    .groupBy(tournamentControlTemplates.id, users.id);
+  return rows.map(row => ({
+    ...row,
+    lobbyCount: Number(row.lobbyCount),
+    ownedByCurrentUser: row.createdByUserId === userId,
+  }));
+}
+
+async function getTemplateForUseOrThrow(
+  db: QueryExecutor,
+  templateId: number,
+  userId: number
+) {
+  const [template] = await db
+    .select()
+    .from(tournamentControlTemplates)
+    .where(eq(tournamentControlTemplates.id, templateId))
+    .limit(1);
+  if (
+    !template ||
+    (template.visibility !== "public" && template.createdByUserId !== userId)
+  )
+    throw new TRPCError({ code: "NOT_FOUND", message: "Template not found." });
+  return template;
+}
+
+async function getOwnedTemplateOrThrow(
+  db: QueryExecutor,
+  templateId: number,
+  user: { id: number; role: "user" | "admin" }
+) {
+  const [template] = await db
+    .select()
+    .from(tournamentControlTemplates)
+    .where(eq(tournamentControlTemplates.id, templateId))
+    .limit(1);
+  if (!template)
+    throw new TRPCError({ code: "NOT_FOUND", message: "Template not found." });
+  if (user.role !== "admin" && template.createdByUserId !== user.id)
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "You can only manage templates you created.",
+    });
+  return template;
+}
+
+async function renameTemplate(
+  templateId: number,
+  name: string,
+  user: { id: number; role: "user" | "admin" }
+) {
+  const db = await requireDb();
+  await getOwnedTemplateOrThrow(db, templateId, user);
+  await db
+    .update(tournamentControlTemplates)
+    .set({ name, updatedAt: sql`now()` })
+    .where(eq(tournamentControlTemplates.id, templateId));
+  return { templateId };
+}
+
+async function setTemplateVisibility(
+  templateId: number,
+  visibility: "private" | "public",
+  user: { id: number; role: "user" | "admin" }
+) {
+  const db = await requireDb();
+  await getOwnedTemplateOrThrow(db, templateId, user);
+  await db
+    .update(tournamentControlTemplates)
+    .set({ visibility, updatedAt: sql`now()` })
+    .where(eq(tournamentControlTemplates.id, templateId));
+  return { templateId, visibility };
+}
+
+async function deleteTemplate(
+  templateId: number,
+  user: { id: number; role: "user" | "admin" }
+) {
+  const db = await requireDb();
+  await getOwnedTemplateOrThrow(db, templateId, user);
+  await db
+    .delete(tournamentControlTemplates)
+    .where(eq(tournamentControlTemplates.id, templateId));
+  return { templateId };
 }
 
 async function getActiveViewerLink(db: QueryExecutor, tournamentId: number) {
@@ -1390,19 +1498,11 @@ async function createTournamentFromTemplate(
 ) {
   const db = await requireDb();
   return db.transaction(async tx => {
-    const [template] = await tx
-      .select()
-      .from(tournamentControlTemplates)
-      .where(eq(tournamentControlTemplates.id, input.templateId))
-      .limit(1);
-    if (
-      !template ||
-      (template.visibility !== "public" && template.createdByUserId !== userId)
-    )
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Template not found.",
-      });
+    const template = await getTemplateForUseOrThrow(
+      tx,
+      input.templateId,
+      userId
+    );
     const templateGames = await tx
       .select()
       .from(tournamentControlTemplateGames)
@@ -2478,6 +2578,26 @@ export const personalTcrRouter = router({
         ctx.user.id
       )
     ),
+  renameTemplate: personalTcrProcedure
+    .input(
+      z.object({
+        templateId: idSchema,
+        name: z.string().trim().min(2).max(120),
+      })
+    )
+    .mutation(({ input, ctx }) =>
+      renameTemplate(input.templateId, input.name, ctx.user)
+    ),
+  setTemplateVisibility: personalTcrProcedure
+    .input(
+      z.object({ templateId: idSchema, visibility: templateVisibilitySchema })
+    )
+    .mutation(({ input, ctx }) =>
+      setTemplateVisibility(input.templateId, input.visibility, ctx.user)
+    ),
+  deleteTemplate: personalTcrProcedure
+    .input(z.object({ templateId: idSchema }))
+    .mutation(({ input, ctx }) => deleteTemplate(input.templateId, ctx.user)),
   get: personalTcrProcedure
     .input(tournamentIdSchema)
     .query(async ({ input, ctx }) => {
@@ -3075,7 +3195,7 @@ export const personalTcrRouter = router({
     .input(
       tournamentIdSchema.extend({
         name: z.string().trim().min(2).max(120),
-        visibility: z.literal("private").default("private"),
+        visibility: templateVisibilitySchema,
       })
     )
     .mutation(async ({ input, ctx }) => {

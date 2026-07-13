@@ -518,6 +518,11 @@ export default function TournamentControlRoom({
   const [selectedRoundGameIds, setSelectedRoundGameIds] = useState<Set<number>>(
     () => new Set()
   );
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
+  const [templateName, setTemplateName] = useState("");
+  const [templateVisibility, setTemplateVisibility] = useState<
+    "private" | "public"
+  >("private");
 
   const query = controlApi.get.useQuery(
     { tournamentId },
@@ -1997,22 +2002,9 @@ export default function TournamentControlRoom({
               variant="outline"
               className="h-10 border-neon-gold/40 text-neon-gold hover:bg-neon-gold/10"
               onClick={() => {
-                const name = window.prompt(
-                  "Template name",
-                  `${query.data.tournament.name} Template`
-                );
-                if (!name) return;
-                const visibility = window.confirm("Make this template public?")
-                  ? "public"
-                  : "private";
-                if (isPersonalTcr)
-                  savePersonalTemplate.mutate({
-                    tournamentId,
-                    name,
-                    visibility: "private",
-                  });
-                else
-                  saveAdminTemplate.mutate({ tournamentId, name, visibility });
+                setTemplateName(`${query.data.tournament.name} Template`);
+                setTemplateVisibility("private");
+                setSaveTemplateOpen(true);
               }}
             >
               Save Template
@@ -4050,6 +4042,74 @@ export default function TournamentControlRoom({
               renameTournament.isPending
                 ? "Saving…"
                 : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={saveTemplateOpen} onOpenChange={setSaveTemplateOpen}>
+        <DialogContent className="border-neon-gold/40 bg-zinc-950 text-white">
+          <DialogHeader>
+            <DialogTitle className="font-mono text-neon-gold">
+              Save Template
+            </DialogTitle>
+            <DialogDescription>
+              Templates copy lobby layout, maps, rounds, and connections only.
+              Assigned teams, private lobby codes, and private tournament
+              details are not copied. Public templates can be used by other TCR
+              users.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            value={templateName}
+            onChange={event => setTemplateName(event.target.value)}
+            placeholder="Template name"
+            className="border-white/15 bg-black/60 text-white"
+          />
+          <select
+            className="rounded border border-white/15 bg-black/60 px-3 py-2 text-white"
+            value={templateVisibility}
+            onChange={event =>
+              setTemplateVisibility(event.target.value as "private" | "public")
+            }
+          >
+            <option value="private">Private — only you can use it</option>
+            <option value="public">Public — any TCR user can use it</option>
+          </select>
+          {(savePersonalTemplate.error || saveAdminTemplate.error) && (
+            <p className="text-sm text-red-200">
+              {(savePersonalTemplate.error || saveAdminTemplate.error)?.message}
+            </p>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              className="border-white/20 text-white"
+              onClick={() => setSaveTemplateOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="border border-[#FFD700] bg-[#FFD700] text-black hover:bg-[#D4AF37]"
+              disabled={
+                templateName.trim().length < 2 ||
+                savePersonalTemplate.isPending ||
+                saveAdminTemplate.isPending
+              }
+              onClick={() => {
+                const input = {
+                  tournamentId,
+                  name: templateName,
+                  visibility: templateVisibility,
+                };
+                const options = { onSuccess: () => setSaveTemplateOpen(false) };
+                if (isPersonalTcr) savePersonalTemplate.mutate(input, options);
+                else saveAdminTemplate.mutate(input, options);
+              }}
+            >
+              {savePersonalTemplate.isPending || saveAdminTemplate.isPending
+                ? "Saving…"
+                : "Save Template"}
             </Button>
           </DialogFooter>
         </DialogContent>
