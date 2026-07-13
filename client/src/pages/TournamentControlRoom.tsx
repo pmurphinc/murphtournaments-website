@@ -71,6 +71,7 @@ import {
   type RoundFrameColorId,
 } from "@/lib/tournamentControlBoard";
 export { resolveConnectionDropTargetGameId } from "@/lib/tournamentControlBoard";
+import { rebaseBoardUndoHistoryAfterRestore } from "@/lib/tournamentControlUndo";
 import { DEFAULT_COMPETITIVE_MAP_IDS, THE_FINALS_MAPS } from "@/lib/finalsMaps";
 import { Input } from "@/components/ui/input";
 import {
@@ -624,6 +625,9 @@ export default function TournamentControlRoom({
   const createFinal =
     controlApi.createFinalRoundMatch.useMutation(mutationOptions);
   const moveGame = controlApi.moveGame.useMutation(mutationOptions);
+  const moveGames = controlApi.moveGames.useMutation({
+    onError: (error: { message: string }) => toast.error(error.message),
+  });
   const connectGames = controlApi.connectGames.useMutation(mutationOptions);
   const deleteGameConnection =
     controlApi.deleteGameConnection.useMutation(mutationOptions);
@@ -645,10 +649,15 @@ export default function TournamentControlRoom({
   const autoFillLobby = controlApi.autoFillLobby.useMutation({
     onMutate: () => captureUndoSnapshot(),
     onSuccess: (result, _variables, snapshot?: BoardUndoSnapshot) => {
+      const boardRevision = result.board.tournament.boardRevision;
       if (snapshot)
         setUndoHistory(history =>
           [
-            { kind: "board" as const, snapshot, label: "Auto-fill lobby" },
+            {
+              kind: "board" as const,
+              snapshot: { ...snapshot, expectedRevision: boardRevision },
+              label: "Auto-fill lobby",
+            },
             ...history,
           ].slice(0, undoHistoryLimit)
         );
@@ -673,23 +682,32 @@ export default function TournamentControlRoom({
       if (entries.length === 0) return;
       const snapshot = captureUndoSnapshotRef.current?.();
       if (!snapshot) return;
-      suppressNextBoardUndoRef.current += entries.length;
-      void Promise.all(
-        entries.map(([gameId, position]) =>
-          moveGame.mutateAsync({ gameId, position })
-        )
-      )
-        .then(() =>
+      moveGames
+        .mutateAsync({
+          tournamentId,
+          positions: entries.map(([gameId, position]) => ({
+            gameId,
+            position,
+          })),
+        })
+        .then(result =>
           setUndoHistory(history =>
             [
-              { kind: "board" as const, snapshot, label: "Move group" },
+              {
+                kind: "board" as const,
+                snapshot: {
+                  ...snapshot,
+                  expectedRevision: result.tournament.boardRevision,
+                },
+                label: "Move group",
+              },
               ...history,
             ].slice(0, undoHistoryLimit)
           )
         )
         .catch(() => undefined);
     },
-    [moveGame]
+    [moveGames, tournamentId]
   );
   const deleteTeam = controlApi.deleteTeam.useMutation({
     onSuccess: () => {
@@ -710,8 +728,11 @@ export default function TournamentControlRoom({
     controlApi.clearTournamentCanvas.useMutation(mutationOptions);
   const restoreTournamentBoardSnapshot =
     controlApi.restoreTournamentBoardSnapshot.useMutation({
-      onSuccess: () => {
-        setUndoHistory(history => history.slice(1));
+      onSuccess: data => {
+        const boardRevision = data.tournament.boardRevision;
+        setUndoHistory(history =>
+          rebaseBoardUndoHistoryAfterRestore(history, boardRevision)
+        );
         invalidate();
         toast.success("Undo applied");
       },

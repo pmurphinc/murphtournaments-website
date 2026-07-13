@@ -555,6 +555,56 @@ async function requireDb() {
   return db;
 }
 
+async function lockTournamentForBoardMutation(
+  db: QueryExecutor,
+  tournamentId: number
+) {
+  const rows = readRows<{
+    id: number;
+    boardRevision: number;
+    finalizedAt: Date | null;
+  }>(
+    await db.execute(
+      sql`SELECT id, boardRevision, finalizedAt FROM tournaments WHERE id = ${tournamentId} FOR UPDATE`
+    )
+  );
+  const [tournament] = rows;
+  if (!tournament)
+    throw new TRPCError({ code: "NOT_FOUND", message: "Tournament not found" });
+  assertTournamentUnlocked(tournament);
+  return tournament;
+}
+
+async function runBoardMutation<T>(
+  tournamentId: number,
+  mutate: (tx: QueryExecutor) => Promise<T>,
+  options: { increment?: boolean } = {}
+) {
+  const db = await requireDb();
+  return db.transaction(async tx => {
+    await lockTournamentForBoardMutation(tx, tournamentId);
+    const result = await mutate(tx);
+    if (options.increment !== false)
+      await incrementBoardRevision(tx, tournamentId);
+    return result;
+  });
+}
+
+async function runBoardMutationAndFetch(
+  tournamentId: number,
+  mutate: (tx: QueryExecutor) => Promise<void>,
+  options: { increment?: boolean } = {}
+) {
+  return runBoardMutation(
+    tournamentId,
+    async tx => {
+      await mutate(tx);
+      return fetchTournamentRows(tx, tournamentId);
+    },
+    options
+  );
+}
+
 async function getGameOrThrow(db: QueryExecutor, gameId: number) {
   const [game] = await db
     .select()
@@ -659,24 +709,22 @@ async function createGame(
   position: { x: number; y: number },
   user?: { role: "user" | "admin" }
 ) {
-  const db = await requireDb();
-  const data = await fetchTournamentControlData(tournamentId);
-  assertTournamentUnlocked(data.tournament);
-  await assertGameNodeLimit(db, tournamentId, 1, user);
-  const count = data.games.filter(g => g.gameType === gameType).length + 1;
-  const safePosition = clampCanvasPosition(position);
-  await db.insert(tournamentGames).values({
-    tournamentId,
-    gameType,
-    displayLabel:
-      gameType === "cashout"
-        ? `Cashout Lobby ${count}`
-        : `Final Round ${count}`,
-    canvasX: safePosition.x,
-    canvasY: safePosition.y,
+  return runBoardMutationAndFetch(tournamentId, async tx => {
+    const data = await fetchTournamentRows(tx, tournamentId);
+    await assertGameNodeLimit(tx, tournamentId, 1, user);
+    const count = data.games.filter(g => g.gameType === gameType).length + 1;
+    const safePosition = clampCanvasPosition(position);
+    await tx.insert(tournamentGames).values({
+      tournamentId,
+      gameType,
+      displayLabel:
+        gameType === "cashout"
+          ? `Cashout Lobby ${count}`
+          : `Final Round ${count}`,
+      canvasX: safePosition.x,
+      canvasY: safePosition.y,
+    });
   });
-  await incrementBoardRevision(db, tournamentId);
-  return fetchTournamentControlData(tournamentId);
 }
 
 async function listTournamentRows(db: QueryExecutor) {
@@ -721,31 +769,27 @@ async function listOwnerCandidates(db: QueryExecutor) {
 }
 
 async function updateTournamentName(tournamentId: number, name: string) {
-  const db = await requireDb();
-  const data = await fetchTournamentRows(db, tournamentId);
-  assertTournamentUnlocked(data.tournament);
-  await db
-    .update(tournaments)
-    .set({ name, boardRevision: sql`${tournaments.boardRevision} + 1` })
-    .where(eq(tournaments.id, tournamentId));
-  return fetchTournamentRows(db, tournamentId);
+  return runBoardMutationAndFetch(tournamentId, async tx => {
+    await tx
+      .update(tournaments)
+      .set({ name })
+      .where(eq(tournaments.id, tournamentId));
+  });
 }
 
 async function deleteTournamentTeam(tournamentId: number, teamId: number) {
-  const db = await requireDb();
-  const data = await fetchTournamentRows(db, tournamentId);
-  assertTournamentUnlocked(data.tournament);
-  const [team] = await db
-    .select()
-    .from(teams)
-    .where(and(eq(teams.id, teamId), eq(teams.tournamentId, tournamentId)))
-    .limit(1);
-  if (!team)
-    throw new TRPCError({ code: "NOT_FOUND", message: "Team not found." });
-  await db
-    .delete(teams)
-    .where(and(eq(teams.id, teamId), eq(teams.tournamentId, tournamentId)));
-  return fetchTournamentControlData(tournamentId);
+  return runBoardMutationAndFetch(tournamentId, async tx => {
+    const [team] = await tx
+      .select()
+      .from(teams)
+      .where(and(eq(teams.id, teamId), eq(teams.tournamentId, tournamentId)))
+      .limit(1);
+    if (!team)
+      throw new TRPCError({ code: "NOT_FOUND", message: "Team not found." });
+    await tx
+      .delete(teams)
+      .where(and(eq(teams.id, teamId), eq(teams.tournamentId, tournamentId)));
+  });
 }
 
 async function setTournamentOwner(
@@ -902,6 +946,42 @@ async function randomizeGameMap(db: QueryExecutor, gameId: number) {
   return fetchTournamentControlData(game.tournamentId);
 }
 
+async function moveGames(input: {
+  tournamentId: number;
+  positions: { gameId: number; position: { x: number; y: number } }[];
+}) {
+  const uniqueGameIds = new Set(input.positions.map(entry => entry.gameId));
+  if (uniqueGameIds.size !== input.positions.length)
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Duplicate lobby move.",
+    });
+  return runBoardMutationAndFetch(input.tournamentId, async tx => {
+    const games = await tx
+      .select()
+      .from(tournamentGames)
+      .where(inArray(tournamentGames.id, Array.from(uniqueGameIds)));
+    if (games.length !== input.positions.length)
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "One or more lobbies were not found.",
+      });
+    if (games.some(game => game.tournamentId !== input.tournamentId))
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Selected lobbies must belong to this tournament.",
+      });
+    for (const game of games) assertGamePositionUnlocked(game);
+    for (const entry of input.positions) {
+      const safePosition = clampCanvasPosition(entry.position);
+      await tx
+        .update(tournamentGames)
+        .set({ canvasX: safePosition.x, canvasY: safePosition.y })
+        .where(eq(tournamentGames.id, entry.gameId));
+    }
+  });
+}
+
 async function connectGames(
   tournamentId: number,
   sourceGameId: number,
@@ -991,6 +1071,8 @@ async function autoFillLobby(gameId: number) {
         slotIndex: assignment.slotIndex,
       });
     }
+    if (assignments.length > 0)
+      await incrementBoardRevision(tx, targetGame.tournamentId);
     const updatedAssignments = await getAssignmentsForGame(tx, targetGame.id);
     const slotsOpen =
       gameCapacity[targetGame.gameType] - updatedAssignments.length;
@@ -1020,19 +1102,17 @@ async function setRoundGroupLocked(input: {
   roundGroupId: string;
   locked: boolean;
 }) {
-  const db = await requireDb();
-  const data = await fetchTournamentRows(db, input.tournamentId);
-  assertTournamentUnlocked(data.tournament);
-  await db
-    .update(tournamentGames)
-    .set({ roundLocked: input.locked ? 1 : 0 })
-    .where(
-      and(
-        eq(tournamentGames.tournamentId, input.tournamentId),
-        eq(tournamentGames.roundGroupId, input.roundGroupId)
-      )
-    );
-  return fetchTournamentControlData(input.tournamentId);
+  return runBoardMutationAndFetch(input.tournamentId, async tx => {
+    await tx
+      .update(tournamentGames)
+      .set({ roundLocked: input.locked ? 1 : 0 })
+      .where(
+        and(
+          eq(tournamentGames.tournamentId, input.tournamentId),
+          eq(tournamentGames.roundGroupId, input.roundGroupId)
+        )
+      );
+  });
 }
 
 function assertGamePositionUnlocked(game: {
@@ -1129,6 +1209,7 @@ async function updateRoundGroup(input: {
         })
         .where(inArray(tournamentGames.id, uniqueGameIds));
     }
+    await incrementBoardRevision(tx, input.tournamentId);
     return fetchTournamentRows(tx, input.tournamentId);
   });
 }
@@ -1147,6 +1228,7 @@ async function clearTournamentCanvas(tournamentId: number) {
     await tx
       .delete(tournamentGames)
       .where(eq(tournamentGames.tournamentId, tournamentId));
+    await incrementBoardRevision(tx, tournamentId);
     return fetchTournamentRows(tx, tournamentId);
   });
 }
@@ -2279,24 +2361,25 @@ export async function assignTeamToGameSlot(
 ) {
   const db = await requireDb();
   const game = await getGameOrThrow(db, gameId);
-  const context = await fetchGameContext(db, game.tournamentId);
-  assertTournamentUnlocked(context.tournament);
-  const slotIndex = resolveAssignmentSlot({
-    game,
-    assignments: context.assignments,
-    preferredSlotIndex,
-    teamId,
+  return runBoardMutationAndFetch(game.tournamentId, async tx => {
+    const gameInTx = await getGameOrThrow(tx, gameId);
+    const context = await fetchGameContext(tx, gameInTx.tournamentId);
+    const slotIndex = resolveAssignmentSlot({
+      game: gameInTx,
+      assignments: context.assignments,
+      preferredSlotIndex,
+      teamId,
+    });
+    validateAssignmentPlan({
+      ...context,
+      targetGameId: gameId,
+      teamId,
+      slotIndex,
+    });
+    await tx
+      .insert(tournamentGameAssignments)
+      .values({ gameId, teamId, slotIndex });
   });
-  validateAssignmentPlan({
-    ...context,
-    targetGameId: gameId,
-    teamId,
-    slotIndex,
-  });
-  await db
-    .insert(tournamentGameAssignments)
-    .values({ gameId, teamId, slotIndex });
-  return fetchTournamentControlData(game.tournamentId);
 }
 
 async function setAssignmentResultPlacement(
@@ -2341,6 +2424,7 @@ async function setAssignmentResultPlacement(
     await tx.execute(
       sql`UPDATE tournament_game_assignments SET resultPlacement = ${resultPlacement} WHERE id = ${assignmentId}`
     );
+    await incrementBoardRevision(tx, row.game.tournamentId);
     return fetchTournamentRows(tx, row.game.tournamentId);
   });
 }
@@ -3322,6 +3406,7 @@ export const personalTcrRouter = router({
         .update(tournamentGames)
         .set({ displayLabel: input.displayLabel })
         .where(eq(tournamentGames.id, input.gameId));
+      await incrementBoardRevision(db, game.tournamentId);
       return fetchTournamentControlData(game.tournamentId);
     }),
   moveGame: personalTcrProcedure
@@ -3341,6 +3426,19 @@ export const personalTcrRouter = router({
         .where(eq(tournamentGames.id, input.gameId));
       return fetchTournamentControlData(game.tournamentId);
     }),
+  moveGames: personalTcrProcedure
+    .input(
+      tournamentIdSchema.extend({
+        positions: z
+          .array(gameIdSchema.extend({ position: positionSchema }))
+          .min(1),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const db = await requireDb();
+      await getManageableTournamentOrThrow(db, input.tournamentId, ctx.user);
+      return moveGames(input);
+    }),
   setLobbyCode: personalTcrProcedure
     .input(gameIdSchema.extend({ lobbyCode: lobbyCodeSchema }))
     .mutation(async ({ input, ctx }) => {
@@ -3355,6 +3453,7 @@ export const personalTcrRouter = router({
         .update(tournamentGames)
         .set({ privateLobbyCode: input.lobbyCode })
         .where(eq(tournamentGames.id, input.gameId));
+      await incrementBoardRevision(db, game.tournamentId);
       return fetchTournamentControlData(game.tournamentId);
     }),
   setGameMap: personalTcrProcedure
@@ -3406,6 +3505,7 @@ export const personalTcrRouter = router({
         .update(tournamentGames)
         .set({ seriesBestOf: input.seriesBestOf })
         .where(eq(tournamentGames.id, input.gameId));
+      await incrementBoardRevision(db, game.tournamentId);
       return fetchTournamentControlData(game.tournamentId);
     }),
   randomizeGameMap: personalTcrProcedure
@@ -3665,6 +3765,7 @@ export const personalTcrRouter = router({
             eq(tournamentGameAssignments.teamId, input.teamId)
           )
         );
+      await incrementBoardRevision(db, game.tournamentId);
       return fetchTournamentControlData(game.tournamentId);
     }),
   removeAssignedTeams: personalTcrProcedure
@@ -3679,6 +3780,7 @@ export const personalTcrRouter = router({
       await db
         .delete(tournamentGameAssignments)
         .where(eq(tournamentGameAssignments.gameId, input.gameId));
+      await incrementBoardRevision(db, game.tournamentId);
       return fetchTournamentControlData(game.tournamentId);
     }),
   deleteGame: personalTcrProcedure
@@ -3694,6 +3796,7 @@ export const personalTcrRouter = router({
       await db
         .delete(tournamentGames)
         .where(eq(tournamentGames.id, input.gameId));
+      await incrementBoardRevision(db, game.tournamentId);
       return fetchTournamentControlData(game.tournamentId);
     }),
   saveTemplateFromTournament: personalTcrProcedure
@@ -4223,6 +4326,7 @@ export const tournamentControlRouter = router({
         .update(tournamentGames)
         .set({ displayLabel: input.displayLabel })
         .where(eq(tournamentGames.id, input.gameId));
+      await incrementBoardRevision(db, game.tournamentId);
       return fetchTournamentControlData(game.tournamentId);
     }),
   setFinalRoundSeriesBestOf: discordTournamentStaffProcedure
@@ -4240,6 +4344,7 @@ export const tournamentControlRouter = router({
         .update(tournamentGames)
         .set({ seriesBestOf: input.seriesBestOf })
         .where(eq(tournamentGames.id, input.gameId));
+      await incrementBoardRevision(db, game.tournamentId);
       return fetchTournamentControlData(game.tournamentId);
     }),
   moveGame: discordTournamentStaffProcedure
@@ -4247,13 +4352,25 @@ export const tournamentControlRouter = router({
     .mutation(async ({ input }) => {
       const db = await requireDb();
       const game = await getGameOrThrow(db, input.gameId);
-      const safePosition = clampCanvasPosition(input.position);
-      await db
-        .update(tournamentGames)
-        .set({ canvasX: safePosition.x, canvasY: safePosition.y })
-        .where(eq(tournamentGames.id, input.gameId));
-      return fetchTournamentControlData(game.tournamentId);
+      return runBoardMutationAndFetch(game.tournamentId, async tx => {
+        const gameInTx = await getGameOrThrow(tx, input.gameId);
+        assertGamePositionUnlocked(gameInTx);
+        const safePosition = clampCanvasPosition(input.position);
+        await tx
+          .update(tournamentGames)
+          .set({ canvasX: safePosition.x, canvasY: safePosition.y })
+          .where(eq(tournamentGames.id, input.gameId));
+      });
     }),
+  moveGames: discordTournamentStaffProcedure
+    .input(
+      tournamentIdSchema.extend({
+        positions: z
+          .array(gameIdSchema.extend({ position: positionSchema }))
+          .min(1),
+      })
+    )
+    .mutation(({ input }) => moveGames(input)),
   connectGames: discordTournamentStaffProcedure
     .input(
       tournamentIdSchema.extend({
@@ -4347,11 +4464,12 @@ export const tournamentControlRouter = router({
     .mutation(async ({ input }) => {
       const db = await requireDb();
       const game = await getGameOrThrow(db, input.gameId);
-      await db
-        .update(tournamentGames)
-        .set({ mapId: input.mapId })
-        .where(eq(tournamentGames.id, input.gameId));
-      return fetchTournamentControlData(game.tournamentId);
+      return runBoardMutationAndFetch(game.tournamentId, async tx => {
+        await tx
+          .update(tournamentGames)
+          .set({ mapId: input.mapId })
+          .where(eq(tournamentGames.id, input.gameId));
+      });
     }),
   randomizeGameMap: discordTournamentStaffProcedure
     .input(gameIdSchema)
@@ -4365,11 +4483,12 @@ export const tournamentControlRouter = router({
     .mutation(async ({ input }) => {
       const db = await requireDb();
       const game = await getGameOrThrow(db, input.gameId);
-      await db
-        .update(tournamentGames)
-        .set({ broadcastUrl: input.broadcastUrl })
-        .where(eq(tournamentGames.id, input.gameId));
-      return fetchTournamentControlData(game.tournamentId);
+      return runBoardMutationAndFetch(game.tournamentId, async tx => {
+        await tx
+          .update(tournamentGames)
+          .set({ broadcastUrl: input.broadcastUrl })
+          .where(eq(tournamentGames.id, input.gameId));
+      });
     }),
   setLobbyCode: discordTournamentStaffProcedure
     .input(gameIdSchema.extend({ lobbyCode: lobbyCodeSchema }))
@@ -4381,6 +4500,7 @@ export const tournamentControlRouter = router({
         .update(tournamentGames)
         .set({ privateLobbyCode: input.lobbyCode })
         .where(eq(tournamentGames.id, input.gameId));
+      await incrementBoardRevision(db, game.tournamentId);
       return fetchTournamentControlData(game.tournamentId);
     }),
   setAssignmentResultPlacement: discordTournamentStaffProcedure
@@ -4550,6 +4670,7 @@ export const tournamentControlRouter = router({
             eq(tournamentGameAssignments.teamId, input.teamId)
           )
         );
+      await incrementBoardRevision(db, game.tournamentId);
       return fetchTournamentControlData(game.tournamentId);
     }),
   removeAssignedTeams: discordTournamentStaffProcedure
@@ -4566,6 +4687,7 @@ export const tournamentControlRouter = router({
       await db
         .delete(tournamentGameAssignments)
         .where(eq(tournamentGameAssignments.gameId, input.gameId));
+      await incrementBoardRevision(db, game.tournamentId);
       return fetchTournamentControlData(game.tournamentId);
     }),
   deleteGame: discordTournamentStaffProcedure
@@ -4577,6 +4699,7 @@ export const tournamentControlRouter = router({
       await db
         .delete(tournamentGames)
         .where(eq(tournamentGames.id, input.gameId));
+      await incrementBoardRevision(db, game.tournamentId);
       return fetchTournamentControlData(game.tournamentId);
     }),
 });
