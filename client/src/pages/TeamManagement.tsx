@@ -295,26 +295,26 @@ export default function TeamManagement() {
         <div className="space-y-6">
           {!query.isLoading && !hasTeamMembership ? (
             <Card className="border-yellow-400/30 bg-black/70 text-white">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-yellow-300" /> Create Team
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Input
-                value={teamName}
-                onChange={e => setTeamName(e.target.value)}
-                placeholder="Team Name"
-                maxLength={64}
-              />
-              <Button
-                className="w-full"
-                onClick={() => create.mutate({ name: teamName })}
-                disabled={create.isPending || teamName.trim().length < 2}
-              >
-                Create Team
-              </Button>
-            </CardContent>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-yellow-300" /> Create Team
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Input
+                  value={teamName}
+                  onChange={e => setTeamName(e.target.value)}
+                  placeholder="Team Name"
+                  maxLength={64}
+                />
+                <Button
+                  className="w-full"
+                  onClick={() => create.mutate({ name: teamName })}
+                  disabled={create.isPending || teamName.trim().length < 2}
+                >
+                  Create Team
+                </Button>
+              </CardContent>
             </Card>
           ) : null}
           <Card className="border-neon-cyan/30 bg-black/70 text-white">
@@ -555,6 +555,86 @@ export default function TeamManagement() {
                           </div>
                         ))}
                       </div>
+                    </div>
+                    <div className="rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/5 p-4">
+                      <h3 className="mb-2 flex items-center gap-2 font-mono text-sm uppercase text-yellow-300">
+                        <Trophy className="h-4 w-4" /> Tournament Record
+                      </h3>
+                      {team.tournamentRecord ? (
+                        <div className="space-y-3 text-sm text-white/70">
+                          <div className="grid gap-2 sm:grid-cols-4">
+                            <div>
+                              Overall{" "}
+                              <strong className="text-white">
+                                {team.tournamentRecord.wins}-
+                                {team.tournamentRecord.losses}
+                              </strong>
+                            </div>
+                            <div>
+                              Cashout{" "}
+                              <strong className="text-white">
+                                {team.tournamentRecord.cashoutWins}-
+                                {team.tournamentRecord.cashoutLosses}
+                              </strong>
+                            </div>
+                            <div>
+                              Final{" "}
+                              <strong className="text-white">
+                                {team.tournamentRecord.finalRoundWins}-
+                                {team.tournamentRecord.finalRoundLosses}
+                              </strong>
+                            </div>
+                            <div>
+                              🏆{" "}
+                              <strong className="text-white">
+                                {team.tournamentRecord.championships}
+                              </strong>{" "}
+                              / {team.tournamentRecord.tournamentsPlayed} played
+                            </div>
+                          </div>
+                          {team.tournamentRecord.tournaments.length ? (
+                            team.tournamentRecord.tournaments.map(result => (
+                              <a
+                                key={result.tournamentId}
+                                href={result.resultsPath}
+                                className="block rounded border border-white/10 bg-black/40 p-3 hover:border-[#FFD700]/40"
+                              >
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <span className="font-semibold text-white">
+                                    {result.tournamentName}
+                                  </span>
+                                  {result.isChampion ? (
+                                    <span className="rounded bg-[#FFD700] px-2 py-0.5 font-mono text-[10px] uppercase text-black">
+                                      Champion
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <p className="mt-1 text-xs text-white/55">
+                                  {result.completedAt
+                                    ? new Date(
+                                        result.completedAt
+                                      ).toLocaleDateString()
+                                    : "Finalized"}{" "}
+                                  · Score {result.scoreSnapshot} · Overall{" "}
+                                  {result.wins}-{result.losses} · Cashout{" "}
+                                  {result.cashoutWins}-{result.cashoutLosses} ·
+                                  Final {result.finalRoundWins}-
+                                  {result.finalRoundLosses} · Place{" "}
+                                  {result.finalPlacement ?? "—"}
+                                </p>
+                              </a>
+                            ))
+                          ) : (
+                            <p className="text-sm text-white/55">
+                              No finalized tournament records yet.
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-white/55">
+                          No finalized tournament records yet.
+                        </p>
+                      )}
                     </div>
                     <div>
                       <h3 className="mb-2 font-mono text-sm uppercase text-yellow-300">

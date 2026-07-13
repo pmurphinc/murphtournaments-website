@@ -22,6 +22,7 @@ import {
   tournamentControlTemplates,
   tournamentGameAssignments,
   tournamentGames,
+  tournamentTeamResults,
   tournaments,
   tournamentTeamClaimLinks,
   tournamentTeamSubmissions,
@@ -54,6 +55,10 @@ import {
   DEFAULT_COMPETITIVE_MAP_IDS,
   drawUniqueMaps,
 } from "../shared/finalsMaps";
+import {
+  calculateTournamentScoreboard,
+  getValidPlacementsForGameType,
+} from "../shared/tournamentResults";
 import { shouldCreateTournamentTeamForApproval } from "./tournamentTeamSubmissions";
 
 type Database = NonNullable<Awaited<ReturnType<typeof getDb>>>;
@@ -79,6 +84,15 @@ export const PERSONAL_TCR_LIMITS = {
   activeStaffLinksPerTournament: 1,
 } as const;
 const STAFF_INVITE_TTL_DAYS = 7;
+const TOURNAMENT_LOCKED_MESSAGE = "Tournament is finalized and locked.";
+
+function assertTournamentUnlocked(tournament: { finalizedAt: Date | null }) {
+  if (tournament.finalizedAt)
+    throw new TRPCError({
+      code: "CONFLICT",
+      message: TOURNAMENT_LOCKED_MESSAGE,
+    });
+}
 
 function assertTournamentOwnerOrSiteAdmin(
   tournament: { ownerUserId: number | null },
@@ -499,7 +513,7 @@ async function fetchTournamentRows(db: QueryExecutor, tournamentId: number) {
     .limit(1);
   if (!tournament)
     throw new TRPCError({ code: "NOT_FOUND", message: "Tournament not found" });
-  const [teamRows, gameRows, assignmentRows, connectionResult] =
+  const [teamRows, gameRows, assignmentRows, resultRows, connectionResult] =
     await Promise.all([
       db
         .select({
@@ -538,6 +552,10 @@ async function fetchTournamentRows(db: QueryExecutor, tournamentId: number) {
           eq(tournamentGameAssignments.gameId, tournamentGames.id)
         )
         .where(eq(tournamentGames.tournamentId, tournamentId)),
+      db
+        .select()
+        .from(tournamentTeamResults)
+        .where(eq(tournamentTeamResults.tournamentId, tournamentId)),
       db.execute(
         sql`SELECT id, tournamentId, sourceGameId, targetGameId, flowType FROM tournament_game_connections WHERE tournamentId = ${tournamentId}`
       ),
@@ -554,6 +572,7 @@ async function fetchTournamentRows(db: QueryExecutor, tournamentId: number) {
     })),
     games: gameRows,
     assignments: assignmentRows,
+    results: resultRows,
     connections: readRows<ControlGameConnection>(connectionResult),
   };
 }
@@ -580,6 +599,7 @@ async function createGame(
 ) {
   const db = await requireDb();
   const data = await fetchTournamentControlData(tournamentId);
+  assertTournamentUnlocked(data.tournament);
   const count = data.games.filter(g => g.gameType === gameType).length + 1;
   const safePosition = clampCanvasPosition(position);
   await db.insert(tournamentGames).values({
@@ -638,7 +658,8 @@ async function listOwnerCandidates(db: QueryExecutor) {
 
 async function updateTournamentName(tournamentId: number, name: string) {
   const db = await requireDb();
-  await fetchTournamentRows(db, tournamentId);
+  const data = await fetchTournamentRows(db, tournamentId);
+  assertTournamentUnlocked(data.tournament);
   await db
     .update(tournaments)
     .set({ name })
@@ -648,6 +669,8 @@ async function updateTournamentName(tournamentId: number, name: string) {
 
 async function deleteTournamentTeam(tournamentId: number, teamId: number) {
   const db = await requireDb();
+  const data = await fetchTournamentRows(db, tournamentId);
+  assertTournamentUnlocked(data.tournament);
   const [team] = await db
     .select()
     .from(teams)
@@ -689,7 +712,8 @@ async function setTournamentOwner(
 async function deleteTournament(tournamentId: number) {
   const db = await requireDb();
   return db.transaction(async tx => {
-    await fetchTournamentRows(tx, tournamentId);
+    const data = await fetchTournamentRows(tx, tournamentId);
+    assertTournamentUnlocked(data.tournament);
     await tx.execute(
       sql`UPDATE tournament_control_templates SET sourceTournamentId = NULL WHERE sourceTournamentId = ${tournamentId}`
     );
@@ -927,7 +951,8 @@ async function setRoundGroupLocked(input: {
   locked: boolean;
 }) {
   const db = await requireDb();
-  await fetchTournamentRows(db, input.tournamentId);
+  const data = await fetchTournamentRows(db, input.tournamentId);
+  assertTournamentUnlocked(data.tournament);
   await db
     .update(tournamentGames)
     .set({ roundLocked: input.locked ? 1 : 0 })
@@ -961,7 +986,8 @@ async function updateRoundGroup(input: {
 }) {
   const db = await requireDb();
   return db.transaction(async tx => {
-    await fetchTournamentRows(tx, input.tournamentId);
+    const data = await fetchTournamentRows(tx, input.tournamentId);
+    assertTournamentUnlocked(data.tournament);
     const uniqueGameIds = Array.from(new Set(input.gameIds));
     if (
       (input.mode === "create" || input.mode === "add") &&
@@ -1040,7 +1066,8 @@ async function updateRoundGroup(input: {
 async function clearTournamentCanvas(tournamentId: number) {
   const db = await requireDb();
   return db.transaction(async tx => {
-    await fetchTournamentRows(tx, tournamentId);
+    const data = await fetchTournamentRows(tx, tournamentId);
+    assertTournamentUnlocked(data.tournament);
     await tx.execute(
       sql`DELETE FROM tournament_game_connections WHERE tournamentId = ${tournamentId}`
     );
@@ -1060,7 +1087,8 @@ async function restoreTournamentBoardSnapshot(
 ) {
   const db = await requireDb();
   return db.transaction(async tx => {
-    await fetchTournamentRows(tx, tournamentId);
+    const data = await fetchTournamentRows(tx, tournamentId);
+    assertTournamentUnlocked(data.tournament);
     const tournamentTeamRows = await tx
       .select({ id: teams.id })
       .from(teams)
@@ -1391,7 +1419,12 @@ async function ensureViewerLinkForApprovedSubmission(
     await db
       .update(tournamentViewerLinks)
       .set({ status: "revoked", updatedAt: sql`now()` })
-      .where(inArray(tournamentViewerLinks.id, activeLinks.map(link => link.id)));
+      .where(
+        inArray(
+          tournamentViewerLinks.id,
+          activeLinks.map(link => link.id)
+        )
+      );
   }
   const token = randomBytes(32).toString("base64url");
   await db.insert(tournamentViewerLinks).values({
@@ -2052,6 +2085,7 @@ export async function assignTeamToGameSlot(
   const db = await requireDb();
   const game = await getGameOrThrow(db, gameId);
   const context = await fetchGameContext(db, game.tournamentId);
+  assertTournamentUnlocked(context.tournament);
   const slotIndex = resolveAssignmentSlot({
     game,
     assignments: context.assignments,
@@ -2093,6 +2127,8 @@ async function setAssignmentResultPlacement(
       });
     }
 
+    const data = await fetchTournamentRows(tx, row.game.tournamentId);
+    assertTournamentUnlocked(data.tournament);
     const capacity = gameCapacity[row.game.gameType];
     if (resultPlacement !== null && resultPlacement > capacity) {
       throw new TRPCError({
@@ -2536,6 +2572,227 @@ async function listCommunityTournaments() {
     );
 }
 
+function getArchivedResultsPath(tournamentId: number) {
+  return `/tournament-results/${tournamentId}`;
+}
+
+type FinalizationSummary = {
+  tournamentId: number;
+  finalizedAt: Date | null;
+  champion: { teamId: number; teamName: string } | null;
+  resultsPath: string;
+};
+
+async function getFinalizationSummary(
+  db: QueryExecutor,
+  tournamentId: number
+): Promise<FinalizationSummary> {
+  const [tournament] = await db
+    .select()
+    .from(tournaments)
+    .where(eq(tournaments.id, tournamentId))
+    .limit(1);
+  const [champion] = await db
+    .select()
+    .from(tournamentTeamResults)
+    .where(
+      and(
+        eq(tournamentTeamResults.tournamentId, tournamentId),
+        eq(tournamentTeamResults.isChampion, 1)
+      )
+    )
+    .limit(1);
+  return {
+    tournamentId,
+    finalizedAt: tournament?.finalizedAt ?? null,
+    champion: champion
+      ? {
+          teamId: champion.tournamentTeamId,
+          teamName: champion.teamNameSnapshot,
+        }
+      : null,
+    resultsPath: getArchivedResultsPath(tournamentId),
+  };
+}
+
+function findChampionGame(input: {
+  games: Array<{
+    id: number;
+    gameType: TournamentGameType;
+    status: string;
+    displayLabel: string;
+  }>;
+  connections: ControlGameConnection[];
+  assignments: AssignmentResultRow[];
+}) {
+  const sourceIds = new Set(
+    input.connections.map(connection => connection.sourceGameId)
+  );
+  const terminalFinals = input.games.filter(
+    game =>
+      game.gameType === "final_round" &&
+      game.status === "complete" &&
+      !sourceIds.has(game.id) &&
+      input.assignments.some(assignment => assignment.gameId === game.id)
+  );
+  if (terminalFinals.length === 0)
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "The championship winner could not be determined.",
+    });
+  if (terminalFinals.length > 1)
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Multiple possible championship matches were found.",
+    });
+  const championAssignments = input.assignments.filter(
+    assignment =>
+      assignment.gameId === terminalFinals[0]!.id &&
+      assignment.resultPlacement === 1
+  );
+  if (championAssignments.length !== 1)
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "The championship winner could not be determined.",
+    });
+  return {
+    game: terminalFinals[0]!,
+    championTeamId: championAssignments[0]!.teamId,
+  };
+}
+
+function validateFinalizationData(
+  data: Awaited<ReturnType<typeof fetchTournamentRows>>
+) {
+  if (data.teams.length === 0)
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "The tournament must contain teams before it can be finalized.",
+    });
+  if (data.games.length === 0)
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message:
+        "The tournament must contain tournament games before it can be finalized.",
+    });
+  const teamsById = new Map(data.teams.map(team => [team.id, team] as const));
+  for (const game of data.games) {
+    const gameAssignments = data.assignments.filter(
+      assignment => assignment.gameId === game.id
+    );
+    if (gameAssignments.length === 0) continue;
+    if (game.status !== "complete")
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `${game.displayLabel} is not complete.`,
+      });
+    const validPlacements = new Set<number>(
+      getValidPlacementsForGameType(game.gameType)
+    );
+    const seen = new Set<number>();
+    for (const assignment of gameAssignments) {
+      const teamName =
+        teamsById.get(assignment.teamId)?.name ?? "Assigned team";
+      if (assignment.resultPlacement == null)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `${game.displayLabel} is missing a placement for ${teamName}.`,
+        });
+      if (!validPlacements.has(assignment.resultPlacement))
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `${game.displayLabel} has an invalid placement for ${teamName}.`,
+        });
+      if (seen.has(assignment.resultPlacement))
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `${game.displayLabel} has duplicate placement ${assignment.resultPlacement}.`,
+        });
+      seen.add(assignment.resultPlacement);
+    }
+  }
+  return findChampionGame({
+    games: data.games,
+    connections: data.connections,
+    assignments: data.assignments,
+  });
+}
+
+async function finalizeTournament(
+  tournamentId: number,
+  user: { id: number; role: "user" | "admin" }
+) {
+  const db = await requireDb();
+  return db.transaction(async tx => {
+    const tournament = await getOwnedTournamentOrThrow(tx, tournamentId, user);
+    if (tournament.finalizedAt) return getFinalizationSummary(tx, tournamentId);
+    const data = await fetchTournamentRows(tx, tournamentId);
+    const { championTeamId } = validateFinalizationData(data);
+    const scoreboard = calculateTournamentScoreboard(
+      data.teams,
+      data.games,
+      data.assignments
+    );
+    const scoreByTeamId = new Map(
+      scoreboard.map(row => [row.teamId, row] as const)
+    );
+    const finalPlacementByTeamId = new Map<number, number>();
+    for (const assignment of data.assignments) {
+      const game = data.games.find(row => row.id === assignment.gameId);
+      if (game?.gameType === "final_round" && assignment.resultPlacement)
+        finalPlacementByTeamId.set(
+          assignment.teamId,
+          assignment.resultPlacement
+        );
+    }
+    for (const team of data.teams) {
+      const row = scoreByTeamId.get(team.id);
+      const finalPlacement =
+        team.id === championTeamId
+          ? 1
+          : (finalPlacementByTeamId.get(team.id) ?? null);
+      await tx.execute(
+        sql`INSERT INTO tournament_team_results (tournamentId, tournamentTeamId, managedTeamId, teamNameSnapshot, scoreSnapshot, totalWins, totalLosses, cashoutWins, cashoutLosses, finalRoundWins, finalRoundLosses, finalPlacement, isChampion, createdAt, updatedAt) VALUES (${tournamentId}, ${team.id}, ${team.managedTeamId ?? null}, ${team.name}, ${team.frp}, ${row?.wins ?? 0}, ${row?.losses ?? 0}, ${row?.cashoutWins ?? 0}, ${row?.cashoutLosses ?? 0}, ${row?.finalRoundWins ?? 0}, ${row?.finalRoundLosses ?? 0}, ${finalPlacement}, ${team.id === championTeamId ? 1 : 0}, NOW(), NOW()) ON DUPLICATE KEY UPDATE managedTeamId = VALUES(managedTeamId), teamNameSnapshot = VALUES(teamNameSnapshot), scoreSnapshot = VALUES(scoreSnapshot), totalWins = VALUES(totalWins), totalLosses = VALUES(totalLosses), cashoutWins = VALUES(cashoutWins), cashoutLosses = VALUES(cashoutLosses), finalRoundWins = VALUES(finalRoundWins), finalRoundLosses = VALUES(finalRoundLosses), finalPlacement = VALUES(finalPlacement), isChampion = VALUES(isChampion), updatedAt = NOW()`
+      );
+    }
+    await tx
+      .update(tournaments)
+      .set({
+        eventStatus: "complete",
+        currentStage: "finished",
+        finalizedAt: sql`now()`,
+        finalizedByUserId: user.id,
+        unlockedAt: null,
+        unlockedByUserId: null,
+      })
+      .where(eq(tournaments.id, tournamentId));
+    return getFinalizationSummary(tx, tournamentId);
+  });
+}
+
+async function unlockTournamentForEditing(
+  tournamentId: number,
+  user: { id: number; role: "user" | "admin" }
+) {
+  if (user.role !== "admin")
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Only site administrators can unlock finalized tournaments.",
+    });
+  const db = await requireDb();
+  await db
+    .update(tournaments)
+    .set({
+      finalizedAt: null,
+      finalizedByUserId: null,
+      unlockedAt: sql`now()`,
+      unlockedByUserId: user.id,
+      eventStatus: "live",
+    })
+    .where(eq(tournaments.id, tournamentId));
+  return fetchTournamentControlData(tournamentId);
+}
+
 export const personalTcrProcedure = discordAuthenticatedProcedure;
 
 export const personalTcrRouter = router({
@@ -2652,6 +2909,16 @@ export const personalTcrRouter = router({
       await getManageableTournamentOrThrow(db, input.tournamentId, ctx.user);
       return updateTournamentName(input.tournamentId, input.name);
     }),
+  finalizeTournament: personalTcrProcedure
+    .input(tournamentIdSchema)
+    .mutation(({ input, ctx }) =>
+      finalizeTournament(input.tournamentId, ctx.user)
+    ),
+  unlockTournamentForEditing: personalTcrProcedure
+    .input(tournamentIdSchema)
+    .mutation(({ input, ctx }) =>
+      unlockTournamentForEditing(input.tournamentId, ctx.user)
+    ),
   deleteTournament: personalTcrProcedure
     .input(tournamentIdSchema)
     .mutation(async ({ input, ctx }) => {
@@ -3345,6 +3612,74 @@ export const personalTcrRouter = router({
 
 export const communityTournamentsRouter = router({
   list: publicProcedure.query(() => listCommunityTournaments()),
+  getResultsArchive: publicProcedure
+    .input(tournamentIdSchema)
+    .query(async ({ input, ctx }) => {
+      const db = await requireDb();
+      const [tournament] = await db
+        .select()
+        .from(tournaments)
+        .where(eq(tournaments.id, input.tournamentId))
+        .limit(1);
+      if (!tournament?.finalizedAt)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Finalized results not found.",
+        });
+      if (tournament.visibility !== "public") {
+        const user = ctx.user;
+        const isManager =
+          user &&
+          (user.role === "admin" ||
+            tournament.ownerUserId === user.id ||
+            (await hasTournamentStaffMembership(
+              db,
+              input.tournamentId,
+              user.id
+            )));
+        const memberRows = user
+          ? await db
+              .select({ id: managedTeamMembers.id })
+              .from(tournamentTeamResults)
+              .innerJoin(
+                managedTeamMembers,
+                eq(
+                  tournamentTeamResults.managedTeamId,
+                  managedTeamMembers.teamId
+                )
+              )
+              .where(
+                and(
+                  eq(tournamentTeamResults.tournamentId, input.tournamentId),
+                  eq(managedTeamMembers.userId, user.id)
+                )
+              )
+              .limit(1)
+          : [];
+        if (!isManager && memberRows.length === 0)
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message:
+              "Private tournament results require an authorized team or manager view.",
+          });
+      }
+      const results = await db
+        .select()
+        .from(tournamentTeamResults)
+        .where(eq(tournamentTeamResults.tournamentId, input.tournamentId));
+      return {
+        tournament: {
+          id: tournament.id,
+          name: tournament.name,
+          finalizedAt: tournament.finalizedAt,
+        },
+        results: results.sort(
+          (a, b) =>
+            (a.finalPlacement ?? 999) - (b.finalPlacement ?? 999) ||
+            b.totalWins - a.totalWins
+        ),
+      };
+    }),
   getBySlug: publicProcedure
     .input(z.object({ slug: z.string().trim().min(1).max(120) }))
     .query(async ({ input }) => {
@@ -3617,6 +3952,16 @@ export const tournamentControlRouter = router({
     .input(tournamentIdSchema.extend({ ownerUserId: idSchema.nullable() }))
     .mutation(({ input }) =>
       setTournamentOwner(input.tournamentId, input.ownerUserId)
+    ),
+  finalizeTournament: discordTournamentStaffProcedure
+    .input(tournamentIdSchema)
+    .mutation(({ input, ctx }) =>
+      finalizeTournament(input.tournamentId, ctx.user)
+    ),
+  unlockTournamentForEditing: discordTournamentStaffProcedure
+    .input(tournamentIdSchema)
+    .mutation(({ input, ctx }) =>
+      unlockTournamentForEditing(input.tournamentId, ctx.user)
     ),
   deleteTournament: discordTournamentStaffProcedure
     .input(tournamentIdSchema)

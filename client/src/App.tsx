@@ -38,6 +38,7 @@ import PersonalTcrIndex from "./pages/PersonalTcrIndex";
 import TcrTemplatesPage from "./pages/TcrTemplates";
 import TournamentStaffInviteJoin from "./pages/TournamentStaffInviteJoin";
 import CommunityTournaments from "./pages/CommunityTournaments";
+import TournamentResultsArchive from "./pages/TournamentResultsArchive";
 import { useEffect } from "react";
 
 /**
@@ -86,6 +87,10 @@ function Router() {
             component={CommunityTournaments}
           />
           <Route path={"/tournaments"} component={TournamentHistory} />
+          <Route
+            path={"/tournament-results/:tournamentId"}
+            component={TournamentResultsArchive}
+          />
           <Route
             path={"/bracket/:viewerToken"}
             component={TournamentControlViewer}

@@ -238,6 +238,14 @@ export const tournaments = mysqlTable(
       .notNull(),
     publicSlug: varchar("publicSlug", { length: 120 }),
     publishedAt: timestamp("publishedAt"),
+    finalizedAt: timestamp("finalizedAt"),
+    finalizedByUserId: int("finalizedByUserId").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    unlockedAt: timestamp("unlockedAt"),
+    unlockedByUserId: int("unlockedByUserId").references(() => users.id, {
+      onDelete: "set null",
+    }),
     maxTeams: int("maxTeams"),
     ownerUserId: int("ownerUserId").references(() => users.id, {
       onDelete: "set null",
@@ -633,6 +641,7 @@ export const tournamentGameAssignments = mysqlTable(
       .notNull()
       .references(() => teams.id, { onDelete: "cascade" }),
     slotIndex: int("slotIndex").notNull(),
+    resultPlacement: int("resultPlacement"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
@@ -645,6 +654,10 @@ export const tournamentGameAssignments = mysqlTable(
     uniqueIndex("tournament_game_assignments_game_team_unique").on(
       table.gameId,
       table.teamId
+    ),
+    uniqueIndex("tournament_game_assignments_game_result_unique").on(
+      table.gameId,
+      table.resultPlacement
     ),
   ]
 );
@@ -692,6 +705,45 @@ export const tournamentLobbyCodeDeliveries = mysqlTable(
 
 export type TournamentLobbyCodeDelivery =
   typeof tournamentLobbyCodeDeliveries.$inferSelect;
+
+export const tournamentTeamResults = mysqlTable(
+  "tournament_team_results",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    tournamentId: int("tournamentId")
+      .notNull()
+      .references(() => tournaments.id, { onDelete: "cascade" }),
+    tournamentTeamId: int("tournamentTeamId")
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    managedTeamId: int("managedTeamId").references(() => managedTeams.id, {
+      onDelete: "set null",
+    }),
+    teamNameSnapshot: varchar("teamNameSnapshot", { length: 255 }).notNull(),
+    scoreSnapshot: int("scoreSnapshot").default(0).notNull(),
+    totalWins: int("totalWins").default(0).notNull(),
+    totalLosses: int("totalLosses").default(0).notNull(),
+    cashoutWins: int("cashoutWins").default(0).notNull(),
+    cashoutLosses: int("cashoutLosses").default(0).notNull(),
+    finalRoundWins: int("finalRoundWins").default(0).notNull(),
+    finalRoundLosses: int("finalRoundLosses").default(0).notNull(),
+    finalPlacement: int("finalPlacement"),
+    isChampion: int("isChampion").default(0).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    uniqueIndex("tournament_team_results_tournament_team_unique").on(
+      table.tournamentId,
+      table.tournamentTeamId
+    ),
+    index("tournament_team_results_managed_team_idx").on(table.managedTeamId),
+    index("tournament_team_results_tournament_idx").on(table.tournamentId),
+  ]
+);
+export type TournamentTeamResult = typeof tournamentTeamResults.$inferSelect;
+export type InsertTournamentTeamResult =
+  typeof tournamentTeamResults.$inferInsert;
 
 // Tournament history archive
 export const tournamentHistory = mysqlTable("tournament_history", {

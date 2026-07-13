@@ -519,6 +519,8 @@ export default function TournamentControlRoom({
     () => new Set()
   );
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
+  const [finalizeDialogOpen, setFinalizeDialogOpen] = useState(false);
+  const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
   const [templateName, setTemplateName] = useState("");
   const [templateVisibility, setTemplateVisibility] = useState<
     "private" | "public"
@@ -711,6 +713,25 @@ export default function TournamentControlRoom({
   const savePersonalTemplate =
     trpc.personalTcr.saveTemplateFromTournament.useMutation({
       onSuccess: () => toast.success("Template saved"),
+      onError: (error: { message: string }) => toast.error(error.message),
+    });
+  const finalizeTournament = controlApi.finalizeTournament.useMutation({
+    onSuccess: data => {
+      invalidate();
+      toast.success(
+        data.champion
+          ? `Tournament finalized. Champion: ${data.champion.teamName}`
+          : "Tournament finalized"
+      );
+    },
+    onError: (error: { message: string }) => toast.error(error.message),
+  });
+  const unlockTournamentForEditing =
+    controlApi.unlockTournamentForEditing.useMutation({
+      onSuccess: () => {
+        invalidate();
+        toast.success("Tournament unlocked for editing");
+      },
       onError: (error: { message: string }) => toast.error(error.message),
     });
   const enableViewerLink = controlApi.enableViewerLink.useMutation({
@@ -1772,12 +1793,14 @@ export default function TournamentControlRoom({
   ]);
 
   const openDialog = (state: Exclude<DialogState, null>, defaultValue = "") => {
+    if (query.data?.tournament.finalizedAt) return;
     setDialogState(state);
     setFormName(defaultValue);
   };
 
   const cycleAssignmentPlacement = useCallback(
     (assignment: AssignmentView, capacity: number) => {
+      if (query.data?.tournament.finalizedAt) return;
       setPlacement.mutate({
         assignmentId: assignment.id,
         resultPlacement: getNextPlacementValue(
@@ -1786,7 +1809,7 @@ export default function TournamentControlRoom({
         ),
       });
     },
-    [setPlacement]
+    [query.data?.tournament.finalizedAt, setPlacement]
   );
 
   const toggleMinimizedGame = (gameId: number) => {
@@ -1837,9 +1860,69 @@ export default function TournamentControlRoom({
     );
   }
   if (!query.data) return <ControlState title="Tournament not found" />;
+  const isFinalizedLocked = Boolean(query.data.tournament.finalizedAt);
+  const championRow = scoreboardRows.find(row =>
+    (
+      query.data as {
+        results?: Array<{ tournamentTeamId: number; isChampion: number }>;
+      } & typeof query.data
+    ).results?.some(
+      result =>
+        result.tournamentTeamId === row.teamId && result.isChampion === 1
+    )
+  );
+  const canFinalizeTournament =
+    auth.user.role === "admin" ||
+    query.data.tournament.ownerUserId === auth.user.id;
 
   return (
     <section className="min-h-screen bg-black text-white">
+      <AlertDialog
+        open={finalizeDialogOpen}
+        onOpenChange={setFinalizeDialogOpen}
+      >
+        <AlertDialogContent className="border-[#FFD700]/50 bg-black text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Finalize tournament?</AlertDialogTitle>
+            <AlertDialogDescription className="text-white/70">
+              Finalizing will save all team results, name the Champion, mark the
+              tournament complete, freeze the TCR, and prevent further changes
+              unless a site administrator unlocks it.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={finalizeTournament.isPending}
+              onClick={() => finalizeTournament.mutate({ tournamentId })}
+            >
+              FINALIZE TOURNAMENT
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={unlockDialogOpen} onOpenChange={setUnlockDialogOpen}>
+        <AlertDialogContent className="border-red-300/50 bg-black text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unlock tournament?</AlertDialogTitle>
+            <AlertDialogDescription className="text-white/70">
+              Archived results will temporarily be considered under correction
+              until the tournament is finalized again.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={unlockTournamentForEditing.isPending}
+              onClick={() =>
+                unlockTournamentForEditing.mutate({ tournamentId })
+              }
+            >
+              UNLOCK FOR EDITING
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <header className="border-b border-neon-gold/30 bg-zinc-950 px-6 py-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -1851,11 +1934,18 @@ export default function TournamentControlRoom({
                 {query.data.tournament.name}
               </h1>
               {alphaBadge}
+              {isFinalizedLocked && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-[#FFD700]/60 bg-[#FFD700]/15 px-3 py-1 font-mono text-xs font-black uppercase text-[#FFD700]">
+                  <Lock className="h-3.5 w-3.5" /> TOURNAMENT FINALIZED
+                </span>
+              )}
               <Button
                 size="sm"
                 variant="outline"
                 className="border-neon-gold/40 text-neon-gold hover:bg-neon-gold/10"
+                disabled={isFinalizedLocked}
                 onClick={() => {
+                  if (isFinalizedLocked) return;
                   setFormName(query.data.tournament.name);
                   setFormError(null);
                   setDialogState({
@@ -1991,6 +2081,39 @@ export default function TournamentControlRoom({
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
+            {isFinalizedLocked ? (
+              <div className="rounded border border-[#FFD700]/40 bg-[#FFD700]/10 px-3 py-2 text-xs text-[#FFD700]">
+                <div className="font-mono font-black uppercase">
+                  TOURNAMENT FINALIZED
+                </div>
+                <div>Champion: {championRow?.teamName ?? "Champion saved"}</div>
+                <div>
+                  {query.data.tournament.finalizedAt
+                    ? new Date(
+                        query.data.tournament.finalizedAt
+                      ).toLocaleString()
+                    : ""}
+                </div>
+              </div>
+            ) : canFinalizeTournament ? (
+              <Button
+                className="h-10 border border-[#FFD700] bg-[#FFD700] font-mono text-xs font-black uppercase text-black hover:bg-[#D4AF37]"
+                disabled={finalizeTournament.isPending}
+                onClick={() => setFinalizeDialogOpen(true)}
+              >
+                <Lock className="mr-2 h-4 w-4" /> FINALIZE TOURNAMENT
+              </Button>
+            ) : null}
+            {isFinalizedLocked && auth.user.role === "admin" ? (
+              <Button
+                variant="outline"
+                className="h-10 border-red-300/50 text-red-100 hover:bg-red-950/30"
+                disabled={unlockTournamentForEditing.isPending}
+                onClick={() => setUnlockDialogOpen(true)}
+              >
+                <LockOpen className="mr-2 h-4 w-4" /> UNLOCK FOR EDITING
+              </Button>
+            ) : null}
             <Button
               variant="outline"
               className="h-10 border-neon-gold/40 text-neon-gold hover:bg-neon-gold/10"

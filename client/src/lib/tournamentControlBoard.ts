@@ -729,63 +729,10 @@ export function isTeamEliminated(input: EliminationInput): boolean {
   return input.gameType === "final_round" && input.placement === 2;
 }
 
-export type ScoreboardTeam = { id: number; name: string };
-export type ScoreboardGame = {
-  id: number;
-  gameType: GameType;
-  status: GameStatus;
-};
-export type ScoreboardAssignment = {
-  gameId: number;
-  teamId: number;
-  resultPlacement?: number | null;
-};
-export type ScoreboardRow = {
-  teamId: number;
-  teamName: string;
-  wins: number;
-  losses: number;
-};
-
-export function calculateTournamentScoreboard(
-  teams: readonly ScoreboardTeam[],
-  games: readonly ScoreboardGame[],
-  assignments: readonly ScoreboardAssignment[]
-): ScoreboardRow[] {
-  const gamesById = new Map(games.map(game => [game.id, game] as const));
-  const rows = new Map<number, ScoreboardRow>(
-    teams.map(
-      team =>
-        [
-          team.id,
-          { teamId: team.id, teamName: team.name, wins: 0, losses: 0 },
-        ] as const
-    )
-  );
-  for (const assignment of assignments) {
-    const game = gamesById.get(assignment.gameId);
-    const row = rows.get(assignment.teamId);
-    if (
-      !game ||
-      !row ||
-      game.status !== "complete" ||
-      assignment.resultPlacement == null
-    )
-      continue;
-    if (game.gameType === "cashout") {
-      if (assignment.resultPlacement === 1 || assignment.resultPlacement === 2)
-        row.wins += 1;
-      if (assignment.resultPlacement === 3 || assignment.resultPlacement === 4)
-        row.losses += 1;
-    } else if (game.gameType === "final_round") {
-      if (assignment.resultPlacement === 1) row.wins += 1;
-      if (assignment.resultPlacement === 2) row.losses += 1;
-    }
-  }
-  return Array.from(rows.values()).sort(
-    (a, b) =>
-      b.wins - a.wins ||
-      a.losses - b.losses ||
-      a.teamName.localeCompare(b.teamName)
-  );
-}
+export {
+  calculateTournamentScoreboard,
+  type TournamentScoreboardRow as ScoreboardRow,
+  type TournamentResultTeam as ScoreboardTeam,
+  type TournamentResultGame as ScoreboardGame,
+  type TournamentResultAssignment as ScoreboardAssignment,
+} from "@shared/tournamentResults";
