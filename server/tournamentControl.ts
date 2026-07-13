@@ -1,10 +1,11 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, not, sql } from "drizzle-orm";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { getDb } from "./db";
 import {
   discordAuthenticatedProcedure,
+  personalTcrAlphaProcedure,
   protectedProcedure,
   publicProcedure,
   router,
@@ -148,6 +149,73 @@ async function getManageableTournamentOrThrow(
   });
 }
 
+async function getMutableManageableTournamentOrThrow(
+  db: QueryExecutor,
+  tournamentId: number,
+  user: { id: number; role: "user" | "admin" }
+) {
+  const tournament = await getManageableTournamentOrThrow(
+    db,
+    tournamentId,
+    user
+  );
+  assertTournamentUnlocked(tournament);
+  return tournament;
+}
+
+async function assertPersonalTournamentLimit(
+  db: QueryExecutor,
+  user: { id: number; role: "user" | "admin" }
+) {
+  if (user.role === "admin") return;
+  const activeRows = await db
+    .select({ id: tournaments.id })
+    .from(tournaments)
+    .where(
+      and(
+        eq(tournaments.ownerUserId, user.id),
+        sql`${tournaments.eventStatus} <> 'complete'`
+      )
+    );
+  if (activeRows.length >= PERSONAL_TCR_LIMITS.activeTournamentsPerUser)
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Active personal tournament limit reached.",
+    });
+}
+
+async function assertTeamLimit(
+  db: QueryExecutor,
+  tournamentId: number,
+  user?: { role: "user" | "admin" }
+) {
+  if (user?.role === "admin") return;
+  const rows = await db
+    .select({ id: teams.id })
+    .from(teams)
+    .where(eq(teams.tournamentId, tournamentId));
+  if (rows.length >= PERSONAL_TCR_LIMITS.teamsPerTournament)
+    throw new TRPCError({ code: "FORBIDDEN", message: "Team limit reached." });
+}
+
+async function assertGameNodeLimit(
+  db: QueryExecutor,
+  tournamentId: number,
+  additional = 1,
+  user?: { role: "user" | "admin" }
+) {
+  if (user?.role === "admin") return;
+  const rows = await db
+    .select({ id: tournamentGames.id })
+    .from(tournamentGames)
+    .where(eq(tournamentGames.tournamentId, tournamentId));
+  if (rows.length + additional > PERSONAL_TCR_LIMITS.gameNodesPerTournament)
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Lobby node limit reached.",
+    });
+}
+
 async function getOwnedTournamentOrThrow(
   db: QueryExecutor,
   tournamentId: number,
@@ -170,7 +238,7 @@ async function assertGameBelongsToOwnedTournament(
   user: { id: number; role: "user" | "admin" }
 ) {
   const game = await getGameOrThrow(db, gameId);
-  await getManageableTournamentOrThrow(db, game.tournamentId, user);
+  await getMutableManageableTournamentOrThrow(db, game.tournamentId, user);
   return game;
 }
 
@@ -193,7 +261,7 @@ async function assertAssignmentBelongsToOwnedTournament(
       code: "NOT_FOUND",
       message: "Team assignment not found",
     });
-  await getManageableTournamentOrThrow(db, row.game.tournamentId, user);
+  await getMutableManageableTournamentOrThrow(db, row.game.tournamentId, user);
   return row;
 }
 
@@ -213,7 +281,11 @@ async function assertConnectionBelongsToOwnedTournament(
       code: "NOT_FOUND",
       message: "Lobby connection not found",
     });
-  await getManageableTournamentOrThrow(db, connection.tournamentId, user);
+  await getMutableManageableTournamentOrThrow(
+    db,
+    connection.tournamentId,
+    user
+  );
   return connection;
 }
 
@@ -261,14 +333,7 @@ type AssignmentResultRow = {
 };
 type BoardSnapshotInput = {
   tournament?: { name: string };
-  teams?: Array<{
-    id: number;
-    name: string;
-    managedTeamId?: number | null;
-    captainUserId?: number | null;
-    captainDiscordId?: string | null;
-    captainDisplayName?: string | null;
-  }>;
+  capturedAt?: string;
   games: Array<{
     id: number;
     tournamentId: number;
@@ -369,18 +434,7 @@ export const storedMapIdSchema = z
 
 const boardSnapshotSchema = z.object({
   tournament: z.object({ name: z.string().trim().min(2).max(255) }).optional(),
-  teams: z
-    .array(
-      z.object({
-        id: idSchema,
-        name: teamNameSchema,
-        managedTeamId: idSchema.nullable().optional(),
-        captainUserId: idSchema.nullable().optional(),
-        captainDiscordId: z.string().nullable().optional(),
-        captainDisplayName: z.string().nullable().optional(),
-      })
-    )
-    .optional(),
+  capturedAt: z.string().datetime().optional(),
   games: z.array(
     z.object({
       id: idSchema,
@@ -595,11 +649,13 @@ async function fetchGameContext(db: QueryExecutor, tournamentId: number) {
 async function createGame(
   tournamentId: number,
   gameType: TournamentGameType,
-  position: { x: number; y: number }
+  position: { x: number; y: number },
+  user?: { role: "user" | "admin" }
 ) {
   const db = await requireDb();
   const data = await fetchTournamentControlData(tournamentId);
   assertTournamentUnlocked(data.tournament);
+  await assertGameNodeLimit(db, tournamentId, 1, user);
   const count = data.games.filter(g => g.gameType === gameType).length + 1;
   const safePosition = clampCanvasPosition(position);
   await db.insert(tournamentGames).values({
@@ -1093,8 +1149,7 @@ async function restoreTournamentBoardSnapshot(
       .select({ id: teams.id })
       .from(teams)
       .where(eq(teams.tournamentId, tournamentId));
-    let tournamentTeamIds = new Set(tournamentTeamRows.map(team => team.id));
-    const teamIdMap = new Map<number, number>();
+    const tournamentTeamIds = new Set(tournamentTeamRows.map(team => team.id));
     for (const game of snapshot.games) {
       if (game.tournamentId !== tournamentId)
         throw new TRPCError({
@@ -1103,20 +1158,14 @@ async function restoreTournamentBoardSnapshot(
         });
     }
     const snapshotGameIds = new Set(snapshot.games.map(game => game.id));
-    const snapshotTeamIds = snapshot.teams
-      ? new Set(snapshot.teams.map(team => team.id))
-      : null;
+
     for (const assignment of snapshot.assignments) {
       if (!snapshotGameIds.has(assignment.gameId))
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Snapshot assignment references an unknown lobby",
         });
-      if (
-        snapshotTeamIds
-          ? !snapshotTeamIds.has(assignment.teamId)
-          : !tournamentTeamIds.has(assignment.teamId)
-      )
+      if (!tournamentTeamIds.has(assignment.teamId))
         throw new TRPCError({
           code: "BAD_REQUEST",
           message:
@@ -1135,28 +1184,42 @@ async function restoreTournamentBoardSnapshot(
         });
     }
 
+    if (snapshot.capturedAt) {
+      const capturedAt = new Date(snapshot.capturedAt);
+      if (Number.isNaN(capturedAt.getTime()))
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Invalid undo snapshot timestamp.",
+        });
+      const changed = await tx
+        .select({ id: tournamentGames.id })
+        .from(tournamentGames)
+        .where(
+          and(
+            eq(tournamentGames.tournamentId, tournamentId),
+            sql`${tournamentGames.updatedAt} > ${capturedAt}`
+          )
+        )
+        .limit(1);
+      if (changed.length)
+        throw new TRPCError({
+          code: "CONFLICT",
+          message:
+            "The board changed after this Undo snapshot was captured. Refresh before undoing.",
+        });
+    }
+
+    if (snapshot.games.length > PERSONAL_TCR_LIMITS.gameNodesPerTournament)
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Lobby node limit reached.",
+      });
+
     if (snapshot.tournament?.name) {
       await tx
         .update(tournaments)
         .set({ name: snapshot.tournament.name })
         .where(eq(tournaments.id, tournamentId));
-    }
-
-    if (snapshot.teams) {
-      await tx.delete(teams).where(eq(teams.tournamentId, tournamentId));
-      for (const team of snapshot.teams) {
-        const result = await tx.insert(teams).values({
-          tournamentId,
-          name: team.name,
-          managedTeamId: team.managedTeamId ?? null,
-          frp: 0,
-        });
-        teamIdMap.set(
-          team.id,
-          requireInsertId(result, "Failed to restore team")
-        );
-      }
-      tournamentTeamIds = new Set(teamIdMap.values());
     }
 
     await tx.execute(
@@ -1165,13 +1228,28 @@ async function restoreTournamentBoardSnapshot(
     await tx.execute(
       sql`DELETE tournament_game_assignments FROM tournament_game_assignments INNER JOIN tournament_games ON tournament_game_assignments.gameId = tournament_games.id WHERE tournament_games.tournamentId = ${tournamentId}`
     );
-    await tx
-      .delete(tournamentGames)
-      .where(eq(tournamentGames.tournamentId, tournamentId));
+    if (snapshot.games.length === 0) {
+      await tx
+        .delete(tournamentGames)
+        .where(eq(tournamentGames.tournamentId, tournamentId));
+    } else {
+      await tx.delete(tournamentGames).where(
+        and(
+          eq(tournamentGames.tournamentId, tournamentId),
+          not(
+            inArray(
+              tournamentGames.id,
+              snapshot.games.map(game => game.id)
+            )
+          )
+        )
+      );
+    }
 
+    const currentGameIds = new Set(data.games.map(game => game.id));
     const gameIdMap = new Map<number, number>();
     for (const game of snapshot.games) {
-      const result = await tx.insert(tournamentGames).values({
+      const values = {
         tournamentId,
         gameType: game.gameType,
         status: game.status,
@@ -1186,11 +1264,25 @@ async function restoreTournamentBoardSnapshot(
         roundLabel: game.roundLabel ?? null,
         roundColor: game.roundColor ?? null,
         roundLocked: game.roundLocked ?? 0,
-      });
-      gameIdMap.set(
-        game.id,
-        requireInsertId(result, "Failed to restore lobby")
-      );
+      };
+      if (currentGameIds.has(game.id)) {
+        await tx
+          .update(tournamentGames)
+          .set(values)
+          .where(
+            and(
+              eq(tournamentGames.id, game.id),
+              eq(tournamentGames.tournamentId, tournamentId)
+            )
+          );
+        gameIdMap.set(game.id, game.id);
+      } else {
+        const result = await tx.insert(tournamentGames).values(values);
+        gameIdMap.set(
+          game.id,
+          requireInsertId(result, "Failed to restore lobby")
+        );
+      }
     }
 
     for (const assignment of snapshot.assignments) {
@@ -1198,7 +1290,7 @@ async function restoreTournamentBoardSnapshot(
       if (!newGameId) continue;
       const result = await tx.insert(tournamentGameAssignments).values({
         gameId: newGameId,
-        teamId: teamIdMap.get(assignment.teamId) ?? assignment.teamId,
+        teamId: assignment.teamId,
         slotIndex: assignment.slotIndex,
       });
       const newAssignmentId = requireInsertId(
@@ -1375,15 +1467,47 @@ async function getActiveViewerLink(db: QueryExecutor, tournamentId: number) {
   return rows[0] ?? null;
 }
 
-async function createViewerLink(tournamentId: number, userId: number) {
+async function getOrCreateViewerLink(tournamentId: number, userId: number) {
   const db = await requireDb();
   await fetchTournamentRows(db, tournamentId);
   const existing = await getActiveViewerLink(db, tournamentId);
+  if (existing?.publicToken)
+    return {
+      path: createTokenPath("/bracket", existing.publicToken),
+      url: createTokenPath("/bracket", existing.publicToken),
+      enabled: true,
+    } as const;
   if (existing)
     await db
       .update(tournamentViewerLinks)
       .set({ status: "revoked", updatedAt: sql`now()` })
       .where(eq(tournamentViewerLinks.id, existing.id));
+  const token = randomBytes(32).toString("base64url");
+  await db.insert(tournamentViewerLinks).values({
+    tournamentId,
+    createdByUserId: userId,
+    tokenHash: hashToken(token),
+    publicToken: token,
+  });
+  return {
+    path: createTokenPath("/bracket", token),
+    url: createTokenPath("/bracket", token),
+    enabled: true,
+  } as const;
+}
+
+async function regenerateViewerLink(tournamentId: number, userId: number) {
+  const db = await requireDb();
+  await fetchTournamentRows(db, tournamentId);
+  await db
+    .update(tournamentViewerLinks)
+    .set({ status: "revoked", updatedAt: sql`now()` })
+    .where(
+      and(
+        eq(tournamentViewerLinks.tournamentId, tournamentId),
+        eq(tournamentViewerLinks.status, "active")
+      )
+    );
   const token = randomBytes(32).toString("base64url");
   await db.insert(tournamentViewerLinks).values({
     tournamentId,
@@ -1559,15 +1683,19 @@ async function saveTemplateFromTournament(
 }
 
 async function createTournamentFromTemplate(
-  input: { templateId: number; name: string },
-  userId: number
+  input: {
+    templateId: number;
+    name: string;
+    visibility?: "private" | "public";
+  },
+  user: { id: number; role: "user" | "admin" }
 ) {
   const db = await requireDb();
   return db.transaction(async tx => {
     const template = await getTemplateForUseOrThrow(
       tx,
       input.templateId,
-      userId
+      user.id
     );
     const templateGames = await tx
       .select()
@@ -1577,9 +1705,24 @@ async function createTournamentFromTemplate(
       .select()
       .from(tournamentControlTemplateConnections)
       .where(eq(tournamentControlTemplateConnections.templateId, template.id));
-    const insertResult = await tx
-      .insert(tournaments)
-      .values({ name: input.name, ownerUserId: userId });
+    await assertPersonalTournamentLimit(tx, user);
+    if (templateGames.length > PERSONAL_TCR_LIMITS.gameNodesPerTournament)
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Lobby node limit reached.",
+      });
+    const visibility = input.visibility ?? "private";
+    const publicSlug =
+      visibility === "public"
+        ? await createUniquePublicSlug(tx, input.name)
+        : null;
+    const insertResult = await tx.insert(tournaments).values({
+      name: input.name,
+      ownerUserId: user.id,
+      visibility,
+      publicSlug,
+      publishedAt: null,
+    });
     const tournamentId = requireInsertId(
       insertResult,
       "Tournament creation failed: database did not return the created tournament id."
@@ -2793,7 +2936,7 @@ async function unlockTournamentForEditing(
   return fetchTournamentControlData(tournamentId);
 }
 
-export const personalTcrProcedure = discordAuthenticatedProcedure;
+export const personalTcrProcedure = personalTcrAlphaProcedure;
 
 export const personalTcrRouter = router({
   listTournaments: personalTcrProcedure.query(async ({ ctx }) => {
@@ -2812,23 +2955,7 @@ export const personalTcrRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
-      const activeRows = await db
-        .select({ id: tournaments.id })
-        .from(tournaments)
-        .where(
-          and(
-            eq(tournaments.ownerUserId, ctx.user.id),
-            sql`${tournaments.eventStatus} <> 'complete'`
-          )
-        );
-      if (
-        ctx.user.role !== "admin" &&
-        activeRows.length >= PERSONAL_TCR_LIMITS.activeTournamentsPerUser
-      )
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Active personal tournament limit reached.",
-        });
+      await assertPersonalTournamentLimit(db, ctx.user);
       const publicSlug =
         input.visibility === "public"
           ? await createUniquePublicSlug(db, input.name)
@@ -2869,8 +2996,12 @@ export const personalTcrRouter = router({
     )
     .mutation(async ({ input, ctx }) =>
       createTournamentFromTemplate(
-        { templateId: input.templateId, name: input.name },
-        ctx.user.id
+        {
+          templateId: input.templateId,
+          name: input.name,
+          visibility: input.visibility,
+        },
+        ctx.user
       )
     ),
   renameTemplate: personalTcrProcedure
@@ -2997,7 +3128,14 @@ export const personalTcrRouter = router({
     .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
       await getManageableTournamentOrThrow(db, input.tournamentId, ctx.user);
-      return createViewerLink(input.tournamentId, ctx.user.id);
+      return getOrCreateViewerLink(input.tournamentId, ctx.user.id);
+    }),
+  regenerateViewerLink: personalTcrProcedure
+    .input(tournamentIdSchema)
+    .mutation(async ({ input, ctx }) => {
+      const db = await requireDb();
+      await getManageableTournamentOrThrow(db, input.tournamentId, ctx.user);
+      return regenerateViewerLink(input.tournamentId, ctx.user.id);
     }),
   listTeamSubmissions: personalTcrProcedure
     .input(z.object({ tournamentId: idSchema.optional() }).optional())
@@ -3064,19 +3202,12 @@ export const personalTcrRouter = router({
     .input(tournamentIdSchema.extend({ name: teamNameSchema, frp: frpSchema }))
     .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
-      await getManageableTournamentOrThrow(db, input.tournamentId, ctx.user);
-      const teamRows = await db
-        .select({ id: teams.id })
-        .from(teams)
-        .where(eq(teams.tournamentId, input.tournamentId));
-      if (
-        ctx.user.role !== "admin" &&
-        teamRows.length >= PERSONAL_TCR_LIMITS.teamsPerTournament
-      )
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Team limit reached.",
-        });
+      await getMutableManageableTournamentOrThrow(
+        db,
+        input.tournamentId,
+        ctx.user
+      );
+      await assertTeamLimit(db, input.tournamentId, ctx.user);
       await assertUniqueTeamName(db, input.tournamentId, input.name);
       await db.insert(teams).values({
         tournamentId: input.tournamentId,
@@ -3089,34 +3220,44 @@ export const personalTcrRouter = router({
     .input(tournamentIdSchema.extend({ teamId: idSchema }))
     .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
-      await getManageableTournamentOrThrow(db, input.tournamentId, ctx.user);
+      await getMutableManageableTournamentOrThrow(
+        db,
+        input.tournamentId,
+        ctx.user
+      );
       return deleteTournamentTeam(input.tournamentId, input.teamId);
     }),
   createCashoutLobby: personalTcrProcedure
     .input(tournamentIdSchema.extend({ position: positionSchema }))
     .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
-      await getManageableTournamentOrThrow(db, input.tournamentId, ctx.user);
-      const games = await db
-        .select({ id: tournamentGames.id })
-        .from(tournamentGames)
-        .where(eq(tournamentGames.tournamentId, input.tournamentId));
-      if (
-        ctx.user.role !== "admin" &&
-        games.length >= PERSONAL_TCR_LIMITS.gameNodesPerTournament
-      )
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Lobby node limit reached.",
-        });
-      return createGame(input.tournamentId, "cashout", input.position);
+      await getMutableManageableTournamentOrThrow(
+        db,
+        input.tournamentId,
+        ctx.user
+      );
+      return createGame(
+        input.tournamentId,
+        "cashout",
+        input.position,
+        ctx.user
+      );
     }),
   createFinalRoundMatch: personalTcrProcedure
     .input(tournamentIdSchema.extend({ position: positionSchema }))
     .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
-      await getManageableTournamentOrThrow(db, input.tournamentId, ctx.user);
-      return createGame(input.tournamentId, "final_round", input.position);
+      await getMutableManageableTournamentOrThrow(
+        db,
+        input.tournamentId,
+        ctx.user
+      );
+      return createGame(
+        input.tournamentId,
+        "final_round",
+        input.position,
+        ctx.user
+      );
     }),
   renameGame: personalTcrProcedure
     .input(gameIdSchema.extend({ displayLabel: labelSchema }))
@@ -3140,7 +3281,6 @@ export const personalTcrRouter = router({
         input.gameId,
         ctx.user
       );
-      assertGamePositionUnlocked(game);
       assertGamePositionUnlocked(game);
       const safePosition = clampCanvasPosition(input.position);
       await db
@@ -3450,7 +3590,15 @@ export const personalTcrRouter = router({
         locked: z.boolean(),
       })
     )
-    .mutation(({ input }) => setRoundGroupLocked(input)),
+    .mutation(async ({ input, ctx }) => {
+      const db = await requireDb();
+      await getMutableManageableTournamentOrThrow(
+        db,
+        input.tournamentId,
+        ctx.user
+      );
+      return setRoundGroupLocked(input);
+    }),
   removeTeam: personalTcrProcedure
     .input(gameIdSchema.extend({ teamId: idSchema }))
     .mutation(async ({ input, ctx }) => {
@@ -3751,12 +3899,12 @@ export const tournamentControlRouter = router({
       })
     )
     .mutation(({ input, ctx }) =>
-      createTournamentFromTemplate(input, ctx.user.id)
+      createTournamentFromTemplate(input, ctx.user)
     ),
   enableViewerLink: discordTournamentStaffProcedure
     .input(tournamentIdSchema)
     .mutation(({ input, ctx }) =>
-      createViewerLink(input.tournamentId, ctx.user.id)
+      getOrCreateViewerLink(input.tournamentId, ctx.user.id)
     ),
   getViewer: publicProcedure
     .input(z.object({ token: tokenSchema }))
