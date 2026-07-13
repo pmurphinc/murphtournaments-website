@@ -81,6 +81,7 @@ describe("buildIndexDefinitionFromStatisticsRows", () => {
 import {
   assertProductionSchemaAlreadyHasMigrations,
   assertReconciliationEntries,
+  getAppliedReconciliationEntries,
   reconcileLedgerEntries,
 } from "../../../scripts/reconcile-drizzle-migrations";
 
@@ -461,7 +462,7 @@ describe("production schema reconciliation checks", () => {
         "app"
       )
     ).rejects.toThrow(
-      /Required column tournament_games\.roundColor is missing/
+      /Migration 0025_add_tournament_round_group_colors is partially applied; missing artifact\(s\): column tournament_games\.roundColor/
     );
   });
 
@@ -496,7 +497,7 @@ describe("production schema reconciliation checks", () => {
     await expect(
       assertProductionSchemaAlreadyHasMigrations(schemaConnection(badFk), "app")
     ).rejects.toThrow(
-      /Required foreign key tournament_staff_invite_links\.tournament_staff_invite_links_acceptedByUserId_users_id_fk/
+      /Migration 0023_tournament_staff_invites is partially applied; missing artifact\(s\): foreign key tournament_staff_invite_links\.tournament_staff_invite_links_acceptedByUserId_users_id_fk/
     );
   });
 });
@@ -523,7 +524,25 @@ function ledgerConnection(
   } as never as { inserted: Array<[string, number]> };
 }
 
-const entries = [
+const allEntries = [
+  {
+    idx: 19,
+    tag: "0019_tournament_maps_and_owners",
+    createdAt: 19,
+    hash: "h19",
+  },
+  {
+    idx: 20,
+    tag: "0020_add_tournament_connection_flow_type",
+    createdAt: 20,
+    hash: "h20",
+  },
+  {
+    idx: 21,
+    tag: "0021_add_tournament_game_broadcast_url",
+    createdAt: 21,
+    hash: "h21",
+  },
   { idx: 22, tag: "0022_add_personal_tcr", createdAt: 22, hash: "h22" },
   { idx: 23, tag: "0023_tournament_staff_invites", createdAt: 23, hash: "h23" },
   {
@@ -539,6 +558,163 @@ const entries = [
     hash: "h25",
   },
 ];
+
+const entries = allEntries.slice(3);
+
+function remove0023(schema: MockSchema) {
+  schema.tables.delete("tournament_staff_members");
+  schema.tables.delete("tournament_staff_invite_links");
+  for (const key of [...schema.indexes.keys()]) {
+    if (
+      key.startsWith("tournament_staff_members.") ||
+      key.startsWith("tournament_staff_invite_links.")
+    ) {
+      schema.indexes.delete(key);
+    }
+  }
+  for (const key of [...schema.foreignKeys.keys()]) {
+    if (
+      key.startsWith("tournament_staff_members.") ||
+      key.startsWith("tournament_staff_invite_links.")
+    ) {
+      schema.foreignKeys.delete(key);
+    }
+  }
+}
+
+function remove0024(schema: MockSchema) {
+  schema.columns.delete(columnKey("tournament_games", "roundGroupId"));
+  schema.columns.delete(columnKey("tournament_games", "roundLabel"));
+  schema.columns.delete(
+    columnKey("tournament_control_template_games", "roundGroupId")
+  );
+  schema.columns.delete(
+    columnKey("tournament_control_template_games", "roundLabel")
+  );
+  schema.indexes.delete(
+    indexKey("tournament_games", "tournament_games_round_group_idx")
+  );
+}
+
+function remove0025(schema: MockSchema) {
+  schema.columns.delete(columnKey("tournament_games", "roundColor"));
+  schema.columns.delete(
+    columnKey("tournament_control_template_games", "roundColor")
+  );
+}
+
+function remove0022Through0025(schema: MockSchema) {
+  for (const column of [
+    "visibility",
+    "publicSlug",
+    "publishedAt",
+    "maxTeams",
+  ]) {
+    schema.columns.delete(columnKey("tournaments", column));
+  }
+  schema.tables.delete("tournament_private_invite_links");
+  schema.tables.delete("tournament_lobby_code_deliveries");
+  for (const key of [...schema.indexes.keys()]) {
+    if (
+      key.startsWith("tournaments.tournaments_publicSlug") ||
+      key.startsWith("tournaments.tournaments_visibility") ||
+      key.startsWith("tournaments.tournaments_owner_visibility") ||
+      key.startsWith("tournament_private_invite_links.") ||
+      key.startsWith("tournament_lobby_code_deliveries.")
+    ) {
+      schema.indexes.delete(key);
+    }
+  }
+  for (const key of [...schema.foreignKeys.keys()]) {
+    if (
+      key.startsWith("tournament_private_invite_links.") ||
+      key.startsWith("tournament_lobby_code_deliveries.")
+    ) {
+      schema.foreignKeys.delete(key);
+    }
+  }
+  remove0023(schema);
+  remove0024(schema);
+  remove0025(schema);
+}
+
+describe("sequential migration schema reconciliation", () => {
+  it("reconciles 0022 and stops successfully before absent 0023", async () => {
+    const schema = fullSchema();
+    remove0023(schema);
+    remove0024(schema);
+    remove0025(schema);
+
+    await expect(
+      getAppliedReconciliationEntries(
+        schemaConnection(schema),
+        "app",
+        allEntries
+      )
+    ).resolves.toEqual(allEntries.slice(0, 4));
+  });
+
+  it("reconciles through 0023 and stops before absent 0024", async () => {
+    const schema = fullSchema();
+    remove0024(schema);
+    remove0025(schema);
+
+    await expect(
+      getAppliedReconciliationEntries(
+        schemaConnection(schema),
+        "app",
+        allEntries
+      )
+    ).resolves.toEqual(allEntries.slice(0, 5));
+  });
+
+  it("reconciles through 0025 when all supported migrations are present", async () => {
+    await expect(
+      getAppliedReconciliationEntries(
+        schemaConnection(fullSchema()),
+        "app",
+        allEntries
+      )
+    ).resolves.toEqual(allEntries);
+  });
+
+  it("fails clearly for a partially applied 0023", async () => {
+    const schema = fullSchema();
+    schema.tables.delete("tournament_staff_members");
+
+    await expect(
+      getAppliedReconciliationEntries(
+        schemaConnection(schema),
+        "app",
+        allEntries
+      )
+    ).rejects.toThrow(
+      /Migration 0023_tournament_staff_invites is partially applied; missing artifact\(s\): table tournament_staff_members/
+    );
+  });
+
+  it("fails clearly when later artifacts are present after an earlier absent migration", async () => {
+    const schema = fullSchema();
+    remove0022Through0025(schema);
+    addColumn(schema, "tournament_games", "roundColor", "varchar(24)");
+    addColumn(
+      schema,
+      "tournament_control_template_games",
+      "roundColor",
+      "varchar(24)"
+    );
+
+    await expect(
+      getAppliedReconciliationEntries(
+        schemaConnection(schema),
+        "app",
+        allEntries
+      )
+    ).rejects.toThrow(
+      /0025_add_tournament_round_group_colors has schema artifacts present after earlier migration 0022_add_personal_tcr was absent/
+    );
+  });
+});
 
 describe("migration ledger reconciliation", () => {
   it("inserts ledger rows chronologically", async () => {

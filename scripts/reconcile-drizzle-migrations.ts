@@ -82,277 +82,316 @@ const migrationsToReconcile = [
   "0025_add_tournament_round_group_colors",
 ] as const;
 
-const requiredColumns: ColumnCheck[] = [
-  { table: "tournaments", column: "ownerUserId" },
-  { table: "tournament_games", column: "mapId" },
-  { table: "tournament_control_template_games", column: "mapId" },
-  { table: "tournament_game_connections", column: "flowType" },
-  { table: "tournament_control_template_connections", column: "flowType" },
-  { table: "tournament_games", column: "broadcastUrl" },
+const migrationSchemaChecks = [
   {
-    table: "tournaments",
-    column: "visibility",
-    columnType: "enum('private','public')",
-    nullable: false,
-    defaultValue: "private",
+    tag: "0019_tournament_maps_and_owners",
+    columns: [
+      { table: "tournaments", column: "ownerUserId" },
+      { table: "tournament_games", column: "mapId" },
+      { table: "tournament_control_template_games", column: "mapId" },
+    ],
+    foreignKeys: [
+      {
+        table: "tournaments",
+        constraint: "tournaments_ownerUserId_users_id_fk",
+        column: "ownerUserId",
+        referencedTable: "users",
+        referencedColumn: "id",
+      },
+    ],
   },
   {
-    table: "tournaments",
-    column: "publicSlug",
-    columnType: "varchar(120)",
-    nullable: true,
-    defaultValue: null,
+    tag: "0020_add_tournament_connection_flow_type",
+    columns: [
+      { table: "tournament_game_connections", column: "flowType" },
+      { table: "tournament_control_template_connections", column: "flowType" },
+    ],
+    reconcileSafeTransition: reconcileMigration0020IndexTransition,
   },
   {
-    table: "tournaments",
-    column: "publishedAt",
-    columnType: "timestamp",
-    nullable: true,
-    defaultValue: null,
+    tag: "0021_add_tournament_game_broadcast_url",
+    columns: [{ table: "tournament_games", column: "broadcastUrl" }],
   },
   {
-    table: "tournaments",
-    column: "maxTeams",
-    columnType: "int",
-    nullable: true,
-    defaultValue: null,
+    tag: "0022_add_personal_tcr",
+    columns: [
+      {
+        table: "tournaments",
+        column: "visibility",
+        columnType: "enum('private','public')",
+        nullable: false,
+        defaultValue: "private",
+      },
+      {
+        table: "tournaments",
+        column: "publicSlug",
+        columnType: "varchar(120)",
+        nullable: true,
+        defaultValue: null,
+      },
+      {
+        table: "tournaments",
+        column: "publishedAt",
+        columnType: "timestamp",
+        nullable: true,
+        defaultValue: null,
+      },
+      {
+        table: "tournaments",
+        column: "maxTeams",
+        columnType: "int",
+        nullable: true,
+        defaultValue: null,
+      },
+    ],
+    tables: [
+      { table: "tournament_private_invite_links" },
+      { table: "tournament_lobby_code_deliveries" },
+    ],
+    indexes: [
+      {
+        table: "tournaments",
+        index: "tournaments_publicSlug_unique",
+        columns: ["publicSlug"],
+        unique: true,
+      },
+      {
+        table: "tournaments",
+        index: "tournaments_visibility_published_idx",
+        columns: ["visibility", "publishedAt"],
+        unique: false,
+      },
+      {
+        table: "tournaments",
+        index: "tournaments_owner_visibility_idx",
+        columns: ["ownerUserId", "visibility"],
+        unique: false,
+      },
+      {
+        table: "tournament_private_invite_links",
+        index: "tournament_private_invite_links_token_unique",
+        columns: ["token"],
+        unique: true,
+      },
+      {
+        table: "tournament_private_invite_links",
+        index: "tournament_private_invite_links_tournament_status_idx",
+        columns: ["tournamentId", "status"],
+        unique: false,
+      },
+      {
+        table: "tournament_lobby_code_deliveries",
+        index: "tournament_lobby_code_deliveries_game_team_unique",
+        columns: ["gameId", "teamId"],
+        unique: true,
+      },
+      {
+        table: "tournament_lobby_code_deliveries",
+        index: "tournament_lobby_code_deliveries_team_status_idx",
+        columns: ["teamId", "status"],
+        unique: false,
+      },
+    ],
+    foreignKeys: [
+      {
+        table: "tournament_private_invite_links",
+        constraint: "tournament_private_invite_links_tournament_fk",
+        column: "tournamentId",
+        referencedTable: "tournaments",
+        referencedColumn: "id",
+      },
+      {
+        table: "tournament_private_invite_links",
+        constraint: "tournament_private_invite_links_creator_fk",
+        column: "createdByUserId",
+        referencedTable: "users",
+        referencedColumn: "id",
+      },
+      {
+        table: "tournament_lobby_code_deliveries",
+        constraint: "tournament_lobby_code_deliveries_game_fk",
+        column: "gameId",
+        referencedTable: "tournament_games",
+        referencedColumn: "id",
+      },
+      {
+        table: "tournament_lobby_code_deliveries",
+        constraint: "tournament_lobby_code_deliveries_team_fk",
+        column: "teamId",
+        referencedTable: "teams",
+        referencedColumn: "id",
+      },
+      {
+        table: "tournament_lobby_code_deliveries",
+        constraint: "tournament_lobby_code_deliveries_releaser_fk",
+        column: "releasedByUserId",
+        referencedTable: "users",
+        referencedColumn: "id",
+      },
+    ],
   },
   {
-    table: "tournament_games",
-    column: "roundGroupId",
-    columnType: "varchar(64)",
-    nullable: true,
-    defaultValue: null,
+    tag: "0023_tournament_staff_invites",
+    tables: [
+      { table: "tournament_staff_members" },
+      { table: "tournament_staff_invite_links" },
+    ],
+    indexes: [
+      {
+        table: "tournament_staff_members",
+        index: "tournament_staff_members_tournament_user_unique",
+        columns: ["tournamentId", "userId"],
+        unique: true,
+      },
+      {
+        table: "tournament_staff_members",
+        index: "tournament_staff_members_tournament_idx",
+        columns: ["tournamentId"],
+        unique: false,
+      },
+      {
+        table: "tournament_staff_members",
+        index: "tournament_staff_members_user_idx",
+        columns: ["userId"],
+        unique: false,
+      },
+      {
+        table: "tournament_staff_invite_links",
+        index: "tournament_staff_invite_links_tokenHash_unique",
+        columns: ["tokenHash"],
+        unique: true,
+      },
+      {
+        table: "tournament_staff_invite_links",
+        index: "tournament_staff_invite_links_tournament_status_idx",
+        columns: ["tournamentId", "status"],
+        unique: false,
+      },
+      {
+        table: "tournament_staff_invite_links",
+        index: "tournament_staff_invite_links_status_expires_idx",
+        columns: ["status", "expiresAt"],
+        unique: false,
+      },
+    ],
+    foreignKeys: [
+      {
+        table: "tournament_staff_members",
+        constraint: "tournament_staff_members_tournamentId_tournaments_id_fk",
+        column: "tournamentId",
+        referencedTable: "tournaments",
+        referencedColumn: "id",
+      },
+      {
+        table: "tournament_staff_members",
+        constraint: "tournament_staff_members_userId_users_id_fk",
+        column: "userId",
+        referencedTable: "users",
+        referencedColumn: "id",
+      },
+      {
+        table: "tournament_staff_members",
+        constraint: "tournament_staff_members_addedByUserId_users_id_fk",
+        column: "addedByUserId",
+        referencedTable: "users",
+        referencedColumn: "id",
+      },
+      {
+        table: "tournament_staff_invite_links",
+        constraint:
+          "tournament_staff_invite_links_tournamentId_tournaments_id_fk",
+        column: "tournamentId",
+        referencedTable: "tournaments",
+        referencedColumn: "id",
+      },
+      {
+        table: "tournament_staff_invite_links",
+        constraint: "tournament_staff_invite_links_createdByUserId_users_id_fk",
+        column: "createdByUserId",
+        referencedTable: "users",
+        referencedColumn: "id",
+      },
+      {
+        table: "tournament_staff_invite_links",
+        constraint:
+          "tournament_staff_invite_links_acceptedByUserId_users_id_fk",
+        column: "acceptedByUserId",
+        referencedTable: "users",
+        referencedColumn: "id",
+      },
+    ],
   },
   {
-    table: "tournament_games",
-    column: "roundLabel",
-    columnType: "varchar(80)",
-    nullable: true,
-    defaultValue: null,
+    tag: "0024_add_tournament_round_groups",
+    columns: [
+      {
+        table: "tournament_games",
+        column: "roundGroupId",
+        columnType: "varchar(64)",
+        nullable: true,
+        defaultValue: null,
+      },
+      {
+        table: "tournament_games",
+        column: "roundLabel",
+        columnType: "varchar(80)",
+        nullable: true,
+        defaultValue: null,
+      },
+      {
+        table: "tournament_control_template_games",
+        column: "roundGroupId",
+        columnType: "varchar(64)",
+        nullable: true,
+        defaultValue: null,
+      },
+      {
+        table: "tournament_control_template_games",
+        column: "roundLabel",
+        columnType: "varchar(80)",
+        nullable: true,
+        defaultValue: null,
+      },
+    ],
+    indexes: [
+      {
+        table: "tournament_games",
+        index: "tournament_games_round_group_idx",
+        columns: ["tournamentId", "roundGroupId"],
+        unique: false,
+      },
+    ],
   },
   {
-    table: "tournament_control_template_games",
-    column: "roundGroupId",
-    columnType: "varchar(64)",
-    nullable: true,
-    defaultValue: null,
+    tag: "0025_add_tournament_round_group_colors",
+    columns: [
+      {
+        table: "tournament_games",
+        column: "roundColor",
+        columnType: "varchar(24)",
+        nullable: true,
+        defaultValue: null,
+      },
+      {
+        table: "tournament_control_template_games",
+        column: "roundColor",
+        columnType: "varchar(24)",
+        nullable: true,
+        defaultValue: null,
+      },
+    ],
   },
-  {
-    table: "tournament_control_template_games",
-    column: "roundLabel",
-    columnType: "varchar(80)",
-    nullable: true,
-    defaultValue: null,
-  },
-  {
-    table: "tournament_games",
-    column: "roundColor",
-    columnType: "varchar(24)",
-    nullable: true,
-    defaultValue: null,
-  },
-  {
-    table: "tournament_control_template_games",
-    column: "roundColor",
-    columnType: "varchar(24)",
-    nullable: true,
-    defaultValue: null,
-  },
-];
-
-const requiredTables: TableCheck[] = [
-  { table: "tournament_private_invite_links" },
-  { table: "tournament_lobby_code_deliveries" },
-  { table: "tournament_staff_members" },
-  { table: "tournament_staff_invite_links" },
-];
-
-const requiredIndexes: IndexCheck[] = [
-  {
-    table: "tournaments",
-    index: "tournaments_publicSlug_unique",
-    columns: ["publicSlug"],
-    unique: true,
-  },
-  {
-    table: "tournaments",
-    index: "tournaments_visibility_published_idx",
-    columns: ["visibility", "publishedAt"],
-    unique: false,
-  },
-  {
-    table: "tournaments",
-    index: "tournaments_owner_visibility_idx",
-    columns: ["ownerUserId", "visibility"],
-    unique: false,
-  },
-  {
-    table: "tournament_private_invite_links",
-    index: "tournament_private_invite_links_token_unique",
-    columns: ["token"],
-    unique: true,
-  },
-  {
-    table: "tournament_private_invite_links",
-    index: "tournament_private_invite_links_tournament_status_idx",
-    columns: ["tournamentId", "status"],
-    unique: false,
-  },
-  {
-    table: "tournament_lobby_code_deliveries",
-    index: "tournament_lobby_code_deliveries_game_team_unique",
-    columns: ["gameId", "teamId"],
-    unique: true,
-  },
-  {
-    table: "tournament_lobby_code_deliveries",
-    index: "tournament_lobby_code_deliveries_team_status_idx",
-    columns: ["teamId", "status"],
-    unique: false,
-  },
-  {
-    table: "tournament_staff_members",
-    index: "tournament_staff_members_tournament_user_unique",
-    columns: ["tournamentId", "userId"],
-    unique: true,
-  },
-  {
-    table: "tournament_staff_members",
-    index: "tournament_staff_members_tournament_idx",
-    columns: ["tournamentId"],
-    unique: false,
-  },
-  {
-    table: "tournament_staff_members",
-    index: "tournament_staff_members_user_idx",
-    columns: ["userId"],
-    unique: false,
-  },
-  {
-    table: "tournament_staff_invite_links",
-    index: "tournament_staff_invite_links_tokenHash_unique",
-    columns: ["tokenHash"],
-    unique: true,
-  },
-  {
-    table: "tournament_staff_invite_links",
-    index: "tournament_staff_invite_links_tournament_status_idx",
-    columns: ["tournamentId", "status"],
-    unique: false,
-  },
-  {
-    table: "tournament_staff_invite_links",
-    index: "tournament_staff_invite_links_status_expires_idx",
-    columns: ["status", "expiresAt"],
-    unique: false,
-  },
-  {
-    table: "tournament_games",
-    index: "tournament_games_round_group_idx",
-    columns: ["tournamentId", "roundGroupId"],
-    unique: false,
-  },
-  {
-    table: "tournament_game_connections",
-    index: "tournament_game_connections_source_target_flow_unique",
-    columns: ["sourceGameId", "targetGameId", "flowType"],
-    unique: true,
-  },
-  {
-    table: "tournament_control_template_connections",
-    index: "tournament_control_template_connections_unique",
-    columns: ["sourceTemplateGameId", "targetTemplateGameId", "flowType"],
-    unique: true,
-  },
-];
-
-const requiredForeignKeys: ForeignKeyCheck[] = [
-  {
-    table: "tournaments",
-    constraint: "tournaments_ownerUserId_users_id_fk",
-    column: "ownerUserId",
-    referencedTable: "users",
-    referencedColumn: "id",
-  },
-  {
-    table: "tournament_private_invite_links",
-    constraint: "tournament_private_invite_links_tournament_fk",
-    column: "tournamentId",
-    referencedTable: "tournaments",
-    referencedColumn: "id",
-  },
-  {
-    table: "tournament_private_invite_links",
-    constraint: "tournament_private_invite_links_creator_fk",
-    column: "createdByUserId",
-    referencedTable: "users",
-    referencedColumn: "id",
-  },
-  {
-    table: "tournament_lobby_code_deliveries",
-    constraint: "tournament_lobby_code_deliveries_game_fk",
-    column: "gameId",
-    referencedTable: "tournament_games",
-    referencedColumn: "id",
-  },
-  {
-    table: "tournament_lobby_code_deliveries",
-    constraint: "tournament_lobby_code_deliveries_team_fk",
-    column: "teamId",
-    referencedTable: "teams",
-    referencedColumn: "id",
-  },
-  {
-    table: "tournament_lobby_code_deliveries",
-    constraint: "tournament_lobby_code_deliveries_releaser_fk",
-    column: "releasedByUserId",
-    referencedTable: "users",
-    referencedColumn: "id",
-  },
-  {
-    table: "tournament_staff_members",
-    constraint: "tournament_staff_members_tournamentId_tournaments_id_fk",
-    column: "tournamentId",
-    referencedTable: "tournaments",
-    referencedColumn: "id",
-  },
-  {
-    table: "tournament_staff_members",
-    constraint: "tournament_staff_members_userId_users_id_fk",
-    column: "userId",
-    referencedTable: "users",
-    referencedColumn: "id",
-  },
-  {
-    table: "tournament_staff_members",
-    constraint: "tournament_staff_members_addedByUserId_users_id_fk",
-    column: "addedByUserId",
-    referencedTable: "users",
-    referencedColumn: "id",
-  },
-  {
-    table: "tournament_staff_invite_links",
-    constraint: "tournament_staff_invite_links_tournamentId_tournaments_id_fk",
-    column: "tournamentId",
-    referencedTable: "tournaments",
-    referencedColumn: "id",
-  },
-  {
-    table: "tournament_staff_invite_links",
-    constraint: "tournament_staff_invite_links_createdByUserId_users_id_fk",
-    column: "createdByUserId",
-    referencedTable: "users",
-    referencedColumn: "id",
-  },
-  {
-    table: "tournament_staff_invite_links",
-    constraint: "tournament_staff_invite_links_acceptedByUserId_users_id_fk",
-    column: "acceptedByUserId",
-    referencedTable: "users",
-    referencedColumn: "id",
-  },
-];
+] as const satisfies ReadonlyArray<{
+  tag: (typeof migrationsToReconcile)[number];
+  columns?: readonly ColumnCheck[];
+  tables?: readonly TableCheck[];
+  indexes?: readonly IndexCheck[];
+  foreignKeys?: readonly ForeignKeyCheck[];
+  reconcileSafeTransition?: (
+    connection: mysql.Connection,
+    databaseName: string
+  ) => Promise<void>;
+}>;
 
 async function readMigrationEntries(): Promise<MigrationEntry[]> {
   const migrationsDir = path.join(process.cwd(), "drizzle");
@@ -410,11 +449,11 @@ async function countRows(
   return Number(rows[0]?.count ?? 0);
 }
 
-async function assertTableExists(
+async function tableExists(
   connection: mysql.Connection,
   databaseName: string,
   check: TableCheck
-) {
+): Promise<boolean> {
   const count = await countRows(
     connection,
     `select count(*) as count
@@ -423,7 +462,15 @@ async function assertTableExists(
     [databaseName, check.table]
   );
 
-  if (count !== 1) {
+  return count === 1;
+}
+
+async function assertTableExists(
+  connection: mysql.Connection,
+  databaseName: string,
+  check: TableCheck
+) {
+  if (!(await tableExists(connection, databaseName, check))) {
     throw new Error(
       `Required table ${check.table} is missing; not reconciling the ledger.`
     );
@@ -439,11 +486,11 @@ function normalizeInformationSchemaValue(
   return Buffer.isBuffer(value) ? value.toString("utf8") : String(value);
 }
 
-async function assertColumnExists(
+async function getColumnDefinition(
   connection: mysql.Connection,
   databaseName: string,
   check: ColumnCheck
-) {
+): Promise<ColumnDefinitionRow | undefined> {
   const [rows] = await connection.execute<ColumnDefinitionRow[]>(
     `select
         COLUMN_TYPE as columnType,
@@ -454,7 +501,13 @@ async function assertColumnExists(
     [databaseName, check.table, check.column]
   );
 
-  const definition = rows[0];
+  return rows[0];
+}
+
+function assertColumnDefinitionMatches(
+  definition: ColumnDefinitionRow | undefined,
+  check: ColumnCheck
+) {
   if (!definition) {
     throw new Error(
       `Required column ${check.table}.${check.column} is missing; not reconciling the ledger.`
@@ -489,6 +542,17 @@ async function assertColumnExists(
       `Required column ${check.table}.${check.column} has unexpected default ${String(actualDefault)}; expected ${String(check.defaultValue)}.`
     );
   }
+}
+
+async function assertColumnExists(
+  connection: mysql.Connection,
+  databaseName: string,
+  check: ColumnCheck
+) {
+  assertColumnDefinitionMatches(
+    await getColumnDefinition(connection, databaseName, check),
+    check
+  );
 }
 
 async function getIndexDefinition(
@@ -571,6 +635,17 @@ function indexMatchesDefinition(
   );
 }
 
+function assertIndexDefinitionMatches(
+  definition: IndexDefinition,
+  check: IndexCheck
+) {
+  if (!indexMatchesDefinition(definition, check.columns, check.unique)) {
+    throw new Error(
+      `Required index ${check.table}.${check.index} is missing or has an unexpected definition.`
+    );
+  }
+}
+
 async function assertIndexExists(
   connection: mysql.Connection,
   databaseName: string,
@@ -582,12 +657,7 @@ async function assertIndexExists(
     check.table,
     check.index
   );
-
-  if (!indexMatchesDefinition(definition, check.columns, check.unique)) {
-    throw new Error(
-      `Required index ${check.table}.${check.index} is missing or has an unexpected definition.`
-    );
-  }
+  assertIndexDefinitionMatches(definition, check);
 }
 
 async function reconcileMigration0020IndexTransition(
@@ -693,60 +763,197 @@ async function reconcileMigration0020IndexTransition(
   );
 }
 
+async function foreignKeyExists(
+  connection: mysql.Connection,
+  databaseName: string,
+  check: ForeignKeyCheck
+): Promise<boolean> {
+  const count = await countRows(
+    connection,
+    `select count(*) as count
+       from information_schema.key_column_usage
+      where table_schema = ?
+        and table_name = ?
+        and constraint_name = ?
+        and column_name = ?
+        and referenced_table_name = ?
+        and referenced_column_name = ?`,
+    [
+      databaseName,
+      check.table,
+      check.constraint,
+      check.column,
+      check.referencedTable,
+      check.referencedColumn,
+    ]
+  );
+  return count === 1;
+}
+
 async function assertForeignKeyExists(
   connection: mysql.Connection,
-  databaseName: string
+  databaseName: string,
+  check: ForeignKeyCheck
 ) {
-  for (const check of requiredForeignKeys) {
-    const count = await countRows(
-      connection,
-      `select count(*) as count
-         from information_schema.key_column_usage
-        where table_schema = ?
-          and table_name = ?
-          and constraint_name = ?
-          and column_name = ?
-          and referenced_table_name = ?
-          and referenced_column_name = ?`,
-      [
-        databaseName,
-        check.table,
-        check.constraint,
-        check.column,
-        check.referencedTable,
-        check.referencedColumn,
-      ]
+  if (!(await foreignKeyExists(connection, databaseName, check))) {
+    throw new Error(
+      `Required foreign key ${check.table}.${check.constraint} is missing; not reconciling the ledger.`
     );
+  }
+}
 
-    if (count !== 1) {
+type MigrationSchemaState = "present" | "absent";
+
+async function getMigrationSchemaState(
+  connection: mysql.Connection,
+  databaseName: string,
+  migration: (typeof migrationSchemaChecks)[number]
+): Promise<MigrationSchemaState> {
+  const artifacts: Array<{
+    name: string;
+    present: boolean;
+    verify: () => void;
+  }> = [];
+
+  for (const check of migration.tables ?? []) {
+    artifacts.push({
+      name: `table ${check.table}`,
+      present: await tableExists(connection, databaseName, check),
+      verify: () => undefined,
+    });
+  }
+
+  for (const check of migration.columns ?? []) {
+    const definition = await getColumnDefinition(
+      connection,
+      databaseName,
+      check
+    );
+    artifacts.push({
+      name: `column ${check.table}.${check.column}`,
+      present: definition !== undefined,
+      verify: () => assertColumnDefinitionMatches(definition, check),
+    });
+  }
+
+  for (const check of migration.indexes ?? []) {
+    const definition = await getIndexDefinition(
+      connection,
+      databaseName,
+      check.table,
+      check.index
+    );
+    artifacts.push({
+      name: `index ${check.table}.${check.index}`,
+      present: definition.exists,
+      verify: () => assertIndexDefinitionMatches(definition, check),
+    });
+  }
+
+  for (const check of migration.foreignKeys ?? []) {
+    artifacts.push({
+      name: `foreign key ${check.table}.${check.constraint}`,
+      present: await foreignKeyExists(connection, databaseName, check),
+      verify: () => undefined,
+    });
+  }
+
+  const presentArtifacts = artifacts.filter(artifact => artifact.present);
+  if (presentArtifacts.length === 0) {
+    return "absent";
+  }
+
+  if (presentArtifacts.length !== artifacts.length) {
+    const missingArtifacts = artifacts
+      .filter(artifact => !artifact.present)
+      .map(artifact => artifact.name)
+      .join(", ");
+    throw new Error(
+      `Migration ${migration.tag} is partially applied; missing artifact(s): ${missingArtifacts}.`
+    );
+  }
+
+  for (const artifact of artifacts) {
+    try {
+      artifact.verify();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       throw new Error(
-        `Required foreign key ${check.table}.${check.constraint} is missing; not reconciling the ledger.`
+        `Migration ${migration.tag} is partially applied; incorrect ${artifact.name}: ${message}`
       );
     }
   }
+
+  if (migration.reconcileSafeTransition) {
+    await migration.reconcileSafeTransition(connection, databaseName);
+  }
+
+  return "present";
+}
+
+export async function getAppliedReconciliationEntries(
+  connection: mysql.Connection,
+  databaseName: string,
+  entries: MigrationEntry[]
+): Promise<MigrationEntry[]> {
+  const entriesByTag = new Map(entries.map(entry => [entry.tag, entry]));
+  const appliedEntries: MigrationEntry[] = [];
+  let stoppedAt: string | undefined;
+
+  for (const migration of migrationSchemaChecks) {
+    const state = await getMigrationSchemaState(
+      connection,
+      databaseName,
+      migration
+    );
+    if (state === "present") {
+      if (stoppedAt) {
+        throw new Error(
+          `Migration ${migration.tag} has schema artifacts present after earlier migration ${stoppedAt} was absent; not reconciling out-of-order schema state.`
+        );
+      }
+      const entry = entriesByTag.get(migration.tag);
+      if (!entry) {
+        throw new Error(
+          `Missing ${migration.tag} in drizzle/meta/_journal.json`
+        );
+      }
+      appliedEntries.push(entry);
+      continue;
+    }
+
+    if (!stoppedAt) {
+      stoppedAt = migration.tag;
+      console.log(
+        `Reconciliation stopped before ${migration.tag} because its schema is not applied.`
+      );
+    }
+  }
+
+  return appliedEntries;
 }
 
 export async function assertProductionSchemaAlreadyHasMigrations(
   connection: mysql.Connection,
   databaseName: string
 ) {
-  await Promise.all(
-    requiredTables.map(check =>
-      assertTableExists(connection, databaseName, check)
-    )
+  const entries = migrationSchemaChecks.map(({ tag }, index) => ({
+    idx: index,
+    createdAt: index,
+    tag,
+    hash: tag,
+  }));
+  const appliedEntries = await getAppliedReconciliationEntries(
+    connection,
+    databaseName,
+    entries
   );
-  await Promise.all(
-    requiredColumns.map(check =>
-      assertColumnExists(connection, databaseName, check)
-    )
-  );
-  await reconcileMigration0020IndexTransition(connection, databaseName);
-  await Promise.all(
-    requiredIndexes.map(check =>
-      assertIndexExists(connection, databaseName, check)
-    )
-  );
-  await assertForeignKeyExists(connection, databaseName);
+
+  if (appliedEntries.length !== migrationSchemaChecks.length) {
+    throw new Error(
+      `Expected all reconciliation migrations through 0025 to be present, but only ${appliedEntries.length} were present.`
+    );
+  }
 }
 
 export async function reconcileLedgerEntries(
@@ -811,8 +1018,12 @@ async function main() {
 
   try {
     const databaseName = await getDatabaseName(connection);
-    await assertProductionSchemaAlreadyHasMigrations(connection, databaseName);
-    await reconcileLedgerEntries(connection, reconciliationEntries);
+    const appliedEntries = await getAppliedReconciliationEntries(
+      connection,
+      databaseName,
+      reconciliationEntries
+    );
+    await reconcileLedgerEntries(connection, appliedEntries);
   } finally {
     await connection.end();
   }
