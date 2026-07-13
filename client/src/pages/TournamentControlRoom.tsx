@@ -53,6 +53,8 @@ import {
   isKeyboardPanKeyCode,
   shouldCancelBoardDragsForPinch,
   hasOpenLobbySlot,
+  isTeamEliminated,
+  calculateTournamentScoreboard,
   shouldStartCanvasPan,
   snapCanvasPointToGrid,
   type CanvasPanStart,
@@ -190,10 +192,22 @@ type ZoomRailDragStart = {
   dragged: boolean;
 };
 type BoardUndoSnapshot = {
+  tournament: { name: string };
+  teams: ControlTeamView[];
   games: ControlGameView[];
   assignments: AssignmentView[];
   connections: ConnectionView[];
 };
+type UiUndoState = {
+  selectedGameId: number | null;
+  selectedAssignmentId: number | null;
+  selectedConnectionId: number | null;
+  selectedRoundGameIds: number[];
+};
+type UndoEntry =
+  | { kind: "board"; snapshot: BoardUndoSnapshot; label: string }
+  | { kind: "ui"; state: UiUndoState; label: string };
+const undoHistoryLimit = 50;
 
 type DialogState =
   | { type: "create-team" }
@@ -248,7 +262,7 @@ type ControlRoomOverlayPreferences = {
   zoom: number;
 };
 
-type ZoomRailActivePanel = "options" | "rounds" | "controls" | null;
+type ZoomRailActivePanel = "options" | "rounds" | "controls" | "score" | null;
 
 export function readControlRoomOverlayPreferences(): Partial<ControlRoomOverlayPreferences> {
   if (typeof window === "undefined") return {};
@@ -482,9 +496,9 @@ export default function TournamentControlRoom({
   const [zoomRailActivePanel, setZoomRailActivePanel] =
     useState<ZoomRailActivePanel>(null);
   const suppressZoomRailClickRef = useRef(false);
-  const [undoSnapshot, setUndoSnapshot] = useState<BoardUndoSnapshot | null>(
-    null
-  );
+  const suppressNextBoardUndoRef = useRef(0);
+  const captureUndoSnapshotRef = useRef<(() => BoardUndoSnapshot) | null>(null);
+  const [undoHistory, setUndoHistory] = useState<UndoEntry[]>([]);
   const zoomRailDragRef = useRef<ZoomRailDragStart | null>(null);
   const canvasPanRef = useRef<
     (CanvasPanStart & { pointerId: number; dragged: boolean }) | null
@@ -529,11 +543,43 @@ export default function TournamentControlRoom({
       ? utils.personalTcr.get.invalidate({ tournamentId })
       : utils.tournamentControl.get.invalidate({ tournamentId });
   const mutationOptions = {
-    onSuccess: invalidate,
+    onMutate: () => {
+      if (suppressNextBoardUndoRef.current > 0) {
+        suppressNextBoardUndoRef.current -= 1;
+        return undefined;
+      }
+      return captureUndoSnapshot();
+    },
+    onSuccess: (
+      _data: unknown,
+      _variables: unknown,
+      snapshot?: BoardUndoSnapshot
+    ) => {
+      if (snapshot)
+        setUndoHistory(history =>
+          [
+            { kind: "board" as const, snapshot, label: "Board change" },
+            ...history,
+          ].slice(0, undoHistoryLimit)
+        );
+      invalidate();
+    },
     onError: (error: { message: string }) => toast.error(error.message),
   };
   const renameTournament = controlApi.renameTournament.useMutation({
-    onSuccess: () => {
+    onMutate: () => captureUndoSnapshot(),
+    onSuccess: (
+      _data: unknown,
+      _variables: unknown,
+      snapshot?: BoardUndoSnapshot
+    ) => {
+      if (snapshot)
+        setUndoHistory(history =>
+          [
+            { kind: "board" as const, snapshot, label: "Rename tournament" },
+            ...history,
+          ].slice(0, undoHistoryLimit)
+        );
       setDialogState(null);
       setFormError(null);
       invalidate();
@@ -566,7 +612,15 @@ export default function TournamentControlRoom({
   const removeAssignedTeams =
     controlApi.removeAssignedTeams.useMutation(mutationOptions);
   const autoFillLobby = controlApi.autoFillLobby.useMutation({
-    onSuccess: result => {
+    onMutate: () => captureUndoSnapshot(),
+    onSuccess: (result, _variables, snapshot?: BoardUndoSnapshot) => {
+      if (snapshot)
+        setUndoHistory(history =>
+          [
+            { kind: "board" as const, snapshot, label: "Auto-fill lobby" },
+            ...history,
+          ].slice(0, undoHistoryLimit)
+        );
       invalidate();
       const partial =
         result.slotsOpen > 0
@@ -584,14 +638,42 @@ export default function TournamentControlRoom({
     controlApi.setRoundGroupLocked.useMutation(mutationOptions);
   const persistGroupPositions = useCallback(
     (positions: ReadonlyMap<number, CanvasPoint>) => {
-      positions.forEach((position, gameId) => {
-        moveGame.mutate({ gameId, position });
-      });
+      const entries = Array.from(positions.entries());
+      if (entries.length === 0) return;
+      const snapshot = captureUndoSnapshotRef.current?.();
+      if (!snapshot) return;
+      suppressNextBoardUndoRef.current += entries.length;
+      void Promise.all(
+        entries.map(([gameId, position]) =>
+          moveGame.mutateAsync({ gameId, position })
+        )
+      )
+        .then(() =>
+          setUndoHistory(history =>
+            [
+              { kind: "board" as const, snapshot, label: "Move group" },
+              ...history,
+            ].slice(0, undoHistoryLimit)
+          )
+        )
+        .catch(() => undefined);
     },
     [moveGame]
   );
   const deleteTeam = controlApi.deleteTeam.useMutation({
-    onSuccess: () => {
+    onMutate: () => captureUndoSnapshot(),
+    onSuccess: (
+      _data: unknown,
+      _variables: unknown,
+      snapshot?: BoardUndoSnapshot
+    ) => {
+      if (snapshot)
+        setUndoHistory(history =>
+          [
+            { kind: "board" as const, snapshot, label: "Delete team" },
+            ...history,
+          ].slice(0, undoHistoryLimit)
+        );
       setDialogState(null);
       invalidate();
       toast.success("Team deleted");
@@ -608,9 +690,9 @@ export default function TournamentControlRoom({
   const restoreTournamentBoardSnapshot =
     controlApi.restoreTournamentBoardSnapshot.useMutation({
       onSuccess: () => {
-        setUndoSnapshot(null);
+        setUndoHistory(history => history.slice(1));
         invalidate();
-        toast.success("Board restored");
+        toast.success("Undo applied");
       },
       onError: (error: { message: string }) => toast.error(error.message),
     });
@@ -733,9 +815,12 @@ export default function TournamentControlRoom({
   const games = (query.data?.games ?? []) as ControlGameView[];
   const assignments = (query.data?.assignments ?? []) as AssignmentView[];
   const connections = (query.data?.connections ?? []) as ConnectionView[];
+  const tournamentName = query.data?.tournament.name ?? "";
 
   const captureUndoSnapshot = useCallback(
     (): BoardUndoSnapshot => ({
+      tournament: { name: tournamentName },
+      teams: (query.data?.teams ?? []).map(team => ({ ...team })),
       games: games.map(game => ({
         ...game,
         seriesBestOf:
@@ -746,14 +831,23 @@ export default function TournamentControlRoom({
       assignments: assignments.map(assignment => ({ ...assignment })),
       connections: connections.map(connection => ({ ...connection })),
     }),
-    [assignments, connections, games]
+    [assignments, connections, games, query.data?.teams, tournamentName]
   );
+
+  captureUndoSnapshotRef.current = captureUndoSnapshot;
 
   const runDestructiveBoardAction = useCallback(
     (action: () => Promise<unknown>) => {
       const snapshot = captureUndoSnapshot();
       void action()
-        .then(() => setUndoSnapshot(snapshot))
+        .then(() =>
+          setUndoHistory(history =>
+            [
+              { kind: "board" as const, snapshot, label: "Board change" },
+              ...history,
+            ].slice(0, undoHistoryLimit)
+          )
+        )
         .catch(() => undefined);
     },
     [captureUndoSnapshot]
@@ -855,6 +949,27 @@ export default function TournamentControlRoom({
   const availableTeamsToggleLabel = getAvailableTeamsToggleLabel(
     unassignedTeams.length
   );
+  const scoreboardRows = useMemo(
+    () =>
+      calculateTournamentScoreboard(
+        query.data?.teams ?? [],
+        games,
+        assignments
+      ),
+    [assignments, games, query.data?.teams]
+  );
+  const gamesWithOutgoingLoserConnection = useMemo(
+    () =>
+      new Set(
+        connections
+          .filter(connection => connection.flowType === "loser")
+          .map(connection => connection.sourceGameId)
+      ),
+    [connections]
+  );
+  useEffect(() => {
+    setUndoHistory([]);
+  }, [tournamentId]);
 
   const selectedAssignmentContext = useMemo(() => {
     if (selectedAssignmentId === null) return null;
@@ -945,18 +1060,24 @@ export default function TournamentControlRoom({
         return;
       }
       if (payload.fromGameId) {
-        moveTeam.mutate({
-          gameId: payload.fromGameId,
-          toGameId: game.id,
-          teamId: payload.teamId,
-          slotIndex,
-        });
+        moveTeam.mutate(
+          {
+            gameId: payload.fromGameId,
+            toGameId: game.id,
+            teamId: payload.teamId,
+            slotIndex,
+          },
+          { onSuccess: () => setDragPayload(null) }
+        );
       } else {
-        assignTeam.mutate({
-          gameId: game.id,
-          teamId: payload.teamId,
-          slotIndex,
-        });
+        assignTeam.mutate(
+          {
+            gameId: game.id,
+            teamId: payload.teamId,
+            slotIndex,
+          },
+          { onSuccess: () => setDragPayload(null) }
+        );
       }
     },
     [assignTeam, moveTeam]
@@ -1575,12 +1696,75 @@ export default function TournamentControlRoom({
   );
 
   const undoBoardAction = useCallback(() => {
-    if (!undoSnapshot) return;
+    const entry = undoHistory[0];
+    if (!entry || restoreTournamentBoardSnapshot.isPending) return;
+    if (entry.kind === "ui") {
+      setSelectedGameId(entry.state.selectedGameId);
+      setSelectedAssignmentId(entry.state.selectedAssignmentId);
+      setSelectedConnectionId(entry.state.selectedConnectionId);
+      setSelectedRoundGameIds(new Set(entry.state.selectedRoundGameIds));
+      setUndoHistory(history => history.slice(1));
+      return;
+    }
     restoreTournamentBoardSnapshot.mutate({
       tournamentId,
-      snapshot: undoSnapshot,
+      snapshot: entry.snapshot,
     });
-  }, [restoreTournamentBoardSnapshot, tournamentId, undoSnapshot]);
+  }, [restoreTournamentBoardSnapshot, tournamentId, undoHistory]);
+
+  const pushUiUndo = useCallback(
+    (label: string) => {
+      const state: UiUndoState = {
+        selectedGameId,
+        selectedAssignmentId,
+        selectedConnectionId,
+        selectedRoundGameIds: Array.from(selectedRoundGameIds),
+      };
+      setUndoHistory(history =>
+        [{ kind: "ui" as const, state, label }, ...history].slice(
+          0,
+          undoHistoryLimit
+        )
+      );
+    },
+    [
+      selectedAssignmentId,
+      selectedConnectionId,
+      selectedGameId,
+      selectedRoundGameIds,
+    ]
+  );
+
+  useEffect(() => {
+    const isEditable = (target: EventTarget | null) => {
+      if (!(target instanceof HTMLElement)) return false;
+      return Boolean(
+        target.closest('input, textarea, select, [contenteditable="true"]')
+      );
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.key.toLowerCase() !== "z" ||
+        (!event.ctrlKey && !event.metaKey) ||
+        event.shiftKey
+      )
+        return;
+      if (
+        isEditable(event.target) ||
+        undoHistory.length === 0 ||
+        restoreTournamentBoardSnapshot.isPending
+      )
+        return;
+      event.preventDefault();
+      undoBoardAction();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    restoreTournamentBoardSnapshot.isPending,
+    undoBoardAction,
+    undoHistory.length,
+  ]);
 
   const openDialog = (state: Exclude<DialogState, null>, defaultValue = "") => {
     setDialogState(state);
@@ -1870,23 +2054,37 @@ export default function TournamentControlRoom({
               active games.
             </p>
             <div
-              className="space-y-2"
-              onDragOver={event => event.preventDefault()}
+              className="space-y-2 rounded-lg border border-dashed border-[#FFD700]/35 bg-[#FFD700]/5 p-2 transition"
+              onDragOver={event => {
+                const payload =
+                  parseDragPayload(
+                    event.dataTransfer.getData("application/json")
+                  ) ?? dragPayload;
+                if (!payload?.fromGameId) return;
+                const sourceGame = gamesById.get(payload.fromGameId);
+                if (sourceGame?.status === "complete") return;
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "move";
+              }}
               onDrop={event => {
-                const payload = parseDragPayload(
-                  event.dataTransfer.getData("application/json")
+                event.preventDefault();
+                const payload =
+                  parseDragPayload(
+                    event.dataTransfer.getData("application/json")
+                  ) ?? dragPayload;
+                if (!payload?.fromGameId) return;
+                const sourceGame = gamesById.get(payload.fromGameId);
+                if (sourceGame?.status === "complete") return;
+                removeTeam.mutate(
+                  { gameId: payload.fromGameId, teamId: payload.teamId },
+                  { onSuccess: () => setDragPayload(null) }
                 );
-                if (payload?.fromGameId) {
-                  removeTeam.mutate({
-                    gameId: payload.fromGameId,
-                    teamId: payload.teamId,
-                  });
-                }
               }}
             >
               {unassignedTeams.length === 0 ? (
                 <p className="rounded border border-dashed border-white/15 p-4 text-sm text-white/50">
-                  No available teams.
+                  Drop an assigned team here to return it to Available Teams. No
+                  teams are currently available.
                 </p>
               ) : (
                 unassignedTeams.map(team => (
@@ -1894,6 +2092,7 @@ export default function TournamentControlRoom({
                     key={team.id}
                     team={team}
                     onDragStart={() => setDragPayload({ teamId: team.id })}
+                    onDragEnd={() => setDragPayload(null)}
                     onCreateClaimLink={
                       !team.managedTeamId
                         ? () => createClaimLink.mutate({ teamId: team.id })
@@ -2166,12 +2365,12 @@ export default function TournamentControlRoom({
                       type="button"
                       data-no-canvas-pan="true"
                       disabled={
-                        !undoSnapshot ||
+                        undoHistory.length === 0 ||
                         restoreTournamentBoardSnapshot.isPending
                       }
                       className="flex min-h-12 w-full flex-col items-center justify-center gap-0.5 border-b border-white/10 text-white/70 transition hover:bg-[#FFD700]/10 hover:text-[#FFD700] disabled:cursor-not-allowed disabled:text-white/25 disabled:hover:bg-transparent"
-                      title="Undo last destructive board action"
-                      aria-label="Undo last destructive board action"
+                      title="Undo last tournament control room action"
+                      aria-label="Undo last tournament control room action"
                       onPointerDown={event => event.stopPropagation()}
                       onClick={event => {
                         event.stopPropagation();
@@ -2308,6 +2507,26 @@ export default function TournamentControlRoom({
                         Controls
                       </span>
                     </button>
+                    <button
+                      type="button"
+                      data-no-canvas-pan="true"
+                      aria-controls="zoom-rail-shared-panel"
+                      aria-expanded={zoomRailActivePanel === "score"}
+                      className={`flex min-h-12 w-full flex-col items-center justify-center gap-0.5 border-t border-white/10 transition hover:bg-[#FFD700]/10 hover:text-[#FFD700] ${zoomRailActivePanel === "score" ? "bg-[#FFD700]/15 text-[#FFD700]" : "text-white/70"}`}
+                      title="Score"
+                      aria-label="Scoreboard panel"
+                      onPointerDown={event => event.stopPropagation()}
+                      onClick={event => {
+                        event.stopPropagation();
+                        setZoomRailActivePanel(panel =>
+                          panel === "score" ? null : "score"
+                        );
+                      }}
+                    >
+                      <span className="text-[9px] font-black uppercase leading-none">
+                        Score
+                      </span>
+                    </button>
 
                     {zoomRailActivePanel !== null && (
                       <div
@@ -2325,7 +2544,9 @@ export default function TournamentControlRoom({
                               ? "Board Options"
                               : zoomRailActivePanel === "rounds"
                                 ? "Groups"
-                                : "PC Controls"}
+                                : zoomRailActivePanel === "controls"
+                                  ? "PC Controls"
+                                  : "Scoreboard"}
                           </p>
                           <button
                             type="button"
@@ -2491,6 +2712,28 @@ export default function TournamentControlRoom({
                             </Button>
                           </div>
                         )}
+                        {zoomRailActivePanel === "score" && (
+                          <div className="space-y-2">
+                            <p className="text-xs text-white/55">
+                              Completed lobby results only. Every tournament
+                              team is listed.
+                            </p>
+                            {scoreboardRows.map(row => (
+                              <div
+                                key={row.teamId}
+                                className="flex items-center justify-between gap-3 rounded border border-white/10 bg-black/45 px-3 py-2 text-xs"
+                              >
+                                <span className="min-w-0 truncate font-bold text-white">
+                                  {row.teamName}
+                                </span>
+                                <span className="shrink-0 text-[#FFD700]">
+                                  {row.wins} W | {row.losses} L
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
                         {zoomRailActivePanel === "controls" && (
                           <div className="grid gap-2 text-[11px] text-white/75 sm:grid-cols-2">
                             {(
@@ -3371,7 +3614,12 @@ export default function TournamentControlRoom({
                                   assignments={gameAssignments}
                                   selectedAssignmentId={selectedAssignmentId}
                                   teamsById={teamsById}
+                                  game={game}
+                                  hasOutgoingLoserConnection={gamesWithOutgoingLoserConnection.has(
+                                    game.id
+                                  )}
                                   onSelect={assignmentId => {
+                                    pushUiUndo("Select assignment");
                                     setSelectedAssignmentId(assignmentId);
                                     setSelectedConnectionId(null);
                                     setSelectedGameId(null);
@@ -3480,6 +3728,7 @@ export default function TournamentControlRoom({
                                                 assignment.id
                                               }
                                               onSelect={() => {
+                                                pushUiUndo("Select assignment");
                                                 setSelectedAssignmentId(
                                                   assignment.id
                                                 );
@@ -3498,6 +3747,19 @@ export default function TournamentControlRoom({
                                                   fromGameId: game.id,
                                                 })
                                               }
+                                              onDragEnd={() =>
+                                                setDragPayload(null)
+                                              }
+                                              eliminated={isTeamEliminated({
+                                                gameType: game.gameType,
+                                                status: game.status,
+                                                placement:
+                                                  assignment.resultPlacement,
+                                                hasOutgoingLoserConnection:
+                                                  gamesWithOutgoingLoserConnection.has(
+                                                    game.id
+                                                  ),
+                                              })}
                                             />
                                           ) : (
                                             <p className="text-sm text-white/35">
@@ -4156,11 +4418,15 @@ function CompactResultList({
   assignments,
   selectedAssignmentId,
   teamsById,
+  game,
+  hasOutgoingLoserConnection,
   onSelect,
 }: {
   assignments: AssignmentView[];
   selectedAssignmentId: number | null;
   teamsById: Map<number, ControlTeamView>;
+  game: ControlGameView;
+  hasOutgoingLoserConnection: boolean;
   onSelect: (assignmentId: number) => void;
 }) {
   const sortedAssignments = [...assignments].sort((a, b) => {
@@ -4182,6 +4448,12 @@ function CompactResultList({
     <div className="space-y-1.5">
       {sortedAssignments.map(assignment => {
         const team = teamsById.get(assignment.teamId);
+        const eliminated = isTeamEliminated({
+          gameType: game.gameType,
+          status: game.status,
+          placement: assignment.resultPlacement,
+          hasOutgoingLoserConnection,
+        });
         return (
           <button
             key={assignment.id}
@@ -4194,13 +4466,16 @@ function CompactResultList({
             className={`flex w-full items-center justify-between gap-2 rounded border px-2 py-1.5 text-left transition ${
               selectedAssignmentId === assignment.id
                 ? "border-[#FFD700] bg-[#FFD700]/15"
-                : "border-white/10 bg-black/45 hover:border-[#FFD700]/50"
+                : eliminated
+                  ? "border-red-400/70 bg-red-950/45 text-red-100 hover:border-red-300"
+                  : "border-white/10 bg-black/45 hover:border-[#FFD700]/50"
             }`}
           >
             <span className="min-w-0 truncate font-mono text-xs font-bold text-white">
               {team?.name ?? "Unknown team"}
             </span>
             <span className="shrink-0 font-mono text-[10px] uppercase text-white/45">
+              {eliminated ? "Eliminated · " : ""}
               {assignment.resultPlacement
                 ? formatPlacement(assignment.resultPlacement)
                 : `Slot ${assignment.slotIndex}`}
@@ -4224,6 +4499,8 @@ function TeamCard({
   onCreateClaimLink,
   onDelete,
   deleteDisabled,
+  onDragEnd,
+  eliminated,
 }: {
   team: ControlTeamView;
   fromGameId?: number;
@@ -4236,6 +4513,8 @@ function TeamCard({
   onCreateClaimLink?: () => void;
   onDelete?: () => void;
   deleteDisabled?: boolean;
+  onDragEnd?: () => void;
+  eliminated?: boolean;
 }) {
   const lastTouchTapRef = useRef<{ time: number; x: number; y: number } | null>(
     null
@@ -4290,8 +4569,11 @@ function TeamCard({
         event.dataTransfer.setData("application/json", JSON.stringify(payload));
         onDragStart();
       }}
-      onDragEnd={event => event.stopPropagation()}
-      className={`rounded border bg-white/10 px-3 py-2 shadow-lg transition ${
+      onDragEnd={event => {
+        event.stopPropagation();
+        onDragEnd?.();
+      }}
+      className={`rounded border px-3 py-2 shadow-lg transition ${eliminated ? "border-red-400/70 bg-red-950/45 text-red-100" : "bg-white/10"} ${
         selected
           ? "border-[#FFD700] ring-2 ring-[#FFD700]/50"
           : "border-white/10"
@@ -4312,6 +4594,11 @@ function TeamCard({
           >
             Claim Link
           </button>
+        ) : null}
+        {eliminated ? (
+          <span className="shrink-0 rounded border border-red-300/60 bg-red-500/20 px-2 py-0.5 font-mono text-[10px] font-black uppercase text-red-100">
+            Eliminated
+          </span>
         ) : null}
         {placement ? (
           <span className="shrink-0 rounded bg-[#FFD700] px-2 py-0.5 font-mono text-[10px] font-black uppercase text-black">

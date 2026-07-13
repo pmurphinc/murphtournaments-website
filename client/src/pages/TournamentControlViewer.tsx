@@ -19,6 +19,7 @@ import {
   getConnectionPath,
   getFitToContentView,
   getGameStatusClasses,
+  isTeamEliminated,
   getMidpoint,
   getNodeHeight,
   getPointerDistance,
@@ -607,6 +608,11 @@ export default function TournamentControlViewer() {
                   )
                 : null;
               const statusClasses = getGameStatusClasses(game.status);
+              const hasOutgoingLoserConnection = query.data.connections.some(
+                connection =>
+                  connection.sourceGameId === game.id &&
+                  connection.flowType === "loser"
+              );
               return (
                 <article
                   key={game.id}
@@ -722,10 +728,18 @@ export default function TournamentControlViewer() {
                           const team = assignment
                             ? teamsById.get(assignment.teamId)
                             : null;
+                          const eliminated = assignment
+                            ? isTeamEliminated({
+                                gameType: game.gameType,
+                                status: game.status,
+                                placement: assignment.resultPlacement,
+                                hasOutgoingLoserConnection,
+                              })
+                            : false;
                           return (
                             <div
                               key={slot}
-                              className="rounded border border-white/10 bg-black/50 p-2"
+                              className={`rounded border p-2 ${eliminated ? "border-red-400/70 bg-red-950/45" : "border-white/10 bg-black/50"}`}
                             >
                               <p className="font-mono text-[10px] uppercase text-white/35">
                                 Slot {slot}
@@ -735,6 +749,7 @@ export default function TournamentControlViewer() {
                                 {assignment?.resultPlacement
                                   ? ` · ${assignment.resultPlacement}`
                                   : ""}
+                                {eliminated ? " · Eliminated" : ""}
                               </p>
                             </div>
                           );
