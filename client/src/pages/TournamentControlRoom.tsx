@@ -7,11 +7,10 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
-import { Link, useLocation, useParams } from "wouter";
+import { Link, useParams } from "wouter";
 import { Grip, Lock, LockOpen, Maximize2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
-import { isPersonalTcrPath } from "@/lib/tcrRouteMode";
 import { getSafeTournamentControlErrorMessage } from "@/lib/tcrError";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getDiscordLoginUrl } from "@/lib/discordLogin";
@@ -424,11 +423,19 @@ function shouldSkipNodeDrag(target: EventTarget | null) {
   );
 }
 
-export default function TournamentControlRoom() {
+export type TournamentControlRoomMode = "personal" | "discord-staff";
+
+type TournamentControlRoomProps = {
+  mode: TournamentControlRoomMode;
+};
+
+export default function TournamentControlRoom({
+  mode,
+}: TournamentControlRoomProps) {
   const params = useParams<{ tournamentId: string }>();
-  const [location] = useLocation();
-  const isPersonalTcr = isPersonalTcrPath(location, params.tournamentId);
-  const controlApi = isPersonalTcr ? trpc.personalTcr : trpc.tournamentControl;
+  const isPersonalTcr = mode === "personal";
+  const controlApi =
+    mode === "personal" ? trpc.personalTcr : trpc.tournamentControl;
   const tournamentId = Number(params.tournamentId);
   const auth = useAuth();
   const utils = trpc.useUtils();
@@ -2830,7 +2837,40 @@ export default function TournamentControlRoom() {
                               }}
                             >
                               <span>{frame.label}</span>
-                              <button type="button" data-no-canvas-pan="true" aria-label={frame.locked ? "Unlock group positions" : "Lock group positions"} title={frame.locked ? "Unlock group positions" : "Lock group positions"} className="ml-2 inline-flex rounded border border-white/20 bg-black/30 p-0.5 align-middle" onPointerDown={event => { event.preventDefault(); event.stopPropagation(); }} onClick={event => { event.preventDefault(); event.stopPropagation(); setRoundGroupLocked.mutate({ tournamentId, roundGroupId: frame.groupId, locked: !frame.locked }); }}>{frame.locked ? <Lock size={14} /> : <LockOpen size={14} />}</button>
+                              <button
+                                type="button"
+                                data-no-canvas-pan="true"
+                                aria-label={
+                                  frame.locked
+                                    ? "Unlock group positions"
+                                    : "Lock group positions"
+                                }
+                                title={
+                                  frame.locked
+                                    ? "Unlock group positions"
+                                    : "Lock group positions"
+                                }
+                                className="ml-2 inline-flex rounded border border-white/20 bg-black/30 p-0.5 align-middle"
+                                onPointerDown={event => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                }}
+                                onClick={event => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  setRoundGroupLocked.mutate({
+                                    tournamentId,
+                                    roundGroupId: frame.groupId,
+                                    locked: !frame.locked,
+                                  });
+                                }}
+                              >
+                                {frame.locked ? (
+                                  <Lock size={14} />
+                                ) : (
+                                  <LockOpen size={14} />
+                                )}
+                              </button>
                             </div>
                           </ContextMenuTrigger>
                           <ContextMenuContent
@@ -3244,7 +3284,10 @@ export default function TournamentControlRoom() {
                                   >
                                     {isMinimized ? "+" : "−"}
                                   </button>
-                                  {hasOpenLobbySlot(game, gameAssignments.length) && (
+                                  {hasOpenLobbySlot(
+                                    game,
+                                    gameAssignments.length
+                                  ) && (
                                     <button
                                       type="button"
                                       data-no-node-drag="true"
@@ -3357,7 +3400,10 @@ export default function TournamentControlRoom() {
                                     );
                                   }}
                                 >
-                                  {hasOpenLobbySlot(game, gameAssignments.length) && (
+                                  {hasOpenLobbySlot(
+                                    game,
+                                    gameAssignments.length
+                                  ) && (
                                     <Button
                                       type="button"
                                       size="sm"
