@@ -12,7 +12,8 @@
     "test": "vitest run",
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
     "db:migrate": "drizzle-kit migrate",
-    "db:reconcile": "tsx scripts/reconcile-drizzle-migrations.ts"
+    "db:reconcile": "tsx scripts/reconcile-drizzle-migrations.ts",
+    "db:repair-0023": "tsx scripts/repair-missing-0023-tournament-staff.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.693.0",
