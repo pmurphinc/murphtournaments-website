@@ -94,7 +94,7 @@ function canonicalizeCurrentTimestampExpression(
   const normalized = normalize(value);
   if (normalized === null) return null;
   const unwrapped = stripWrappingParentheses(normalized);
-  return /^current_timestamp\s*(?:\(\s*\))?$/i.test(unwrapped)
+  return /^(?:current_timestamp|now)\s*(?:\(\s*\))?$/i.test(unwrapped)
     ? "CURRENT_TIMESTAMP"
     : null;
 }
