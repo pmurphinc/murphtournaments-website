@@ -10,11 +10,11 @@ import { clearDiscordTournamentStaffCache } from "../../../server/discordTournam
 import { extractInsertId } from "../../../server/tournamentControl";
 import { tournamentControlTemplateConnections, tournamentControlTemplateGames, tournamentControlTemplates, tournamentGames, tournaments } from "../../../drizzle/schema";
 
-type TournamentRow = { id: number; name: string; eventStatus: "not-live"; currentCycle: "1"; currentStage: "check-in"; currentMatch: null; eventNote: null };
-type GameRow = { id: number; tournamentId: number; gameType: "cashout" | "final_round"; status: "draft"; displayLabel: string; canvasX: number; canvasY: number; seriesBestOf: number; privateLobbyCode: string | null; mapId: string | null };
+type TournamentRow = { id: number; name: string; ownerUserId?: number | null; eventStatus: "not-live"; currentCycle: "1"; currentStage: "check-in"; currentMatch: null; eventNote: null };
+type GameRow = { id: number; tournamentId: number; gameType: "cashout" | "final_round"; status: "draft"; displayLabel: string; canvasX: number; canvasY: number; seriesBestOf: number; privateLobbyCode: string | null; mapId: string | null; roundGroupId: string | null; roundLabel: string | null; roundColor: string | null; roundLocked: number };
 type TemplateRow = { id: number; name: string; visibility: "private" | "public"; createdByUserId: number; sourceTournamentId: number | null };
-type TemplateGameRow = { id: number; templateId: number; gameType: "cashout" | "final_round"; displayLabel: string; canvasX: number; canvasY: number; seriesBestOf: number; mapId: string | null };
-type TemplateConnectionRow = { id: number; templateId: number; sourceTemplateGameId: number; targetTemplateGameId: number };
+type TemplateGameRow = { id: number; templateId: number; gameType: "cashout" | "final_round"; displayLabel: string; canvasX: number; canvasY: number; seriesBestOf: number; mapId: string | null; roundGroupId: string | null; roundLabel: string | null; roundColor: string | null; roundLocked: number };
+type TemplateConnectionRow = { id: number; templateId: number; sourceTemplateGameId: number; targetTemplateGameId: number; flowType: "winner" | "loser" };
 type Insertable = Partial<TournamentRow & GameRow & TemplateRow & TemplateGameRow & TemplateConnectionRow>;
 
 type SelectBuilder<T> = { where: (condition?: unknown) => SelectResult<T>; leftJoin: (table?: unknown, condition?: unknown) => SelectBuilder<T>; innerJoin: (table?: unknown, condition?: unknown) => SelectBuilder<T>; then: Promise<T[]>["then"] };
@@ -74,13 +74,23 @@ const db = {
         return mysql2InsertResult(row.id);
       }
       if (table === tournamentControlTemplateGames) {
-        const row: TemplateGameRow = { id: state.nextTemplateGameId++, templateId: Number(value.templateId), gameType: value.gameType === "final_round" ? "final_round" : "cashout", displayLabel: String(value.displayLabel), canvasX: Number(value.canvasX), canvasY: Number(value.canvasY), seriesBestOf: Number(value.seriesBestOf), mapId: value.mapId == null ? null : String(value.mapId) };
+        const row: TemplateGameRow = { id: state.nextTemplateGameId++, templateId: Number(value.templateId), gameType: value.gameType === "final_round" ? "final_round" : "cashout", displayLabel: String(value.displayLabel), canvasX: Number(value.canvasX), canvasY: Number(value.canvasY), seriesBestOf: Number(value.seriesBestOf), mapId: value.mapId == null ? null : String(value.mapId), roundGroupId: value.roundGroupId == null ? null : String(value.roundGroupId), roundLabel: value.roundLabel == null ? null : String(value.roundLabel), roundColor: value.roundColor == null ? null : String(value.roundColor), roundLocked: Number(value.roundLocked ?? 0) };
         state.templateGames.push(row);
         return mysql2InsertResult(row.id);
       }
       if (table === tournamentControlTemplateConnections) {
-        state.templateConnections.push({ id: state.nextTemplateConnectionId++, templateId: Number(value.templateId), sourceTemplateGameId: Number(value.sourceTemplateGameId), targetTemplateGameId: Number(value.targetTemplateGameId) });
+        state.templateConnections.push({ id: state.nextTemplateConnectionId++, templateId: Number(value.templateId), sourceTemplateGameId: Number(value.sourceTemplateGameId), targetTemplateGameId: Number(value.targetTemplateGameId), flowType: value.flowType === "loser" ? "loser" : "winner" });
         return mysql2InsertResult(state.nextTemplateConnectionId - 1);
+      }
+      if (table === tournaments) {
+        const row: TournamentRow = { id: state.nextTournamentId++, name: String(value.name), ownerUserId: Number(value.ownerUserId), eventStatus: "not-live", currentCycle: "1", currentStage: "check-in", currentMatch: null, eventNote: null };
+        state.tournaments.push(row);
+        return mysql2InsertResult(row.id);
+      }
+      if (table === tournamentGames) {
+        const row: GameRow = { id: state.nextGameId++, tournamentId: Number(value.tournamentId), gameType: value.gameType === "final_round" ? "final_round" : "cashout", status: "draft", displayLabel: String(value.displayLabel), canvasX: Number(value.canvasX), canvasY: Number(value.canvasY), seriesBestOf: Number(value.seriesBestOf), privateLobbyCode: null, mapId: value.mapId == null ? null : String(value.mapId), roundGroupId: value.roundGroupId == null ? null : String(value.roundGroupId), roundLabel: value.roundLabel == null ? null : String(value.roundLabel), roundColor: value.roundColor == null ? null : String(value.roundColor), roundLocked: Number(value.roundLocked ?? 0) };
+        state.games.push(row);
+        return mysql2InsertResult(row.id);
       }
       return mysql2InsertResult(1);
     },
@@ -96,10 +106,10 @@ function staffContext(): TrpcContext {
 
 describe("tournamentControl template save flow", () => {
   beforeEach(() => {
-    state.tournaments = [{ id: 1, name: "Source", eventStatus: "not-live", currentCycle: "1", currentStage: "check-in", currentMatch: null, eventNote: null }];
+    state.tournaments = [{ id: 1, name: "Source", ownerUserId: 7, eventStatus: "not-live", currentCycle: "1", currentStage: "check-in", currentMatch: null, eventNote: null }];
     state.games = [
-      { id: 10, tournamentId: 1, gameType: "cashout", status: "draft", displayLabel: "Cashout A", canvasX: 100, canvasY: 100, seriesBestOf: 1, privateLobbyCode: "secret", mapId: "monaco" },
-      { id: 11, tournamentId: 1, gameType: "final_round", status: "draft", displayLabel: "Final", canvasX: 200, canvasY: 100, seriesBestOf: 3, privateLobbyCode: "secret-final", mapId: "skyway-stadium" },
+      { id: 10, tournamentId: 1, gameType: "cashout", status: "draft", displayLabel: "Cashout A", canvasX: 100, canvasY: 100, seriesBestOf: 1, privateLobbyCode: "secret", mapId: "monaco", roundGroupId: "source-group-a", roundLabel: "Round 1", roundColor: "#f97316", roundLocked: 1 },
+      { id: 11, tournamentId: 1, gameType: "final_round", status: "draft", displayLabel: "Final", canvasX: 200, canvasY: 100, seriesBestOf: 3, privateLobbyCode: "secret-final", mapId: "skyway-stadium", roundGroupId: "source-group-b", roundLabel: "Finals", roundColor: "#7c3aed", roundLocked: 0 },
     ];
     state.templates = [];
     state.templateGames = [];
@@ -107,6 +117,8 @@ describe("tournamentControl template save flow", () => {
     state.nextTemplateId = 100;
     state.nextTemplateGameId = 200;
     state.nextTemplateConnectionId = 300;
+    state.nextTournamentId = 2;
+    state.nextGameId = 20;
     state.gameSelects = 0;
     state.templateGameSelects = 0;
     process.env.DISCORD_BOT_TOKEN = "bot-token";
@@ -126,8 +138,50 @@ describe("tournamentControl template save flow", () => {
 
     expect(result).toEqual({ templateId: 100 });
     expect(state.templateGames.map(game => game.id)).toEqual([200, 201]);
-    expect(state.templateConnections).toEqual([{ id: 300, templateId: 100, sourceTemplateGameId: 200, targetTemplateGameId: 201 }]);
+    expect(state.templateConnections).toEqual([{ id: 300, templateId: 100, sourceTemplateGameId: 200, targetTemplateGameId: 201, flowType: "winner" }]);
     expect(state.templateGames.map(game => game.mapId)).toEqual(["monaco", "skyway-stadium"]);
     expect(state.templateGameSelects).toBe(0);
+  });
+
+  it("remaps shared template round groups once when creating a tournament", async () => {
+    state.templates = [
+      { id: 100, name: "Grouped Template", visibility: "private", createdByUserId: 7, sourceTournamentId: 1 },
+    ];
+    state.templateGames = [
+      { id: 200, templateId: 100, gameType: "cashout", displayLabel: "Group A Lobby 1", canvasX: 100, canvasY: 120, seriesBestOf: 1, mapId: "monaco", roundGroupId: "template-group-a", roundLabel: "Round 1", roundColor: "#f97316", roundLocked: 1 },
+      { id: 201, templateId: 100, gameType: "cashout", displayLabel: "Group A Lobby 2", canvasX: 340, canvasY: 120, seriesBestOf: 1, mapId: "seoul", roundGroupId: "template-group-a", roundLabel: "Round 1", roundColor: "#f97316", roundLocked: 1 },
+      { id: 202, templateId: 100, gameType: "final_round", displayLabel: "Group B Final", canvasX: 580, canvasY: 120, seriesBestOf: 3, mapId: "skyway-stadium", roundGroupId: "template-group-b", roundLabel: "Finals", roundColor: "#7c3aed", roundLocked: 0 },
+      { id: 203, templateId: 100, gameType: "cashout", displayLabel: "Ungrouped", canvasX: 820, canvasY: 120, seriesBestOf: 1, mapId: "las-vegas", roundGroupId: null, roundLabel: null, roundColor: null, roundLocked: 0 },
+    ];
+    state.templateConnections = [
+      { id: 300, templateId: 100, sourceTemplateGameId: 200, targetTemplateGameId: 202, flowType: "winner" },
+    ];
+    state.games = [];
+
+    const caller = appRouter.createCaller(staffContext());
+    const result = await caller.tournamentControl.createTournamentFromTemplate({ templateId: 100, name: "Restored Tournament" });
+
+    expect(result.createdTournament).toBeTruthy();
+    expect(state.games).toHaveLength(4);
+    const [first, second, third, fourth] = state.games;
+    expect(first.roundGroupId).toBeTruthy();
+    expect(second.roundGroupId).toBe(first.roundGroupId);
+    expect(third.roundGroupId).toBeTruthy();
+    expect(third.roundGroupId).not.toBe(first.roundGroupId);
+    expect(fourth.roundGroupId).toBeNull();
+    expect([first.roundGroupId, third.roundGroupId]).not.toContain("template-group-a");
+    expect([first.roundGroupId, third.roundGroupId]).not.toContain("template-group-b");
+    expect(state.games.map(game => ({ label: game.roundLabel, color: game.roundColor, locked: game.roundLocked }))).toEqual([
+      { label: "Round 1", color: "#f97316", locked: 1 },
+      { label: "Round 1", color: "#f97316", locked: 1 },
+      { label: "Finals", color: "#7c3aed", locked: 0 },
+      { label: null, color: null, locked: 0 },
+    ]);
+    expect(state.games.map(game => ({ x: game.canvasX, y: game.canvasY, mapId: game.mapId, seriesBestOf: game.seriesBestOf }))).toEqual([
+      { x: 100, y: 120, mapId: "monaco", seriesBestOf: 1 },
+      { x: 340, y: 120, mapId: "seoul", seriesBestOf: 1 },
+      { x: 580, y: 120, mapId: "skyway-stadium", seriesBestOf: 3 },
+      { x: 820, y: 120, mapId: "las-vegas", seriesBestOf: 1 },
+    ]);
   });
 });
