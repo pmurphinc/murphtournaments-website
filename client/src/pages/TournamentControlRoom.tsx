@@ -193,7 +193,7 @@ type ZoomRailDragStart = {
 };
 type BoardUndoSnapshot = {
   tournament: { name: string };
-  capturedAt: string;
+  expectedRevision: number;
   games: ControlGameView[];
   assignments: AssignmentView[];
   connections: ConnectionView[];
@@ -521,6 +521,8 @@ export default function TournamentControlRoom({
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
   const [finalizeDialogOpen, setFinalizeDialogOpen] = useState(false);
   const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
+  const [regenerateViewerDialogOpen, setRegenerateViewerDialogOpen] =
+    useState(false);
   const [templateName, setTemplateName] = useState("");
   const [templateVisibility, setTemplateVisibility] = useState<
     "private" | "public"
@@ -558,14 +560,21 @@ export default function TournamentControlRoom({
       return captureUndoSnapshot();
     },
     onSuccess: (
-      _data: unknown,
+      data: { tournament?: { boardRevision?: number } } | unknown,
       _variables: unknown,
       snapshot?: BoardUndoSnapshot
     ) => {
-      if (snapshot)
+      const boardRevision = (
+        data as { tournament?: { boardRevision?: number } }
+      )?.tournament?.boardRevision;
+      if (snapshot && typeof boardRevision === "number")
         setUndoHistory(history =>
           [
-            { kind: "board" as const, snapshot, label: "Board change" },
+            {
+              kind: "board" as const,
+              snapshot: { ...snapshot, expectedRevision: boardRevision },
+              label: "Board change",
+            },
             ...history,
           ].slice(0, undoHistoryLimit)
         );
@@ -576,14 +585,21 @@ export default function TournamentControlRoom({
   const renameTournament = controlApi.renameTournament.useMutation({
     onMutate: () => captureUndoSnapshot(),
     onSuccess: (
-      _data: unknown,
+      data: { tournament?: { boardRevision?: number } } | unknown,
       _variables: unknown,
       snapshot?: BoardUndoSnapshot
     ) => {
-      if (snapshot)
+      const boardRevision = (
+        data as { tournament?: { boardRevision?: number } }
+      )?.tournament?.boardRevision;
+      if (snapshot && typeof boardRevision === "number")
         setUndoHistory(history =>
           [
-            { kind: "board" as const, snapshot, label: "Rename tournament" },
+            {
+              kind: "board" as const,
+              snapshot: { ...snapshot, expectedRevision: boardRevision },
+              label: "Rename tournament",
+            },
             ...history,
           ].slice(0, undoHistoryLimit)
         );
@@ -732,12 +748,24 @@ export default function TournamentControlRoom({
       },
       onError: (error: { message: string }) => toast.error(error.message),
     });
-  const enableViewerLink = controlApi.enableViewerLink.useMutation({
-    onSuccess: async data => {
-      await navigator.clipboard.writeText(
-        `${window.location.origin}${data.path}`
-      );
+  const copyViewerLinkToClipboard = async (path: string) => {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}${path}`);
       toast.success("Viewer link copied");
+    } catch {
+      toast.error(
+        "Viewer link created, but clipboard copy failed. Please copy it manually from your browser."
+      );
+    }
+  };
+  const enableViewerLink = controlApi.enableViewerLink.useMutation({
+    onSuccess: data => copyViewerLinkToClipboard(data.path),
+    onError: (error: { message: string }) => toast.error(error.message),
+  });
+  const regenerateViewerLink = controlApi.regenerateViewerLink.useMutation({
+    onSuccess: data => {
+      setRegenerateViewerDialogOpen(false);
+      void copyViewerLinkToClipboard(data.path);
     },
     onError: (error: { message: string }) => toast.error(error.message),
   });
@@ -844,7 +872,7 @@ export default function TournamentControlRoom({
   const captureUndoSnapshot = useCallback(
     (): BoardUndoSnapshot => ({
       tournament: { name: tournamentName },
-      capturedAt: new Date().toISOString(),
+      expectedRevision: query.data?.tournament.boardRevision ?? 0,
       games: games.map(game => ({
         ...game,
         seriesBestOf:
@@ -855,7 +883,13 @@ export default function TournamentControlRoom({
       assignments: assignments.map(assignment => ({ ...assignment })),
       connections: connections.map(connection => ({ ...connection })),
     }),
-    [assignments, connections, games, query.data?.teams, tournamentName]
+    [
+      assignments,
+      connections,
+      games,
+      query.data?.tournament.boardRevision,
+      tournamentName,
+    ]
   );
 
   captureUndoSnapshotRef.current = captureUndoSnapshot;
@@ -1899,6 +1933,29 @@ export default function TournamentControlRoom({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <AlertDialog
+        open={regenerateViewerDialogOpen}
+        onOpenChange={setRegenerateViewerDialogOpen}
+      >
+        <AlertDialogContent className="border-red-300/50 bg-black text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Regenerate viewer link?</AlertDialogTitle>
+            <AlertDialogDescription className="text-white/70">
+              The current viewer link will stop working immediately. Anyone
+              using the old link will need the new one.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={regenerateViewerLink.isPending}
+              onClick={() => regenerateViewerLink.mutate({ tournamentId })}
+            >
+              Regenerate Viewer Link
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <AlertDialog open={unlockDialogOpen} onOpenChange={setUnlockDialogOpen}>
         <AlertDialogContent className="border-red-300/50 bg-black text-white">
           <AlertDialogHeader>
@@ -2115,9 +2172,22 @@ export default function TournamentControlRoom({
             <Button
               variant="outline"
               className="h-10 border-neon-gold/40 text-neon-gold hover:bg-neon-gold/10"
+              disabled={
+                enableViewerLink.isPending || regenerateViewerLink.isPending
+              }
               onClick={() => enableViewerLink.mutate({ tournamentId })}
             >
               Copy Viewer Link
+            </Button>
+            <Button
+              variant="outline"
+              className="h-10 border-red-300/50 text-red-100 hover:bg-red-950/30"
+              disabled={
+                enableViewerLink.isPending || regenerateViewerLink.isPending
+              }
+              onClick={() => setRegenerateViewerDialogOpen(true)}
+            >
+              Regenerate Viewer Link
             </Button>
             <Button
               variant="outline"

@@ -204,6 +204,13 @@
       "when": 1784851200000,
       "tag": "0028_tournament_finalization_results",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "5",
+      "when": 1784937600000,
+      "tag": "0029_add_tournament_board_revision",
+      "breakpoints": true
     }
   ]
 }
