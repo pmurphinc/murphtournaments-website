@@ -1316,6 +1316,15 @@ async function createTournamentFromTemplate(
       "Tournament creation failed: database did not return the created tournament id."
     );
     const gameIdMap = new Map<number, number>();
+    const roundGroupIdMap = new Map<string, string>();
+    const remapRoundGroupId = (sourceRoundGroupId: string | null) => {
+      if (!sourceRoundGroupId) return null;
+      const existingGroupId = roundGroupIdMap.get(sourceRoundGroupId);
+      if (existingGroupId) return existingGroupId;
+      const newGroupId = randomUUID();
+      roundGroupIdMap.set(sourceRoundGroupId, newGroupId);
+      return newGroupId;
+    };
     for (const game of templateGames) {
       assertSeriesBestOf(game.gameType, game.seriesBestOf as 1 | 3 | 5);
       const gameInsertResult = await tx.insert(tournamentGames).values({
@@ -1326,9 +1335,7 @@ async function createTournamentFromTemplate(
         canvasY: game.canvasY,
         seriesBestOf: game.gameType === "final_round" ? game.seriesBestOf : 1,
         mapId: game.mapId,
-        roundGroupId: game.roundGroupId
-          ? `${game.roundGroupId}-${randomUUID()}`.slice(0, 64)
-          : null,
+        roundGroupId: remapRoundGroupId(game.roundGroupId),
         roundLabel: game.roundLabel,
         roundColor: game.roundColor,
         roundLocked: game.roundLocked ?? 0,
