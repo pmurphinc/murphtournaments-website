@@ -238,6 +238,7 @@ export const tournaments = mysqlTable(
       .notNull(),
     publicSlug: varchar("publicSlug", { length: 120 }),
     publishedAt: timestamp("publishedAt"),
+    boardRevision: int("boardRevision").default(0).notNull(),
     finalizedAt: timestamp("finalizedAt"),
     finalizedByUserId: int("finalizedByUserId").references(() => users.id, {
       onDelete: "set null",

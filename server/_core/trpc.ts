@@ -57,6 +57,15 @@ function getTcrAlphaAllowlist() {
   );
 }
 
+if (
+  process.env.TCR_ALPHA_MODE === "true" &&
+  getTcrAlphaAllowlist().size === 0
+) {
+  console.warn(
+    "TCR alpha mode is enabled without any valid allowlisted Discord IDs; only site admins can access Personal TCR."
+  );
+}
+
 export const personalTcrAlphaProcedure = discordAuthenticatedProcedure.use(
   t.middleware(async opts => {
     const { ctx, next } = opts;
