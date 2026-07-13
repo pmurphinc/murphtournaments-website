@@ -109,10 +109,46 @@ describe("TCR scoreboard", () => {
     );
 
     expect(rows).toEqual([
-      { teamId: 4, teamName: "Bravo", wins: 1, losses: 0 },
-      { teamId: 1, teamName: "The Retros", wins: 1, losses: 1 },
-      { teamId: 3, teamName: "Zero Crew", wins: 0, losses: 0 },
-      { teamId: 2, teamName: "Alpha", wins: 0, losses: 1 },
+      {
+        teamId: 4,
+        teamName: "Bravo",
+        wins: 1,
+        losses: 0,
+        cashoutWins: 0,
+        cashoutLosses: 0,
+        finalRoundWins: 1,
+        finalRoundLosses: 0,
+      },
+      {
+        teamId: 1,
+        teamName: "The Retros",
+        wins: 1,
+        losses: 1,
+        cashoutWins: 1,
+        cashoutLosses: 0,
+        finalRoundWins: 0,
+        finalRoundLosses: 1,
+      },
+      {
+        teamId: 3,
+        teamName: "Zero Crew",
+        wins: 0,
+        losses: 0,
+        cashoutWins: 0,
+        cashoutLosses: 0,
+        finalRoundWins: 0,
+        finalRoundLosses: 0,
+      },
+      {
+        teamId: 2,
+        teamName: "Alpha",
+        wins: 0,
+        losses: 1,
+        cashoutWins: 0,
+        cashoutLosses: 1,
+        finalRoundWins: 0,
+        finalRoundLosses: 0,
+      },
     ]);
   });
 });
