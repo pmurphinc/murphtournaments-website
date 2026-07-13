@@ -458,7 +458,18 @@ describe("repair missing 0023 tournament staff", () => {
     "CURRENT_TIMESTAMP()",
     "current_timestamp()",
     "(current_timestamp())",
+    "NOW",
+    "NOW()",
+    "now()",
+    "(now())",
+    Buffer.from("CURRENT_TIMESTAMP"),
+    Buffer.from("CURRENT_TIMESTAMP()"),
+    Buffer.from("current_timestamp()"),
     Buffer.from("(current_timestamp())"),
+    Buffer.from("NOW"),
+    Buffer.from("NOW()"),
+    Buffer.from("now()"),
+    Buffer.from("(now())"),
   ])("accepts equivalent timestamp default %#", async value => {
     const s = base();
     add0023(s);
@@ -480,7 +491,13 @@ describe("repair missing 0023 tournament staff", () => {
     "on update CURRENT_TIMESTAMP",
     "on update current_timestamp()",
     "DEFAULT_GENERATED ON UPDATE (current_timestamp())",
+    "ON UPDATE NOW()",
+    "ON UPDATE now()",
+    "DEFAULT_GENERATED ON UPDATE NOW()",
     Buffer.from("default_generated   on   update   current_timestamp()"),
+    Buffer.from("ON UPDATE NOW()"),
+    Buffer.from("ON UPDATE now()"),
+    Buffer.from("DEFAULT_GENERATED ON UPDATE NOW()"),
   ])("accepts equivalent updatedAt EXTRA %#", async value => {
     const s = base();
     add0023(s);
@@ -493,6 +510,30 @@ describe("repair missing 0023 tournament staff", () => {
       createdArtifacts: [],
       databaseName: "app",
     });
+  });
+
+  it("accepts exact production NOW metadata with DEFAULT_GENERATED on existing 0023 tables", async () => {
+    const s = base();
+    add0023(s);
+    for (const table of [
+      "tournament_staff_members",
+      "tournament_staff_invite_links",
+    ]) {
+      setDefault(s, table, "createdAt", "now()");
+      setExtra(s, table, "createdAt", "DEFAULT_GENERATED");
+      setDefault(s, table, "updatedAt", "now()");
+      setExtra(
+        s,
+        table,
+        "updatedAt",
+        "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+      );
+    }
+    await expect(repairMissing0023TournamentStaff(conn(s))).resolves.toEqual({
+      createdArtifacts: [],
+      databaseName: "app",
+    });
+    expect(s.sql.some(x => x.startsWith("CREATE TABLE"))).toBe(false);
   });
 
   it("rejects updatedAt when ON UPDATE behavior is missing", async () => {
