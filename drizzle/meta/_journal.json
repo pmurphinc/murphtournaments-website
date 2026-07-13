@@ -183,6 +183,13 @@
       "when": 1784592000000,
       "tag": "0025_add_tournament_round_group_colors",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "5",
+      "when": 1784678400000,
+      "tag": "0026_team_bans_round_locks",
+      "breakpoints": true
     }
   ]
 }

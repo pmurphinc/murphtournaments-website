@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { Link, useLocation, useParams } from "wouter";
-import { Grip, Maximize2, RotateCcw } from "lucide-react";
+import { Grip, Lock, LockOpen, Maximize2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { isPersonalTcrPath } from "@/lib/tcrRouteMode";
@@ -53,6 +53,7 @@ import {
   nodeWidth,
   isKeyboardPanKeyCode,
   shouldCancelBoardDragsForPinch,
+  hasOpenLobbySlot,
   shouldStartCanvasPan,
   snapCanvasPointToGrid,
   type CanvasPanStart,
@@ -158,6 +159,7 @@ type ControlGameView = {
   roundGroupId?: string | null;
   roundLabel?: string | null;
   roundColor?: RoundFrameColorId | null;
+  roundLocked?: number;
 };
 type AssignmentView = {
   id: number;
@@ -571,6 +573,8 @@ export default function TournamentControlRoom() {
   });
   const updateRoundGroup =
     controlApi.updateRoundGroup.useMutation(mutationOptions);
+  const setRoundGroupLocked =
+    controlApi.setRoundGroupLocked.useMutation(mutationOptions);
   const persistGroupPositions = useCallback(
     (positions: ReadonlyMap<number, CanvasPoint>) => {
       positions.forEach((position, gameId) => {
@@ -2672,8 +2676,9 @@ export default function TournamentControlRoom() {
                       return (
                         <ContextMenu key={`${frame.groupId}-header-menu`}>
                           <ContextMenuTrigger asChild>
-                            <button
-                              type="button"
+                            <div
+                              role="button"
+                              tabIndex={0}
                               data-no-canvas-pan="true"
                               data-round-group-header="true"
                               className={`pointer-events-auto absolute z-[2] touch-none select-none rounded-md border-2 px-3 py-1.5 font-mono text-sm font-black uppercase tracking-[0.18em] ${frame.theme.label} ${groupSelected ? "ring-4 ring-[#FFD700]/80 shadow-[0_0_26px_rgba(255,215,0,0.34)]" : ""} ${groupDrag?.groupId === frame.groupId ? "cursor-grabbing" : "cursor-grab"}`}
@@ -2687,7 +2692,7 @@ export default function TournamentControlRoom() {
                                 event.stopPropagation();
                               }}
                               onPointerDown={event => {
-                                if (event.button !== 0) return;
+                                if (event.button !== 0 || frame.locked) return;
                                 event.preventDefault();
                                 event.stopPropagation();
                                 const startPositions = new Map(
@@ -2824,8 +2829,9 @@ export default function TournamentControlRoom() {
                                 suppressGroupHeaderClickRef.current = false;
                               }}
                             >
-                              {frame.label}
-                            </button>
+                              <span>{frame.label}</span>
+                              <button type="button" data-no-canvas-pan="true" aria-label={frame.locked ? "Unlock group positions" : "Lock group positions"} title={frame.locked ? "Unlock group positions" : "Lock group positions"} className="ml-2 inline-flex rounded border border-white/20 bg-black/30 p-0.5 align-middle" onPointerDown={event => { event.preventDefault(); event.stopPropagation(); }} onClick={event => { event.preventDefault(); event.stopPropagation(); setRoundGroupLocked.mutate({ tournamentId, roundGroupId: frame.groupId, locked: !frame.locked }); }}>{frame.locked ? <Lock size={14} /> : <LockOpen size={14} />}</button>
+                            </div>
                           </ContextMenuTrigger>
                           <ContextMenuContent
                             onPointerDown={event => event.stopPropagation()}
@@ -3089,7 +3095,8 @@ export default function TournamentControlRoom() {
                               onPointerDown={event => {
                                 if (
                                   event.pointerType === "touch" ||
-                                  isPinchingRef.current
+                                  isPinchingRef.current ||
+                                  (game.roundGroupId && game.roundLocked === 1)
                                 )
                                   return;
                                 if (
@@ -3237,7 +3244,7 @@ export default function TournamentControlRoom() {
                                   >
                                     {isMinimized ? "+" : "−"}
                                   </button>
-                                  {!isComplete && (
+                                  {hasOpenLobbySlot(game, gameAssignments.length) && (
                                     <button
                                       type="button"
                                       data-no-node-drag="true"
@@ -3350,7 +3357,7 @@ export default function TournamentControlRoom() {
                                     );
                                   }}
                                 >
-                                  {!isComplete && (
+                                  {hasOpenLobbySlot(game, gameAssignments.length) && (
                                     <Button
                                       type="button"
                                       size="sm"

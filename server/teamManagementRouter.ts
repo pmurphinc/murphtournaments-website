@@ -2,7 +2,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { isDiscordAuthenticatedUser } from "./_core/discordOAuth";
-import { acceptManagedTeamJoinLink, cancelManagedTeamInvite, createManagedTeam, createManagedTeamJoinLink, disbandManagedTeam, getManagedTeamJoinLinkPreview, inviteManagedTeamByDiscordUsername, leaveManagedTeam, listManagedTeamJoinLinks, listMyTeamManagement, removeManagedTeamMember, renameManagedTeam, respondToManagedTeamInvite, revokeManagedTeamJoinLink, transferManagedTeamCaptain, listAvailableTournamentsForMyTeams, submitManagedTeamToTournament } from "./teamManagement";
+import { acceptManagedTeamJoinLink, cancelManagedTeamInvite, createManagedTeam, createManagedTeamJoinLink, disbandManagedTeam, getManagedTeamJoinLinkPreview, inviteManagedTeamByDiscordUsername, leaveManagedTeam, listManagedTeamJoinLinks, listMyTeamManagement, removeManagedTeamMember, renameManagedTeam, respondToManagedTeamInvite, revokeManagedTeamJoinLink, transferManagedTeamCaptain, listAvailableTournamentsForMyTeams, submitManagedTeamToTournament, updateManagedTeamMapBan } from "./teamManagement";
 
 const discordProcedure = protectedProcedure.use(async ({ ctx, next }) => {
   if (!isDiscordAuthenticatedUser(ctx.user)) throw new TRPCError({ code: "FORBIDDEN", message: "Team Management requires Discord sign-in" });
@@ -24,6 +24,7 @@ export const teamManagementRouter = router({
   revokeJoinLink: discordProcedure.input(z.object({ linkId: z.number().int().positive() })).mutation(({ ctx, input }) => revokeManagedTeamJoinLink(ctx.user.id, input.linkId)),
   acceptJoinLink: discordProcedure.input(z.object({ token: joinToken })).mutation(({ ctx, input }) => acceptManagedTeamJoinLink(ctx.user.id, input.token)),
   rename: discordProcedure.input(z.object({ teamId, name: teamName })).mutation(({ ctx, input }) => renameManagedTeam(ctx.user.id, input.teamId, input.name)),
+  updateMapBan: discordProcedure.input(z.object({ teamId, mapBanId: z.string().trim().min(1).max(64).nullable() })).mutation(({ ctx, input }) => updateManagedTeamMapBan(ctx.user.id, input.teamId, input.mapBanId)),
   disband: discordProcedure.input(z.object({ teamId, confirmation: z.literal("DISBAND") })).mutation(({ ctx, input }) => disbandManagedTeam(ctx.user.id, input.teamId, input.confirmation)),
   inviteByDiscordUsername: discordProcedure.input(z.object({ teamId, discordUsername: z.string().trim().min(2).max(64) })).mutation(({ ctx, input }) => inviteManagedTeamByDiscordUsername(ctx.user.id, input.teamId, input.discordUsername)),
   respondToInvite: discordProcedure.input(z.object({ inviteId: z.number().int().positive(), response: z.enum(["accept", "decline"]) })).mutation(({ ctx, input }) => respondToManagedTeamInvite(ctx.user.id, input.inviteId, input.response)),

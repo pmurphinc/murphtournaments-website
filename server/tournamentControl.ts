@@ -261,6 +261,7 @@ type BoardSnapshotInput = {
     roundGroupId?: string | null;
     roundLabel?: string | null;
     roundColor?: string | null;
+    roundLocked?: number | null;
   }>;
   assignments: Array<{
     id: number;
@@ -360,6 +361,7 @@ const boardSnapshotSchema = z.object({
       roundGroupId: z.string().trim().max(64).nullable().optional(),
       roundLabel: z.string().trim().max(80).nullable().optional(),
       roundColor: z.string().trim().max(24).nullable().optional(),
+      roundLocked: z.number().int().min(0).max(1).optional(),
     })
   ),
   assignments: z.array(
@@ -740,6 +742,30 @@ async function assertConnectionGames(
   }
 }
 
+export function getEligibleCompetitiveMapIds(defaultPool: readonly string[], bannedMapIds: readonly (string | null | undefined)[]) {
+  const bans = new Set(bannedMapIds.filter((id): id is string => typeof id === "string" && id.length > 0));
+  return defaultPool.filter(mapId => !bans.has(mapId));
+}
+
+async function getEligibleMapIdsForGameRandomization(db: QueryExecutor, gameId: number) {
+  const rows = await db
+    .select({ mapBanId: managedTeams.mapBanId })
+    .from(tournamentGameAssignments)
+    .innerJoin(teams, eq(tournamentGameAssignments.teamId, teams.id))
+    .leftJoin(managedTeams, eq(teams.managedTeamId, managedTeams.id))
+    .where(eq(tournamentGameAssignments.gameId, gameId));
+  return getEligibleCompetitiveMapIds(DEFAULT_COMPETITIVE_MAP_IDS, rows.map(row => row.mapBanId));
+}
+
+async function randomizeGameMap(db: QueryExecutor, gameId: number) {
+  const game = await getGameOrThrow(db, gameId);
+  const eligibleMapIds = await getEligibleMapIdsForGameRandomization(db, gameId);
+  if (eligibleMapIds.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No eligible maps remain after assigned team map bans." });
+  const [mapId] = drawUniqueMaps(eligibleMapIds, 1);
+  await db.update(tournamentGames).set({ mapId }).where(eq(tournamentGames.id, gameId));
+  return fetchTournamentControlData(game.tournamentId);
+}
+
 async function connectGames(
   tournamentId: number,
   sourceGameId: number,
@@ -850,6 +876,17 @@ const roundColorSchema = z.enum([
   "emerald",
 ]);
 
+async function setRoundGroupLocked(input: { tournamentId: number; roundGroupId: string; locked: boolean }) {
+  const db = await requireDb();
+  await fetchTournamentRows(db, input.tournamentId);
+  await db.update(tournamentGames).set({ roundLocked: input.locked ? 1 : 0 }).where(and(eq(tournamentGames.tournamentId, input.tournamentId), eq(tournamentGames.roundGroupId, input.roundGroupId)));
+  return fetchTournamentControlData(input.tournamentId);
+}
+
+function assertGamePositionUnlocked(game: { roundGroupId: string | null; roundLocked: number }) {
+  if (game.roundGroupId && game.roundLocked === 1) throw new TRPCError({ code: "FORBIDDEN", message: "Unlock this group before moving its lobbies." });
+}
+
 async function updateRoundGroup(input: {
   tournamentId: number;
   gameIds: number[];
@@ -892,7 +929,7 @@ async function updateRoundGroup(input: {
     if (input.mode === "remove") {
       await tx
         .update(tournamentGames)
-        .set({ roundGroupId: null, roundLabel: null, roundColor: null })
+        .set({ roundGroupId: null, roundLabel: null, roundColor: null, roundLocked: 0 })
         .where(inArray(tournamentGames.id, uniqueGameIds));
     } else if (input.mode === "rename" || input.mode === "color") {
       const groupId = input.roundGroupId ?? selectedGames[0]?.roundGroupId;
@@ -921,6 +958,7 @@ async function updateRoundGroup(input: {
           roundGroupId: input.roundGroupId ?? randomUUID(),
           roundLabel: input.label ?? "Group",
           roundColor: input.color ?? null,
+          roundLocked: selectedGames.find(game => game.roundGroupId === input.roundGroupId)?.roundLocked ?? 0,
         })
         .where(inArray(tournamentGames.id, uniqueGameIds));
     }
@@ -1016,6 +1054,7 @@ async function restoreTournamentBoardSnapshot(
         roundGroupId: game.roundGroupId ?? null,
         roundLabel: game.roundLabel ?? null,
         roundColor: game.roundColor ?? null,
+        roundLocked: game.roundLocked ?? 0,
       });
       gameIdMap.set(
         game.id,
@@ -1219,6 +1258,7 @@ async function saveTemplateFromTournament(
           roundGroupId: game.roundGroupId,
           roundLabel: game.roundLabel,
           roundColor: game.roundColor,
+          roundLocked: game.roundLocked ?? 0,
         });
       const templateGameId = requireInsertId(
         gameInsertResult,
@@ -1291,6 +1331,7 @@ async function createTournamentFromTemplate(
           : null,
         roundLabel: game.roundLabel,
         roundColor: game.roundColor,
+        roundLocked: game.roundLocked ?? 0,
       });
       const tournamentGameId = requireInsertId(
         gameInsertResult,
@@ -2564,6 +2605,8 @@ export const personalTcrRouter = router({
         input.gameId,
         ctx.user
       );
+      assertGamePositionUnlocked(game);
+      assertGamePositionUnlocked(game);
       const safePosition = clampCanvasPosition(input.position);
       await db
         .update(tournamentGames)
@@ -2643,13 +2686,7 @@ export const personalTcrRouter = router({
     .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
       await assertGameBelongsToOwnedTournament(db, input.gameId, ctx.user);
-      const [mapId] = drawUniqueMaps(DEFAULT_COMPETITIVE_MAP_IDS, 1);
-      const game = await getGameOrThrow(db, input.gameId);
-      await db
-        .update(tournamentGames)
-        .set({ mapId })
-        .where(eq(tournamentGames.id, input.gameId));
-      return fetchTournamentControlData(game.tournamentId);
+      return randomizeGameMap(db, input.gameId);
     }),
   connectGames: personalTcrProcedure
     .input(
@@ -2871,6 +2908,9 @@ export const personalTcrRouter = router({
       await getManageableTournamentOrThrow(db, input.tournamentId, ctx.user);
       return updateRoundGroup(input);
     }),
+  setRoundGroupLocked: personalTcrProcedure
+    .input(tournamentIdSchema.extend({ roundGroupId: roundGroupIdSchema, locked: z.boolean() }))
+    .mutation(({ input }) => setRoundGroupLocked(input)),
   removeTeam: personalTcrProcedure
     .input(gameIdSchema.extend({ teamId: idSchema }))
     .mutation(async ({ input, ctx }) => {
@@ -3493,19 +3533,8 @@ export const tournamentControlRouter = router({
   randomizeGameMap: discordTournamentStaffProcedure
     .input(gameIdSchema)
     .mutation(async ({ input }) => {
-      const [mapId] = drawUniqueMaps(DEFAULT_COMPETITIVE_MAP_IDS, 1);
-      if (!mapId)
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "No maps available to randomize",
-        });
       const db = await requireDb();
-      const game = await getGameOrThrow(db, input.gameId);
-      await db
-        .update(tournamentGames)
-        .set({ mapId })
-        .where(eq(tournamentGames.id, input.gameId));
-      return fetchTournamentControlData(game.tournamentId);
+      return randomizeGameMap(db, input.gameId);
     }),
 
   setBroadcastUrl: discordTournamentStaffProcedure
@@ -3671,6 +3700,9 @@ export const tournamentControlRouter = router({
       })
     )
     .mutation(({ input }) => updateRoundGroup(input)),
+  setRoundGroupLocked: discordTournamentStaffProcedure
+    .input(tournamentIdSchema.extend({ roundGroupId: roundGroupIdSchema, locked: z.boolean() }))
+    .mutation(({ input }) => setRoundGroupLocked(input)),
   removeTeam: discordTournamentStaffProcedure
     .input(gameIdSchema.extend({ teamId: idSchema }))
     .mutation(async ({ input }) => {

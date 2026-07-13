@@ -53,6 +53,7 @@ export const managedTeams = mysqlTable(
     captainUserId: int("captainUserId")
       .notNull()
       .references(() => users.id),
+    mapBanId: varchar("mapBanId", { length: 64 }),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
@@ -426,6 +427,7 @@ export const tournamentGames = mysqlTable(
     roundGroupId: varchar("roundGroupId", { length: 64 }),
     roundLabel: varchar("roundLabel", { length: 80 }),
     roundColor: varchar("roundColor", { length: 24 }),
+    roundLocked: int("roundLocked").default(0).notNull(),
     broadcastUrl: varchar("broadcastUrl", { length: 1024 }),
     mapId: varchar("mapId", { length: 64 }),
     seriesBestOf: int("seriesBestOf").default(1).notNull(),
@@ -544,6 +546,7 @@ export const tournamentControlTemplateGames = mysqlTable(
     roundGroupId: varchar("roundGroupId", { length: 64 }),
     roundLabel: varchar("roundLabel", { length: 80 }),
     roundColor: varchar("roundColor", { length: 24 }),
+    roundLocked: int("roundLocked").default(0).notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },

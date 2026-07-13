@@ -1,21 +1,9 @@
-import { ShieldAlert } from "lucide-react";
+import { MessageCircle, Send, ShieldAlert } from "lucide-react";
+import type { inferRouterOutputs } from "@trpc/server";
+import type { AppRouter } from "../../../server/routers";
 import { Button } from "@/components/ui/button";
 
-type Listing = {
-  id: number;
-  userId: number;
-  listingType: "lft" | "lfp";
-  title: string;
-  description: string;
-  platform: string | null;
-  region: string | null;
-  availability: string | null;
-  preferredRole: string | null;
-  contact: string | null;
-  hiddenByAdmin: number;
-  discordDisplayName: string | null;
-  discordUsername: string | null;
-};
+type Listing = inferRouterOutputs<AppRouter>["teamFinder"]["list"][number];
 
 type Props = {
   listing: Listing;
@@ -27,6 +15,9 @@ type Props = {
   onReport: (id: number) => void;
   onToggleHidden: (id: number, hiddenByAdmin: boolean) => void;
   isToggling?: boolean;
+  canInvite?: boolean;
+  invitePending?: boolean;
+  onInvite?: (listing: Listing) => void;
 };
 
 export default function TeamFinderListingCard({
@@ -39,6 +30,9 @@ export default function TeamFinderListingCard({
   onReport,
   onToggleHidden,
   isToggling,
+  canInvite,
+  invitePending,
+  onInvite,
 }: Props) {
   const isHidden = listing.hiddenByAdmin === 1;
   const isOwner = currentUserId === listing.userId;
@@ -76,6 +70,8 @@ export default function TeamFinderListingCard({
       <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-white/10 pt-4">
         {isOwner && <Button type="button" onClick={() => onEdit(listing)}>Edit</Button>}
         {isOwner && <Button type="button" variant="destructive" onClick={() => onDelete(listing.id)}>Delete</Button>}
+        {!isOwner && listing.discordUserId && <Button asChild type="button" variant="outline"><a href={`https://discord.com/users/${listing.discordUserId}`} target="_blank" rel="noopener noreferrer"><MessageCircle size={16} /> Message in Discord</a></Button>}
+        {!isOwner && listing.listingType === "lft" && canInvite && <Button type="button" onClick={() => onInvite?.(listing)} disabled={invitePending}><Send size={16} /> {invitePending ? "Inviting…" : "Invite to Team"}</Button>}
         {!isOwner && isDiscordUser && <Button type="button" variant="outline" onClick={() => onReport(listing.id)}>Report</Button>}
         {isAdmin && (
           <Button type="button" variant={isHidden ? "default" : "outline"} onClick={() => onToggleHidden(listing.id, !isHidden)} disabled={isToggling}>

@@ -25,6 +25,12 @@ export function deriveTeamFinderListingContent(input: TeamFinderListingInput, di
   return { title, description, contact: discordUsername ? `Discord: @${discordUsername}` : "Discord" };
 }
 
+export function deriveDiscordUserId(openId: string | null | undefined) {
+  if (!openId?.startsWith("discord:")) return null;
+  const id = openId.slice("discord:".length);
+  return /^\d+$/.test(id) ? id : null;
+}
+
 export async function listTeamFinderListings(isAdmin: boolean) {
   const db = await getDb();
   if (!db) return [];
@@ -46,13 +52,15 @@ export async function listTeamFinderListings(isAdmin: boolean) {
       updatedAt: teamFinderListings.updatedAt,
       discordDisplayName: users.discordDisplayName,
       discordUsername: users.discordUsername,
+      openId: users.openId,
     })
     .from(teamFinderListings)
     .innerJoin(users, eq(teamFinderListings.userId, users.id))
     .orderBy(desc(teamFinderListings.createdAt));
 
   const where = getTeamFinderListWhereClause(isAdmin);
-  return where ? query.where(where) : query;
+  const rows = await (where ? query.where(where) : query);
+  return rows.map(({ openId, ...row }) => ({ ...row, discordUserId: deriveDiscordUserId(openId) }));
 }
 
 export async function createTeamFinderListing(userId: number, discordUsername: string | null | undefined, input: TeamFinderListingInput) {
