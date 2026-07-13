@@ -193,7 +193,7 @@ type ZoomRailDragStart = {
 };
 type BoardUndoSnapshot = {
   tournament: { name: string };
-  teams: ControlTeamView[];
+  capturedAt: string;
   games: ControlGameView[];
   assignments: AssignmentView[];
   connections: ConnectionView[];
@@ -594,7 +594,15 @@ export default function TournamentControlRoom({
     },
     onError: (error: { message: string }) => setFormError(error.message),
   });
-  const createTeam = controlApi.createTeam.useMutation(mutationOptions);
+  const createTeam = controlApi.createTeam.useMutation({
+    onSuccess: () => {
+      invalidate();
+      toast.success(
+        "Team created. Roster changes are not included in board Undo."
+      );
+    },
+    onError: (error: { message: string }) => toast.error(error.message),
+  });
   const createCashout =
     controlApi.createCashoutLobby.useMutation(mutationOptions);
   const createFinal =
@@ -668,22 +676,12 @@ export default function TournamentControlRoom({
     [moveGame]
   );
   const deleteTeam = controlApi.deleteTeam.useMutation({
-    onMutate: () => captureUndoSnapshot(),
-    onSuccess: (
-      _data: unknown,
-      _variables: unknown,
-      snapshot?: BoardUndoSnapshot
-    ) => {
-      if (snapshot)
-        setUndoHistory(history =>
-          [
-            { kind: "board" as const, snapshot, label: "Delete team" },
-            ...history,
-          ].slice(0, undoHistoryLimit)
-        );
+    onSuccess: () => {
       setDialogState(null);
       invalidate();
-      toast.success("Team deleted");
+      toast.success(
+        "Team deleted. Roster changes are not included in board Undo."
+      );
     },
     onError: (error: { message: string }) => toast.error(error.message),
   });
@@ -846,7 +844,7 @@ export default function TournamentControlRoom({
   const captureUndoSnapshot = useCallback(
     (): BoardUndoSnapshot => ({
       tournament: { name: tournamentName },
-      teams: (query.data?.teams ?? []).map(team => ({ ...team })),
+      capturedAt: new Date().toISOString(),
       games: games.map(game => ({
         ...game,
         seriesBestOf:

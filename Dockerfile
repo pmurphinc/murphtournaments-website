@@ -17,4 +17,4 @@ RUN pnpm build
 FROM base AS runtime
 ENV NODE_ENV=production
 COPY --from=build /app /app
-CMD ["pnpm", "start"]
+CMD ["sh", "-c", "pnpm db:migrate && echo 'Database migrations completed successfully.' && pnpm start"]
