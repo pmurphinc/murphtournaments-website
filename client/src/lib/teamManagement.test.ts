@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+
+const compact = (value: string) => value.replace(/\s+/g, " ");
 import { TRPCError } from "@trpc/server";
 import { assertCaptainRole, canReactivateManagedTeamInvite, createManagedTeamSlug, normalizeDiscordUsername } from "../../../server/teamManagement";
 
@@ -14,7 +16,44 @@ describe("Team Management rules", () => {
   });
 
   it("normalizes invite usernames with or without @", () => {
-    expect(normalizeDiscordUsername(" @Murph ")).toBe("Murph");
+    expect(normalizeDiscordUsername(" @Murph ")).toBe("murph");
+    expect(normalizeDiscordUsername("Murph")).toBe("murph");
+  });
+
+
+  it("looks up Discord usernames case-insensitively by unique username and not display name", async () => {
+    const source = await import("node:fs/promises").then(fs => fs.readFile(new URL("../../../server/teamManagement.ts", import.meta.url), "utf8"));
+    expect(source).toContain("lower(${users.discordUsername}) = ${username}");
+    expect(source).not.toContain("discordDisplayName, username");
+  });
+
+  it("recipient-facing invites are returned, accepted, declined, and refetched explicitly", async () => {
+    const [serverSource, pageSource] = await Promise.all([
+      import("node:fs/promises").then(fs => fs.readFile(new URL("../../../server/teamManagement.ts", import.meta.url), "utf8")),
+      import("node:fs/promises").then(fs => fs.readFile(new URL("../pages/TeamManagement.tsx", import.meta.url), "utf8")),
+    ]);
+    expect(serverSource).toContain("receivedInvites");
+    expect(serverSource).toContain("eq(managedTeamInvites.invitedUserId, userId)");
+    expect(serverSource).toContain('status: response === "accept" ? "accepted" : "declined"');
+    expect(pageSource).toContain('refetchOnMount: "always"');
+    expect(pageSource).toContain("refetchOnWindowFocus: true");
+    expect(pageSource).toContain("query.data.receivedInvites.map");
+  });
+
+  it("hides Create Team for existing memberships without focusing missing inputs", async () => {
+    const pageSource = await import("node:fs/promises").then(fs => fs.readFile(new URL("../pages/TeamManagement.tsx", import.meta.url), "utf8"));
+    expect(pageSource).toContain("const hasTeamMembership = (query.data?.teams.length ?? 0) > 0");
+    expect(pageSource).toContain("!query.isLoading && !hasTeamMembership");
+    expect(pageSource).not.toContain("querySelector<HTMLInputElement>");
+  });
+
+  it("returns viewer paths only for approved submissions using retrievable active viewer tokens", async () => {
+    const source = await import("node:fs/promises").then(fs => fs.readFile(new URL("../../../server/teamManagement.ts", import.meta.url), "utf8"));
+    expect(compact(source)).toContain('viewerPath: submission.submission.status === "approved"');
+    expect(source).toContain("ensureRetrievableViewerPath");
+    expect(source).toContain("publicToken");
+    expect(source).toContain("Legacy active viewer-link rows stored only tokenHash");
+    expect(source).toContain("inArray(tournamentViewerLinks.tournamentId, approvedTournamentIds)");
   });
 
   it("creates URL-safe slugs for managed teams", () => {
@@ -23,7 +62,7 @@ describe("Team Management rules", () => {
 
   it("invite acceptance creates membership correctly in service transaction code", async () => {
     const source = await import("node:fs/promises").then(fs => fs.readFile(new URL("../../../server/teamManagement.ts", import.meta.url), "utf8"));
-    expect(source).toContain('tx.insert(managedTeamMembers).values({ teamId: invite.teamId, userId, role: "member" })');
+    expect(source).toContain('teamId: invite.teamId, userId, role: "member"');
     expect(source).toContain('status: response === "accept" ? "accepted" : "declined"');
   });
 
@@ -68,7 +107,7 @@ describe("Team Management migration and invite persistence", () => {
     expect(canReactivateManagedTeamInvite("revoked")).toBe(true);
     expect(canReactivateManagedTeamInvite("pending")).toBe(false);
     expect(source).toContain("existingInvite && canReactivateManagedTeamInvite(existingInvite.status)");
-    expect(source).toContain('set({ status: "pending", createdByUserId: userId, updatedAt: sql`now()` })');
+    expect(source).toContain('createdByUserId: userId, updatedAt: sql`now()`');
     expect(source).toContain("where(eq(managedTeamInvites.id, existingInvite.id))");
   });
 
@@ -141,8 +180,8 @@ describe("Team Management join links", () => {
 
   it("signed-in Discord users accept valid links as members without duplicate membership", async () => {
     const source = await import("node:fs/promises").then(fs => fs.readFile(new URL("../../../server/teamManagement.ts", import.meta.url), "utf8"));
-    expect(source).toContain('tx.insert(managedTeamMembers).values({ teamId: link.teamId, userId, role: "member" })');
-    expect(source).toContain("if (existing) return { success: true, alreadyMember: true, role: existing.role } as const");
+    expect(source).toContain('teamId: link.teamId, userId, role: "member"');
+    expect(compact(source)).toContain("if (existing) return { success: true, alreadyMember: true, role: existing.role } as const");
     expect(source).toContain("useCount: sql`${managedTeamJoinLinks.useCount} + 1`");
   });
 

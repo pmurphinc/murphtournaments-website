@@ -491,6 +491,7 @@ export const tournamentViewerLinks = mysqlTable(
       .notNull()
       .references(() => users.id),
     tokenHash: varchar("tokenHash", { length: 64 }).notNull(),
+    publicToken: varchar("publicToken", { length: 128 }),
     status: mysqlEnum("status", ["active", "revoked"])
       .default("active")
       .notNull(),

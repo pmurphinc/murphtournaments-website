@@ -190,6 +190,13 @@
       "when": 1784678400000,
       "tag": "0026_team_bans_round_locks",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "5",
+      "when": 1784764800000,
+      "tag": "0027_tournament_viewer_public_token",
+      "breakpoints": true
     }
   ]
 }

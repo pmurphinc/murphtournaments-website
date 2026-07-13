@@ -337,3 +337,14 @@ describe("Tournament Control Room zoom persistence", () => {
     );
   });
 });
+
+
+describe("Team approval rejection UI", () => {
+  it("only reveals the rejection note after Reject is selected", async () => {
+    const source = await import("node:fs/promises").then(fs => fs.readFile(new URL("./TournamentControlIndex.tsx", import.meta.url), "utf8"));
+    expect(source).toContain("activeRejectSubmissionId");
+    expect(source).toContain("Confirm Rejection");
+    expect(source).toContain("setActiveRejectSubmissionId(submission.id)");
+    expect(source).toContain('submission.status === "rejected" && submission.adminNote');
+  });
+});

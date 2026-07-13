@@ -1361,12 +1361,45 @@ async function createViewerLink(tournamentId: number, userId: number) {
     tournamentId,
     createdByUserId: userId,
     tokenHash: hashToken(token),
+    publicToken: token,
   });
   return {
     path: createTokenPath("/bracket", token),
     url: createTokenPath("/bracket", token),
     enabled: true,
   } as const;
+}
+
+async function ensureViewerLinkForApprovedSubmission(
+  db: QueryExecutor,
+  tournamentId: number,
+  userId: number
+) {
+  const activeLinks = await db
+    .select()
+    .from(tournamentViewerLinks)
+    .where(
+      and(
+        eq(tournamentViewerLinks.tournamentId, tournamentId),
+        eq(tournamentViewerLinks.status, "active")
+      )
+    );
+  if (activeLinks.some(link => link.publicToken)) return;
+  // Legacy active viewer links only have tokenHash, so the raw /bracket token is unrecoverable.
+  // Rotate those unretrievable rows before creating a durable retrievable viewer token.
+  if (activeLinks.length) {
+    await db
+      .update(tournamentViewerLinks)
+      .set({ status: "revoked", updatedAt: sql`now()` })
+      .where(inArray(tournamentViewerLinks.id, activeLinks.map(link => link.id)));
+  }
+  const token = randomBytes(32).toString("base64url");
+  await db.insert(tournamentViewerLinks).values({
+    tournamentId,
+    createdByUserId: userId,
+    tokenHash: hashToken(token),
+    publicToken: token,
+  });
 }
 
 async function getViewerDataByToken(token: string) {
@@ -1980,6 +2013,11 @@ async function approveSubmission(submissionId: number) {
       .update(tournamentTeamSubmissions)
       .set({ status: "approved", adminNote: null })
       .where(eq(tournamentTeamSubmissions.id, submissionId));
+    await ensureViewerLinkForApprovedSubmission(
+      tx,
+      row.submission.tournamentId,
+      row.submission.submittedByUserId
+    );
     return fetchTournamentRows(tx, row.submission.tournamentId);
   });
 }
