@@ -55,9 +55,83 @@ function normalize(value: string | Buffer | null): string | null {
   return Buffer.isBuffer(value) ? value.toString("utf8") : String(value);
 }
 
-function normalizeDefault(value: string | Buffer | null): string | null {
+type NormalizedColumnDefault = string | null;
+
+function normalizeDefault(
+  value: string | Buffer | null
+): NormalizedColumnDefault {
   const normalized = normalize(value);
   return normalized === "NULL" ? null : normalized;
+}
+
+function stripWrappingParentheses(value: string): string {
+  let current = value.trim();
+  while (current.startsWith("(") && current.endsWith(")")) {
+    let depth = 0;
+    let wrapsWholeExpression = true;
+    for (let index = 0; index < current.length; index += 1) {
+      const char = current[index];
+      if (char === "(") depth += 1;
+      else if (char === ")") depth -= 1;
+      if (depth === 0 && index < current.length - 1) {
+        wrapsWholeExpression = false;
+        break;
+      }
+      if (depth < 0) {
+        wrapsWholeExpression = false;
+        break;
+      }
+    }
+    if (!wrapsWholeExpression || depth !== 0) break;
+    current = current.slice(1, -1).trim();
+  }
+  return current;
+}
+
+function canonicalizeCurrentTimestampExpression(
+  value: string | Buffer | null
+): "CURRENT_TIMESTAMP" | null {
+  const normalized = normalize(value);
+  if (normalized === null) return null;
+  const unwrapped = stripWrappingParentheses(normalized);
+  return /^current_timestamp\s*(?:\(\s*\))?$/i.test(unwrapped)
+    ? "CURRENT_TIMESTAMP"
+    : null;
+}
+
+function normalizeComparableDefault(
+  value: string | Buffer | null,
+  expected: NormalizedColumnDefault
+): NormalizedColumnDefault {
+  const normalized = normalizeDefault(value);
+  if (expected !== "CURRENT_TIMESTAMP") return normalized;
+  return canonicalizeCurrentTimestampExpression(normalized) ?? normalized;
+}
+
+function hasOnUpdateCurrentTimestamp(extra: string): boolean {
+  const withoutDefaultGenerated = extra.replace(/\bdefault_generated\b/gi, " ");
+  const match = withoutDefaultGenerated.match(/\bon\s+update\s+(.+)$/i);
+  if (!match) return false;
+  return (
+    canonicalizeCurrentTimestampExpression(match[1]) === "CURRENT_TIMESTAMP"
+  );
+}
+
+function describeColumnDefinition(
+  table: string,
+  check: ColumnCheck,
+  actual: {
+    type: string | null;
+    nullable: boolean;
+    defaultValue: NormalizedColumnDefault;
+    extra: string;
+  }
+): string {
+  return [
+    `Column ${table}.${check.name} has unexpected definition.`,
+    `Actual: type=${JSON.stringify(actual.type)}, nullable=${actual.nullable}, default=${JSON.stringify(actual.defaultValue)}, extra=${JSON.stringify(actual.extra)}.`,
+    `Expected: type=${JSON.stringify(check.type)}, nullable=${check.nullable}, default=${JSON.stringify(check.defaultValue)}, extra=${JSON.stringify(check.extra ?? "")}.`,
+  ].join(" ");
 }
 
 function parseNonUnique(value: unknown): boolean {
@@ -415,19 +489,27 @@ function assertColumn(
     throw new Error(`Expected column ${table}.${check.name} is missing.`);
   const type = normalize(row.columnType);
   const nullable = normalize(row.isNullable) === "YES";
-  const def = normalizeDefault(row.columnDefault);
+  const def = normalizeComparableDefault(row.columnDefault, check.defaultValue);
   const extra = normalize(row.extra) ?? "";
+  const actual = { type, nullable, defaultValue: def, extra };
   if (
     type !== check.type ||
     nullable !== check.nullable ||
     def !== check.defaultValue
   ) {
-    throw new Error(`Column ${table}.${check.name} has unexpected definition.`);
+    throw new Error(describeColumnDefinition(table, check, actual));
   }
-  if (check.extra && !extra.toLowerCase().includes(check.extra.toLowerCase())) {
-    throw new Error(
-      `Column ${table}.${check.name} has unexpected extra definition.`
-    );
+  if (check.extra === "auto_increment") {
+    if (!extra.toLowerCase().split(/\s+/).includes("auto_increment"))
+      throw new Error(describeColumnDefinition(table, check, actual));
+  } else if (check.extra?.toLowerCase().includes("on update")) {
+    if (!hasOnUpdateCurrentTimestamp(extra))
+      throw new Error(describeColumnDefinition(table, check, actual));
+  } else if (
+    check.extra &&
+    !extra.toLowerCase().includes(check.extra.toLowerCase())
+  ) {
+    throw new Error(describeColumnDefinition(table, check, actual));
   }
 }
 

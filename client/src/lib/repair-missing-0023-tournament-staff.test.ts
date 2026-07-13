@@ -6,8 +6,8 @@ type Col = {
   columnName?: string;
   columnType: string;
   isNullable: "YES" | "NO";
-  columnDefault: string | null;
-  extra: string;
+  columnDefault: string | Buffer | null;
+  extra: string | Buffer;
 };
 type Schema = {
   tables: Set<string>;
@@ -36,8 +36,8 @@ function addCol(
   c: string,
   type = "int",
   nullable: "YES" | "NO" = "YES",
-  def: string | null = null,
-  extra = ""
+  def: string | Buffer | null = null,
+  extra: string | Buffer = ""
 ) {
   s.columns.set(ck(t, c), {
     columnName: c,
@@ -46,6 +46,30 @@ function addCol(
     columnDefault: def,
     extra,
   });
+}
+
+function setDefault(
+  s: Schema,
+  table: string,
+  column: string,
+  value: string | Buffer | null
+) {
+  const col = s.columns.get(ck(table, column));
+  if (!col) throw new Error(`Missing test column ${table}.${column}`);
+  col.columnDefault = value;
+}
+function setExtra(
+  s: Schema,
+  table: string,
+  column: string,
+  value: string | Buffer
+) {
+  const col = s.columns.get(ck(table, column));
+  if (!col) throw new Error(`Missing test column ${table}.${column}`);
+  col.extra = value;
+}
+function destructiveSql(sql: string) {
+  return /\b(drop|truncate)\b|\bdelete\s+from\b|^\s*update\s+/i.test(sql);
 }
 function addIdx(
   s: Schema,
@@ -428,5 +452,91 @@ describe("repair missing 0023 tournament staff", () => {
     expect(
       s.indexes.has(ik("tournament_games", "tournament_games_round_group_idx"))
     ).toBe(true);
+  });
+  it.each([
+    "CURRENT_TIMESTAMP",
+    "CURRENT_TIMESTAMP()",
+    "current_timestamp()",
+    "(current_timestamp())",
+    Buffer.from("(current_timestamp())"),
+  ])("accepts equivalent timestamp default %#", async value => {
+    const s = base();
+    add0023(s);
+    for (const table of [
+      "tournament_staff_members",
+      "tournament_staff_invite_links",
+    ]) {
+      setDefault(s, table, "createdAt", value);
+      setDefault(s, table, "updatedAt", value);
+    }
+    await expect(repairMissing0023TournamentStaff(conn(s))).resolves.toEqual({
+      createdArtifacts: [],
+      databaseName: "app",
+    });
+  });
+
+  it.each([
+    "DEFAULT_GENERATED on update CURRENT_TIMESTAMP",
+    "on update CURRENT_TIMESTAMP",
+    "on update current_timestamp()",
+    "DEFAULT_GENERATED ON UPDATE (current_timestamp())",
+    Buffer.from("default_generated   on   update   current_timestamp()"),
+  ])("accepts equivalent updatedAt EXTRA %#", async value => {
+    const s = base();
+    add0023(s);
+    for (const table of [
+      "tournament_staff_members",
+      "tournament_staff_invite_links",
+    ])
+      setExtra(s, table, "updatedAt", value);
+    await expect(repairMissing0023TournamentStaff(conn(s))).resolves.toEqual({
+      createdArtifacts: [],
+      databaseName: "app",
+    });
+  });
+
+  it("rejects updatedAt when ON UPDATE behavior is missing", async () => {
+    const s = base();
+    add0023(s);
+    setExtra(s, "tournament_staff_members", "updatedAt", "DEFAULT_GENERATED");
+    await expect(repairMissing0023TournamentStaff(conn(s))).rejects.toThrow(
+      /updatedAt.*unexpected definition.*extra/s
+    );
+  });
+
+  it("keeps ordinary string defaults strictly validated", async () => {
+    const s = base();
+    add0023(s);
+    setDefault(s, "tournament_staff_members", "role", "COLLABORATOR");
+    await expect(repairMissing0023TournamentStaff(conn(s))).rejects.toThrow(
+      /role.*default=.*COLLABORATOR.*expected.*collaborator/is
+    );
+  });
+
+  it("accepts rerun after tables were created before a previous post-verification failure", async () => {
+    const s = base();
+    add0023(s, true);
+    for (const table of [
+      "tournament_staff_members",
+      "tournament_staff_invite_links",
+    ]) {
+      setDefault(s, table, "createdAt", "(current_timestamp())");
+      setDefault(s, table, "updatedAt", Buffer.from("current_timestamp()"));
+      setExtra(s, table, "updatedAt", "on update current_timestamp()");
+    }
+    const r = await repairMissing0023TournamentStaff(conn(s));
+    expect(r.createdArtifacts).toEqual(
+      expect.arrayContaining([
+        "foreign key tournament_staff_members.tournament_staff_members_tournamentId_tournaments_id_fk",
+        "index tournament_staff_members.tournament_staff_members_tournament_idx",
+      ])
+    );
+    expect(s.sql.some(x => x.startsWith("CREATE TABLE"))).toBe(false);
+  });
+
+  it("does not run destructive SQL while repairing missing 0023 artifacts", async () => {
+    const s = base();
+    await repairMissing0023TournamentStaff(conn(s));
+    expect(s.sql.filter(destructiveSql)).toEqual([]);
   });
 });
