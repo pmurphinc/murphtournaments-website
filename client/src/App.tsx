@@ -46,6 +46,14 @@ import { useEffect } from "react";
  * - Responsive mobile-first layout
  * - Tournament-focused content structure
  */
+function PersonalTournamentControlRoomRoute() {
+  return <TournamentControlRoom mode="personal" />;
+}
+
+function DiscordStaffTournamentControlRoomRoute() {
+  return <TournamentControlRoom mode="discord-staff" />;
+}
+
 function Router() {
   // Scroll to top on route change
   const [location] = useLocation();
@@ -118,11 +126,11 @@ function Router() {
           />
           <Route
             path={"/TCR/:tournamentId"}
-            component={TournamentControlRoom}
+            component={PersonalTournamentControlRoomRoute}
           />
           <Route
             path={"/tcr/:tournamentId"}
-            component={TournamentControlRoom}
+            component={PersonalTournamentControlRoomRoute}
           />
           <Route path={"/TCR"} component={PersonalTcrIndex} />
           <Route path={"/tcr"} component={PersonalTcrIndex} />
@@ -132,7 +140,7 @@ function Router() {
           />
           <Route
             path={"/admin/tournaments/:tournamentId/control"}
-            component={TournamentControlRoom}
+            component={DiscordStaffTournamentControlRoomRoute}
           />
           <Route path={"/404"} component={NotFound} />
           {/* Final fallback route */}
