@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  ExternalLink,
   Copy,
   Crown,
   LinkIcon,
@@ -179,10 +180,14 @@ export default function TeamManagement() {
   >({});
   const query = trpc.teamManagement.myTeams.useQuery(undefined, {
     enabled: !!isDiscordUser,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
   const tournamentQuery =
     trpc.teamManagement.listAvailableTournamentsForMyTeams.useQuery(undefined, {
       enabled: !!isDiscordUser,
+      refetchOnMount: "always",
+      refetchOnWindowFocus: true,
     });
   const invalidate = () => {
     utils.teamManagement.myTeams.invalidate();
@@ -252,6 +257,7 @@ export default function TeamManagement() {
     onSuccess: () => ok("Invite link revoked."),
     onError: e => toast.error(e.message),
   });
+  const hasTeamMembership = (query.data?.teams.length ?? 0) > 0;
 
   if (!isDiscordUser)
     return (
@@ -287,7 +293,8 @@ export default function TeamManagement() {
       </div>
       <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
         <div className="space-y-6">
-          <Card className="border-yellow-400/30 bg-black/70 text-white">
+          {!query.isLoading && !hasTeamMembership ? (
+            <Card className="border-yellow-400/30 bg-black/70 text-white">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5 text-yellow-300" /> Create Team
@@ -308,7 +315,8 @@ export default function TeamManagement() {
                 Create Team
               </Button>
             </CardContent>
-          </Card>
+            </Card>
+          ) : null}
           <Card className="border-neon-cyan/30 bg-black/70 text-white">
             <CardHeader>
               <CardTitle>Pending Invites</CardTitle>
@@ -621,6 +629,19 @@ export default function TeamManagement() {
                                     Admin note: {submission.adminNote}
                                   </p>
                                 ) : null}
+                                {submission.status === "approved" &&
+                                submission.viewerPath ? (
+                                  <Button
+                                    asChild
+                                    size="sm"
+                                    className="mt-3 border border-yellow-300 bg-yellow-300 font-mono font-bold uppercase text-black hover:bg-yellow-200"
+                                  >
+                                    <a href={submission.viewerPath}>
+                                      <ExternalLink className="mr-1 h-3 w-3" />
+                                      Open Viewer Room
+                                    </a>
+                                  </Button>
+                                ) : null}
                               </div>
                             ))}
                           {tournamentQuery.data?.tournaments.length ? (
@@ -713,17 +734,11 @@ export default function TeamManagement() {
                 <p className="mb-4 text-white/70">
                   You are not on any managed teams yet.
                 </p>
-                <Button
-                  onClick={() =>
-                    document
-                      .querySelector<HTMLInputElement>(
-                        'input[placeholder="Team Name"]'
-                      )
-                      ?.focus()
-                  }
-                >
-                  Create Team
-                </Button>
+                {!query.isLoading && !hasTeamMembership ? (
+                  <p className="text-sm text-yellow-200">
+                    Use the Create Team form to start a roster.
+                  </p>
+                ) : null}
               </CardContent>
             </Card>
           )}

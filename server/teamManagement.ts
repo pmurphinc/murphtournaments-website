@@ -2,7 +2,7 @@ import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import { createHash, randomBytes } from "node:crypto";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "./db";
-import { managedTeamInvites, managedTeamJoinLinks, managedTeamMembers, managedTeams, tournamentTeamSubmissions, tournaments, users } from "../drizzle/schema";
+import { managedTeamInvites, managedTeamJoinLinks, managedTeamMembers, managedTeams, tournamentTeamSubmissions, tournamentViewerLinks, tournaments, users } from "../drizzle/schema";
 import { assertManagedTeamSubmissionAllowed } from "./tournamentTeamSubmissions";
 import { DEFAULT_COMPETITIVE_MAP_IDS } from "../shared/finalsMaps";
 
@@ -30,7 +30,7 @@ function getJoinLinkState(link: { status: "active" | "revoked"; expiresAt: Date 
 }
 
 export function normalizeDiscordUsername(username: string) {
-  return username.trim().replace(/^@+/, "");
+  return username.trim().replace(/^@+/, "").toLowerCase();
 }
 
 export function createManagedTeamSlug(name: string) {
@@ -124,7 +124,7 @@ export async function disbandManagedTeam(userId: number, teamId: number, confirm
 export async function inviteManagedTeamByDiscordUsername(userId: number, teamId: number, discordUsername: string) {
   const db = await dbOrThrow(); await assertCaptain(db, teamId, userId);
   const username = normalizeDiscordUsername(discordUsername);
-  const [invited] = await db.select().from(users).where(eq(users.discordUsername, username)).limit(1);
+  const [invited] = await db.select().from(users).where(sql`lower(${users.discordUsername}) = ${username}`).limit(1);
   if (!invited) throw new TRPCError({ code: "NOT_FOUND", message: "That Discord user needs to sign in to Murph Tournaments once before they can be invited." });
   const member = await getMember(db, teamId, invited.id);
   if (member) throw new TRPCError({ code: "CONFLICT", message: "That player is already on this team." });
@@ -177,18 +177,66 @@ export async function leaveManagedTeam(userId: number, teamId: number) {
   await db.delete(managedTeamMembers).where(and(eq(managedTeamMembers.teamId, teamId), eq(managedTeamMembers.userId, userId))); return { success: true } as const;
 }
 
+function createViewerPath(token: string) {
+  return `/bracket/${encodeURIComponent(token)}`;
+}
+
+function hashTournamentViewerToken(token: string) {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+async function ensureRetrievableViewerPath(
+  db: TeamManagementExecutor,
+  tournamentId: number,
+  createdByUserId: number,
+  existingLinks: { id: number; publicToken: string | null }[]
+) {
+  const existingWithToken = existingLinks.find(link => link.publicToken);
+  if (existingWithToken?.publicToken) return createViewerPath(existingWithToken.publicToken);
+
+  // Legacy active viewer-link rows stored only tokenHash, so their raw URL cannot be reconstructed.
+  // Rotate those rows and create one active link with a retrievable public token for team members.
+  if (existingLinks.length) {
+    await db
+      .update(tournamentViewerLinks)
+      .set({ status: "revoked", updatedAt: sql`now()` })
+      .where(inArray(tournamentViewerLinks.id, existingLinks.map(link => link.id)));
+  }
+  const token = randomBytes(32).toString("base64url");
+  await db.insert(tournamentViewerLinks).values({
+    tournamentId,
+    createdByUserId,
+    tokenHash: hashTournamentViewerToken(token),
+    publicToken: token,
+  });
+  return createViewerPath(token);
+}
+
 export async function listAvailableTournamentsForMyTeams(userId: number) {
   const db = await dbOrThrow();
   const memberships = await db.select({ team: managedTeams, member: managedTeamMembers }).from(managedTeamMembers).innerJoin(managedTeams, eq(managedTeamMembers.teamId, managedTeams.id)).where(eq(managedTeamMembers.userId, userId));
   const teamIds = memberships.map(row => row.team.id);
   const openTournaments = await db.select().from(tournaments).where(eq(tournaments.registrationOpen, 1));
   const submissions = teamIds.length ? await db.select({ submission: tournamentTeamSubmissions, tournament: tournaments }).from(tournamentTeamSubmissions).innerJoin(tournaments, eq(tournamentTeamSubmissions.tournamentId, tournaments.id)).where(inArray(tournamentTeamSubmissions.managedTeamId, teamIds)) : [];
+  const approvedTournamentIds = Array.from(new Set(submissions.filter(row => row.submission.status === "approved").map(row => row.submission.tournamentId)));
+  const viewerLinks = approvedTournamentIds.length
+    ? await db.select({ id: tournamentViewerLinks.id, tournamentId: tournamentViewerLinks.tournamentId, publicToken: tournamentViewerLinks.publicToken }).from(tournamentViewerLinks).where(and(inArray(tournamentViewerLinks.tournamentId, approvedTournamentIds), eq(tournamentViewerLinks.status, "active")))
+    : [];
+  const viewerPathByTournamentId = new Map<number, string>();
+  for (const tournamentId of approvedTournamentIds) {
+    const links = viewerLinks.filter(link => link.tournamentId === tournamentId);
+    viewerPathByTournamentId.set(tournamentId, await ensureRetrievableViewerPath(db, tournamentId, userId, links));
+  }
   return {
     tournaments: openTournaments,
     teams: memberships.map(row => ({
       ...row.team,
       role: row.member.role,
-      submissions: submissions.filter(submission => submission.submission.managedTeamId === row.team.id).map(submission => ({ ...submission.submission, tournament: submission.tournament })),
+      submissions: submissions.filter(submission => submission.submission.managedTeamId === row.team.id).map(submission => ({
+        ...submission.submission,
+        tournament: submission.tournament,
+        viewerPath: submission.submission.status === "approved" ? viewerPathByTournamentId.get(submission.submission.tournamentId) ?? null : null,
+      })),
     })),
   };
 }

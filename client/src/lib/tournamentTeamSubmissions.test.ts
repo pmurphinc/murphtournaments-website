@@ -37,3 +37,14 @@ describe("tournament team submission rules", () => {
     expect(canCreateManualTournamentTeam({})).toBe(true);
   });
 });
+
+
+describe("approved submission viewer links", () => {
+  it("approval ensures a durable viewer link and legacy hash-only rows are rotated", async () => {
+    const source = await import("node:fs/promises").then(fs => fs.readFile(new URL("../../../server/tournamentControl.ts", import.meta.url), "utf8"));
+    expect(source).toContain("ensureViewerLinkForApprovedSubmission");
+    expect(source).toContain("row.submission.submittedByUserId");
+    expect(source).toContain("Legacy active viewer links only have tokenHash");
+    expect(source).toContain("publicToken: token");
+  });
+});

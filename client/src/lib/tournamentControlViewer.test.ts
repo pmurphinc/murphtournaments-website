@@ -214,3 +214,17 @@ describe("Tournament Control Viewer local board state", () => {
     ]);
   });
 });
+
+
+describe("Tournament Control Viewer server payload", () => {
+  it("uses tokenHash validation while returning sanitized viewer data without private lobby codes", async () => {
+    const source = await import("node:fs/promises").then(fs => fs.readFile(new URL("../../../server/tournamentControl.ts", import.meta.url), "utf8"));
+    const viewerStart = source.indexOf("async function getViewerDataByToken");
+    const viewerEnd = source.indexOf("async function saveTemplateFromTournament", viewerStart);
+    const viewerSource = source.slice(viewerStart, viewerEnd);
+    expect(viewerSource).toContain("eq(tournamentViewerLinks.tokenHash, tokenHash)");
+    expect(viewerSource).toContain('eq(tournamentViewerLinks.status, "active")');
+    expect(viewerSource).not.toContain("privateLobbyCode");
+    expect(viewerSource).not.toContain("discord");
+  });
+});

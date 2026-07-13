@@ -35,7 +35,8 @@ export default function TournamentControlIndex() {
   const [name, setName] = useState("");
   const [eventNote, setEventNote] = useState("");
   const [reviewTournamentId, setReviewTournamentId] = useState<number | null>(null);
-  const [adminNotes, setAdminNotes] = useState<Record<number, string>>({});
+  const [activeRejectSubmissionId, setActiveRejectSubmissionId] = useState<number | null>(null);
+  const [rejectionNote, setRejectionNote] = useState("");
   const [renameTarget, setRenameTarget] = useState<{ id: number; name: string } | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
@@ -48,7 +49,7 @@ export default function TournamentControlIndex() {
   const submissionsQuery = trpc.tournamentControl.listTeamSubmissions.useQuery(undefined, { enabled: auth.user?.loginMethod === "discord", retry: false });
   const toggleRegistration = trpc.tournamentControl.setTournamentRegistrationOpen.useMutation({ onSuccess: () => utils.tournamentControl.listTournaments.invalidate() });
   const approveSubmission = trpc.tournamentControl.approveTeamSubmission.useMutation({ onSuccess: async data => { await utils.tournamentControl.listTeamSubmissions.invalidate(); await utils.tournamentControl.get.invalidate({ tournamentId: data.tournament.id }); } });
-  const rejectSubmission = trpc.tournamentControl.rejectTeamSubmission.useMutation({ onSuccess: () => utils.tournamentControl.listTeamSubmissions.invalidate() });
+  const rejectSubmission = trpc.tournamentControl.rejectTeamSubmission.useMutation({ onSuccess: () => { setActiveRejectSubmissionId(null); setRejectionNote(""); return utils.tournamentControl.listTeamSubmissions.invalidate(); } });
   const renameTournament = trpc.tournamentControl.renameTournament.useMutation({ onSuccess: async () => { setRenameTarget(null); await utils.tournamentControl.listTournaments.invalidate(); } });
   const setTournamentOwner = trpc.tournamentControl.setTournamentOwner.useMutation({ onSuccess: () => utils.tournamentControl.listTournaments.invalidate() });
   const deleteTournament = trpc.tournamentControl.deleteTournament.useMutation({ onSuccess: async () => { setDeleteTarget(null); await utils.tournamentControl.listTournaments.invalidate(); } });
@@ -214,9 +215,10 @@ export default function TournamentControlIndex() {
           <div className="max-h-[65vh] space-y-3 overflow-y-auto pr-1">
             {(submissionsQuery.data?.filter(submission => submission.tournamentId === reviewTournamentId) ?? []).map(submission => (
               <div key={submission.id} className="rounded-lg border border-white/10 bg-black/50 p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h3 className="font-mono text-lg font-bold text-neon-gold">{submission.managedTeam.name}</h3><p className="text-sm text-white/60">Captain: {submission.captain.discordDisplayName || submission.captain.discordUsername || submission.captain.name || "Discord user"}</p><p className="mt-1 font-mono text-xs uppercase text-white/45">{submission.status}</p></div>{submission.status === "pending" ? <div className="flex gap-2"><Button size="sm" className={goldButtonClass} onClick={() => approveSubmission.mutate({ submissionId: submission.id })}>Approve</Button><Button size="sm" variant="destructive" onClick={() => rejectSubmission.mutate({ submissionId: submission.id, adminNote: adminNotes[submission.id] || null })}>Reject</Button></div> : null}</div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h3 className="font-mono text-lg font-bold text-neon-gold">{submission.managedTeam.name}</h3><p className="text-sm text-white/60">Captain: {submission.captain.discordDisplayName || submission.captain.discordUsername || submission.captain.name || "Discord user"}</p><p className="mt-1 font-mono text-xs uppercase text-white/45">{submission.status}</p></div>{submission.status === "pending" ? <div className="flex gap-2">{activeRejectSubmissionId === submission.id ? <><Button size="sm" variant="destructive" onClick={() => rejectSubmission.mutate({ submissionId: submission.id, adminNote: rejectionNote.trim() || null })}>Confirm Rejection</Button><Button size="sm" variant="outline" className="border-white/20 text-white" onClick={() => { setActiveRejectSubmissionId(null); setRejectionNote(""); }}>Cancel</Button></> : <><Button size="sm" className={goldButtonClass} onClick={() => approveSubmission.mutate({ submissionId: submission.id })}>Approve</Button><Button size="sm" variant="destructive" onClick={() => { setActiveRejectSubmissionId(submission.id); setRejectionNote(""); }}>Reject</Button></>}</div> : null}</div>
                 <p className="mt-3 text-xs uppercase tracking-widest text-white/45">Roster</p><div className="mt-2 flex flex-wrap gap-2">{submission.roster.map(row => <span key={row.userId} className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/70">{row.user.discordDisplayName || row.user.discordUsername || row.user.name || "Discord user"}{row.role === "captain" ? " · Captain" : ""}</span>)}</div>
-                <Textarea className="mt-3 border-white/15 bg-black/60 text-white" placeholder="Optional admin note for rejection" value={adminNotes[submission.id] ?? submission.adminNote ?? ""} onChange={event => setAdminNotes(current => ({ ...current, [submission.id]: event.target.value }))} />
+                {submission.status === "pending" && activeRejectSubmissionId === submission.id ? <Textarea className="mt-3 border-white/15 bg-black/60 text-white" placeholder="Optional admin note for rejection" value={rejectionNote} onChange={event => setRejectionNote(event.target.value)} /> : null}
+                {submission.status === "rejected" && submission.adminNote ? <p className="mt-3 rounded border border-red-400/20 bg-red-950/20 p-3 text-sm text-red-100">Admin note: {submission.adminNote}</p> : null}
               </div>
             ))}
             {!(submissionsQuery.data?.some(submission => submission.tournamentId === reviewTournamentId)) && <p className="rounded border border-white/10 bg-black/40 p-4 text-sm text-white/60">No team submissions for this tournament yet.</p>}
