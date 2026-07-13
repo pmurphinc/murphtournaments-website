@@ -4,6 +4,7 @@ import { TRPCError } from "@trpc/server";
 import { getDb } from "./db";
 import { managedTeamInvites, managedTeamJoinLinks, managedTeamMembers, managedTeams, tournamentTeamSubmissions, tournaments, users } from "../drizzle/schema";
 import { assertManagedTeamSubmissionAllowed } from "./tournamentTeamSubmissions";
+import { DEFAULT_COMPETITIVE_MAP_IDS } from "../shared/finalsMaps";
 
 export type TeamManagementAction = "rename" | "invite" | "transferCaptain" | "removeMember" | "disband" | "manage this team";
 type TeamManagementDb = NonNullable<Awaited<ReturnType<typeof getDb>>>;
@@ -95,6 +96,16 @@ export async function createManagedTeam(userId: number, name: string) {
     await tx.insert(managedTeamMembers).values({ teamId: team.id, userId, role: "captain" });
     return team;
   });
+}
+
+export async function updateManagedTeamMapBan(userId: number, teamId: number, mapBanId: string | null) {
+  const db = await dbOrThrow();
+  await assertCaptain(db, teamId, userId);
+  if (mapBanId !== null && !(DEFAULT_COMPETITIVE_MAP_IDS as readonly string[]).includes(mapBanId)) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Map ban must be a default competitive map or No Map Ban." });
+  }
+  await db.update(managedTeams).set({ mapBanId }).where(eq(managedTeams.id, teamId));
+  return { success: true, mapBanId } as const;
 }
 
 export async function renameManagedTeam(userId: number, teamId: number, name: string) {

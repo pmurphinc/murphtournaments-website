@@ -184,6 +184,10 @@ export default function MapRandomizer() {
     }
   }
 
+  const isExactPreset = (ids: readonly FinalsMapId[]) => selectedIds.length === ids.length && ids.every(id => selectedIds.includes(id));
+  const allMapIds = THE_FINALS_MAPS.map(map => map.id);
+  const mainMapIds = groupedMaps.main.map(map => map.id);
+  const compactMapIds = groupedMaps.compact.map(map => map.id);
   const canRoll = selectedMaps.length > 0 && count > 0;
 
   return (
@@ -316,27 +320,31 @@ export default function MapRandomizer() {
             <div className="mt-5 flex flex-wrap gap-2">
               <PresetButton
                 label="Default Competitive"
+                active={isExactPreset(DEFAULT_COMPETITIVE_MAP_IDS)}
                 onClick={() => applySelection(DEFAULT_COMPETITIVE_MAP_IDS)}
               />
               <PresetButton
                 label="All Maps"
+                active={isExactPreset(allMapIds)}
                 onClick={() =>
-                  applySelection(THE_FINALS_MAPS.map(map => map.id))
+                  applySelection(allMapIds)
                 }
               />
               <PresetButton
                 label="Main Arenas Only"
+                active={isExactPreset(mainMapIds)}
                 onClick={() =>
-                  applySelection(groupedMaps.main.map(map => map.id))
+                  applySelection(mainMapIds)
                 }
               />
               <PresetButton
                 label="Compact/Mode-Specific"
+                active={isExactPreset(compactMapIds)}
                 onClick={() =>
-                  applySelection(groupedMaps.compact.map(map => map.id))
+                  applySelection(compactMapIds)
                 }
               />
-              <PresetButton label="Clear" onClick={() => applySelection([])} />
+              <PresetButton label="Clear" active={selectedIds.length === 0} onClick={() => applySelection([])} />
             </div>
           </NeonCard>
 
@@ -399,15 +407,18 @@ export default function MapRandomizer() {
 function PresetButton({
   label,
   onClick,
+  active = false,
 }: {
   label: string;
   onClick: () => void;
+  active?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="rounded-sm border border-white/15 bg-dark-charcoal/80 px-3 py-2 font-mono text-xs font-bold uppercase tracking-widest text-white/70 transition-all hover:border-neon-gold hover:text-neon-gold"
+      aria-pressed={active}
+      className={`rounded-sm border px-3 py-2 font-mono text-xs font-bold uppercase tracking-widest transition-all ${active ? "border-neon-gold bg-neon-gold text-black shadow-[0_0_18px_rgba(255,215,0,0.22)]" : "border-white/15 bg-dark-charcoal/80 text-white/70 hover:border-neon-gold hover:text-neon-gold"}`}
     >
       {label}
     </button>

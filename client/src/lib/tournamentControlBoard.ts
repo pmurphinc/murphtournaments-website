@@ -46,6 +46,7 @@ export type BoardGame = {
   roundGroupId?: string | null;
   roundLabel?: string | null;
   roundColor?: RoundFrameColorId | null;
+  roundLocked?: number | null;
 };
 export type RoundFrameBounds = {
   x: number;
@@ -62,6 +63,7 @@ export type RoundFrame = RoundFrameBounds & {
   label: string;
   theme: RoundFrameTheme;
   colorId: RoundFrameColorId;
+  locked: boolean;
 };
 
 export type RoundFrameColorId =
@@ -72,6 +74,11 @@ export type RoundFrameColorId =
   | "blue"
   | "fuchsia"
   | "emerald";
+
+export function hasOpenLobbySlot(game: { gameType: GameType; status: GameStatus }, assignedCount: number) {
+  const capacity = game.gameType === "final_round" ? 2 : 4;
+  return game.status !== "complete" && assignedCount < capacity;
+}
 
 export const roundFrameThemes: Record<RoundFrameColorId, RoundFrameTheme> = {
   gold: {
@@ -247,6 +254,7 @@ export function getRoundFrames(
                 ? groupGames[0].roundColor
                 : (roundFrameColorIds[index % roundFrameColorIds.length] ??
                   "gold"),
+              locked: groupGames.some(game => game.roundLocked === 1),
               theme:
                 roundFrameThemes[
                   isRoundFrameColorId(groupGames[0]?.roundColor)
