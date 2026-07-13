@@ -614,27 +614,29 @@ export default function TeamManagement() {
                             ?.submissions.map(submission => (
                               <div
                                 key={submission.id}
-                                className="rounded border border-white/10 bg-black/40 p-2 text-sm"
+                                className="flex flex-col gap-3 rounded border border-white/10 bg-black/40 p-2 text-sm sm:flex-row sm:items-center sm:justify-between"
                               >
-                                <span className="font-semibold">
-                                  {submission.tournament.name}
-                                </span>
-                                <span className="ml-2 uppercase text-white/55">
-                                  {submission.status === "pending"
-                                    ? "Pending approval"
-                                    : submission.status}
-                                </span>
-                                {submission.adminNote ? (
-                                  <p className="mt-1 text-xs text-white/50">
-                                    Admin note: {submission.adminNote}
-                                  </p>
-                                ) : null}
+                                <div className="min-w-0">
+                                  <span className="font-semibold">
+                                    {submission.tournament.name}
+                                  </span>
+                                  <span className="ml-2 uppercase text-white/55">
+                                    {submission.status === "pending"
+                                      ? "Pending approval"
+                                      : submission.status}
+                                  </span>
+                                  {submission.adminNote ? (
+                                    <p className="mt-1 text-xs text-white/50">
+                                      Admin note: {submission.adminNote}
+                                    </p>
+                                  ) : null}
+                                </div>
                                 {submission.status === "approved" &&
                                 submission.viewerPath ? (
                                   <Button
                                     asChild
                                     size="sm"
-                                    className="mt-3 border border-yellow-300 bg-yellow-300 font-mono font-bold uppercase text-black hover:bg-yellow-200"
+                                    className="shrink-0 border border-yellow-300 bg-yellow-300 font-mono font-bold uppercase text-black hover:bg-yellow-200"
                                   >
                                     <a href={submission.viewerPath}>
                                       <ExternalLink className="mr-1 h-3 w-3" />
