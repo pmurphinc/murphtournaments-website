@@ -575,6 +575,23 @@ async function lockTournamentForBoardMutation(
   return tournament;
 }
 
+async function lockTournamentRow(db: QueryExecutor, tournamentId: number) {
+  const rows = readRows<{
+    id: number;
+    ownerUserId: number | null;
+    boardRevision: number;
+    finalizedAt: Date | null;
+  }>(
+    await db.execute(
+      sql`SELECT id, ownerUserId, boardRevision, finalizedAt FROM tournaments WHERE id = ${tournamentId} FOR UPDATE`
+    )
+  );
+  const [tournament] = rows;
+  if (!tournament)
+    throw new TRPCError({ code: "NOT_FOUND", message: "Tournament not found" });
+  return tournament;
+}
+
 async function runBoardMutation<T>(
   tournamentId: number,
   mutate: (tx: QueryExecutor) => Promise<T>,
@@ -592,17 +609,17 @@ async function runBoardMutation<T>(
 
 async function runBoardMutationAndFetch(
   tournamentId: number,
-  mutate: (tx: QueryExecutor) => Promise<void>,
+  mutate: (tx: QueryExecutor) => Promise<boolean | void>,
   options: { increment?: boolean } = {}
 ) {
-  return runBoardMutation(
-    tournamentId,
-    async tx => {
-      await mutate(tx);
-      return fetchTournamentRows(tx, tournamentId);
-    },
-    options
-  );
+  const db = await requireDb();
+  return db.transaction(async tx => {
+    await lockTournamentForBoardMutation(tx, tournamentId);
+    const changed = await mutate(tx);
+    if (options.increment !== false && changed !== false)
+      await incrementBoardRevision(tx, tournamentId);
+    return fetchTournamentRows(tx, tournamentId);
+  });
 }
 
 async function getGameOrThrow(db: QueryExecutor, gameId: number) {
@@ -614,6 +631,292 @@ async function getGameOrThrow(db: QueryExecutor, gameId: number) {
   if (!game)
     throw new TRPCError({ code: "NOT_FOUND", message: "Game not found" });
   return game;
+}
+
+async function resolveGameTournamentId(gameId: number) {
+  const db = await requireDb();
+  const [game] = await db
+    .select({ tournamentId: tournamentGames.tournamentId })
+    .from(tournamentGames)
+    .where(eq(tournamentGames.id, gameId))
+    .limit(1);
+  if (!game)
+    throw new TRPCError({ code: "NOT_FOUND", message: "Game not found" });
+  return game.tournamentId;
+}
+
+async function resolveAssignmentTournamentId(assignmentId: number) {
+  const db = await requireDb();
+  const [row] = await db
+    .select({ tournamentId: tournamentGames.tournamentId })
+    .from(tournamentGameAssignments)
+    .innerJoin(
+      tournamentGames,
+      eq(tournamentGameAssignments.gameId, tournamentGames.id)
+    )
+    .where(eq(tournamentGameAssignments.id, assignmentId))
+    .limit(1);
+  if (!row)
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Team assignment not found",
+    });
+  return row.tournamentId;
+}
+
+async function resolveConnectionTournamentId(connectionId: number) {
+  const db = await requireDb();
+  const rows = readRows<{ tournamentId: number }>(
+    await db.execute(
+      sql`SELECT tournamentId FROM tournament_game_connections WHERE id = ${connectionId} LIMIT 1`
+    )
+  );
+  const [connection] = rows;
+  if (!connection)
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Lobby connection not found",
+    });
+  return connection.tournamentId;
+}
+
+async function updateGameFieldAndFetch(
+  gameId: number,
+  getPatch: (
+    game: Awaited<ReturnType<typeof getGameOrThrow>>
+  ) => Partial<typeof tournamentGames.$inferInsert>,
+  options: { requireMutable?: boolean; requireFinalRound?: boolean } = {}
+) {
+  const tournamentId = await resolveGameTournamentId(gameId);
+  return runBoardMutationAndFetch(tournamentId, async tx => {
+    const gameInTx = await getGameOrThrow(tx, gameId);
+    if (gameInTx.tournamentId !== tournamentId)
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Lobby belongs to another tournament.",
+      });
+    if (options.requireFinalRound && gameInTx.gameType !== "final_round")
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Only Final Round matches can use BO3 or BO5.",
+      });
+    if (options.requireMutable) assertGameIsMutable(gameInTx);
+    const patch = getPatch(gameInTx);
+    const changed = Object.entries(patch).some(
+      ([key, value]) => (gameInTx as Record<string, unknown>)[key] !== value
+    );
+    if (!changed) return false;
+    await tx
+      .update(tournamentGames)
+      .set(patch)
+      .where(eq(tournamentGames.id, gameId));
+  });
+}
+
+async function deleteGameAssignmentAndFetch(gameId: number, teamId?: number) {
+  const tournamentId = await resolveGameTournamentId(gameId);
+  return runBoardMutationAndFetch(tournamentId, async tx => {
+    const gameInTx = await getGameOrThrow(tx, gameId);
+    if (gameInTx.tournamentId !== tournamentId)
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Lobby belongs to another tournament.",
+      });
+    if (gameInTx.status === "complete")
+      throw new TRPCError({
+        code: "CONFLICT",
+        message:
+          "Completed games are historical. Mark the game active before changing assignments.",
+      });
+    const rows = await tx
+      .select({ id: tournamentGameAssignments.id })
+      .from(tournamentGameAssignments)
+      .where(
+        teamId === undefined
+          ? eq(tournamentGameAssignments.gameId, gameId)
+          : and(
+              eq(tournamentGameAssignments.gameId, gameId),
+              eq(tournamentGameAssignments.teamId, teamId)
+            )
+      );
+    if (rows.length === 0) return false;
+    await tx
+      .delete(tournamentGameAssignments)
+      .where(
+        teamId === undefined
+          ? eq(tournamentGameAssignments.gameId, gameId)
+          : and(
+              eq(tournamentGameAssignments.gameId, gameId),
+              eq(tournamentGameAssignments.teamId, teamId)
+            )
+      );
+  });
+}
+
+async function deleteGameAndFetch(gameId: number) {
+  const tournamentId = await resolveGameTournamentId(gameId);
+  return runBoardMutationAndFetch(tournamentId, async tx => {
+    const gameInTx = await getGameOrThrow(tx, gameId);
+    if (gameInTx.tournamentId !== tournamentId)
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Lobby belongs to another tournament.",
+      });
+    assertGameIsMutable(gameInTx);
+    await tx.delete(tournamentGames).where(eq(tournamentGames.id, gameId));
+  });
+}
+
+async function createTournamentTeamAndFetch(input: {
+  tournamentId: number;
+  name: string;
+  frp: number;
+  user?: { role: "user" | "admin" };
+}) {
+  return runBoardMutationAndFetch(input.tournamentId, async tx => {
+    await assertTeamLimit(tx, input.tournamentId, input.user);
+    await assertUniqueTeamName(tx, input.tournamentId, input.name);
+    await tx.insert(teams).values({
+      tournamentId: input.tournamentId,
+      name: input.name,
+      frp: input.frp,
+    });
+  });
+}
+
+async function setTournamentRegistrationOpenAndFetch(
+  tournamentId: number,
+  registrationOpen: boolean
+) {
+  return runBoardMutationAndFetch(tournamentId, async tx => {
+    const [tournament] = await tx
+      .select()
+      .from(tournaments)
+      .where(eq(tournaments.id, tournamentId))
+      .limit(1);
+    if (!tournament)
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Tournament not found",
+      });
+    const nextValue = registrationOpen ? 1 : 0;
+    if (tournament.registrationOpen === nextValue) return false;
+    await tx
+      .update(tournaments)
+      .set({ registrationOpen: nextValue })
+      .where(eq(tournaments.id, tournamentId));
+  });
+}
+
+async function updateGameStatusAndFetch(
+  gameId: number,
+  status: (typeof tournamentGameStatuses)[number]
+) {
+  const tournamentId = await resolveGameTournamentId(gameId);
+  return runBoardMutationAndFetch(tournamentId, async tx => {
+    const gameInTx = await getGameOrThrow(tx, gameId);
+    if (gameInTx.tournamentId !== tournamentId)
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Lobby belongs to another tournament.",
+      });
+    if (gameInTx.status === status) return false;
+    const context = await fetchGameContext(tx, gameInTx.tournamentId);
+    if (status === "complete") {
+      // Qualifier advancement validation happens in the same transaction and rolls back with the status change.
+    } else if (
+      activeTournamentGameStatuses.includes(
+        status as (typeof activeTournamentGameStatuses)[number]
+      )
+    ) {
+      if (gameInTx.status === "complete")
+        validateReopenPlan({ ...context, gameId });
+      else {
+        const assignedRows = context.assignments.filter(
+          assignment => assignment.gameId === gameId
+        );
+        for (const assignment of assignedRows)
+          validateAssignmentPlan({
+            ...context,
+            targetGameId: gameId,
+            teamId: assignment.teamId,
+            slotIndex: assignment.slotIndex,
+          });
+      }
+    }
+    await tx
+      .update(tournamentGames)
+      .set({ status })
+      .where(eq(tournamentGames.id, gameId));
+    if (status === "complete")
+      await advanceCompletedGameQualifiers(tx, gameInTx);
+  });
+}
+
+async function moveTeamBetweenGamesAndFetch(input: {
+  gameId: number;
+  teamId: number;
+  toGameId: number;
+  preferredSlotIndex?: number;
+}) {
+  const tournamentId = await resolveGameTournamentId(input.gameId);
+  return runBoardMutationAndFetch(tournamentId, async tx => {
+    const sourceGameInTx = await getGameOrThrow(tx, input.gameId);
+    const targetGameInTx = await getGameOrThrow(tx, input.toGameId);
+    if (sourceGameInTx.tournamentId !== targetGameInTx.tournamentId)
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Lobbies must belong to the same tournament.",
+      });
+    if (sourceGameInTx.tournamentId !== tournamentId)
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Lobby belongs to another tournament.",
+      });
+    const context = await fetchGameContext(tx, sourceGameInTx.tournamentId);
+    const existing = context.assignments.find(
+      assignment =>
+        assignment.gameId === input.gameId && assignment.teamId === input.teamId
+    );
+    if (!existing)
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Team assignment not found.",
+      });
+    const assignmentsForSlotResolution = context.assignments.filter(
+      assignment =>
+        !(
+          assignment.gameId === input.gameId &&
+          assignment.teamId === input.teamId
+        )
+    );
+    const slotIndex = resolveAssignmentSlot({
+      game: targetGameInTx,
+      assignments: assignmentsForSlotResolution,
+      preferredSlotIndex: input.preferredSlotIndex,
+      teamId: input.teamId,
+    });
+    if (input.gameId === input.toGameId && existing.slotIndex === slotIndex)
+      return false;
+    validateMovePlan({
+      ...context,
+      sourceGameId: input.gameId,
+      targetGameId: input.toGameId,
+      teamId: input.teamId,
+      slotIndex,
+    });
+    await tx
+      .delete(tournamentGameAssignments)
+      .where(
+        and(
+          eq(tournamentGameAssignments.gameId, input.gameId),
+          eq(tournamentGameAssignments.teamId, input.teamId)
+        )
+      );
+    await tx
+      .insert(tournamentGameAssignments)
+      .values({ gameId: input.toGameId, teamId: input.teamId, slotIndex });
+  });
 }
 
 async function fetchTournamentRows(db: QueryExecutor, tournamentId: number) {
@@ -770,6 +1073,17 @@ async function listOwnerCandidates(db: QueryExecutor) {
 
 async function updateTournamentName(tournamentId: number, name: string) {
   return runBoardMutationAndFetch(tournamentId, async tx => {
+    const [tournament] = await tx
+      .select({ name: tournaments.name })
+      .from(tournaments)
+      .where(eq(tournaments.id, tournamentId))
+      .limit(1);
+    if (!tournament)
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Tournament not found",
+      });
+    if (tournament.name === name) return false;
     await tx
       .update(tournaments)
       .set({ name })
@@ -796,32 +1110,41 @@ async function setTournamentOwner(
   tournamentId: number,
   ownerUserId: number | null
 ) {
-  const db = await requireDb();
-  await fetchTournamentRows(db, tournamentId);
-  if (ownerUserId !== null) {
-    const [owner] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.id, ownerUserId))
+  return runBoardMutationAndFetch(tournamentId, async tx => {
+    const [tournament] = await tx
+      .select({ ownerUserId: tournaments.ownerUserId })
+      .from(tournaments)
+      .where(eq(tournaments.id, tournamentId))
       .limit(1);
-    if (!owner)
+    if (!tournament)
       throw new TRPCError({
         code: "NOT_FOUND",
-        message: "Owner user not found",
+        message: "Tournament not found",
       });
-  }
-  await db
-    .update(tournaments)
-    .set({ ownerUserId })
-    .where(eq(tournaments.id, tournamentId));
-  return listTournamentRows(db);
+    if (ownerUserId !== null) {
+      const [owner] = await tx
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.id, ownerUserId))
+        .limit(1);
+      if (!owner)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Owner user not found",
+        });
+    }
+    if (tournament.ownerUserId === ownerUserId) return false;
+    await tx
+      .update(tournaments)
+      .set({ ownerUserId })
+      .where(eq(tournaments.id, tournamentId));
+  });
 }
 
 async function deleteTournament(tournamentId: number) {
   const db = await requireDb();
   return db.transaction(async tx => {
-    const data = await fetchTournamentRows(tx, tournamentId);
-    assertTournamentUnlocked(data.tournament);
+    await lockTournamentForBoardMutation(tx, tournamentId);
     await tx.execute(
       sql`UPDATE tournament_control_templates SET sourceTournamentId = NULL WHERE sourceTournamentId = ${tournamentId}`
     );
@@ -925,25 +1248,30 @@ async function getEligibleMapIdsForGameRandomization(
 }
 
 async function randomizeGameMap(db: QueryExecutor, gameId: number) {
-  const game = await getGameOrThrow(db, gameId);
-  const data = await fetchTournamentRows(db, game.tournamentId);
-  assertTournamentUnlocked(data.tournament);
-  const eligibleMapIds = await getEligibleMapIdsForGameRandomization(
-    db,
-    gameId
-  );
-  if (eligibleMapIds.length === 0)
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "No eligible maps remain after assigned team map bans.",
-    });
-  const [mapId] = drawUniqueMaps(eligibleMapIds, 1);
-  await db
-    .update(tournamentGames)
-    .set({ mapId })
-    .where(eq(tournamentGames.id, gameId));
-  await incrementBoardRevision(db, game.tournamentId);
-  return fetchTournamentControlData(game.tournamentId);
+  const tournamentId = await resolveGameTournamentId(gameId);
+  return runBoardMutationAndFetch(tournamentId, async tx => {
+    const gameInTx = await getGameOrThrow(tx, gameId);
+    if (gameInTx.tournamentId !== tournamentId)
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Lobby belongs to another tournament.",
+      });
+    const eligibleMapIds = await getEligibleMapIdsForGameRandomization(
+      tx,
+      gameId
+    );
+    if (eligibleMapIds.length === 0)
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "No eligible maps remain after assigned team map bans.",
+      });
+    const [mapId] = drawUniqueMaps(eligibleMapIds, 1);
+    if (gameInTx.mapId === mapId) return false;
+    await tx
+      .update(tournamentGames)
+      .set({ mapId })
+      .where(eq(tournamentGames.id, gameId));
+  });
 }
 
 async function moveGames(input: {
@@ -972,13 +1300,19 @@ async function moveGames(input: {
         message: "Selected lobbies must belong to this tournament.",
       });
     for (const game of games) assertGamePositionUnlocked(game);
+    let changed = false;
     for (const entry of input.positions) {
       const safePosition = clampCanvasPosition(entry.position);
+      const game = games.find(row => row.id === entry.gameId);
+      if (game?.canvasX === safePosition.x && game.canvasY === safePosition.y)
+        continue;
+      changed = true;
       await tx
         .update(tournamentGames)
         .set({ canvasX: safePosition.x, canvasY: safePosition.y })
         .where(eq(tournamentGames.id, entry.gameId));
     }
+    if (!changed) return false;
   });
 }
 
@@ -988,63 +1322,79 @@ async function connectGames(
   targetGameId: number,
   flowType: ConnectionFlowType = "winner"
 ) {
-  const db = await requireDb();
-  const data = await fetchTournamentRows(db, tournamentId);
-  assertTournamentUnlocked(data.tournament);
-  await assertConnectionGames(db, tournamentId, sourceGameId, targetGameId);
-  await db.execute(sql`
-    INSERT INTO tournament_game_connections (tournamentId, sourceGameId, targetGameId, flowType)
-    VALUES (${tournamentId}, ${sourceGameId}, ${targetGameId}, ${flowType})
-    ON DUPLICATE KEY UPDATE updatedAt = CURRENT_TIMESTAMP
-  `);
-  await incrementBoardRevision(db, tournamentId);
-  return fetchTournamentControlData(tournamentId);
+  return runBoardMutationAndFetch(tournamentId, async tx => {
+    await assertConnectionGames(tx, tournamentId, sourceGameId, targetGameId);
+    const existing = readRows<{ id: number; flowType: ConnectionFlowType }>(
+      await tx.execute(
+        sql`SELECT id, flowType FROM tournament_game_connections WHERE tournamentId = ${tournamentId} AND sourceGameId = ${sourceGameId} AND targetGameId = ${targetGameId} LIMIT 1 FOR UPDATE`
+      )
+    )[0];
+    if (existing?.flowType === flowType) return false;
+    await tx.execute(sql`
+      INSERT INTO tournament_game_connections (tournamentId, sourceGameId, targetGameId, flowType)
+      VALUES (${tournamentId}, ${sourceGameId}, ${targetGameId}, ${flowType})
+      ON DUPLICATE KEY UPDATE flowType = VALUES(flowType), updatedAt = CURRENT_TIMESTAMP
+    `);
+  });
 }
 
 async function deleteGameConnection(connectionId: number) {
-  const db = await requireDb();
-  const connectionRows = readRows<ControlGameConnection>(
-    await db.execute(
-      sql`SELECT id, tournamentId, sourceGameId, targetGameId, flowType FROM tournament_game_connections WHERE id = ${connectionId} LIMIT 1`
-    )
-  );
-  const [connection] = connectionRows;
-  if (!connection)
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Lobby connection not found",
-    });
-  await db.execute(
-    sql`DELETE FROM tournament_game_connections WHERE id = ${connectionId}`
-  );
-  return fetchTournamentControlData(connection.tournamentId);
+  const tournamentId = await resolveConnectionTournamentId(connectionId);
+  return runBoardMutationAndFetch(tournamentId, async tx => {
+    const rows = readRows<{ id: number }>(
+      await tx.execute(
+        sql`SELECT id FROM tournament_game_connections WHERE id = ${connectionId} AND tournamentId = ${tournamentId} LIMIT 1 FOR UPDATE`
+      )
+    );
+    if (rows.length === 0) return false;
+    await tx.execute(
+      sql`DELETE FROM tournament_game_connections WHERE id = ${connectionId} AND tournamentId = ${tournamentId}`
+    );
+  });
 }
 
 async function clearTournamentConnections(tournamentId: number) {
-  const db = await requireDb();
-  await fetchTournamentRows(db, tournamentId);
-  await db.execute(
-    sql`DELETE FROM tournament_game_connections WHERE tournamentId = ${tournamentId}`
-  );
-  return fetchTournamentControlData(tournamentId);
+  return runBoardMutationAndFetch(tournamentId, async tx => {
+    const rows = readRows<{ id: number }>(
+      await tx.execute(
+        sql`SELECT id FROM tournament_game_connections WHERE tournamentId = ${tournamentId} FOR UPDATE`
+      )
+    );
+    if (rows.length === 0) return false;
+    await tx.execute(
+      sql`DELETE FROM tournament_game_connections WHERE tournamentId = ${tournamentId}`
+    );
+  });
 }
 
 async function returnTournamentTeamsToAvailable(tournamentId: number) {
-  const db = await requireDb();
-  await fetchTournamentRows(db, tournamentId);
-  await db.execute(
-    sql`DELETE tournament_game_assignments FROM tournament_game_assignments INNER JOIN tournament_games ON tournament_game_assignments.gameId = tournament_games.id WHERE tournament_games.tournamentId = ${tournamentId}`
-  );
-  return fetchTournamentControlData(tournamentId);
+  return runBoardMutationAndFetch(tournamentId, async tx => {
+    const rows = readRows<{ id: number }>(
+      await tx.execute(
+        sql`SELECT tournament_game_assignments.id FROM tournament_game_assignments INNER JOIN tournament_games ON tournament_game_assignments.gameId = tournament_games.id WHERE tournament_games.tournamentId = ${tournamentId} FOR UPDATE`
+      )
+    );
+    if (rows.length === 0) return false;
+    await tx.execute(
+      sql`DELETE tournament_game_assignments FROM tournament_game_assignments INNER JOIN tournament_games ON tournament_game_assignments.gameId = tournament_games.id WHERE tournament_games.tournamentId = ${tournamentId}`
+    );
+  });
 }
 
 async function autoFillLobby(gameId: number) {
   const db = await requireDb();
+  const game = await getGameOrThrow(db, gameId);
   return db.transaction(async tx => {
+    await lockTournamentForBoardMutation(tx, game.tournamentId);
     await tx.execute(
-      sql`SELECT id FROM tournament_games WHERE id = ${gameId} FOR UPDATE`
+      sql`SELECT id FROM tournament_games WHERE id = ${gameId} AND tournamentId = ${game.tournamentId} FOR UPDATE`
     );
     const targetGame = await getGameOrThrow(tx, gameId);
+    if (targetGame.tournamentId !== game.tournamentId)
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Lobby belongs to another tournament.",
+      });
     if (targetGame.status === "complete")
       throw new TRPCError({
         code: "CONFLICT",
@@ -1103,9 +1453,25 @@ async function setRoundGroupLocked(input: {
   locked: boolean;
 }) {
   return runBoardMutationAndFetch(input.tournamentId, async tx => {
+    const games = await tx
+      .select({
+        id: tournamentGames.id,
+        roundLocked: tournamentGames.roundLocked,
+      })
+      .from(tournamentGames)
+      .where(
+        and(
+          eq(tournamentGames.tournamentId, input.tournamentId),
+          eq(tournamentGames.roundGroupId, input.roundGroupId)
+        )
+      );
+    if (games.length === 0)
+      throw new TRPCError({ code: "NOT_FOUND", message: "Group not found." });
+    const nextLocked = input.locked ? 1 : 0;
+    if (games.every(game => game.roundLocked === nextLocked)) return false;
     await tx
       .update(tournamentGames)
-      .set({ roundLocked: input.locked ? 1 : 0 })
+      .set({ roundLocked: nextLocked })
       .where(
         and(
           eq(tournamentGames.tournamentId, input.tournamentId),
@@ -1134,10 +1500,7 @@ async function updateRoundGroup(input: {
   color?: z.infer<typeof roundColorSchema>;
   mode: "create" | "add" | "rename" | "remove" | "color";
 }) {
-  const db = await requireDb();
-  return db.transaction(async tx => {
-    const data = await fetchTournamentRows(tx, input.tournamentId);
-    assertTournamentUnlocked(data.tournament);
+  return runBoardMutationAndFetch(input.tournamentId, async tx => {
     const uniqueGameIds = Array.from(new Set(input.gameIds));
     if (
       (input.mode === "create" || input.mode === "add") &&
@@ -1167,6 +1530,16 @@ async function updateRoundGroup(input: {
         message: "Selected lobbies must belong to this tournament.",
       });
     if (input.mode === "remove") {
+      if (
+        selectedGames.every(
+          game =>
+            !game.roundGroupId &&
+            !game.roundLabel &&
+            !game.roundColor &&
+            game.roundLocked === 0
+        )
+      )
+        return false;
       await tx
         .update(tournamentGames)
         .set({
@@ -1183,12 +1556,34 @@ async function updateRoundGroup(input: {
           code: "BAD_REQUEST",
           message: "Group not found.",
         });
+      const matchingGames = await tx
+        .select()
+        .from(tournamentGames)
+        .where(
+          and(
+            eq(tournamentGames.tournamentId, input.tournamentId),
+            eq(tournamentGames.roundGroupId, groupId)
+          )
+        );
+      const nextValue =
+        input.mode === "color"
+          ? (input.color ?? "gold")
+          : (input.label ?? "Group");
+      if (
+        matchingGames.length > 0 &&
+        matchingGames.every(game =>
+          input.mode === "color"
+            ? game.roundColor === nextValue
+            : game.roundLabel === nextValue
+        )
+      )
+        return false;
       await tx
         .update(tournamentGames)
         .set(
           input.mode === "color"
-            ? { roundColor: input.color ?? "gold" }
-            : { roundLabel: input.label ?? "Group" }
+            ? { roundColor: nextValue }
+            : { roundLabel: nextValue }
         )
         .where(
           and(
@@ -1197,28 +1592,57 @@ async function updateRoundGroup(input: {
           )
         );
     } else {
+      const nextGroupId = input.roundGroupId ?? randomUUID();
+      const nextLabel = input.label ?? "Group";
+      const nextColor = input.color ?? null;
+      const nextLocked =
+        selectedGames.find(game => game.roundGroupId === input.roundGroupId)
+          ?.roundLocked ?? 0;
+      if (
+        selectedGames.every(
+          game =>
+            game.roundGroupId === nextGroupId &&
+            game.roundLabel === nextLabel &&
+            game.roundColor === nextColor &&
+            game.roundLocked === nextLocked
+        )
+      )
+        return false;
       await tx
         .update(tournamentGames)
         .set({
-          roundGroupId: input.roundGroupId ?? randomUUID(),
-          roundLabel: input.label ?? "Group",
-          roundColor: input.color ?? null,
-          roundLocked:
-            selectedGames.find(game => game.roundGroupId === input.roundGroupId)
-              ?.roundLocked ?? 0,
+          roundGroupId: nextGroupId,
+          roundLabel: nextLabel,
+          roundColor: nextColor,
+          roundLocked: nextLocked,
         })
         .where(inArray(tournamentGames.id, uniqueGameIds));
     }
-    await incrementBoardRevision(tx, input.tournamentId);
-    return fetchTournamentRows(tx, input.tournamentId);
   });
 }
 
 async function clearTournamentCanvas(tournamentId: number) {
-  const db = await requireDb();
-  return db.transaction(async tx => {
-    const data = await fetchTournamentRows(tx, tournamentId);
-    assertTournamentUnlocked(data.tournament);
+  return runBoardMutationAndFetch(tournamentId, async tx => {
+    const existingGames = await tx
+      .select({ id: tournamentGames.id })
+      .from(tournamentGames)
+      .where(eq(tournamentGames.tournamentId, tournamentId));
+    const existingConnections = readRows<{ id: number }>(
+      await tx.execute(
+        sql`SELECT id FROM tournament_game_connections WHERE tournamentId = ${tournamentId} FOR UPDATE`
+      )
+    );
+    const existingAssignments = readRows<{ id: number }>(
+      await tx.execute(
+        sql`SELECT tournament_game_assignments.id FROM tournament_game_assignments INNER JOIN tournament_games ON tournament_game_assignments.gameId = tournament_games.id WHERE tournament_games.tournamentId = ${tournamentId} FOR UPDATE`
+      )
+    );
+    if (
+      existingGames.length === 0 &&
+      existingConnections.length === 0 &&
+      existingAssignments.length === 0
+    )
+      return false;
     await tx.execute(
       sql`DELETE FROM tournament_game_connections WHERE tournamentId = ${tournamentId}`
     );
@@ -1228,8 +1652,6 @@ async function clearTournamentCanvas(tournamentId: number) {
     await tx
       .delete(tournamentGames)
       .where(eq(tournamentGames.tournamentId, tournamentId));
-    await incrementBoardRevision(tx, tournamentId);
-    return fetchTournamentRows(tx, tournamentId);
   });
 }
 
@@ -1239,8 +1661,30 @@ async function restoreTournamentBoardSnapshot(
 ) {
   const db = await requireDb();
   return db.transaction(async tx => {
+    const lockedRows = readRows<{
+      id: number;
+      boardRevision: number;
+      finalizedAt: Date | null;
+    }>(
+      await tx.execute(
+        sql`SELECT id, boardRevision, finalizedAt FROM tournaments WHERE id = ${tournamentId} FOR UPDATE`
+      )
+    );
+    const [lockedTournament] = lockedRows;
+    if (!lockedTournament)
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Tournament not found",
+      });
+    assertTournamentUnlocked(lockedTournament);
+    if (lockedTournament.boardRevision !== snapshot.expectedRevision)
+      throw new TRPCError({
+        code: "CONFLICT",
+        message:
+          "The tournament changed after this action. Refresh before using Undo.",
+      });
+
     const data = await fetchTournamentRows(tx, tournamentId);
-    assertTournamentUnlocked(data.tournament);
     const tournamentTeamRows = await tx
       .select({ id: teams.id })
       .from(teams)
@@ -1279,29 +1723,6 @@ async function restoreTournamentBoardSnapshot(
           message: "Snapshot connection references an unknown lobby",
         });
     }
-
-    const lockedRows = readRows<{
-      id: number;
-      boardRevision: number;
-      finalizedAt: Date | null;
-    }>(
-      await tx.execute(
-        sql`SELECT id, boardRevision, finalizedAt FROM tournaments WHERE id = ${tournamentId} FOR UPDATE`
-      )
-    );
-    const [lockedTournament] = lockedRows;
-    if (!lockedTournament)
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Tournament not found",
-      });
-    assertTournamentUnlocked(lockedTournament);
-    if (lockedTournament.boardRevision !== snapshot.expectedRevision)
-      throw new TRPCError({
-        code: "CONFLICT",
-        message:
-          "The tournament changed after this action. Refresh before using Undo.",
-      });
 
     if (snapshot.games.length > PERSONAL_TCR_LIMITS.gameNodesPerTournament)
       throw new TRPCError({
@@ -1565,16 +1986,7 @@ async function getActiveViewerLink(db: QueryExecutor, tournamentId: number) {
 async function getOrCreateViewerLink(tournamentId: number, userId: number) {
   const db = await requireDb();
   return db.transaction(async tx => {
-    const tournamentRows = readRows<{ id: number }>(
-      await tx.execute(
-        sql`SELECT id FROM tournaments WHERE id = ${tournamentId} FOR UPDATE`
-      )
-    );
-    if (!tournamentRows.length)
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Tournament not found",
-      });
+    await lockTournamentForBoardMutation(tx, tournamentId);
     const existing = await getActiveViewerLink(tx, tournamentId);
     if (existing?.publicToken)
       return {
@@ -1605,16 +2017,7 @@ async function getOrCreateViewerLink(tournamentId: number, userId: number) {
 async function regenerateViewerLink(tournamentId: number, userId: number) {
   const db = await requireDb();
   return db.transaction(async tx => {
-    const tournamentRows = readRows<{ id: number }>(
-      await tx.execute(
-        sql`SELECT id FROM tournaments WHERE id = ${tournamentId} FOR UPDATE`
-      )
-    );
-    if (!tournamentRows.length)
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Tournament not found",
-      });
+    await lockTournamentForBoardMutation(tx, tournamentId);
     await tx
       .update(tournamentViewerLinks)
       .set({ status: "revoked", updatedAt: sql`now()` })
@@ -2171,6 +2574,45 @@ async function sendDiscordDm(discordUserId: string, content: string) {
     throw new Error(`Discord DM failed (${messageResponse.status})`);
 }
 
+async function releaseLobbyCodeDeliveries(
+  gameId: number,
+  releasedByUserId: number,
+  teamId?: number
+) {
+  const db = await requireDb();
+  const tournamentId = await resolveGameTournamentId(gameId);
+  await db.transaction(async tx => {
+    await lockTournamentForBoardMutation(tx, tournamentId);
+    const game = await getGameOrThrow(tx, gameId);
+    if (game.tournamentId !== tournamentId)
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Lobby belongs to another tournament.",
+      });
+    const rows = await tx
+      .select({ assignment: tournamentGameAssignments, team: teams })
+      .from(tournamentGameAssignments)
+      .innerJoin(teams, eq(tournamentGameAssignments.teamId, teams.id))
+      .where(eq(tournamentGameAssignments.gameId, gameId));
+    const selected = teamId ? rows.filter(row => row.team.id === teamId) : rows;
+    if (teamId && selected.length === 0)
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Team is not assigned to this lobby",
+      });
+    for (const row of selected) {
+      if (row.team.tournamentId !== tournamentId)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Assigned team belongs to another tournament.",
+        });
+      await tx.execute(
+        sql`INSERT INTO tournament_lobby_code_deliveries (gameId, teamId, releasedByUserId, lastDiscordAttemptAt) VALUES (${gameId}, ${row.team.id}, ${releasedByUserId}, NOW()) ON DUPLICATE KEY UPDATE status = 'available', releasedByUserId = ${releasedByUserId}, lastDiscordAttemptAt = NOW(), updatedAt = NOW()`
+      );
+    }
+  });
+}
+
 async function sendLobbyCode(gameId: number, teamId?: number) {
   const db = await requireDb();
   const preview = await getLobbyCodeRecipients(db, gameId, teamId);
@@ -2256,7 +2698,18 @@ async function listSubmissionRows(db: QueryExecutor, tournamentId?: number) {
 
 async function approveSubmission(submissionId: number) {
   const db = await requireDb();
+  const [resolved] = await db
+    .select({ tournamentId: tournamentTeamSubmissions.tournamentId })
+    .from(tournamentTeamSubmissions)
+    .where(eq(tournamentTeamSubmissions.id, submissionId))
+    .limit(1);
+  if (!resolved)
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Team submission not found",
+    });
   return db.transaction(async tx => {
+    await lockTournamentForBoardMutation(tx, resolved.tournamentId);
     const [row] = await tx
       .select({
         submission: tournamentTeamSubmissions,
@@ -2269,26 +2722,11 @@ async function approveSubmission(submissionId: number) {
       )
       .where(eq(tournamentTeamSubmissions.id, submissionId))
       .limit(1);
-    if (!row)
+    if (!row || row.submission.tournamentId !== resolved.tournamentId)
       throw new TRPCError({
         code: "NOT_FOUND",
         message: "Team submission not found",
       });
-    const lockedTournamentRows = readRows<{
-      id: number;
-      finalizedAt: Date | null;
-    }>(
-      await tx.execute(
-        sql`SELECT id, finalizedAt FROM tournaments WHERE id = ${row.submission.tournamentId} FOR UPDATE`
-      )
-    );
-    const [lockedTournament] = lockedTournamentRows;
-    if (!lockedTournament)
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Tournament not found",
-      });
-    assertTournamentUnlocked(lockedTournament);
     const existing = await tx
       .select()
       .from(teams)
@@ -2299,6 +2737,7 @@ async function approveSubmission(submissionId: number) {
         )
       )
       .limit(1);
+    let changed = false;
     if (
       shouldCreateTournamentTeamForApproval({
         status: row.submission.status,
@@ -2317,17 +2756,31 @@ async function approveSubmission(submissionId: number) {
         name: row.managedTeam.name,
         frp: 0,
       });
+      changed = true;
     }
-    await tx
-      .update(tournamentTeamSubmissions)
-      .set({ status: "approved", adminNote: null })
-      .where(eq(tournamentTeamSubmissions.id, submissionId));
-    await ensureViewerLinkForApprovedSubmission(
+    if (
+      row.submission.status !== "approved" ||
+      row.submission.adminNote !== null
+    ) {
+      await tx
+        .update(tournamentTeamSubmissions)
+        .set({ status: "approved", adminNote: null })
+        .where(eq(tournamentTeamSubmissions.id, submissionId));
+      changed = true;
+    }
+    const activeViewerLink = await getActiveViewerLink(
       tx,
-      row.submission.tournamentId,
-      row.submission.submittedByUserId
+      row.submission.tournamentId
     );
-    await incrementBoardRevision(tx, row.submission.tournamentId);
+    if (!activeViewerLink?.publicToken) {
+      await ensureViewerLinkForApprovedSubmission(
+        tx,
+        row.submission.tournamentId,
+        row.submission.submittedByUserId
+      );
+      changed = true;
+    }
+    if (changed) await incrementBoardRevision(tx, row.submission.tournamentId);
     return fetchTournamentRows(tx, row.submission.tournamentId);
   });
 }
@@ -2338,7 +2791,7 @@ async function rejectSubmission(
 ) {
   const db = await requireDb();
   const [submission] = await db
-    .select()
+    .select({ tournamentId: tournamentTeamSubmissions.tournamentId })
     .from(tournamentTeamSubmissions)
     .where(eq(tournamentTeamSubmissions.id, submissionId))
     .limit(1);
@@ -2347,11 +2800,25 @@ async function rejectSubmission(
       code: "NOT_FOUND",
       message: "Team submission not found",
     });
-  await db
-    .update(tournamentTeamSubmissions)
-    .set({ status: "rejected", adminNote: adminNote ?? null })
-    .where(eq(tournamentTeamSubmissions.id, submissionId));
-  return listSubmissionRows(db, submission.tournamentId);
+  return runBoardMutationAndFetch(submission.tournamentId, async tx => {
+    const [current] = await tx
+      .select()
+      .from(tournamentTeamSubmissions)
+      .where(eq(tournamentTeamSubmissions.id, submissionId))
+      .limit(1);
+    if (!current || current.tournamentId !== submission.tournamentId)
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Team submission not found",
+      });
+    const note = adminNote ?? null;
+    if (current.status === "rejected" && current.adminNote === note)
+      return false;
+    await tx
+      .update(tournamentTeamSubmissions)
+      .set({ status: "rejected", adminNote: note })
+      .where(eq(tournamentTeamSubmissions.id, submissionId));
+  });
 }
 
 export async function assignTeamToGameSlot(
@@ -2359,9 +2826,8 @@ export async function assignTeamToGameSlot(
   teamId: number,
   preferredSlotIndex?: number
 ) {
-  const db = await requireDb();
-  const game = await getGameOrThrow(db, gameId);
-  return runBoardMutationAndFetch(game.tournamentId, async tx => {
+  const tournamentId = await resolveGameTournamentId(gameId);
+  return runBoardMutationAndFetch(tournamentId, async tx => {
     const gameInTx = await getGameOrThrow(tx, gameId);
     const context = await fetchGameContext(tx, gameInTx.tournamentId);
     const slotIndex = resolveAssignmentSlot({
@@ -2386,8 +2852,8 @@ async function setAssignmentResultPlacement(
   assignmentId: number,
   resultPlacement: number | null
 ) {
-  const db = await requireDb();
-  return db.transaction(async tx => {
+  const tournamentId = await resolveAssignmentTournamentId(assignmentId);
+  return runBoardMutationAndFetch(tournamentId, async tx => {
     const [row] = await tx
       .select({ assignment: tournamentGameAssignments, game: tournamentGames })
       .from(tournamentGameAssignments)
@@ -2398,15 +2864,17 @@ async function setAssignmentResultPlacement(
       .where(eq(tournamentGameAssignments.id, assignmentId))
       .limit(1);
 
-    if (!row) {
+    if (!row)
       throw new TRPCError({
         code: "NOT_FOUND",
         message: "Team assignment not found",
       });
-    }
+    if (row.game.tournamentId !== tournamentId)
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Assignment belongs to another tournament.",
+      });
 
-    const data = await fetchTournamentRows(tx, row.game.tournamentId);
-    assertTournamentUnlocked(data.tournament);
     const capacity = gameCapacity[row.game.gameType];
     if (resultPlacement !== null && resultPlacement > capacity) {
       throw new TRPCError({
@@ -2414,6 +2882,8 @@ async function setAssignmentResultPlacement(
         message: `${row.game.gameType === "cashout" ? "Cashout lobbies" : "Final Round matches"} only support placements 1-${capacity}`,
       });
     }
+
+    if (row.assignment.resultPlacement === resultPlacement) return false;
 
     if (resultPlacement !== null) {
       await tx.execute(
@@ -2424,8 +2894,113 @@ async function setAssignmentResultPlacement(
     await tx.execute(
       sql`UPDATE tournament_game_assignments SET resultPlacement = ${resultPlacement} WHERE id = ${assignmentId}`
     );
-    await incrementBoardRevision(tx, row.game.tournamentId);
-    return fetchTournamentRows(tx, row.game.tournamentId);
+  });
+}
+
+async function acceptTeamClaimLink(token: string, user: { id: number }) {
+  const db = await requireDb();
+  const tokenHash = hashToken(token);
+  const [resolved] = await db
+    .select({ tournamentId: teams.tournamentId })
+    .from(tournamentTeamClaimLinks)
+    .innerJoin(teams, eq(tournamentTeamClaimLinks.tournamentTeamId, teams.id))
+    .where(eq(tournamentTeamClaimLinks.tokenHash, tokenHash))
+    .limit(1);
+  if (!resolved)
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Claim link not found.",
+    });
+
+  return db.transaction(async tx => {
+    await lockTournamentForBoardMutation(tx, resolved.tournamentId);
+    const [row] = await tx
+      .select({ link: tournamentTeamClaimLinks, team: teams })
+      .from(tournamentTeamClaimLinks)
+      .innerJoin(teams, eq(tournamentTeamClaimLinks.tournamentTeamId, teams.id))
+      .where(eq(tournamentTeamClaimLinks.tokenHash, tokenHash))
+      .limit(1);
+    if (!row || row.team.tournamentId !== resolved.tournamentId)
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Claim link not found.",
+      });
+    const state = getClaimLinkState(row.link);
+    if (state.revoked)
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "This claim link has been revoked.",
+      });
+    if (state.claimed)
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "This claim link has already been used.",
+      });
+    if (state.expired)
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "This claim link has expired.",
+      });
+    if (row.team.managedTeamId)
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: "This team is already managed.",
+      });
+
+    const baseSlug = createManagedTeamSlug(row.team.name);
+    let slug = baseSlug;
+    for (let i = 2; ; i++) {
+      const existing = await tx
+        .select({ id: managedTeams.id })
+        .from(managedTeams)
+        .where(eq(managedTeams.slug, slug))
+        .limit(1);
+      if (!existing.length) break;
+      slug = `${baseSlug}-${i}`.slice(0, 80);
+    }
+    await tx
+      .insert(managedTeams)
+      .values({ name: row.team.name, slug, captainUserId: user.id });
+    const [managedTeam] = await tx
+      .select()
+      .from(managedTeams)
+      .where(eq(managedTeams.slug, slug))
+      .limit(1);
+    if (!managedTeam)
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Managed team creation failed.",
+      });
+    await tx.insert(managedTeamMembers).values({
+      teamId: managedTeam.id,
+      userId: user.id,
+      role: "captain",
+    });
+    await tx
+      .update(teams)
+      .set({ managedTeamId: managedTeam.id })
+      .where(eq(teams.id, row.team.id));
+    const claimResult = await tx.execute(sql`
+      UPDATE tournament_team_claim_links
+      SET status = 'claimed', claimedByUserId = ${user.id}, updatedAt = NOW()
+      WHERE id = ${row.link.id}
+        AND status = 'active'
+        AND expiresAt > NOW()
+    `);
+    if (getAffectedRows(claimResult) !== 1)
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: "This claim link has already been used.",
+      });
+    await incrementBoardRevision(tx, resolved.tournamentId);
+    const board = await fetchTournamentRows(tx, resolved.tournamentId);
+    return {
+      success: true,
+      managedTeamId: managedTeam.id,
+      tournamentId: row.team.tournamentId,
+      boardRevision: board.tournament.boardRevision,
+      board,
+    };
   });
 }
 
@@ -2525,14 +3100,17 @@ async function removeTournamentStaffMember(
 ) {
   const db = await requireDb();
   await getOwnedTournamentOrThrow(db, tournamentId, user);
-  await db
-    .delete(tournamentStaffMembers)
-    .where(
-      and(
-        eq(tournamentStaffMembers.tournamentId, tournamentId),
-        eq(tournamentStaffMembers.id, memberId)
-      )
-    );
+  await db.transaction(async tx => {
+    await lockTournamentForBoardMutation(tx, tournamentId);
+    await tx
+      .delete(tournamentStaffMembers)
+      .where(
+        and(
+          eq(tournamentStaffMembers.tournamentId, tournamentId),
+          eq(tournamentStaffMembers.id, memberId)
+        )
+      );
+  });
   return listTournamentStaff(tournamentId, user);
 }
 async function getOrCreateStaffInviteLink(
@@ -2542,6 +3120,7 @@ async function getOrCreateStaffInviteLink(
   const db = await requireDb();
   await getOwnedTournamentOrThrow(db, tournamentId, user);
   return db.transaction(async tx => {
+    await lockTournamentForBoardMutation(tx, tournamentId);
     const [existing] = await tx
       .execute(
         sql`
@@ -2596,16 +3175,52 @@ async function revokeStaffInviteLink(
 ) {
   const db = await requireDb();
   await getOwnedTournamentOrThrow(db, tournamentId, user);
-  await db
-    .update(tournamentStaffInviteLinks)
-    .set({ status: "revoked", updatedAt: sql`now()` })
-    .where(
-      and(
-        eq(tournamentStaffInviteLinks.tournamentId, tournamentId),
-        eq(tournamentStaffInviteLinks.status, "active")
-      )
-    );
+  await db.transaction(async tx => {
+    await lockTournamentForBoardMutation(tx, tournamentId);
+    await tx
+      .update(tournamentStaffInviteLinks)
+      .set({ status: "revoked", updatedAt: sql`now()` })
+      .where(
+        and(
+          eq(tournamentStaffInviteLinks.tournamentId, tournamentId),
+          eq(tournamentStaffInviteLinks.status, "active")
+        )
+      );
+  });
   return { success: true } as const;
+}
+
+async function regenerateStaffInviteLink(
+  tournamentId: number,
+  user: { id: number; role: "user" | "admin" }
+) {
+  const db = await requireDb();
+  await getOwnedTournamentOrThrow(db, tournamentId, user);
+  return db.transaction(async tx => {
+    await lockTournamentForBoardMutation(tx, tournamentId);
+    await tx.execute(sql`
+      UPDATE tournament_staff_invite_links
+      SET status = 'revoked', updatedAt = NOW()
+      WHERE tournamentId = ${tournamentId}
+        AND status = 'active'
+    `);
+    const token = randomBytes(32).toString("base64url");
+    const expiresAt = new Date(
+      Date.now() + STAFF_INVITE_TTL_DAYS * 24 * 60 * 60 * 1000
+    );
+    await tx.insert(tournamentStaffInviteLinks).values({
+      tournamentId,
+      createdByUserId: user.id,
+      tokenHash: hashToken(token),
+      expiresAt,
+    });
+    return {
+      path: createTokenPath("/TCR/staff/join", token),
+      url: createTokenPath("/TCR/staff/join", token),
+      expiresAt,
+      hasActiveInvite: true,
+    } as const;
+  });
 }
 
 async function previewStaffInvite(token: string) {
@@ -2669,6 +3284,7 @@ async function acceptStaffInvite(
         code: "NOT_FOUND",
         message: "This staff invite is invalid.",
       });
+    await lockTournamentForBoardMutation(tx, row.tournament.id);
     if (row.invite.status === "revoked")
       throw new TRPCError({
         code: "FORBIDDEN",
@@ -2731,28 +3347,59 @@ async function getOrCreatePrivateInviteLink(
       path: createTokenPath("/tournaments/invite", existing.token),
       url: createTokenPath("/tournaments/invite", existing.token),
     } as const;
-  const active = await db
-    .select({ id: tournamentPrivateInviteLinks.id })
-    .from(tournamentPrivateInviteLinks)
-    .where(
-      and(
-        eq(tournamentPrivateInviteLinks.tournamentId, tournamentId),
-        eq(tournamentPrivateInviteLinks.status, "active")
-      )
-    );
-  if (active.length >= PERSONAL_TCR_LIMITS.activePrivateLinksPerTournament)
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "Private invite link limit reached.",
-    });
-  const token = randomBytes(32).toString("base64url");
-  await db
-    .insert(tournamentPrivateInviteLinks)
-    .values({ tournamentId, createdByUserId: user.id, token });
-  return {
-    path: createTokenPath("/tournaments/invite", token),
-    url: createTokenPath("/tournaments/invite", token),
-  } as const;
+  return db.transaction(async tx => {
+    await lockTournamentForBoardMutation(tx, tournamentId);
+    const active = await tx
+      .select({ id: tournamentPrivateInviteLinks.id })
+      .from(tournamentPrivateInviteLinks)
+      .where(
+        and(
+          eq(tournamentPrivateInviteLinks.tournamentId, tournamentId),
+          eq(tournamentPrivateInviteLinks.status, "active")
+        )
+      );
+    if (active.length >= PERSONAL_TCR_LIMITS.activePrivateLinksPerTournament)
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Private invite link limit reached.",
+      });
+    const token = randomBytes(32).toString("base64url");
+    await tx
+      .insert(tournamentPrivateInviteLinks)
+      .values({ tournamentId, createdByUserId: user.id, token });
+    return {
+      path: createTokenPath("/tournaments/invite", token),
+      url: createTokenPath("/tournaments/invite", token),
+    } as const;
+  });
+}
+
+async function regeneratePrivateInviteLink(
+  tournamentId: number,
+  user: { id: number; role: "user" | "admin" }
+) {
+  const db = await requireDb();
+  await getMutableManageableTournamentOrThrow(db, tournamentId, user);
+  return db.transaction(async tx => {
+    await lockTournamentForBoardMutation(tx, tournamentId);
+    await tx
+      .update(tournamentPrivateInviteLinks)
+      .set({ status: "revoked", updatedAt: sql`now()` })
+      .where(
+        and(
+          eq(tournamentPrivateInviteLinks.tournamentId, tournamentId),
+          eq(tournamentPrivateInviteLinks.status, "active")
+        )
+      );
+    const token = randomBytes(32).toString("base64url");
+    await tx
+      .insert(tournamentPrivateInviteLinks)
+      .values({ tournamentId, createdByUserId: user.id, token });
+    return {
+      path: createTokenPath("/tournaments/invite", token),
+      url: createTokenPath("/tournaments/invite", token),
+    } as const;
+  });
 }
 
 async function revokePrivateInviteLink(
@@ -2760,17 +3407,99 @@ async function revokePrivateInviteLink(
   user: { id: number; role: "user" | "admin" }
 ) {
   const db = await requireDb();
-  await getManageableTournamentOrThrow(db, tournamentId, user);
-  await db
-    .update(tournamentPrivateInviteLinks)
-    .set({ status: "revoked", updatedAt: sql`now()` })
-    .where(
-      and(
-        eq(tournamentPrivateInviteLinks.tournamentId, tournamentId),
-        eq(tournamentPrivateInviteLinks.status, "active")
-      )
-    );
+  await getMutableManageableTournamentOrThrow(db, tournamentId, user);
+  await db.transaction(async tx => {
+    await lockTournamentForBoardMutation(tx, tournamentId);
+    await tx
+      .update(tournamentPrivateInviteLinks)
+      .set({ status: "revoked", updatedAt: sql`now()` })
+      .where(
+        and(
+          eq(tournamentPrivateInviteLinks.tournamentId, tournamentId),
+          eq(tournamentPrivateInviteLinks.status, "active")
+        )
+      );
+  });
   return { success: true } as const;
+}
+
+async function createTeamClaimLink(
+  teamId: number,
+  user: { id: number; role: "user" | "admin" }
+) {
+  const db = await requireDb();
+  const [team] = await db
+    .select({ tournamentId: teams.tournamentId })
+    .from(teams)
+    .where(eq(teams.id, teamId))
+    .limit(1);
+  if (!team)
+    throw new TRPCError({ code: "NOT_FOUND", message: "Team not found." });
+  return db.transaction(async tx => {
+    await lockTournamentForBoardMutation(tx, team.tournamentId);
+    const [currentTeam] = await tx
+      .select()
+      .from(teams)
+      .where(eq(teams.id, teamId))
+      .limit(1);
+    if (!currentTeam || currentTeam.tournamentId !== team.tournamentId)
+      throw new TRPCError({ code: "NOT_FOUND", message: "Team not found." });
+    if (currentTeam.managedTeamId)
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: "This team is already managed.",
+      });
+    const token = randomBytes(32).toString("base64url");
+    const expiresAt = new Date(
+      Date.now() + CLAIM_LINK_TTL_DAYS * 24 * 60 * 60 * 1000
+    );
+    await tx.insert(tournamentTeamClaimLinks).values({
+      tournamentTeamId: currentTeam.id,
+      createdByUserId: user.id,
+      tokenHash: hashToken(token),
+      expiresAt,
+    });
+    return {
+      path: createTokenPath("/teams/claim", token),
+      url: createTokenPath("/teams/claim", token),
+      expiresAt,
+    };
+  });
+}
+
+async function revokeTeamClaimLink(linkId: number) {
+  const db = await requireDb();
+  const [row] = await db
+    .select({ team: teams })
+    .from(tournamentTeamClaimLinks)
+    .innerJoin(teams, eq(tournamentTeamClaimLinks.tournamentTeamId, teams.id))
+    .where(eq(tournamentTeamClaimLinks.id, linkId))
+    .limit(1);
+  if (!row)
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Claim link not found.",
+    });
+  return db.transaction(async tx => {
+    await lockTournamentForBoardMutation(tx, row.team.tournamentId);
+    const [current] = await tx
+      .select({ link: tournamentTeamClaimLinks, team: teams })
+      .from(tournamentTeamClaimLinks)
+      .innerJoin(teams, eq(tournamentTeamClaimLinks.tournamentTeamId, teams.id))
+      .where(eq(tournamentTeamClaimLinks.id, linkId))
+      .limit(1);
+    if (!current || current.team.tournamentId !== row.team.tournamentId)
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Claim link not found.",
+      });
+    if (current.link.status === "revoked") return { success: true } as const;
+    await tx
+      .update(tournamentTeamClaimLinks)
+      .set({ status: "revoked", updatedAt: sql`now()` })
+      .where(eq(tournamentTeamClaimLinks.id, linkId));
+    return { success: true } as const;
+  });
 }
 
 async function setTournamentVisibility(
@@ -2779,21 +3508,33 @@ async function setTournamentVisibility(
   user: { id: number; role: "user" | "admin" }
 ) {
   const db = await requireDb();
-  const tournament = await getManageableTournamentOrThrow(
-    db,
-    tournamentId,
-    user
-  );
-  const publicSlug =
-    visibility === "public"
-      ? (tournament.publicSlug ??
-        (await createUniquePublicSlug(db, tournament.name)))
-      : tournament.publicSlug;
-  await db
-    .update(tournaments)
-    .set({ visibility, publicSlug })
-    .where(eq(tournaments.id, tournamentId));
-  return listPersonalTournamentRows(db, user);
+  await getMutableManageableTournamentOrThrow(db, tournamentId, user);
+  return runBoardMutationAndFetch(tournamentId, async tx => {
+    const [fullTournament] = await tx
+      .select()
+      .from(tournaments)
+      .where(eq(tournaments.id, tournamentId))
+      .limit(1);
+    if (!fullTournament)
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Tournament not found",
+      });
+    const publicSlug =
+      visibility === "public"
+        ? (fullTournament.publicSlug ??
+          (await createUniquePublicSlug(tx, fullTournament.name)))
+        : fullTournament.publicSlug;
+    if (
+      fullTournament.visibility === visibility &&
+      fullTournament.publicSlug === publicSlug
+    )
+      return false;
+    await tx
+      .update(tournaments)
+      .set({ visibility, publicSlug })
+      .where(eq(tournaments.id, tournamentId));
+  });
 }
 
 async function publishTournament(
@@ -2802,24 +3543,38 @@ async function publishTournament(
   user: { id: number; role: "user" | "admin" }
 ) {
   const db = await requireDb();
-  const tournament = await getManageableTournamentOrThrow(
-    db,
-    tournamentId,
-    user
-  );
-  let publicSlug = tournament.publicSlug;
-  if (publish && tournament.visibility !== "public")
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "Set visibility to public before publishing.",
-    });
-  if (publish && !publicSlug)
-    publicSlug = await createUniquePublicSlug(db, tournament.name);
-  await db
-    .update(tournaments)
-    .set({ publicSlug, publishedAt: publish ? sql`now()` : null })
-    .where(eq(tournaments.id, tournamentId));
-  return listPersonalTournamentRows(db, user);
+  await getMutableManageableTournamentOrThrow(db, tournamentId, user);
+  return runBoardMutationAndFetch(tournamentId, async tx => {
+    const [tournament] = await tx
+      .select()
+      .from(tournaments)
+      .where(eq(tournaments.id, tournamentId))
+      .limit(1);
+    if (!tournament)
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Tournament not found",
+      });
+    let publicSlug = tournament.publicSlug;
+    if (publish && tournament.visibility !== "public")
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Set visibility to public before publishing.",
+      });
+    if (publish && !publicSlug)
+      publicSlug = await createUniquePublicSlug(tx, tournament.name);
+    if (
+      (publish &&
+        tournament.publishedAt &&
+        tournament.publicSlug === publicSlug) ||
+      (!publish && !tournament.publishedAt)
+    )
+      return false;
+    await tx
+      .update(tournaments)
+      .set({ publicSlug, publishedAt: publish ? sql`now()` : null })
+      .where(eq(tournaments.id, tournamentId));
+  });
 }
 
 async function listCommunityTournaments() {
@@ -2858,6 +3613,7 @@ function getArchivedResultsPath(tournamentId: number) {
 type FinalizationSummary = {
   tournamentId: number;
   finalizedAt: Date | null;
+  boardRevision: number | null;
   champion: { teamId: number; teamName: string } | null;
   resultsPath: string;
 };
@@ -2884,6 +3640,7 @@ async function getFinalizationSummary(
   return {
     tournamentId,
     finalizedAt: tournament?.finalizedAt ?? null,
+    boardRevision: tournament?.boardRevision ?? null,
     champion: champion
       ? {
           teamId: champion.tournamentTeamId,
@@ -3003,8 +3760,15 @@ async function finalizeTournament(
 ) {
   const db = await requireDb();
   return db.transaction(async tx => {
-    const tournament = await getOwnedTournamentOrThrow(tx, tournamentId, user);
-    if (tournament.finalizedAt) return getFinalizationSummary(tx, tournamentId);
+    const lockedTournament = await lockTournamentRow(tx, tournamentId);
+    if (user.role !== "admin" && lockedTournament.ownerUserId !== user.id)
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Only the tournament owner can finalize this tournament.",
+      });
+    if (lockedTournament.finalizedAt)
+      return getFinalizationSummary(tx, tournamentId);
+
     const data = await fetchTournamentRows(tx, tournamentId);
     const { championTeamId } = validateFinalizationData(data);
     const scoreboard = calculateTournamentScoreboard(
@@ -3045,6 +3809,7 @@ async function finalizeTournament(
         unlockedByUserId: null,
       })
       .where(eq(tournaments.id, tournamentId));
+    await incrementBoardRevision(tx, tournamentId);
     return getFinalizationSummary(tx, tournamentId);
   });
 }
@@ -3059,17 +3824,35 @@ async function unlockTournamentForEditing(
       message: "Only site administrators can unlock finalized tournaments.",
     });
   const db = await requireDb();
-  await db
-    .update(tournaments)
-    .set({
-      finalizedAt: null,
-      finalizedByUserId: null,
-      unlockedAt: sql`now()`,
-      unlockedByUserId: user.id,
-      eventStatus: "live",
-    })
-    .where(eq(tournaments.id, tournamentId));
-  return fetchTournamentControlData(tournamentId);
+  return db.transaction(async tx => {
+    const rows = readRows<{
+      id: number;
+      finalizedAt: Date | null;
+    }>(
+      await tx.execute(
+        sql`SELECT id, finalizedAt FROM tournaments WHERE id = ${tournamentId} FOR UPDATE`
+      )
+    );
+    const [tournament] = rows;
+    if (!tournament)
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Tournament not found",
+      });
+    if (!tournament.finalizedAt) return fetchTournamentRows(tx, tournamentId);
+    await tx
+      .update(tournaments)
+      .set({
+        finalizedAt: null,
+        finalizedByUserId: null,
+        unlockedAt: sql`now()`,
+        unlockedByUserId: user.id,
+        eventStatus: "live",
+      })
+      .where(eq(tournaments.id, tournamentId));
+    await incrementBoardRevision(tx, tournamentId);
+    return fetchTournamentRows(tx, tournamentId);
+  });
 }
 
 export const personalTcrProcedure = personalTcrAlphaProcedure;
@@ -3197,12 +3980,15 @@ export const personalTcrRouter = router({
     .input(tournamentIdSchema.extend({ registrationOpen: z.boolean() }))
     .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
-      await getManageableTournamentOrThrow(db, input.tournamentId, ctx.user);
-      await db
-        .update(tournaments)
-        .set({ registrationOpen: input.registrationOpen ? 1 : 0 })
-        .where(eq(tournaments.id, input.tournamentId));
-      return listPersonalTournamentRows(db, ctx.user);
+      await getMutableManageableTournamentOrThrow(
+        db,
+        input.tournamentId,
+        ctx.user
+      );
+      return setTournamentRegistrationOpenAndFetch(
+        input.tournamentId,
+        input.registrationOpen
+      );
     }),
   setTournamentVisibility: personalTcrProcedure
     .input(
@@ -3224,8 +4010,7 @@ export const personalTcrRouter = router({
   regeneratePrivateInviteLink: personalTcrProcedure
     .input(tournamentIdSchema)
     .mutation(async ({ input, ctx }) => {
-      await revokePrivateInviteLink(input.tournamentId, ctx.user);
-      return getOrCreatePrivateInviteLink(input.tournamentId, ctx.user);
+      return regeneratePrivateInviteLink(input.tournamentId, ctx.user);
     }),
   listStaff: personalTcrProcedure
     .input(tournamentIdSchema)
@@ -3245,8 +4030,7 @@ export const personalTcrRouter = router({
   regenerateStaffInviteLink: personalTcrProcedure
     .input(tournamentIdSchema)
     .mutation(async ({ input, ctx }) => {
-      await revokeStaffInviteLink(input.tournamentId, ctx.user);
-      return getOrCreateStaffInviteLink(input.tournamentId, ctx.user);
+      return regenerateStaffInviteLink(input.tournamentId, ctx.user);
     }),
   revokeStaffInviteLink: personalTcrProcedure
     .input(tournamentIdSchema)
@@ -3343,14 +4127,7 @@ export const personalTcrRouter = router({
         input.tournamentId,
         ctx.user
       );
-      await assertTeamLimit(db, input.tournamentId, ctx.user);
-      await assertUniqueTeamName(db, input.tournamentId, input.name);
-      await db.insert(teams).values({
-        tournamentId: input.tournamentId,
-        name: input.name,
-        frp: input.frp,
-      });
-      return fetchTournamentControlData(input.tournamentId);
+      return createTournamentTeamAndFetch({ ...input, user: ctx.user });
     }),
   deleteTeam: personalTcrProcedure
     .input(tournamentIdSchema.extend({ teamId: idSchema }))
@@ -3400,31 +4177,22 @@ export const personalTcrRouter = router({
     .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
       await assertGameBelongsToOwnedTournament(db, input.gameId, ctx.user);
-      const game = await getGameOrThrow(db, input.gameId);
-      assertGameIsMutable(game);
-      await db
-        .update(tournamentGames)
-        .set({ displayLabel: input.displayLabel })
-        .where(eq(tournamentGames.id, input.gameId));
-      await incrementBoardRevision(db, game.tournamentId);
-      return fetchTournamentControlData(game.tournamentId);
+      return updateGameFieldAndFetch(
+        input.gameId,
+        () => ({ displayLabel: input.displayLabel }),
+        { requireMutable: true }
+      );
     }),
   moveGame: personalTcrProcedure
     .input(gameIdSchema.extend({ position: positionSchema }))
     .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
-      const game = await assertGameBelongsToOwnedTournament(
-        db,
-        input.gameId,
-        ctx.user
-      );
-      assertGamePositionUnlocked(game);
-      const safePosition = clampCanvasPosition(input.position);
-      await db
-        .update(tournamentGames)
-        .set({ canvasX: safePosition.x, canvasY: safePosition.y })
-        .where(eq(tournamentGames.id, input.gameId));
-      return fetchTournamentControlData(game.tournamentId);
+      await assertGameBelongsToOwnedTournament(db, input.gameId, ctx.user);
+      return updateGameFieldAndFetch(input.gameId, game => {
+        assertGamePositionUnlocked(game);
+        const safePosition = clampCanvasPosition(input.position);
+        return { canvasX: safePosition.x, canvasY: safePosition.y };
+      });
     }),
   moveGames: personalTcrProcedure
     .input(
@@ -3443,70 +4211,41 @@ export const personalTcrRouter = router({
     .input(gameIdSchema.extend({ lobbyCode: lobbyCodeSchema }))
     .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
-      const game = await assertGameBelongsToOwnedTournament(
-        db,
+      await assertGameBelongsToOwnedTournament(db, input.gameId, ctx.user);
+      return updateGameFieldAndFetch(
         input.gameId,
-        ctx.user
+        () => ({ privateLobbyCode: input.lobbyCode }),
+        { requireMutable: true }
       );
-      assertGameIsMutable(game);
-      await db
-        .update(tournamentGames)
-        .set({ privateLobbyCode: input.lobbyCode })
-        .where(eq(tournamentGames.id, input.gameId));
-      await incrementBoardRevision(db, game.tournamentId);
-      return fetchTournamentControlData(game.tournamentId);
     }),
   setGameMap: personalTcrProcedure
     .input(gameIdSchema.extend({ mapId: userSelectedMapIdSchema }))
     .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
-      const game = await assertGameBelongsToOwnedTournament(
-        db,
-        input.gameId,
-        ctx.user
-      );
-      await db
-        .update(tournamentGames)
-        .set({ mapId: input.mapId })
-        .where(eq(tournamentGames.id, input.gameId));
-      return fetchTournamentControlData(game.tournamentId);
+      await assertGameBelongsToOwnedTournament(db, input.gameId, ctx.user);
+      return updateGameFieldAndFetch(input.gameId, () => ({
+        mapId: input.mapId,
+      }));
     }),
   setBroadcastUrl: personalTcrProcedure
     .input(gameIdSchema.extend({ broadcastUrl: broadcastUrlSchema }))
     .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
-      const game = await assertGameBelongsToOwnedTournament(
-        db,
-        input.gameId,
-        ctx.user
-      );
-      await db
-        .update(tournamentGames)
-        .set({ broadcastUrl: input.broadcastUrl })
-        .where(eq(tournamentGames.id, input.gameId));
-      return fetchTournamentControlData(game.tournamentId);
+      await assertGameBelongsToOwnedTournament(db, input.gameId, ctx.user);
+      return updateGameFieldAndFetch(input.gameId, () => ({
+        broadcastUrl: input.broadcastUrl,
+      }));
     }),
   setFinalRoundSeriesBestOf: personalTcrProcedure
     .input(gameIdSchema.extend({ seriesBestOf: seriesBestOfSchema }))
     .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
-      const game = await assertGameBelongsToOwnedTournament(
-        db,
+      await assertGameBelongsToOwnedTournament(db, input.gameId, ctx.user);
+      return updateGameFieldAndFetch(
         input.gameId,
-        ctx.user
+        () => ({ seriesBestOf: input.seriesBestOf }),
+        { requireMutable: true, requireFinalRound: true }
       );
-      if (game.gameType !== "final_round")
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Only Final Round matches can use BO3 or BO5.",
-        });
-      assertGameIsMutable(game);
-      await db
-        .update(tournamentGames)
-        .set({ seriesBestOf: input.seriesBestOf })
-        .where(eq(tournamentGames.id, input.gameId));
-      await incrementBoardRevision(db, game.tournamentId);
-      return fetchTournamentControlData(game.tournamentId);
     }),
   randomizeGameMap: personalTcrProcedure
     .input(gameIdSchema)
@@ -3576,52 +4315,8 @@ export const personalTcrRouter = router({
     .input(gameIdSchema.extend({ status: z.enum(tournamentGameStatuses) }))
     .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
-      const game = await assertGameBelongsToOwnedTournament(
-        db,
-        input.gameId,
-        ctx.user
-      );
-      if (input.status === "complete")
-        return db.transaction(async tx => {
-          const gameInTx = await getGameOrThrow(tx, input.gameId);
-          await getManageableTournamentOrThrow(
-            tx,
-            gameInTx.tournamentId,
-            ctx.user
-          );
-          await tx
-            .update(tournamentGames)
-            .set({ status: input.status })
-            .where(eq(tournamentGames.id, input.gameId));
-          await advanceCompletedGameQualifiers(tx, gameInTx);
-          return fetchTournamentRows(tx, gameInTx.tournamentId);
-        });
-      if (
-        activeTournamentGameStatuses.includes(
-          input.status as (typeof activeTournamentGameStatuses)[number]
-        )
-      ) {
-        const context = await fetchGameContext(db, game.tournamentId);
-        if (game.status === "complete")
-          validateReopenPlan({ ...context, gameId: input.gameId });
-        else {
-          const assignedRows = context.assignments.filter(
-            assignment => assignment.gameId === input.gameId
-          );
-          for (const assignment of assignedRows)
-            validateAssignmentPlan({
-              ...context,
-              targetGameId: input.gameId,
-              teamId: assignment.teamId,
-              slotIndex: assignment.slotIndex,
-            });
-        }
-      }
-      await db
-        .update(tournamentGames)
-        .set({ status: input.status })
-        .where(eq(tournamentGames.id, input.gameId));
-      return fetchTournamentControlData(game.tournamentId);
+      await assertGameBelongsToOwnedTournament(db, input.gameId, ctx.user);
+      return updateGameStatusAndFetch(input.gameId, input.status);
     }),
   setAssignmentResultPlacement: personalTcrProcedure
     .input(
@@ -3671,46 +4366,13 @@ export const personalTcrRouter = router({
     .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
       await assertGameBelongsToOwnedTournament(db, input.gameId, ctx.user);
-      const targetGame = await assertGameBelongsToOwnedTournament(
-        db,
-        input.toGameId,
-        ctx.user
-      );
-      await db.transaction(async tx => {
-        const context = await fetchGameContext(tx, targetGame.tournamentId);
-        const assignmentsForSlotResolution = context.assignments.filter(
-          assignment =>
-            !(
-              assignment.gameId === input.gameId &&
-              assignment.teamId === input.teamId
-            )
-        );
-        const slotIndex = resolveAssignmentSlot({
-          game: targetGame,
-          assignments: assignmentsForSlotResolution,
-          preferredSlotIndex: input.preferredSlotIndex ?? input.slotIndex,
-          teamId: input.teamId,
-        });
-        validateMovePlan({
-          ...context,
-          sourceGameId: input.gameId,
-          targetGameId: input.toGameId,
-          teamId: input.teamId,
-          slotIndex,
-        });
-        await tx
-          .delete(tournamentGameAssignments)
-          .where(
-            and(
-              eq(tournamentGameAssignments.gameId, input.gameId),
-              eq(tournamentGameAssignments.teamId, input.teamId)
-            )
-          );
-        await tx
-          .insert(tournamentGameAssignments)
-          .values({ gameId: input.toGameId, teamId: input.teamId, slotIndex });
+      await assertGameBelongsToOwnedTournament(db, input.toGameId, ctx.user);
+      return moveTeamBetweenGamesAndFetch({
+        gameId: input.gameId,
+        teamId: input.teamId,
+        toGameId: input.toGameId,
+        preferredSlotIndex: input.preferredSlotIndex ?? input.slotIndex,
       });
-      return fetchTournamentControlData(targetGame.tournamentId);
     }),
 
   autoFillLobby: personalTcrProcedure
@@ -3756,48 +4418,21 @@ export const personalTcrRouter = router({
     .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
       await assertGameBelongsToOwnedTournament(db, input.gameId, ctx.user);
-      const game = await getGameOrThrow(db, input.gameId);
-      await db
-        .delete(tournamentGameAssignments)
-        .where(
-          and(
-            eq(tournamentGameAssignments.gameId, input.gameId),
-            eq(tournamentGameAssignments.teamId, input.teamId)
-          )
-        );
-      await incrementBoardRevision(db, game.tournamentId);
-      return fetchTournamentControlData(game.tournamentId);
+      return deleteGameAssignmentAndFetch(input.gameId, input.teamId);
     }),
   removeAssignedTeams: personalTcrProcedure
     .input(gameIdSchema)
     .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
-      const game = await assertGameBelongsToOwnedTournament(
-        db,
-        input.gameId,
-        ctx.user
-      );
-      await db
-        .delete(tournamentGameAssignments)
-        .where(eq(tournamentGameAssignments.gameId, input.gameId));
-      await incrementBoardRevision(db, game.tournamentId);
-      return fetchTournamentControlData(game.tournamentId);
+      await assertGameBelongsToOwnedTournament(db, input.gameId, ctx.user);
+      return deleteGameAssignmentAndFetch(input.gameId);
     }),
   deleteGame: personalTcrProcedure
     .input(gameIdSchema)
     .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
-      const game = await assertGameBelongsToOwnedTournament(
-        db,
-        input.gameId,
-        ctx.user
-      );
-      assertGameIsMutable(game);
-      await db
-        .delete(tournamentGames)
-        .where(eq(tournamentGames.id, input.gameId));
-      await incrementBoardRevision(db, game.tournamentId);
-      return fetchTournamentControlData(game.tournamentId);
+      await assertGameBelongsToOwnedTournament(db, input.gameId, ctx.user);
+      return deleteGameAndFetch(input.gameId);
     }),
   saveTemplateFromTournament: personalTcrProcedure
     .input(
@@ -3822,22 +4457,12 @@ export const personalTcrRouter = router({
         .limit(1);
       if (!team)
         throw new TRPCError({ code: "NOT_FOUND", message: "Team not found." });
-      await getManageableTournamentOrThrow(db, team.tournamentId, ctx.user);
-      const token = randomBytes(32).toString("base64url");
-      const expiresAt = new Date(
-        Date.now() + CLAIM_LINK_TTL_DAYS * 24 * 60 * 60 * 1000
+      await getMutableManageableTournamentOrThrow(
+        db,
+        team.tournamentId,
+        ctx.user
       );
-      await db.insert(tournamentTeamClaimLinks).values({
-        tournamentTeamId: team.id,
-        createdByUserId: ctx.user.id,
-        tokenHash: hashToken(token),
-        expiresAt,
-      });
-      return {
-        path: createTokenPath("/teams/claim", token),
-        url: createTokenPath("/teams/claim", token),
-        expiresAt,
-      };
+      return createTeamClaimLink(input.teamId, ctx.user);
     }),
   listTeamClaimLinks: personalTcrProcedure
     .input(z.object({ teamId: idSchema }))
@@ -3862,7 +4487,7 @@ export const personalTcrRouter = router({
     .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
       const [row] = await db
-        .select({ link: tournamentTeamClaimLinks, team: teams })
+        .select({ team: teams })
         .from(tournamentTeamClaimLinks)
         .innerJoin(
           teams,
@@ -3875,12 +4500,12 @@ export const personalTcrRouter = router({
           code: "NOT_FOUND",
           message: "Claim link not found.",
         });
-      await getManageableTournamentOrThrow(db, row.team.tournamentId, ctx.user);
-      await db
-        .update(tournamentTeamClaimLinks)
-        .set({ status: "revoked", updatedAt: sql`now()` })
-        .where(eq(tournamentTeamClaimLinks.id, input.linkId));
-      return { success: true } as const;
+      await getMutableManageableTournamentOrThrow(
+        db,
+        row.team.tournamentId,
+        ctx.user
+      );
+      return revokeTeamClaimLink(input.linkId);
     }),
   previewLobbyCodeRecipients: personalTcrProcedure
     .input(gameIdSchema)
@@ -3894,9 +4519,7 @@ export const personalTcrRouter = router({
     .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
       await assertGameBelongsToOwnedTournament(db, input.gameId, ctx.user);
-      await db.execute(
-        sql`INSERT INTO tournament_lobby_code_deliveries (gameId, teamId, releasedByUserId, lastDiscordAttemptAt) VALUES (${input.gameId}, ${input.teamId}, ${ctx.user.id}, NOW()) ON DUPLICATE KEY UPDATE status = 'available', releasedByUserId = ${ctx.user.id}, lastDiscordAttemptAt = NOW(), updatedAt = NOW()`
-      );
+      await releaseLobbyCodeDeliveries(input.gameId, ctx.user.id, input.teamId);
       return sendLobbyCode(input.gameId, input.teamId);
     }),
   sendLobbyCodeToLobbyLeaders: personalTcrProcedure
@@ -3904,11 +4527,7 @@ export const personalTcrRouter = router({
     .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
       await assertGameBelongsToOwnedTournament(db, input.gameId, ctx.user);
-      const assignments = await getAssignmentsForGame(db, input.gameId);
-      for (const assignment of assignments)
-        await db.execute(
-          sql`INSERT INTO tournament_lobby_code_deliveries (gameId, teamId, releasedByUserId, lastDiscordAttemptAt) VALUES (${input.gameId}, ${assignment.teamId}, ${ctx.user.id}, NOW()) ON DUPLICATE KEY UPDATE status = 'available', releasedByUserId = ${ctx.user.id}, lastDiscordAttemptAt = NOW(), updatedAt = NOW()`
-        );
+      await releaseLobbyCodeDeliveries(input.gameId, ctx.user.id);
       return sendLobbyCode(input.gameId);
     }),
 });
@@ -4102,87 +4721,7 @@ export const tournamentControlRouter = router({
     }),
   acceptTeamClaimLink: protectedProcedure
     .input(z.object({ token: tokenSchema }))
-    .mutation(async ({ input, ctx }) => {
-      const db = await requireDb();
-      return db.transaction(async tx => {
-        const [row] = await tx
-          .select({ link: tournamentTeamClaimLinks, team: teams })
-          .from(tournamentTeamClaimLinks)
-          .innerJoin(
-            teams,
-            eq(tournamentTeamClaimLinks.tournamentTeamId, teams.id)
-          )
-          .where(eq(tournamentTeamClaimLinks.tokenHash, hashToken(input.token)))
-          .limit(1);
-        if (!row)
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Claim link not found.",
-          });
-        const state = getClaimLinkState(row.link);
-        if (state.revoked)
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "This claim link has been revoked.",
-          });
-        if (state.claimed)
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "This claim link has already been used.",
-          });
-        if (state.expired)
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "This claim link has expired.",
-          });
-        if (row.team.managedTeamId)
-          throw new TRPCError({
-            code: "CONFLICT",
-            message: "This team is already managed.",
-          });
-        const baseSlug = createManagedTeamSlug(row.team.name);
-        let slug = baseSlug;
-        for (let i = 2; ; i++) {
-          const existing = await tx
-            .select({ id: managedTeams.id })
-            .from(managedTeams)
-            .where(eq(managedTeams.slug, slug))
-            .limit(1);
-          if (!existing.length) break;
-          slug = `${baseSlug}-${i}`.slice(0, 80);
-        }
-        await tx
-          .insert(managedTeams)
-          .values({ name: row.team.name, slug, captainUserId: ctx.user.id });
-        const [managedTeam] = await tx
-          .select()
-          .from(managedTeams)
-          .where(eq(managedTeams.slug, slug))
-          .limit(1);
-        await tx.insert(managedTeamMembers).values({
-          teamId: managedTeam.id,
-          userId: ctx.user.id,
-          role: "captain",
-        });
-        await tx
-          .update(teams)
-          .set({ managedTeamId: managedTeam.id })
-          .where(eq(teams.id, row.team.id));
-        await tx
-          .update(tournamentTeamClaimLinks)
-          .set({
-            status: "claimed",
-            claimedByUserId: ctx.user.id,
-            updatedAt: sql`now()`,
-          })
-          .where(eq(tournamentTeamClaimLinks.id, row.link.id));
-        return {
-          success: true,
-          managedTeamId: managedTeam.id,
-          tournamentId: row.team.tournamentId,
-        };
-      });
-    }),
+    .mutation(({ input, ctx }) => acceptTeamClaimLink(input.token, ctx.user)),
   listTournaments: discordTournamentStaffProcedure.query(async () => {
     const db = await requireDb();
     return listTournamentRows(db);
@@ -4193,15 +4732,12 @@ export const tournamentControlRouter = router({
   }),
   setTournamentRegistrationOpen: discordTournamentStaffProcedure
     .input(tournamentIdSchema.extend({ registrationOpen: z.boolean() }))
-    .mutation(async ({ input }) => {
-      const db = await requireDb();
-      await fetchTournamentRows(db, input.tournamentId);
-      await db
-        .update(tournaments)
-        .set({ registrationOpen: input.registrationOpen ? 1 : 0 })
-        .where(eq(tournaments.id, input.tournamentId));
-      return listTournamentRows(db);
-    }),
+    .mutation(({ input }) =>
+      setTournamentRegistrationOpenAndFetch(
+        input.tournamentId,
+        input.registrationOpen
+      )
+    ),
   listTeamSubmissions: discordTournamentStaffProcedure
     .input(z.object({ tournamentId: idSchema.optional() }).optional())
     .query(async ({ input }) => {
@@ -4282,22 +4818,21 @@ export const tournamentControlRouter = router({
     }),
   sendLobbyCodeToTeamLeader: discordTournamentStaffProcedure
     .input(gameIdSchema.extend({ teamId: idSchema }))
-    .mutation(({ input }) => sendLobbyCode(input.gameId, input.teamId)),
+    .mutation(async ({ input, ctx }) => {
+      await releaseLobbyCodeDeliveries(input.gameId, ctx.user.id, input.teamId);
+      return sendLobbyCode(input.gameId, input.teamId);
+    }),
   sendLobbyCodeToLobbyLeaders: discordTournamentStaffProcedure
     .input(gameIdSchema)
-    .mutation(({ input }) => sendLobbyCode(input.gameId)),
+    .mutation(async ({ input, ctx }) => {
+      await releaseLobbyCodeDeliveries(input.gameId, ctx.user.id);
+      return sendLobbyCode(input.gameId);
+    }),
   createTeam: discordTournamentStaffProcedure
     .input(tournamentIdSchema.extend({ name: teamNameSchema, frp: frpSchema }))
     .mutation(async ({ input }) => {
       const db = await requireDb();
-      await fetchTournamentRows(db, input.tournamentId);
-      await assertUniqueTeamName(db, input.tournamentId, input.name);
-      await db.insert(teams).values({
-        tournamentId: input.tournamentId,
-        name: input.name,
-        frp: input.frp,
-      });
-      return fetchTournamentControlData(input.tournamentId);
+      return createTournamentTeamAndFetch(input);
     }),
   deleteTeam: discordTournamentStaffProcedure
     .input(tournamentIdSchema.extend({ teamId: idSchema }))
@@ -4318,50 +4853,31 @@ export const tournamentControlRouter = router({
     ),
   renameGame: discordTournamentStaffProcedure
     .input(gameIdSchema.extend({ displayLabel: labelSchema }))
-    .mutation(async ({ input }) => {
-      const db = await requireDb();
-      const game = await getGameOrThrow(db, input.gameId);
-      assertGameIsMutable(game);
-      await db
-        .update(tournamentGames)
-        .set({ displayLabel: input.displayLabel })
-        .where(eq(tournamentGames.id, input.gameId));
-      await incrementBoardRevision(db, game.tournamentId);
-      return fetchTournamentControlData(game.tournamentId);
-    }),
+    .mutation(({ input }) =>
+      updateGameFieldAndFetch(
+        input.gameId,
+        () => ({ displayLabel: input.displayLabel }),
+        { requireMutable: true }
+      )
+    ),
   setFinalRoundSeriesBestOf: discordTournamentStaffProcedure
     .input(gameIdSchema.extend({ seriesBestOf: seriesBestOfSchema }))
-    .mutation(async ({ input }) => {
-      const db = await requireDb();
-      const game = await getGameOrThrow(db, input.gameId);
-      if (game.gameType !== "final_round")
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Only Final Round matches can use BO3 or BO5.",
-        });
-      assertGameIsMutable(game);
-      await db
-        .update(tournamentGames)
-        .set({ seriesBestOf: input.seriesBestOf })
-        .where(eq(tournamentGames.id, input.gameId));
-      await incrementBoardRevision(db, game.tournamentId);
-      return fetchTournamentControlData(game.tournamentId);
-    }),
+    .mutation(({ input }) =>
+      updateGameFieldAndFetch(
+        input.gameId,
+        () => ({ seriesBestOf: input.seriesBestOf }),
+        { requireMutable: true, requireFinalRound: true }
+      )
+    ),
   moveGame: discordTournamentStaffProcedure
     .input(gameIdSchema.extend({ position: positionSchema }))
-    .mutation(async ({ input }) => {
-      const db = await requireDb();
-      const game = await getGameOrThrow(db, input.gameId);
-      return runBoardMutationAndFetch(game.tournamentId, async tx => {
-        const gameInTx = await getGameOrThrow(tx, input.gameId);
-        assertGamePositionUnlocked(gameInTx);
+    .mutation(({ input }) =>
+      updateGameFieldAndFetch(input.gameId, game => {
+        assertGamePositionUnlocked(game);
         const safePosition = clampCanvasPosition(input.position);
-        await tx
-          .update(tournamentGames)
-          .set({ canvasX: safePosition.x, canvasY: safePosition.y })
-          .where(eq(tournamentGames.id, input.gameId));
-      });
-    }),
+        return { canvasX: safePosition.x, canvasY: safePosition.y };
+      })
+    ),
   moveGames: discordTournamentStaffProcedure
     .input(
       tournamentIdSchema.extend({
@@ -4416,61 +4932,14 @@ export const tournamentControlRouter = router({
     ),
   updateStatus: discordTournamentStaffProcedure
     .input(gameIdSchema.extend({ status: z.enum(tournamentGameStatuses) }))
-    .mutation(async ({ input }) => {
-      const db = await requireDb();
-      const game = await getGameOrThrow(db, input.gameId);
-
-      if (input.status === "complete") {
-        return db.transaction(async tx => {
-          const gameInTx = await getGameOrThrow(tx, input.gameId);
-          await tx
-            .update(tournamentGames)
-            .set({ status: input.status })
-            .where(eq(tournamentGames.id, input.gameId));
-          await advanceCompletedGameQualifiers(tx, gameInTx);
-          return fetchTournamentRows(tx, gameInTx.tournamentId);
-        });
-      }
-
-      if (
-        activeTournamentGameStatuses.includes(
-          input.status as (typeof activeTournamentGameStatuses)[number]
-        )
-      ) {
-        const context = await fetchGameContext(db, game.tournamentId);
-        if (game.status === "complete") {
-          validateReopenPlan({ ...context, gameId: input.gameId });
-        } else {
-          const assignedRows = context.assignments.filter(
-            assignment => assignment.gameId === input.gameId
-          );
-          for (const assignment of assignedRows)
-            validateAssignmentPlan({
-              ...context,
-              targetGameId: input.gameId,
-              teamId: assignment.teamId,
-              slotIndex: assignment.slotIndex,
-            });
-        }
-      }
-      await db
-        .update(tournamentGames)
-        .set({ status: input.status })
-        .where(eq(tournamentGames.id, input.gameId));
-      return fetchTournamentControlData(game.tournamentId);
-    }),
+    .mutation(({ input }) =>
+      updateGameStatusAndFetch(input.gameId, input.status)
+    ),
   setGameMap: discordTournamentStaffProcedure
     .input(gameIdSchema.extend({ mapId: userSelectedMapIdSchema }))
-    .mutation(async ({ input }) => {
-      const db = await requireDb();
-      const game = await getGameOrThrow(db, input.gameId);
-      return runBoardMutationAndFetch(game.tournamentId, async tx => {
-        await tx
-          .update(tournamentGames)
-          .set({ mapId: input.mapId })
-          .where(eq(tournamentGames.id, input.gameId));
-      });
-    }),
+    .mutation(({ input }) =>
+      updateGameFieldAndFetch(input.gameId, () => ({ mapId: input.mapId }))
+    ),
   randomizeGameMap: discordTournamentStaffProcedure
     .input(gameIdSchema)
     .mutation(async ({ input }) => {
@@ -4480,29 +4949,20 @@ export const tournamentControlRouter = router({
 
   setBroadcastUrl: discordTournamentStaffProcedure
     .input(gameIdSchema.extend({ broadcastUrl: broadcastUrlSchema }))
-    .mutation(async ({ input }) => {
-      const db = await requireDb();
-      const game = await getGameOrThrow(db, input.gameId);
-      return runBoardMutationAndFetch(game.tournamentId, async tx => {
-        await tx
-          .update(tournamentGames)
-          .set({ broadcastUrl: input.broadcastUrl })
-          .where(eq(tournamentGames.id, input.gameId));
-      });
-    }),
+    .mutation(({ input }) =>
+      updateGameFieldAndFetch(input.gameId, () => ({
+        broadcastUrl: input.broadcastUrl,
+      }))
+    ),
   setLobbyCode: discordTournamentStaffProcedure
     .input(gameIdSchema.extend({ lobbyCode: lobbyCodeSchema }))
-    .mutation(async ({ input }) => {
-      const db = await requireDb();
-      const game = await getGameOrThrow(db, input.gameId);
-      assertGameIsMutable(game);
-      await db
-        .update(tournamentGames)
-        .set({ privateLobbyCode: input.lobbyCode })
-        .where(eq(tournamentGames.id, input.gameId));
-      await incrementBoardRevision(db, game.tournamentId);
-      return fetchTournamentControlData(game.tournamentId);
-    }),
+    .mutation(({ input }) =>
+      updateGameFieldAndFetch(
+        input.gameId,
+        () => ({ privateLobbyCode: input.lobbyCode }),
+        { requireMutable: true }
+      )
+    ),
   setAssignmentResultPlacement: discordTournamentStaffProcedure
     .input(
       z.object({
@@ -4537,77 +4997,17 @@ export const tournamentControlRouter = router({
         preferredSlotIndex: z.number().int().positive().optional(),
       })
     )
-    .mutation(async ({ input }) => {
-      const db = await requireDb();
-      const targetGame = await getGameOrThrow(db, input.toGameId);
-      await db.transaction(async tx => {
-        const context = await fetchGameContext(tx, targetGame.tournamentId);
-        const assignmentsForSlotResolution = context.assignments.filter(
-          assignment =>
-            !(
-              assignment.gameId === input.gameId &&
-              assignment.teamId === input.teamId
-            )
-        );
-        const slotIndex = resolveAssignmentSlot({
-          game: targetGame,
-          assignments: assignmentsForSlotResolution,
-          preferredSlotIndex: input.preferredSlotIndex ?? input.slotIndex,
-          teamId: input.teamId,
-        });
-        validateMovePlan({
-          ...context,
-          sourceGameId: input.gameId,
-          targetGameId: input.toGameId,
-          teamId: input.teamId,
-          slotIndex,
-        });
-        await tx
-          .delete(tournamentGameAssignments)
-          .where(
-            and(
-              eq(tournamentGameAssignments.gameId, input.gameId),
-              eq(tournamentGameAssignments.teamId, input.teamId)
-            )
-          );
-        await tx
-          .insert(tournamentGameAssignments)
-          .values({ gameId: input.toGameId, teamId: input.teamId, slotIndex });
-      });
-      return fetchTournamentControlData(targetGame.tournamentId);
-    }),
+    .mutation(({ input }) =>
+      moveTeamBetweenGamesAndFetch({
+        gameId: input.gameId,
+        teamId: input.teamId,
+        toGameId: input.toGameId,
+        preferredSlotIndex: input.preferredSlotIndex ?? input.slotIndex,
+      })
+    ),
   createTeamClaimLink: discordTournamentStaffProcedure
     .input(z.object({ teamId: idSchema }))
-    .mutation(async ({ input, ctx }) => {
-      const db = await requireDb();
-      const [team] = await db
-        .select()
-        .from(teams)
-        .where(eq(teams.id, input.teamId))
-        .limit(1);
-      if (!team)
-        throw new TRPCError({ code: "NOT_FOUND", message: "Team not found." });
-      if (team.managedTeamId)
-        throw new TRPCError({
-          code: "CONFLICT",
-          message: "This team is already managed.",
-        });
-      const token = randomBytes(32).toString("base64url");
-      const expiresAt = new Date(
-        Date.now() + CLAIM_LINK_TTL_DAYS * 24 * 60 * 60 * 1000
-      );
-      await db.insert(tournamentTeamClaimLinks).values({
-        tournamentTeamId: team.id,
-        createdByUserId: ctx.user.id,
-        tokenHash: hashToken(token),
-        expiresAt,
-      });
-      return {
-        path: createTokenPath("/teams/claim", token),
-        url: createTokenPath("/teams/claim", token),
-        expiresAt,
-      };
-    }),
+    .mutation(({ input, ctx }) => createTeamClaimLink(input.teamId, ctx.user)),
   listTeamClaimLinks: discordTournamentStaffProcedure
     .input(z.object({ teamId: idSchema }))
     .query(async ({ input }) => {
@@ -4620,14 +5020,7 @@ export const tournamentControlRouter = router({
     }),
   revokeTeamClaimLink: discordTournamentStaffProcedure
     .input(z.object({ linkId: idSchema }))
-    .mutation(async ({ input }) => {
-      const db = await requireDb();
-      await db
-        .update(tournamentTeamClaimLinks)
-        .set({ status: "revoked", updatedAt: sql`now()` })
-        .where(eq(tournamentTeamClaimLinks.id, input.linkId));
-      return { success: true } as const;
-    }),
+    .mutation(({ input }) => revokeTeamClaimLink(input.linkId)),
 
   autoFillLobby: discordTournamentStaffProcedure
     .input(gameIdSchema)
@@ -4653,55 +5046,45 @@ export const tournamentControlRouter = router({
     .mutation(({ input }) => setRoundGroupLocked(input)),
   removeTeam: discordTournamentStaffProcedure
     .input(gameIdSchema.extend({ teamId: idSchema }))
-    .mutation(async ({ input }) => {
-      const db = await requireDb();
-      const game = await getGameOrThrow(db, input.gameId);
-      if (game.status === "complete")
-        throw new TRPCError({
-          code: "CONFLICT",
-          message:
-            "Completed games are historical. Mark the game active before changing assignments.",
-        });
-      await db
-        .delete(tournamentGameAssignments)
-        .where(
-          and(
-            eq(tournamentGameAssignments.gameId, input.gameId),
-            eq(tournamentGameAssignments.teamId, input.teamId)
-          )
-        );
-      await incrementBoardRevision(db, game.tournamentId);
-      return fetchTournamentControlData(game.tournamentId);
-    }),
+    .mutation(({ input }) =>
+      deleteGameAssignmentAndFetch(input.gameId, input.teamId)
+    ),
   removeAssignedTeams: discordTournamentStaffProcedure
     .input(gameIdSchema)
-    .mutation(async ({ input }) => {
-      const db = await requireDb();
-      const game = await getGameOrThrow(db, input.gameId);
-      if (game.status === "complete")
-        throw new TRPCError({
-          code: "CONFLICT",
-          message:
-            "Completed games are historical. Mark the game active before changing assignments.",
-        });
-      await db
-        .delete(tournamentGameAssignments)
-        .where(eq(tournamentGameAssignments.gameId, input.gameId));
-      await incrementBoardRevision(db, game.tournamentId);
-      return fetchTournamentControlData(game.tournamentId);
-    }),
+    .mutation(({ input }) => deleteGameAssignmentAndFetch(input.gameId)),
   deleteGame: discordTournamentStaffProcedure
     .input(gameIdSchema)
-    .mutation(async ({ input }) => {
-      const db = await requireDb();
-      const game = await getGameOrThrow(db, input.gameId);
-      assertGameIsMutable(game);
-      await db
-        .delete(tournamentGames)
-        .where(eq(tournamentGames.id, input.gameId));
-      await incrementBoardRevision(db, game.tournamentId);
-      return fetchTournamentControlData(game.tournamentId);
-    }),
+    .mutation(({ input }) => deleteGameAndFetch(input.gameId)),
 });
 
 export { getActiveAssignedTeamIds, gameCapacity };
+export const __tournamentControlTestInternals = {
+  runBoardMutationAndFetch,
+  updateTournamentName,
+  setTournamentOwner,
+  deleteTournament,
+  finalizeTournament,
+  unlockTournamentForEditing,
+  approveSubmission,
+  moveGames,
+  createGame,
+  assignTeamToGameSlot,
+  createTournamentTeamAndFetch,
+  setTournamentRegistrationOpenAndFetch,
+  setTournamentVisibility,
+  publishTournament,
+  rejectSubmission,
+  regeneratePrivateInviteLink,
+  createTeamClaimLink,
+  revokeTeamClaimLink,
+  releaseLobbyCodeDeliveries,
+  acceptTeamClaimLink,
+  getOrCreateStaffInviteLink,
+  regenerateStaffInviteLink,
+  revokeStaffInviteLink,
+  acceptStaffInvite,
+  getOrCreateViewerLink,
+  regenerateViewerLink,
+  updateGameFieldAndFetch,
+  restoreTournamentBoardSnapshot,
+};
