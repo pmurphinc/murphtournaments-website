@@ -1093,32 +1093,41 @@ async function setTournamentOwner(
   tournamentId: number,
   ownerUserId: number | null
 ) {
-  const db = await requireDb();
-  await fetchTournamentRows(db, tournamentId);
-  if (ownerUserId !== null) {
-    const [owner] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.id, ownerUserId))
+  return runBoardMutationAndFetch(tournamentId, async tx => {
+    const [tournament] = await tx
+      .select({ ownerUserId: tournaments.ownerUserId })
+      .from(tournaments)
+      .where(eq(tournaments.id, tournamentId))
       .limit(1);
-    if (!owner)
+    if (!tournament)
       throw new TRPCError({
         code: "NOT_FOUND",
-        message: "Owner user not found",
+        message: "Tournament not found",
       });
-  }
-  await db
-    .update(tournaments)
-    .set({ ownerUserId })
-    .where(eq(tournaments.id, tournamentId));
-  return listTournamentRows(db);
+    if (ownerUserId !== null) {
+      const [owner] = await tx
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.id, ownerUserId))
+        .limit(1);
+      if (!owner)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Owner user not found",
+        });
+    }
+    if (tournament.ownerUserId === ownerUserId) return false;
+    await tx
+      .update(tournaments)
+      .set({ ownerUserId })
+      .where(eq(tournaments.id, tournamentId));
+  });
 }
 
 async function deleteTournament(tournamentId: number) {
   const db = await requireDb();
   return db.transaction(async tx => {
-    const data = await fetchTournamentRows(tx, tournamentId);
-    assertTournamentUnlocked(data.tournament);
+    await lockTournamentForBoardMutation(tx, tournamentId);
     await tx.execute(
       sql`UPDATE tournament_control_templates SET sourceTournamentId = NULL WHERE sourceTournamentId = ${tournamentId}`
     );
@@ -2672,7 +2681,18 @@ async function listSubmissionRows(db: QueryExecutor, tournamentId?: number) {
 
 async function approveSubmission(submissionId: number) {
   const db = await requireDb();
+  const [resolved] = await db
+    .select({ tournamentId: tournamentTeamSubmissions.tournamentId })
+    .from(tournamentTeamSubmissions)
+    .where(eq(tournamentTeamSubmissions.id, submissionId))
+    .limit(1);
+  if (!resolved)
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Team submission not found",
+    });
   return db.transaction(async tx => {
+    await lockTournamentForBoardMutation(tx, resolved.tournamentId);
     const [row] = await tx
       .select({
         submission: tournamentTeamSubmissions,
@@ -2685,26 +2705,11 @@ async function approveSubmission(submissionId: number) {
       )
       .where(eq(tournamentTeamSubmissions.id, submissionId))
       .limit(1);
-    if (!row)
+    if (!row || row.submission.tournamentId !== resolved.tournamentId)
       throw new TRPCError({
         code: "NOT_FOUND",
         message: "Team submission not found",
       });
-    const lockedTournamentRows = readRows<{
-      id: number;
-      finalizedAt: Date | null;
-    }>(
-      await tx.execute(
-        sql`SELECT id, finalizedAt FROM tournaments WHERE id = ${row.submission.tournamentId} FOR UPDATE`
-      )
-    );
-    const [lockedTournament] = lockedTournamentRows;
-    if (!lockedTournament)
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Tournament not found",
-      });
-    assertTournamentUnlocked(lockedTournament);
     const existing = await tx
       .select()
       .from(teams)
@@ -2715,6 +2720,7 @@ async function approveSubmission(submissionId: number) {
         )
       )
       .limit(1);
+    let changed = false;
     if (
       shouldCreateTournamentTeamForApproval({
         status: row.submission.status,
@@ -2733,17 +2739,31 @@ async function approveSubmission(submissionId: number) {
         name: row.managedTeam.name,
         frp: 0,
       });
+      changed = true;
     }
-    await tx
-      .update(tournamentTeamSubmissions)
-      .set({ status: "approved", adminNote: null })
-      .where(eq(tournamentTeamSubmissions.id, submissionId));
-    await ensureViewerLinkForApprovedSubmission(
+    if (
+      row.submission.status !== "approved" ||
+      row.submission.adminNote !== null
+    ) {
+      await tx
+        .update(tournamentTeamSubmissions)
+        .set({ status: "approved", adminNote: null })
+        .where(eq(tournamentTeamSubmissions.id, submissionId));
+      changed = true;
+    }
+    const activeViewerLink = await getActiveViewerLink(
       tx,
-      row.submission.tournamentId,
-      row.submission.submittedByUserId
+      row.submission.tournamentId
     );
-    await incrementBoardRevision(tx, row.submission.tournamentId);
+    if (!activeViewerLink?.publicToken) {
+      await ensureViewerLinkForApprovedSubmission(
+        tx,
+        row.submission.tournamentId,
+        row.submission.submittedByUserId
+      );
+      changed = true;
+    }
+    if (changed) await incrementBoardRevision(tx, row.submission.tournamentId);
     return fetchTournamentRows(tx, row.submission.tournamentId);
   });
 }
@@ -3576,6 +3596,7 @@ function getArchivedResultsPath(tournamentId: number) {
 type FinalizationSummary = {
   tournamentId: number;
   finalizedAt: Date | null;
+  boardRevision: number | null;
   champion: { teamId: number; teamName: string } | null;
   resultsPath: string;
 };
@@ -3602,6 +3623,7 @@ async function getFinalizationSummary(
   return {
     tournamentId,
     finalizedAt: tournament?.finalizedAt ?? null,
+    boardRevision: tournament?.boardRevision ?? null,
     champion: champion
       ? {
           teamId: champion.tournamentTeamId,
@@ -3720,8 +3742,19 @@ async function finalizeTournament(
   user: { id: number; role: "user" | "admin" }
 ) {
   const db = await requireDb();
+  await getOwnedTournamentOrThrow(db, tournamentId, user);
   return db.transaction(async tx => {
-    const tournament = await getOwnedTournamentOrThrow(tx, tournamentId, user);
+    await lockTournamentForBoardMutation(tx, tournamentId);
+    const [tournament] = await tx
+      .select()
+      .from(tournaments)
+      .where(eq(tournaments.id, tournamentId))
+      .limit(1);
+    if (!tournament)
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Tournament not found",
+      });
     if (tournament.finalizedAt) return getFinalizationSummary(tx, tournamentId);
     const data = await fetchTournamentRows(tx, tournamentId);
     const { championTeamId } = validateFinalizationData(data);
@@ -3763,6 +3796,7 @@ async function finalizeTournament(
         unlockedByUserId: null,
       })
       .where(eq(tournaments.id, tournamentId));
+    await incrementBoardRevision(tx, tournamentId);
     return getFinalizationSummary(tx, tournamentId);
   });
 }
@@ -3777,17 +3811,35 @@ async function unlockTournamentForEditing(
       message: "Only site administrators can unlock finalized tournaments.",
     });
   const db = await requireDb();
-  await db
-    .update(tournaments)
-    .set({
-      finalizedAt: null,
-      finalizedByUserId: null,
-      unlockedAt: sql`now()`,
-      unlockedByUserId: user.id,
-      eventStatus: "live",
-    })
-    .where(eq(tournaments.id, tournamentId));
-  return fetchTournamentControlData(tournamentId);
+  return db.transaction(async tx => {
+    const rows = readRows<{
+      id: number;
+      finalizedAt: Date | null;
+    }>(
+      await tx.execute(
+        sql`SELECT id, finalizedAt FROM tournaments WHERE id = ${tournamentId} FOR UPDATE`
+      )
+    );
+    const [tournament] = rows;
+    if (!tournament)
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Tournament not found",
+      });
+    if (!tournament.finalizedAt) return fetchTournamentRows(tx, tournamentId);
+    await tx
+      .update(tournaments)
+      .set({
+        finalizedAt: null,
+        finalizedByUserId: null,
+        unlockedAt: sql`now()`,
+        unlockedByUserId: user.id,
+        eventStatus: "live",
+      })
+      .where(eq(tournaments.id, tournamentId));
+    await incrementBoardRevision(tx, tournamentId);
+    return fetchTournamentRows(tx, tournamentId);
+  });
 }
 
 export const personalTcrProcedure = personalTcrAlphaProcedure;
@@ -4996,6 +5048,11 @@ export { getActiveAssignedTeamIds, gameCapacity };
 export const __tournamentControlTestInternals = {
   runBoardMutationAndFetch,
   updateTournamentName,
+  setTournamentOwner,
+  deleteTournament,
+  finalizeTournament,
+  unlockTournamentForEditing,
+  approveSubmission,
   moveGames,
   createGame,
   assignTeamToGameSlot,

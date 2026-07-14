@@ -24,6 +24,7 @@ const state = {
     publicSlug: null,
     visibility: "private",
     registrationOpen: 1,
+    ownerUserId: null,
   },
   games: [
     {
@@ -86,6 +87,8 @@ function restore(snapshot: any) {
 
 function rowsFor(table: unknown, selected?: unknown) {
   if (table === tournaments && selected) {
+    if (Object.prototype.hasOwnProperty.call(selected, "ownerUserId"))
+      return [{ ownerUserId: state.tournament.ownerUserId }];
     if (Object.prototype.hasOwnProperty.call(selected, "name"))
       return [{ name: state.tournament.name }];
     if (Object.prototype.hasOwnProperty.call(selected, "tournamentId"))
@@ -96,7 +99,19 @@ function rowsFor(table: unknown, selected?: unknown) {
   if (table === tournamentGames) return state.games;
   if (table === teams) return state.teams;
   if (table === tournamentGameAssignments) return state.assignments;
-  if (table === tournamentTeamSubmissions) return state.submissions;
+  if (table === tournamentTeamSubmissions) {
+    if (
+      selected &&
+      Object.prototype.hasOwnProperty.call(selected, "submission")
+    )
+      return state.submissions.map(submission => ({
+        submission,
+        managedTeam: state.managedTeams.find(
+          team => team.id === submission.managedTeamId
+        ),
+      }));
+    return state.submissions;
+  }
   if (table === tournamentPrivateInviteLinks) return state.privateInvites;
   if (table === tournamentTeamClaimLinks) {
     if (
@@ -587,6 +602,50 @@ describe("tournament control revision behavior", () => {
       1,
       "Original"
     );
+    expect(board.tournament.boardRevision).toBe(7);
+  });
+
+  it("finalized setTournamentOwner rejects and owner no-op does not increment", async () => {
+    const noOp = await __tournamentControlTestInternals.setTournamentOwner(
+      1,
+      null
+    );
+    expect(noOp.tournament.boardRevision).toBe(7);
+    state.tournament.finalizedAt = new Date();
+    await expect(
+      __tournamentControlTestInternals.setTournamentOwner(1, null)
+    ).rejects.toThrow("finalized");
+  });
+
+  it("approval reapproval no-op does not increment", async () => {
+    state.managedTeams.push({
+      id: 900,
+      name: "Approved",
+      slug: "approved",
+      captainUserId: 1,
+    });
+    state.submissions.push({
+      id: 700,
+      tournamentId: 1,
+      status: "approved",
+      adminNote: null,
+      managedTeamId: 900,
+      submittedByUserId: 1,
+    });
+    state.teams.push({
+      id: 701,
+      tournamentId: 1,
+      managedTeamId: 900,
+      name: "Approved",
+      frp: 0,
+    });
+    state.viewerLinks.push({
+      id: 1,
+      tournamentId: 1,
+      status: "active",
+      publicToken: "viewer",
+    });
+    const board = await __tournamentControlTestInternals.approveSubmission(700);
     expect(board.tournament.boardRevision).toBe(7);
   });
 
