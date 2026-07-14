@@ -238,8 +238,11 @@ function makeDb(): any {
                   state.tournament.boardRevision += 1;
                 else Object.assign(state.tournament, values);
               }
-              if (table === tournamentGames)
+              if (table === tournamentGames) {
+                if (!state.games[0])
+                  state.games.push({ id: values.id ?? 10, tournamentId: 1 });
                 Object.assign(state.games[0], values);
+              }
               if (table === tournamentTeamSubmissions)
                 Object.assign(state.submissions[0], values);
               if (table === tournamentPrivateInviteLinks)
@@ -366,9 +369,36 @@ function makeDb(): any {
 
 vi.mock("../server/db", () => ({ getDb: vi.fn(async () => makeDb()) }));
 
-const { __tournamentControlTestInternals } = await import(
-  "./tournamentControl"
+const {
+  __tournamentControlTestInternals,
+  personalTcrRouter,
+  tournamentControlRouter,
+} = await import("./tournamentControl");
+const { rebaseBoardUndoHistoryAfterRestore } = await import(
+  "../client/src/lib/tournamentControlUndo"
 );
+
+function ctx(user: any) {
+  return {
+    user,
+    req: { protocol: "https", headers: {}, get: () => "localhost" },
+    res: { clearCookie: vi.fn(), cookie: vi.fn() },
+  } as any;
+}
+
+function user(id = 1, role: "user" | "admin" = "admin") {
+  return { id, role, loginMethod: "discord", openId: `discord:${id}23456` };
+}
+
+function boardSnapshot() {
+  return {
+    expectedRevision: state.tournament.boardRevision,
+    tournament: { name: state.tournament.name },
+    games: structuredClone(state.games),
+    assignments: structuredClone(state.assignments),
+    connections: structuredClone(state.connections),
+  };
+}
 
 describe("tournament control revision behavior", () => {
   beforeEach(() => {
@@ -401,6 +431,13 @@ describe("tournament control revision behavior", () => {
     state.results = [];
     state.nextClaimLinkId = 1;
     state.nextManagedTeamId = 1;
+    process.env.DISCORD_BOT_TOKEN = "bot-token";
+    process.env.DISCORD_GUILD_ID = "987654321";
+    process.env.DISCORD_TOURNAMENT_CONTROL_ROLE_IDS = "555";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: true, json: async () => ({ roles: ["555"] }) }))
+    );
   });
 
   it("returns the committed post-increment revision for a lobby creation style mutation", async () => {
@@ -843,5 +880,135 @@ describe("tournament control revision behavior", () => {
     await expect(
       __tournamentControlTestInternals.deleteTournament(1)
     ).resolves.toBeTruthy();
+  });
+
+  it("invokes actual tRPC callers for finalized personal, finalized Discord, and claim acceptance", async () => {
+    state.tournament.finalizedAt = new Date();
+    const personal = personalTcrRouter.createCaller(ctx(user(1, "admin")));
+    await expect(
+      personal.renameTournament({ tournamentId: 1, name: "Blocked" })
+    ).rejects.toThrow("finalized");
+
+    const discord = tournamentControlRouter.createCaller(ctx(user(2, "admin")));
+    await expect(
+      discord.renameTournament({ tournamentId: 1, name: "Blocked" })
+    ).rejects.toThrow("finalized");
+
+    state.tournament.finalizedAt = null;
+    state.teams.push({
+      id: 901,
+      tournamentId: 1,
+      name: "Claimable",
+      frp: 1,
+      managedTeamId: null,
+    });
+    state.claimLinks.push({
+      id: 1,
+      tournamentTeamId: 901,
+      tokenHash: "hash",
+      status: "active",
+      expiresAt: new Date(Date.now() + 60_000),
+      claimedByUserId: null,
+    });
+    const accepted = await discord.acceptTeamClaimLink({
+      token: "abcdefghijklmnop",
+    });
+    expect(accepted.boardRevision).toBe(8);
+  });
+
+  it("restores three sequential snapshots with client undo-history rebasing", async () => {
+    const snapshotA = boardSnapshot();
+    const boardA = await __tournamentControlTestInternals.updateTournamentName(
+      1,
+      "Mutation A"
+    );
+    snapshotA.expectedRevision = boardA.tournament.boardRevision;
+    const snapshotB = boardSnapshot();
+    const boardB =
+      await __tournamentControlTestInternals.setTournamentRegistrationOpenAndFetch(
+        1,
+        false
+      );
+    snapshotB.expectedRevision = boardB.tournament.boardRevision;
+    const snapshotC = boardSnapshot();
+    const boardC = await __tournamentControlTestInternals.updateTournamentName(
+      1,
+      "Mutation C"
+    );
+    snapshotC.expectedRevision = boardC.tournament.boardRevision;
+
+    let history = [
+      { kind: "board" as const, label: "Undo C", snapshot: snapshotC },
+      { kind: "board" as const, label: "Undo B", snapshot: snapshotB },
+      { kind: "board" as const, label: "Undo A", snapshot: snapshotA },
+    ];
+    const restoredC =
+      await __tournamentControlTestInternals.restoreTournamentBoardSnapshot(
+        1,
+        snapshotC
+      );
+    history = rebaseBoardUndoHistoryAfterRestore(
+      history,
+      restoredC.tournament.boardRevision
+    ) as typeof history;
+    expect(history[0].snapshot.expectedRevision).toBe(
+      restoredC.tournament.boardRevision
+    );
+    const restoredB =
+      await __tournamentControlTestInternals.restoreTournamentBoardSnapshot(
+        1,
+        history[0].snapshot as any
+      );
+    history = rebaseBoardUndoHistoryAfterRestore(
+      history,
+      restoredB.tournament.boardRevision
+    ) as typeof history;
+    expect(history[0].snapshot.expectedRevision).toBe(
+      restoredB.tournament.boardRevision
+    );
+    const restoredA =
+      await __tournamentControlTestInternals.restoreTournamentBoardSnapshot(
+        1,
+        history[0].snapshot as any
+      );
+    expect(restoredA.tournament.name).toBe("Original");
+  });
+
+  it("stale restore after unrelated mutation returns CONFLICT", async () => {
+    const snapshotA = boardSnapshot();
+    const boardA = await __tournamentControlTestInternals.updateTournamentName(
+      1,
+      "Mutation A"
+    );
+    snapshotA.expectedRevision = boardA.tournament.boardRevision;
+    const snapshotB = boardSnapshot();
+    const boardB =
+      await __tournamentControlTestInternals.setTournamentRegistrationOpenAndFetch(
+        1,
+        false
+      );
+    snapshotB.expectedRevision = boardB.tournament.boardRevision;
+    const restoredB =
+      await __tournamentControlTestInternals.restoreTournamentBoardSnapshot(
+        1,
+        snapshotB
+      );
+    const [rebasedA] = rebaseBoardUndoHistoryAfterRestore(
+      [
+        { kind: "board" as const, label: "Undo B", snapshot: snapshotB },
+        { kind: "board" as const, label: "Undo A", snapshot: snapshotA },
+      ],
+      restoredB.tournament.boardRevision
+    );
+    await __tournamentControlTestInternals.updateTournamentName(
+      1,
+      "Collaborator change"
+    );
+    await expect(
+      __tournamentControlTestInternals.restoreTournamentBoardSnapshot(
+        1,
+        rebasedA.snapshot as any
+      )
+    ).rejects.toMatchObject({ code: "CONFLICT" });
   });
 });
