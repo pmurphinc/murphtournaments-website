@@ -713,6 +713,30 @@ async function createTournamentTeamAndFetch(input: {
   });
 }
 
+async function setTournamentRegistrationOpenAndFetch(
+  tournamentId: number,
+  registrationOpen: boolean
+) {
+  return runBoardMutationAndFetch(tournamentId, async tx => {
+    const [tournament] = await tx
+      .select()
+      .from(tournaments)
+      .where(eq(tournaments.id, tournamentId))
+      .limit(1);
+    if (!tournament)
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Tournament not found",
+      });
+    const nextValue = registrationOpen ? 1 : 0;
+    if (tournament.registrationOpen === nextValue) return false;
+    await tx
+      .update(tournaments)
+      .set({ registrationOpen: nextValue })
+      .where(eq(tournaments.id, tournamentId));
+  });
+}
+
 async function updateGameStatusAndFetch(
   gameId: number,
   status: (typeof tournamentGameStatuses)[number]
@@ -1428,6 +1452,16 @@ async function updateRoundGroup(input: {
         message: "Selected lobbies must belong to this tournament.",
       });
     if (input.mode === "remove") {
+      if (
+        selectedGames.every(
+          game =>
+            !game.roundGroupId &&
+            !game.roundLabel &&
+            !game.roundColor &&
+            game.roundLocked === 0
+        )
+      )
+        return false;
       await tx
         .update(tournamentGames)
         .set({
@@ -1444,12 +1478,34 @@ async function updateRoundGroup(input: {
           code: "BAD_REQUEST",
           message: "Group not found.",
         });
+      const matchingGames = await tx
+        .select()
+        .from(tournamentGames)
+        .where(
+          and(
+            eq(tournamentGames.tournamentId, input.tournamentId),
+            eq(tournamentGames.roundGroupId, groupId)
+          )
+        );
+      const nextValue =
+        input.mode === "color"
+          ? (input.color ?? "gold")
+          : (input.label ?? "Group");
+      if (
+        matchingGames.length > 0 &&
+        matchingGames.every(game =>
+          input.mode === "color"
+            ? game.roundColor === nextValue
+            : game.roundLabel === nextValue
+        )
+      )
+        return false;
       await tx
         .update(tournamentGames)
         .set(
           input.mode === "color"
-            ? { roundColor: input.color ?? "gold" }
-            : { roundLabel: input.label ?? "Group" }
+            ? { roundColor: nextValue }
+            : { roundLabel: nextValue }
         )
         .where(
           and(
@@ -1458,15 +1514,29 @@ async function updateRoundGroup(input: {
           )
         );
     } else {
+      const nextGroupId = input.roundGroupId ?? randomUUID();
+      const nextLabel = input.label ?? "Group";
+      const nextColor = input.color ?? null;
+      const nextLocked =
+        selectedGames.find(game => game.roundGroupId === input.roundGroupId)
+          ?.roundLocked ?? 0;
+      if (
+        selectedGames.every(
+          game =>
+            game.roundGroupId === nextGroupId &&
+            game.roundLabel === nextLabel &&
+            game.roundColor === nextColor &&
+            game.roundLocked === nextLocked
+        )
+      )
+        return false;
       await tx
         .update(tournamentGames)
         .set({
-          roundGroupId: input.roundGroupId ?? randomUUID(),
-          roundLabel: input.label ?? "Group",
-          roundColor: input.color ?? null,
-          roundLocked:
-            selectedGames.find(game => game.roundGroupId === input.roundGroupId)
-              ?.roundLocked ?? 0,
+          roundGroupId: nextGroupId,
+          roundLabel: nextLabel,
+          roundColor: nextColor,
+          roundLocked: nextLocked,
         })
         .where(inArray(tournamentGames.id, uniqueGameIds));
     }
@@ -3515,21 +3585,10 @@ export const personalTcrRouter = router({
         input.tournamentId,
         ctx.user
       );
-      await db.transaction(async tx => {
-        const tournament = await lockTournamentForBoardMutation(
-          tx,
-          input.tournamentId
-        );
-        const nextValue = input.registrationOpen ? 1 : 0;
-        const currentValue = (tournament as { registrationOpen?: number })
-          .registrationOpen;
-        if (currentValue === nextValue) return;
-        await tx
-          .update(tournaments)
-          .set({ registrationOpen: nextValue })
-          .where(eq(tournaments.id, input.tournamentId));
-      });
-      return listPersonalTournamentRows(db, ctx.user);
+      return setTournamentRegistrationOpenAndFetch(
+        input.tournamentId,
+        input.registrationOpen
+      );
     }),
   setTournamentVisibility: personalTcrProcedure
     .input(
@@ -4371,15 +4430,12 @@ export const tournamentControlRouter = router({
   }),
   setTournamentRegistrationOpen: discordTournamentStaffProcedure
     .input(tournamentIdSchema.extend({ registrationOpen: z.boolean() }))
-    .mutation(async ({ input }) => {
-      const db = await requireDb();
-      await fetchTournamentRows(db, input.tournamentId);
-      await db
-        .update(tournaments)
-        .set({ registrationOpen: input.registrationOpen ? 1 : 0 })
-        .where(eq(tournaments.id, input.tournamentId));
-      return listTournamentRows(db);
-    }),
+    .mutation(({ input }) =>
+      setTournamentRegistrationOpenAndFetch(
+        input.tournamentId,
+        input.registrationOpen
+      )
+    ),
   listTeamSubmissions: discordTournamentStaffProcedure
     .input(z.object({ tournamentId: idSchema.optional() }).optional())
     .query(async ({ input }) => {
@@ -4740,6 +4796,9 @@ export const __tournamentControlTestInternals = {
   runBoardMutationAndFetch,
   updateTournamentName,
   moveGames,
+  createGame,
+  assignTeamToGameSlot,
   createTournamentTeamAndFetch,
+  setTournamentRegistrationOpenAndFetch,
   restoreTournamentBoardSnapshot,
 };

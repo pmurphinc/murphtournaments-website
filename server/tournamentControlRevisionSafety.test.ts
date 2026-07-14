@@ -65,6 +65,16 @@ function rowsFor(table: unknown) {
   return [];
 }
 
+function sqlText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (!value || typeof value !== "object") return "";
+  const chunks = (value as { queryChunks?: unknown[] }).queryChunks;
+  if (Array.isArray(chunks)) return chunks.map(sqlText).join("");
+  const stringChunk = (value as { value?: unknown }).value;
+  if (Array.isArray(stringChunk)) return stringChunk.map(sqlText).join("");
+  return String(value);
+}
+
 function makeDb(): any {
   const db: any = {
     async transaction(callback: (tx: any) => Promise<unknown>) {
@@ -76,8 +86,15 @@ function makeDb(): any {
         throw error;
       }
     },
-    execute(_query: unknown) {
-      return Promise.resolve([[state.tournament]]);
+    execute(query: unknown) {
+      const text = sqlText(query);
+      if (text.includes("tournament_game_connections"))
+        return Promise.resolve([state.connections]);
+      if (text.includes("tournament_game_assignments"))
+        return Promise.resolve([state.assignments]);
+      if (text.includes("tournaments"))
+        return Promise.resolve([[state.tournament]]);
+      return Promise.resolve([[]]);
     },
     select() {
       const builder: any = {
@@ -134,7 +151,21 @@ function makeDb(): any {
             return Promise.resolve({ insertId: row.id });
           }
           if (table === tournamentGames) {
-            const row = { id: values.id ?? 20, ...values };
+            const row = {
+              id: values.id ?? 20 + state.games.length,
+              status: "pending",
+              privateLobbyCode: null,
+              seriesBestOf: 1,
+              mapId: null,
+              broadcastUrl: null,
+              roundGroupId: null,
+              roundLabel: null,
+              roundColor: null,
+              roundLocked: 0,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              ...values,
+            };
             state.games.push(row);
             return Promise.resolve({ insertId: row.id });
           }
@@ -211,6 +242,44 @@ describe("tournament control revision behavior", () => {
       );
     expect(board.tournament.boardRevision).toBe(initial + 1);
     expect(state.tournament.boardRevision).toBe(initial + 1);
+  });
+
+  it("calls the actual lobby creation helper and persists R+1", async () => {
+    const board = await __tournamentControlTestInternals.createGame(
+      1,
+      "cashout",
+      { x: 25, y: 30 }
+    );
+    expect(
+      state.games.some(game => game.displayLabel === "Cashout Lobby 2")
+    ).toBe(true);
+    expect(board.tournament.boardRevision).toBe(8);
+    expect(state.tournament.boardRevision).toBe(8);
+  });
+
+  it("calls assignTeamToGameSlot and persists R+1", async () => {
+    state.teams.push({ id: 200, tournamentId: 1, name: "Assigned", frp: 1 });
+    const board = await __tournamentControlTestInternals.assignTeamToGameSlot(
+      10,
+      200,
+      1
+    );
+    expect(state.assignments).toMatchObject([
+      { gameId: 10, teamId: 200, slotIndex: 1 },
+    ]);
+    expect(board.tournament.boardRevision).toBe(8);
+    expect(state.tournament.boardRevision).toBe(8);
+  });
+
+  it("changed batch move increments exactly once", async () => {
+    const board = await __tournamentControlTestInternals.moveGames({
+      tournamentId: 1,
+      positions: [{ gameId: 10, position: { x: 55, y: 65 } }],
+    });
+    expect(state.games[0].canvasX).toBe(55);
+    expect(state.games[0].canvasY).toBe(65);
+    expect(board.tournament.boardRevision).toBe(8);
+    expect(state.tournament.boardRevision).toBe(8);
   });
 
   it("increments once for manual team creation and returns the persisted revision", async () => {
