@@ -6,6 +6,9 @@ import {
   tournamentGameAssignments,
   tournamentGames,
   tournaments,
+  tournamentTeamSubmissions,
+  tournamentPrivateInviteLinks,
+  tournamentTeamClaimLinks,
 } from "../drizzle/schema";
 
 const state = {
@@ -42,7 +45,12 @@ const state = {
   teams: [] as any[],
   assignments: [] as any[],
   connections: [] as any[],
+  submissions: [] as any[],
+  privateInvites: [] as any[],
+  claimLinks: [] as any[],
   nextTeamId: 100,
+  nextInviteId: 1,
+  nextClaimLinkId: 1,
 };
 
 function cloneState() {
@@ -54,14 +62,23 @@ function restore(snapshot: any) {
   state.teams = snapshot.teams;
   state.assignments = snapshot.assignments;
   state.connections = snapshot.connections;
+  state.submissions = snapshot.submissions;
+  state.privateInvites = snapshot.privateInvites;
+  state.claimLinks = snapshot.claimLinks;
   state.nextTeamId = snapshot.nextTeamId;
+  state.nextInviteId = snapshot.nextInviteId;
+  state.nextClaimLinkId = snapshot.nextClaimLinkId;
 }
 
-function rowsFor(table: unknown) {
+function rowsFor(table: unknown, selected?: unknown) {
+  if (table === tournaments && selected) return [];
   if (table === tournaments) return [state.tournament];
   if (table === tournamentGames) return state.games;
   if (table === teams) return state.teams;
   if (table === tournamentGameAssignments) return state.assignments;
+  if (table === tournamentTeamSubmissions) return state.submissions;
+  if (table === tournamentPrivateInviteLinks) return state.privateInvites;
+  if (table === tournamentTeamClaimLinks) return state.claimLinks;
   return [];
 }
 
@@ -96,9 +113,10 @@ function makeDb(): any {
         return Promise.resolve([[state.tournament]]);
       return Promise.resolve([[]]);
     },
-    select() {
+    select(selected?: unknown) {
       const builder: any = {
         _table: null as unknown,
+        _selected: selected,
         from(table: unknown) {
           this._table = table;
           return this;
@@ -119,7 +137,10 @@ function makeDb(): any {
           resolve: (rows: any[]) => unknown,
           reject: (error: unknown) => unknown
         ) {
-          return Promise.resolve(rowsFor(this._table)).then(resolve, reject);
+          return Promise.resolve(rowsFor(this._table, this._selected)).then(
+            resolve,
+            reject
+          );
         },
       };
       return builder;
@@ -136,6 +157,14 @@ function makeDb(): any {
               }
               if (table === tournamentGames)
                 Object.assign(state.games[0], values);
+              if (table === tournamentTeamSubmissions)
+                Object.assign(state.submissions[0], values);
+              if (table === tournamentPrivateInviteLinks)
+                state.privateInvites.forEach(invite =>
+                  Object.assign(invite, values)
+                );
+              if (table === tournamentTeamClaimLinks)
+                state.claimLinks.forEach(link => Object.assign(link, values));
               return Promise.resolve({ affectedRows: 1 });
             },
           };
@@ -167,6 +196,24 @@ function makeDb(): any {
               ...values,
             };
             state.games.push(row);
+            return Promise.resolve({ insertId: row.id });
+          }
+          if (table === tournamentPrivateInviteLinks) {
+            const row = {
+              id: state.nextInviteId++,
+              status: "active",
+              ...values,
+            };
+            state.privateInvites.push(row);
+            return Promise.resolve({ insertId: row.id });
+          }
+          if (table === tournamentTeamClaimLinks) {
+            const row = {
+              id: state.nextClaimLinkId++,
+              status: "active",
+              ...values,
+            };
+            state.claimLinks.push(row);
             return Promise.resolve({ insertId: row.id });
           }
           if (table === tournamentGameAssignments) {
@@ -220,7 +267,12 @@ describe("tournament control revision behavior", () => {
     state.teams = [];
     state.assignments = [];
     state.connections = [];
+    state.submissions = [];
+    state.privateInvites = [];
+    state.claimLinks = [];
     state.nextTeamId = 100;
+    state.nextInviteId = 1;
+    state.nextClaimLinkId = 1;
   });
 
   it("returns the committed post-increment revision for a lobby creation style mutation", async () => {
@@ -345,5 +397,91 @@ describe("tournament control revision behavior", () => {
         connections: [],
       })
     ).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+
+  it("visibility mutation increments exactly once and returns the board", async () => {
+    const board =
+      await __tournamentControlTestInternals.setTournamentVisibility(
+        1,
+        "public",
+        { id: 1, role: "admin" }
+      );
+    expect(state.tournament.visibility).toBe("public");
+    expect(state.tournament.publicSlug).toBeTruthy();
+    expect(board.tournament.boardRevision).toBe(8);
+  });
+
+  it("publish mutation increments exactly once and returns the board", async () => {
+    state.tournament.visibility = "public";
+    state.tournament.publicSlug = "original";
+    const board = await __tournamentControlTestInternals.publishTournament(
+      1,
+      true,
+      { id: 1, role: "admin" }
+    );
+    expect(state.tournament.publishedAt).toBeTruthy();
+    expect(board.tournament.boardRevision).toBe(8);
+  });
+
+  it("submission rejection increments exactly once", async () => {
+    state.submissions.push({
+      id: 501,
+      tournamentId: 1,
+      status: "pending",
+      adminNote: null,
+      managedTeamId: 1,
+    });
+    const board = await __tournamentControlTestInternals.rejectSubmission(
+      501,
+      "Rejected"
+    );
+    expect(state.submissions[0]).toMatchObject({
+      status: "rejected",
+      adminNote: "Rejected",
+    });
+    expect(board.tournament.boardRevision).toBe(8);
+  });
+
+  it("private invite regeneration revokes and creates inside one transaction", async () => {
+    state.privateInvites.push({
+      id: 1,
+      tournamentId: 1,
+      status: "active",
+      token: "old",
+    });
+    const result =
+      await __tournamentControlTestInternals.regeneratePrivateInviteLink(1, {
+        id: 1,
+        role: "admin",
+      });
+    expect(result.path).toContain("/tournaments/invite/");
+    expect(
+      state.privateInvites.filter(invite => invite.status === "active")
+    ).toHaveLength(1);
+    expect(
+      state.privateInvites.some(
+        invite => invite.token === "old" && invite.status === "revoked"
+      )
+    ).toBe(true);
+  });
+
+  it("finalized claim-link and lobby-code helpers reject", async () => {
+    state.tournament.finalizedAt = new Date();
+    state.teams.push({
+      id: 300,
+      tournamentId: 1,
+      name: "Manual",
+      frp: 1,
+      managedTeamId: null,
+    });
+    await expect(
+      __tournamentControlTestInternals.createTeamClaimLink(300, {
+        id: 1,
+        role: "admin",
+      })
+    ).rejects.toThrow("finalized");
+    await expect(
+      __tournamentControlTestInternals.releaseLobbyCodeDeliveries(10, 1, 300)
+    ).rejects.toThrow("finalized");
   });
 });
