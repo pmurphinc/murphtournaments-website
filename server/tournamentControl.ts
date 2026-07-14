@@ -1056,6 +1056,17 @@ async function listOwnerCandidates(db: QueryExecutor) {
 
 async function updateTournamentName(tournamentId: number, name: string) {
   return runBoardMutationAndFetch(tournamentId, async tx => {
+    const [tournament] = await tx
+      .select({ name: tournaments.name })
+      .from(tournaments)
+      .where(eq(tournaments.id, tournamentId))
+      .limit(1);
+    if (!tournament)
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Tournament not found",
+      });
+    if (tournament.name === name) return false;
     await tx
       .update(tournaments)
       .set({ name })
@@ -1949,16 +1960,7 @@ async function getActiveViewerLink(db: QueryExecutor, tournamentId: number) {
 async function getOrCreateViewerLink(tournamentId: number, userId: number) {
   const db = await requireDb();
   return db.transaction(async tx => {
-    const tournamentRows = readRows<{ id: number }>(
-      await tx.execute(
-        sql`SELECT id FROM tournaments WHERE id = ${tournamentId} FOR UPDATE`
-      )
-    );
-    if (!tournamentRows.length)
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Tournament not found",
-      });
+    await lockTournamentForBoardMutation(tx, tournamentId);
     const existing = await getActiveViewerLink(tx, tournamentId);
     if (existing?.publicToken)
       return {
@@ -1989,16 +1991,7 @@ async function getOrCreateViewerLink(tournamentId: number, userId: number) {
 async function regenerateViewerLink(tournamentId: number, userId: number) {
   const db = await requireDb();
   return db.transaction(async tx => {
-    const tournamentRows = readRows<{ id: number }>(
-      await tx.execute(
-        sql`SELECT id FROM tournaments WHERE id = ${tournamentId} FOR UPDATE`
-      )
-    );
-    if (!tournamentRows.length)
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Tournament not found",
-      });
+    await lockTournamentForBoardMutation(tx, tournamentId);
     await tx
       .update(tournamentViewerLinks)
       .set({ status: "revoked", updatedAt: sql`now()` })
@@ -2867,6 +2860,113 @@ async function setAssignmentResultPlacement(
   });
 }
 
+async function acceptTeamClaimLink(token: string, user: { id: number }) {
+  const db = await requireDb();
+  const tokenHash = hashToken(token);
+  const [resolved] = await db
+    .select({ tournamentId: teams.tournamentId })
+    .from(tournamentTeamClaimLinks)
+    .innerJoin(teams, eq(tournamentTeamClaimLinks.tournamentTeamId, teams.id))
+    .where(eq(tournamentTeamClaimLinks.tokenHash, tokenHash))
+    .limit(1);
+  if (!resolved)
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Claim link not found.",
+    });
+
+  return db.transaction(async tx => {
+    await lockTournamentForBoardMutation(tx, resolved.tournamentId);
+    const [row] = await tx
+      .select({ link: tournamentTeamClaimLinks, team: teams })
+      .from(tournamentTeamClaimLinks)
+      .innerJoin(teams, eq(tournamentTeamClaimLinks.tournamentTeamId, teams.id))
+      .where(eq(tournamentTeamClaimLinks.tokenHash, tokenHash))
+      .limit(1);
+    if (!row || row.team.tournamentId !== resolved.tournamentId)
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Claim link not found.",
+      });
+    const state = getClaimLinkState(row.link);
+    if (state.revoked)
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "This claim link has been revoked.",
+      });
+    if (state.claimed)
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "This claim link has already been used.",
+      });
+    if (state.expired)
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "This claim link has expired.",
+      });
+    if (row.team.managedTeamId)
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: "This team is already managed.",
+      });
+
+    const baseSlug = createManagedTeamSlug(row.team.name);
+    let slug = baseSlug;
+    for (let i = 2; ; i++) {
+      const existing = await tx
+        .select({ id: managedTeams.id })
+        .from(managedTeams)
+        .where(eq(managedTeams.slug, slug))
+        .limit(1);
+      if (!existing.length) break;
+      slug = `${baseSlug}-${i}`.slice(0, 80);
+    }
+    await tx
+      .insert(managedTeams)
+      .values({ name: row.team.name, slug, captainUserId: user.id });
+    const [managedTeam] = await tx
+      .select()
+      .from(managedTeams)
+      .where(eq(managedTeams.slug, slug))
+      .limit(1);
+    if (!managedTeam)
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Managed team creation failed.",
+      });
+    await tx.insert(managedTeamMembers).values({
+      teamId: managedTeam.id,
+      userId: user.id,
+      role: "captain",
+    });
+    await tx
+      .update(teams)
+      .set({ managedTeamId: managedTeam.id })
+      .where(eq(teams.id, row.team.id));
+    const claimResult = await tx.execute(sql`
+      UPDATE tournament_team_claim_links
+      SET status = 'claimed', claimedByUserId = ${user.id}, updatedAt = NOW()
+      WHERE id = ${row.link.id}
+        AND status = 'active'
+        AND expiresAt > NOW()
+    `);
+    if (getAffectedRows(claimResult) !== 1)
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: "This claim link has already been used.",
+      });
+    await incrementBoardRevision(tx, resolved.tournamentId);
+    const board = await fetchTournamentRows(tx, resolved.tournamentId);
+    return {
+      success: true,
+      managedTeamId: managedTeam.id,
+      tournamentId: row.team.tournamentId,
+      boardRevision: board.tournament.boardRevision,
+      board,
+    };
+  });
+}
+
 export const discordTournamentStaffProcedure = publicProcedure.use(
   async ({ ctx, next }) => {
     await assertDiscordTournamentStaff(ctx);
@@ -2963,14 +3063,17 @@ async function removeTournamentStaffMember(
 ) {
   const db = await requireDb();
   await getOwnedTournamentOrThrow(db, tournamentId, user);
-  await db
-    .delete(tournamentStaffMembers)
-    .where(
-      and(
-        eq(tournamentStaffMembers.tournamentId, tournamentId),
-        eq(tournamentStaffMembers.id, memberId)
-      )
-    );
+  await db.transaction(async tx => {
+    await lockTournamentForBoardMutation(tx, tournamentId);
+    await tx
+      .delete(tournamentStaffMembers)
+      .where(
+        and(
+          eq(tournamentStaffMembers.tournamentId, tournamentId),
+          eq(tournamentStaffMembers.id, memberId)
+        )
+      );
+  });
   return listTournamentStaff(tournamentId, user);
 }
 async function getOrCreateStaffInviteLink(
@@ -2980,6 +3083,7 @@ async function getOrCreateStaffInviteLink(
   const db = await requireDb();
   await getOwnedTournamentOrThrow(db, tournamentId, user);
   return db.transaction(async tx => {
+    await lockTournamentForBoardMutation(tx, tournamentId);
     const [existing] = await tx
       .execute(
         sql`
@@ -3034,16 +3138,52 @@ async function revokeStaffInviteLink(
 ) {
   const db = await requireDb();
   await getOwnedTournamentOrThrow(db, tournamentId, user);
-  await db
-    .update(tournamentStaffInviteLinks)
-    .set({ status: "revoked", updatedAt: sql`now()` })
-    .where(
-      and(
-        eq(tournamentStaffInviteLinks.tournamentId, tournamentId),
-        eq(tournamentStaffInviteLinks.status, "active")
-      )
-    );
+  await db.transaction(async tx => {
+    await lockTournamentForBoardMutation(tx, tournamentId);
+    await tx
+      .update(tournamentStaffInviteLinks)
+      .set({ status: "revoked", updatedAt: sql`now()` })
+      .where(
+        and(
+          eq(tournamentStaffInviteLinks.tournamentId, tournamentId),
+          eq(tournamentStaffInviteLinks.status, "active")
+        )
+      );
+  });
   return { success: true } as const;
+}
+
+async function regenerateStaffInviteLink(
+  tournamentId: number,
+  user: { id: number; role: "user" | "admin" }
+) {
+  const db = await requireDb();
+  await getOwnedTournamentOrThrow(db, tournamentId, user);
+  return db.transaction(async tx => {
+    await lockTournamentForBoardMutation(tx, tournamentId);
+    await tx.execute(sql`
+      UPDATE tournament_staff_invite_links
+      SET status = 'revoked', updatedAt = NOW()
+      WHERE tournamentId = ${tournamentId}
+        AND status = 'active'
+    `);
+    const token = randomBytes(32).toString("base64url");
+    const expiresAt = new Date(
+      Date.now() + STAFF_INVITE_TTL_DAYS * 24 * 60 * 60 * 1000
+    );
+    await tx.insert(tournamentStaffInviteLinks).values({
+      tournamentId,
+      createdByUserId: user.id,
+      tokenHash: hashToken(token),
+      expiresAt,
+    });
+    return {
+      path: createTokenPath("/TCR/staff/join", token),
+      url: createTokenPath("/TCR/staff/join", token),
+      expiresAt,
+      hasActiveInvite: true,
+    } as const;
+  });
 }
 
 async function previewStaffInvite(token: string) {
@@ -3107,6 +3247,7 @@ async function acceptStaffInvite(
         code: "NOT_FOUND",
         message: "This staff invite is invalid.",
       });
+    await lockTournamentForBoardMutation(tx, row.tournament.id);
     if (row.invite.status === "revoked")
       throw new TRPCError({
         code: "FORBIDDEN",
@@ -3824,8 +3965,7 @@ export const personalTcrRouter = router({
   regenerateStaffInviteLink: personalTcrProcedure
     .input(tournamentIdSchema)
     .mutation(async ({ input, ctx }) => {
-      await revokeStaffInviteLink(input.tournamentId, ctx.user);
-      return getOrCreateStaffInviteLink(input.tournamentId, ctx.user);
+      return regenerateStaffInviteLink(input.tournamentId, ctx.user);
     }),
   revokeStaffInviteLink: personalTcrProcedure
     .input(tournamentIdSchema)
@@ -4516,87 +4656,7 @@ export const tournamentControlRouter = router({
     }),
   acceptTeamClaimLink: protectedProcedure
     .input(z.object({ token: tokenSchema }))
-    .mutation(async ({ input, ctx }) => {
-      const db = await requireDb();
-      return db.transaction(async tx => {
-        const [row] = await tx
-          .select({ link: tournamentTeamClaimLinks, team: teams })
-          .from(tournamentTeamClaimLinks)
-          .innerJoin(
-            teams,
-            eq(tournamentTeamClaimLinks.tournamentTeamId, teams.id)
-          )
-          .where(eq(tournamentTeamClaimLinks.tokenHash, hashToken(input.token)))
-          .limit(1);
-        if (!row)
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Claim link not found.",
-          });
-        const state = getClaimLinkState(row.link);
-        if (state.revoked)
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "This claim link has been revoked.",
-          });
-        if (state.claimed)
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "This claim link has already been used.",
-          });
-        if (state.expired)
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "This claim link has expired.",
-          });
-        if (row.team.managedTeamId)
-          throw new TRPCError({
-            code: "CONFLICT",
-            message: "This team is already managed.",
-          });
-        const baseSlug = createManagedTeamSlug(row.team.name);
-        let slug = baseSlug;
-        for (let i = 2; ; i++) {
-          const existing = await tx
-            .select({ id: managedTeams.id })
-            .from(managedTeams)
-            .where(eq(managedTeams.slug, slug))
-            .limit(1);
-          if (!existing.length) break;
-          slug = `${baseSlug}-${i}`.slice(0, 80);
-        }
-        await tx
-          .insert(managedTeams)
-          .values({ name: row.team.name, slug, captainUserId: ctx.user.id });
-        const [managedTeam] = await tx
-          .select()
-          .from(managedTeams)
-          .where(eq(managedTeams.slug, slug))
-          .limit(1);
-        await tx.insert(managedTeamMembers).values({
-          teamId: managedTeam.id,
-          userId: ctx.user.id,
-          role: "captain",
-        });
-        await tx
-          .update(teams)
-          .set({ managedTeamId: managedTeam.id })
-          .where(eq(teams.id, row.team.id));
-        await tx
-          .update(tournamentTeamClaimLinks)
-          .set({
-            status: "claimed",
-            claimedByUserId: ctx.user.id,
-            updatedAt: sql`now()`,
-          })
-          .where(eq(tournamentTeamClaimLinks.id, row.link.id));
-        return {
-          success: true,
-          managedTeamId: managedTeam.id,
-          tournamentId: row.team.tournamentId,
-        };
-      });
-    }),
+    .mutation(({ input, ctx }) => acceptTeamClaimLink(input.token, ctx.user)),
   listTournaments: discordTournamentStaffProcedure.query(async () => {
     const db = await requireDb();
     return listTournamentRows(db);
@@ -4746,19 +4806,13 @@ export const tournamentControlRouter = router({
     ),
   moveGame: discordTournamentStaffProcedure
     .input(gameIdSchema.extend({ position: positionSchema }))
-    .mutation(async ({ input }) => {
-      const db = await requireDb();
-      const game = await getGameOrThrow(db, input.gameId);
-      return runBoardMutationAndFetch(game.tournamentId, async tx => {
-        const gameInTx = await getGameOrThrow(tx, input.gameId);
-        assertGamePositionUnlocked(gameInTx);
+    .mutation(({ input }) =>
+      updateGameFieldAndFetch(input.gameId, game => {
+        assertGamePositionUnlocked(game);
         const safePosition = clampCanvasPosition(input.position);
-        await tx
-          .update(tournamentGames)
-          .set({ canvasX: safePosition.x, canvasY: safePosition.y })
-          .where(eq(tournamentGames.id, input.gameId));
-      });
-    }),
+        return { canvasX: safePosition.x, canvasY: safePosition.y };
+      })
+    ),
   moveGames: discordTournamentStaffProcedure
     .input(
       tournamentIdSchema.extend({
@@ -4954,5 +5008,13 @@ export const __tournamentControlTestInternals = {
   createTeamClaimLink,
   revokeTeamClaimLink,
   releaseLobbyCodeDeliveries,
+  acceptTeamClaimLink,
+  getOrCreateStaffInviteLink,
+  regenerateStaffInviteLink,
+  revokeStaffInviteLink,
+  acceptStaffInvite,
+  getOrCreateViewerLink,
+  regenerateViewerLink,
+  updateGameFieldAndFetch,
   restoreTournamentBoardSnapshot,
 };

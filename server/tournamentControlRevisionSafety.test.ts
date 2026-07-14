@@ -9,6 +9,10 @@ import {
   tournamentTeamSubmissions,
   tournamentPrivateInviteLinks,
   tournamentTeamClaimLinks,
+  managedTeams,
+  managedTeamMembers,
+  tournamentStaffInviteLinks,
+  tournamentViewerLinks,
 } from "../drizzle/schema";
 
 const state = {
@@ -48,9 +52,14 @@ const state = {
   submissions: [] as any[],
   privateInvites: [] as any[],
   claimLinks: [] as any[],
+  managedTeams: [] as any[],
+  managedTeamMembers: [] as any[],
+  staffInvites: [] as any[],
+  viewerLinks: [] as any[],
   nextTeamId: 100,
   nextInviteId: 1,
   nextClaimLinkId: 1,
+  nextManagedTeamId: 1,
 };
 
 function cloneState() {
@@ -67,18 +76,54 @@ function restore(snapshot: any) {
   state.claimLinks = snapshot.claimLinks;
   state.nextTeamId = snapshot.nextTeamId;
   state.nextInviteId = snapshot.nextInviteId;
+  state.managedTeams = snapshot.managedTeams;
+  state.managedTeamMembers = snapshot.managedTeamMembers;
+  state.staffInvites = snapshot.staffInvites;
+  state.viewerLinks = snapshot.viewerLinks;
   state.nextClaimLinkId = snapshot.nextClaimLinkId;
+  state.nextManagedTeamId = snapshot.nextManagedTeamId;
 }
 
 function rowsFor(table: unknown, selected?: unknown) {
-  if (table === tournaments && selected) return [];
+  if (table === tournaments && selected) {
+    if (Object.prototype.hasOwnProperty.call(selected, "name"))
+      return [{ name: state.tournament.name }];
+    if (Object.prototype.hasOwnProperty.call(selected, "tournamentId"))
+      return [{ tournamentId: state.tournament.id }];
+    return [];
+  }
   if (table === tournaments) return [state.tournament];
   if (table === tournamentGames) return state.games;
   if (table === teams) return state.teams;
   if (table === tournamentGameAssignments) return state.assignments;
   if (table === tournamentTeamSubmissions) return state.submissions;
   if (table === tournamentPrivateInviteLinks) return state.privateInvites;
-  if (table === tournamentTeamClaimLinks) return state.claimLinks;
+  if (table === tournamentTeamClaimLinks) {
+    if (
+      selected &&
+      Object.prototype.hasOwnProperty.call(selected, "link") &&
+      Object.prototype.hasOwnProperty.call(selected, "team")
+    )
+      return state.claimLinks.map(link => ({
+        link,
+        team: state.teams.find(team => team.id === link.tournamentTeamId),
+      }));
+    if (
+      selected &&
+      Object.prototype.hasOwnProperty.call(selected, "tournamentId")
+    )
+      return state.claimLinks.map(link => {
+        const team = state.teams.find(
+          team => team.id === link.tournamentTeamId
+        );
+        return { tournamentId: team?.tournamentId };
+      });
+    return state.claimLinks;
+  }
+  if (table === managedTeams) return state.managedTeams;
+  if (table === managedTeamMembers) return state.managedTeamMembers;
+  if (table === tournamentStaffInviteLinks) return state.staffInvites;
+  if (table === tournamentViewerLinks) return state.viewerLinks;
   return [];
 }
 
@@ -105,6 +150,14 @@ function makeDb(): any {
     },
     execute(query: unknown) {
       const text = sqlText(query);
+      if (text.includes("UPDATE tournament_team_claim_links")) {
+        const link = state.claimLinks.find(link => link.status === "active");
+        if (!link) return Promise.resolve({ affectedRows: 0 });
+        Object.assign(link, { status: "claimed", claimedByUserId: 1 });
+        return Promise.resolve({ affectedRows: 1 });
+      }
+      if (text.includes("tournament_staff_invite_links"))
+        return Promise.resolve([state.staffInvites]);
       if (text.includes("tournament_game_connections"))
         return Promise.resolve([state.connections]);
       if (text.includes("tournament_game_assignments"))
@@ -165,6 +218,13 @@ function makeDb(): any {
                 );
               if (table === tournamentTeamClaimLinks)
                 state.claimLinks.forEach(link => Object.assign(link, values));
+              if (table === teams) Object.assign(state.teams[0], values);
+              if (table === tournamentStaffInviteLinks)
+                state.staffInvites.forEach(invite =>
+                  Object.assign(invite, values)
+                );
+              if (table === tournamentViewerLinks)
+                state.viewerLinks.forEach(link => Object.assign(link, values));
               return Promise.resolve({ affectedRows: 1 });
             },
           };
@@ -205,6 +265,38 @@ function makeDb(): any {
               ...values,
             };
             state.privateInvites.push(row);
+            return Promise.resolve({ insertId: row.id });
+          }
+          if (table === managedTeams) {
+            const row = { id: state.nextManagedTeamId++, ...values };
+            state.managedTeams.push(row);
+            return Promise.resolve({ insertId: row.id });
+          }
+          if (table === managedTeamMembers) {
+            state.managedTeamMembers.push({
+              id: state.managedTeamMembers.length + 1,
+              ...values,
+            });
+            return Promise.resolve({
+              insertId: state.managedTeamMembers.length,
+            });
+          }
+          if (table === tournamentStaffInviteLinks) {
+            const row = {
+              id: state.staffInvites.length + 1,
+              status: "active",
+              ...values,
+            };
+            state.staffInvites.push(row);
+            return Promise.resolve({ insertId: row.id });
+          }
+          if (table === tournamentViewerLinks) {
+            const row = {
+              id: state.viewerLinks.length + 1,
+              status: "active",
+              ...values,
+            };
+            state.viewerLinks.push(row);
             return Promise.resolve({ insertId: row.id });
           }
           if (table === tournamentTeamClaimLinks) {
@@ -272,7 +364,12 @@ describe("tournament control revision behavior", () => {
     state.claimLinks = [];
     state.nextTeamId = 100;
     state.nextInviteId = 1;
+    state.managedTeams = [];
+    state.managedTeamMembers = [];
+    state.staffInvites = [];
+    state.viewerLinks = [];
     state.nextClaimLinkId = 1;
+    state.nextManagedTeamId = 1;
   });
 
   it("returns the committed post-increment revision for a lobby creation style mutation", async () => {
@@ -483,5 +580,104 @@ describe("tournament control revision behavior", () => {
     await expect(
       __tournamentControlTestInternals.releaseLobbyCodeDeliveries(10, 1, 300)
     ).rejects.toThrow("finalized");
+  });
+
+  it("tournament-name no-op does not increment", async () => {
+    const board = await __tournamentControlTestInternals.updateTournamentName(
+      1,
+      "Original"
+    );
+    expect(board.tournament.boardRevision).toBe(7);
+  });
+
+  it("finalized acceptTeamClaimLink rejects", async () => {
+    state.tournament.finalizedAt = new Date();
+    state.teams.push({
+      id: 400,
+      tournamentId: 1,
+      name: "Claimable",
+      frp: 1,
+      managedTeamId: null,
+    });
+    state.claimLinks.push({
+      id: 1,
+      tournamentTeamId: 400,
+      tokenHash: "hash",
+      status: "active",
+      expiresAt: new Date(Date.now() + 60_000),
+      claimedByUserId: null,
+    });
+    await expect(
+      __tournamentControlTestInternals.acceptTeamClaimLink("token", { id: 1 })
+    ).rejects.toThrow("finalized");
+  });
+
+  it("successful claim acceptance increments exactly once and second attempt conflicts", async () => {
+    state.teams.push({
+      id: 401,
+      tournamentId: 1,
+      name: "Claimable",
+      frp: 1,
+      managedTeamId: null,
+    });
+    state.claimLinks.push({
+      id: 1,
+      tournamentTeamId: 401,
+      tokenHash: "hash",
+      status: "active",
+      expiresAt: new Date(Date.now() + 60_000),
+      claimedByUserId: null,
+    });
+    const result = await __tournamentControlTestInternals.acceptTeamClaimLink(
+      "token",
+      { id: 1 }
+    );
+    expect(result.boardRevision).toBe(8);
+    await expect(
+      __tournamentControlTestInternals.acceptTeamClaimLink("token", { id: 2 })
+    ).rejects.toThrow();
+  });
+
+  it("finalized staff and viewer mutations reject", async () => {
+    state.tournament.finalizedAt = new Date();
+    await expect(
+      __tournamentControlTestInternals.getOrCreateStaffInviteLink(1, {
+        id: 1,
+        role: "admin",
+      })
+    ).rejects.toThrow("finalized");
+    await expect(
+      __tournamentControlTestInternals.regenerateStaffInviteLink(1, {
+        id: 1,
+        role: "admin",
+      })
+    ).rejects.toThrow("finalized");
+    await expect(
+      __tournamentControlTestInternals.revokeStaffInviteLink(1, {
+        id: 1,
+        role: "admin",
+      })
+    ).rejects.toThrow("finalized");
+    await expect(
+      __tournamentControlTestInternals.regenerateViewerLink(1, 1)
+    ).rejects.toThrow("finalized");
+  });
+
+  it("discord moveGame shared helper increments once and skips unchanged coordinates", async () => {
+    const changed =
+      await __tournamentControlTestInternals.updateGameFieldAndFetch(
+        10,
+        game => {
+          const safePosition = { x: 10, y: 20 };
+          return { canvasX: safePosition.x, canvasY: safePosition.y };
+        }
+      );
+    expect(changed.tournament.boardRevision).toBe(8);
+    const unchanged =
+      await __tournamentControlTestInternals.updateGameFieldAndFetch(
+        10,
+        () => ({ canvasX: 10, canvasY: 20 })
+      );
+    expect(unchanged.tournament.boardRevision).toBe(8);
   });
 });
