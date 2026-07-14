@@ -575,6 +575,23 @@ async function lockTournamentForBoardMutation(
   return tournament;
 }
 
+async function lockTournamentRow(db: QueryExecutor, tournamentId: number) {
+  const rows = readRows<{
+    id: number;
+    ownerUserId: number | null;
+    boardRevision: number;
+    finalizedAt: Date | null;
+  }>(
+    await db.execute(
+      sql`SELECT id, ownerUserId, boardRevision, finalizedAt FROM tournaments WHERE id = ${tournamentId} FOR UPDATE`
+    )
+  );
+  const [tournament] = rows;
+  if (!tournament)
+    throw new TRPCError({ code: "NOT_FOUND", message: "Tournament not found" });
+  return tournament;
+}
+
 async function runBoardMutation<T>(
   tournamentId: number,
   mutate: (tx: QueryExecutor) => Promise<T>,
@@ -3742,20 +3759,16 @@ async function finalizeTournament(
   user: { id: number; role: "user" | "admin" }
 ) {
   const db = await requireDb();
-  await getOwnedTournamentOrThrow(db, tournamentId, user);
   return db.transaction(async tx => {
-    await lockTournamentForBoardMutation(tx, tournamentId);
-    const [tournament] = await tx
-      .select()
-      .from(tournaments)
-      .where(eq(tournaments.id, tournamentId))
-      .limit(1);
-    if (!tournament)
+    const lockedTournament = await lockTournamentRow(tx, tournamentId);
+    if (user.role !== "admin" && lockedTournament.ownerUserId !== user.id)
       throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Tournament not found",
+        code: "FORBIDDEN",
+        message: "Only the tournament owner can finalize this tournament.",
       });
-    if (tournament.finalizedAt) return getFinalizationSummary(tx, tournamentId);
+    if (lockedTournament.finalizedAt)
+      return getFinalizationSummary(tx, tournamentId);
+
     const data = await fetchTournamentRows(tx, tournamentId);
     const { championTeamId } = validateFinalizationData(data);
     const scoreboard = calculateTournamentScoreboard(

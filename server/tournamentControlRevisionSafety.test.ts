@@ -13,6 +13,7 @@ import {
   managedTeamMembers,
   tournamentStaffInviteLinks,
   tournamentViewerLinks,
+  tournamentTeamResults,
 } from "../drizzle/schema";
 
 const state = {
@@ -57,6 +58,7 @@ const state = {
   managedTeamMembers: [] as any[],
   staffInvites: [] as any[],
   viewerLinks: [] as any[],
+  results: [] as any[],
   nextTeamId: 100,
   nextInviteId: 1,
   nextClaimLinkId: 1,
@@ -81,6 +83,7 @@ function restore(snapshot: any) {
   state.managedTeamMembers = snapshot.managedTeamMembers;
   state.staffInvites = snapshot.staffInvites;
   state.viewerLinks = snapshot.viewerLinks;
+  state.results = snapshot.results;
   state.nextClaimLinkId = snapshot.nextClaimLinkId;
   state.nextManagedTeamId = snapshot.nextManagedTeamId;
 }
@@ -139,6 +142,7 @@ function rowsFor(table: unknown, selected?: unknown) {
   if (table === managedTeamMembers) return state.managedTeamMembers;
   if (table === tournamentStaffInviteLinks) return state.staffInvites;
   if (table === tournamentViewerLinks) return state.viewerLinks;
+  if (table === tournamentTeamResults) return state.results;
   return [];
 }
 
@@ -165,6 +169,17 @@ function makeDb(): any {
     },
     execute(query: unknown) {
       const text = sqlText(query);
+      if (text.includes("INSERT INTO tournament_team_results")) {
+        state.results = [
+          {
+            tournamentId: 1,
+            tournamentTeamId: state.teams[0]?.id ?? 1,
+            teamNameSnapshot: state.teams[0]?.name ?? "Champion",
+            isChampion: 1,
+          },
+        ];
+        return Promise.resolve({ affectedRows: 1 });
+      }
       if (text.includes("UPDATE tournament_team_claim_links")) {
         const link = state.claimLinks.find(link => link.status === "active");
         if (!link) return Promise.resolve({ affectedRows: 0 });
@@ -383,6 +398,7 @@ describe("tournament control revision behavior", () => {
     state.managedTeamMembers = [];
     state.staffInvites = [];
     state.viewerLinks = [];
+    state.results = [];
     state.nextClaimLinkId = 1;
     state.nextManagedTeamId = 1;
   });
@@ -738,5 +754,94 @@ describe("tournament control revision behavior", () => {
         () => ({ canvasX: 10, canvasY: 20 })
       );
     expect(unchanged.tournament.boardRevision).toBe(8);
+  });
+
+  it("finalization locks, authorizes against locked owner, increments once, and second call is no-op", async () => {
+    state.tournament.ownerUserId = 42;
+    state.teams.push({
+      id: 801,
+      tournamentId: 1,
+      name: "Champion",
+      frp: 1,
+      managedTeamId: null,
+    });
+    Object.assign(state.games[0], {
+      gameType: "final_round",
+      status: "complete",
+    });
+    state.assignments.push({
+      id: 1,
+      gameId: 10,
+      teamId: 801,
+      slotIndex: 1,
+      resultPlacement: 1,
+    });
+    await expect(
+      __tournamentControlTestInternals.finalizeTournament(1, {
+        id: 7,
+        role: "user",
+      })
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    const summary = await __tournamentControlTestInternals.finalizeTournament(
+      1,
+      { id: 42, role: "user" }
+    );
+    expect(summary.boardRevision).toBe(8);
+    const second = await __tournamentControlTestInternals.finalizeTournament(
+      1,
+      { id: 99, role: "admin" }
+    );
+    expect(second.boardRevision).toBe(8);
+  });
+
+  it("unlock increments once and stale restore after finalize/unlock conflicts", async () => {
+    state.tournament.ownerUserId = 42;
+    state.teams.push({
+      id: 802,
+      tournamentId: 1,
+      name: "Champion",
+      frp: 1,
+      managedTeamId: null,
+    });
+    Object.assign(state.games[0], {
+      gameType: "final_round",
+      status: "complete",
+    });
+    state.assignments.push({
+      id: 1,
+      gameId: 10,
+      teamId: 802,
+      slotIndex: 1,
+      resultPlacement: 1,
+    });
+    await __tournamentControlTestInternals.finalizeTournament(1, {
+      id: 42,
+      role: "user",
+    });
+    const board =
+      await __tournamentControlTestInternals.unlockTournamentForEditing(1, {
+        id: 99,
+        role: "admin",
+      });
+    expect(board.tournament.boardRevision).toBe(9);
+    await expect(
+      __tournamentControlTestInternals.restoreTournamentBoardSnapshot(1, {
+        expectedRevision: 7,
+        games: [],
+        assignments: [],
+        connections: [],
+      })
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+
+  it("finalized tournament deletion fails and unfinalized deletion succeeds", async () => {
+    state.tournament.finalizedAt = new Date();
+    await expect(
+      __tournamentControlTestInternals.deleteTournament(1)
+    ).rejects.toThrow("finalized");
+    state.tournament.finalizedAt = null;
+    await expect(
+      __tournamentControlTestInternals.deleteTournament(1)
+    ).resolves.toBeTruthy();
   });
 });
