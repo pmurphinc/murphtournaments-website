@@ -52,8 +52,14 @@
   --dark-purple: #1a0033;
   --dark-black: #000000;
   --dark-charcoal: #0a0e27;
-  --esports-gradient: linear-gradient(180deg, #0a0e27 0%, #1a1a3a 25%, #0d0f1f 75%, #000000 100%);
-  
+  --esports-gradient: linear-gradient(
+    180deg,
+    #0a0e27 0%,
+    #1a1a3a 25%,
+    #0d0f1f 75%,
+    #000000 100%
+  );
+
   /* Theme Colors */
   --primary: var(--neon-magenta);
   --primary-foreground: var(--dark-black);
@@ -125,16 +131,144 @@
   --sidebar-accent-foreground: var(--dark-black);
   --sidebar-border: #333333;
   --sidebar-ring: var(--neon-cyan);
+
+  /*
+   * Murph Tournaments public-site palette (black / charcoal / metallic gold).
+   * Additive only — these are new variable names, so they never override the
+   * neon tokens above. /admin/* and /TCR still read the neon tokens directly
+   * via components/ui/*, so leaving those untouched keeps admin/TCR visually
+   * unaffected by this palette's existence.
+   */
+  --mt-black: #0a0a0b;
+  --mt-charcoal: #151517;
+  --mt-charcoal-raised: #1c1c1f;
+  --mt-steel: #2a2a2e;
+  --mt-steel-line: #333338;
+  --mt-off-white: #f4f3ef;
+  --mt-muted: #9a9a9f;
+  --mt-gold: #c9a94a;
+  --mt-gold-bright: #e8c766;
+  --mt-gold-foreground: #17140a;
+  --mt-danger: #d6534a;
 }
+
+/*
+ * Scopes the shadcn/Radix primitives (Button, Badge, Card, Tabs, Sheet,
+ * Empty, Skeleton, ...) onto the Murph Tournaments palette for public-facing
+ * page content only. Applied to <main> for public routes in App.tsx — never
+ * to /admin/* or /TCR, so ui/* components rendered inside those pages keep
+ * reading the original neon tokens above, completely unaffected.
+ */
+.public-theme {
+  --background: var(--mt-black);
+  --foreground: var(--mt-off-white);
+  --card: var(--mt-charcoal);
+  --card-foreground: var(--mt-off-white);
+  --popover: var(--mt-charcoal-raised);
+  --popover-foreground: var(--mt-off-white);
+  --primary: var(--mt-gold);
+  --primary-foreground: var(--mt-gold-foreground);
+  --secondary: var(--mt-steel);
+  --secondary-foreground: var(--mt-off-white);
+  --muted: var(--mt-charcoal-raised);
+  --muted-foreground: var(--mt-muted);
+  --accent: var(--mt-steel);
+  --accent-foreground: var(--mt-gold-bright);
+  --destructive: var(--mt-danger);
+  --destructive-foreground: #ffffff;
+  --border: var(--mt-steel-line);
+  --input: var(--mt-charcoal-raised);
+  --ring: var(--mt-gold);
+  --radius: 0.5rem;
+
+  background: var(--mt-black);
+  color: var(--mt-off-white);
+  min-height: 100%;
+}
+
+.public-theme h1,
+.public-theme h2,
+.public-theme h3,
+.public-theme h4 {
+  font-family: "Space Mono", monospace;
+  letter-spacing: 0.03em;
+}
+
+.public-theme .mt-hairline {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--mt-steel-line) 20%,
+    var(--mt-gold) 50%,
+    var(--mt-steel-line) 80%,
+    transparent
+  );
+  height: 1px;
+}
+
+.public-theme .mt-panel {
+  background: var(--mt-charcoal);
+  border: 1px solid var(--mt-steel-line);
+  border-radius: var(--radius);
+}
+
+.public-theme .mt-panel.border-dashed {
+  border-style: dashed;
+}
+
+.public-theme .mt-panel-raised {
+  background: var(--mt-charcoal-raised);
+  border: 1px solid var(--mt-steel-line);
+  border-radius: var(--radius);
+}
+
+.public-theme .mt-gold-text {
+  color: var(--mt-gold-bright);
+}
+
+.public-theme .mt-hover-lift {
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.public-theme .mt-hover-lift:hover {
+  border-color: var(--mt-gold);
+  transform: translateY(-2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .public-theme .mt-hover-lift:hover {
+    transform: none;
+  }
+  .public-theme * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+.public-theme :focus-visible {
+  outline: 2px solid var(--mt-gold-bright);
+  outline-offset: 2px;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
   body {
-    background: linear-gradient(180deg, #0a0e27 0%, #1a1a3a 25%, #0d0f1f 75%, #000000 100%);
+    background: linear-gradient(
+      180deg,
+      #0a0e27 0%,
+      #1a1a3a 25%,
+      #0d0f1f 75%,
+      #000000 100%
+    );
     @apply text-foreground;
     min-height: 100vh;
-    font-family: 'IBM Plex Sans', sans-serif;
+    font-family: "IBM Plex Sans", sans-serif;
     cursor: default;
     -webkit-user-select: none;
     user-select: none;
@@ -162,15 +296,21 @@
   input[type="radio"]:not(:disabled) {
     @apply cursor-pointer;
   }
-  
-  h1, h2, h3, h4, h5, h6 {
-    font-family: 'Space Mono', monospace;
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: "Space Mono", monospace;
     font-weight: 700;
     letter-spacing: 0.05em;
   }
-  
-  code, pre {
-    font-family: 'Courier New', monospace;
+
+  code,
+  pre {
+    font-family: "Courier New", monospace;
   }
 }
 
@@ -205,40 +345,48 @@
       max-width: 1280px;
     }
   }
-  
+
   /* Neon Glow Effects */
   .glow-magenta {
-    box-shadow: 0 0 10px rgba(255, 0, 255, 0.5), 0 0 20px rgba(255, 0, 255, 0.3);
+    box-shadow:
+      0 0 10px rgba(255, 0, 255, 0.5),
+      0 0 20px rgba(255, 0, 255, 0.3);
   }
-  
+
   .glow-cyan {
-    box-shadow: 0 0 10px rgba(0, 217, 255, 0.5), 0 0 20px rgba(0, 217, 255, 0.3);
+    box-shadow:
+      0 0 10px rgba(0, 217, 255, 0.5),
+      0 0 20px rgba(0, 217, 255, 0.3);
   }
-  
+
   .glow-gold {
-    box-shadow: 0 0 10px rgba(255, 215, 0, 0.5), 0 0 20px rgba(255, 215, 0, 0.3);
+    box-shadow:
+      0 0 10px rgba(255, 215, 0, 0.5),
+      0 0 20px rgba(255, 215, 0, 0.3);
   }
-  
+
   .glow-lime {
-    box-shadow: 0 0 10px rgba(0, 255, 0, 0.5), 0 0 20px rgba(0, 255, 0, 0.3);
+    box-shadow:
+      0 0 10px rgba(0, 255, 0, 0.5),
+      0 0 20px rgba(0, 255, 0, 0.3);
   }
-  
+
   /* Neon Border Effects */
   .border-neon-magenta {
     border-color: rgb(255, 0, 255);
     box-shadow: inset 0 0 10px rgba(255, 0, 255, 0.2);
   }
-  
+
   .border-neon-cyan {
     border-color: rgb(0, 217, 255);
     box-shadow: inset 0 0 10px rgba(0, 217, 255, 0.2);
   }
-  
+
   .border-neon-gold {
     border-color: rgb(255, 215, 0);
     box-shadow: inset 0 0 10px rgba(255, 215, 0, 0.2);
   }
-  
+
   /* Glitch Effect */
   @keyframes glitch {
     0% {
@@ -266,11 +414,11 @@
       transform: translate(2px, 2px);
     }
   }
-  
+
   .glitch {
     animation: glitch 0.3s infinite;
   }
-  
+
   /* Scan Line Effect */
   @keyframes scan {
     0% {
@@ -280,7 +428,7 @@
       background-position: 0 100%;
     }
   }
-  
+
   .scan-lines {
     background-image: repeating-linear-gradient(
       0deg,
@@ -291,61 +439,71 @@
     );
     animation: scan 8s linear infinite;
   }
-  
+
   /* Pulsing Neon */
   @keyframes pulse-neon {
-    0%, 100% {
+    0%,
+    100% {
       opacity: 1;
     }
     50% {
       opacity: 0.7;
     }
   }
-  
+
   .pulse-neon {
     animation: pulse-neon 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
-  
+
   /* Hover Glow Transition */
   .hover-glow-magenta {
     transition: all 0.3s ease;
   }
-  
+
   .hover-glow-magenta:hover {
-    box-shadow: 0 0 20px rgba(255, 0, 255, 0.8), 0 0 40px rgba(255, 0, 255, 0.5);
+    box-shadow:
+      0 0 20px rgba(255, 0, 255, 0.8),
+      0 0 40px rgba(255, 0, 255, 0.5);
     transform: scale(1.02);
   }
-  
+
   .hover-glow-cyan {
     transition: all 0.3s ease;
   }
-  
+
   .hover-glow-cyan:hover {
-    box-shadow: 0 0 20px rgba(0, 217, 255, 0.8), 0 0 40px rgba(0, 217, 255, 0.5);
+    box-shadow:
+      0 0 20px rgba(0, 217, 255, 0.8),
+      0 0 40px rgba(0, 217, 255, 0.5);
     transform: scale(1.02);
   }
-  
+
   .hover-glow-gold {
     transition: all 0.3s ease;
   }
-  
+
   .hover-glow-gold:hover {
-    box-shadow: 0 0 20px rgba(255, 215, 0, 0.8), 0 0 40px rgba(255, 215, 0, 0.5);
+    box-shadow:
+      0 0 20px rgba(255, 215, 0, 0.8),
+      0 0 40px rgba(255, 215, 0, 0.5);
     transform: scale(1.02);
   }
-  
+
   .hover-glow-lime {
     transition: all 0.3s ease;
   }
-  
+
   .hover-glow-lime:hover {
-    box-shadow: 0 0 20px rgba(0, 255, 0, 0.8), 0 0 40px rgba(0, 255, 0, 0.5);
+    box-shadow:
+      0 0 20px rgba(0, 255, 0, 0.8),
+      0 0 40px rgba(0, 255, 0, 0.5);
     transform: scale(1.02);
   }
 
   /* Loading Throbber Animation */
   @keyframes throb {
-    0%, 100% {
+    0%,
+    100% {
       opacity: 0.4;
       transform: scale(0.9);
     }

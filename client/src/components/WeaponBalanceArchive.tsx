@@ -84,7 +84,7 @@ function getClassColor(value: string | null | undefined) {
 function FilterChip({
   label,
   active,
-  color = "#00d9ff",
+  color = "#e8c766",
   onClick,
 }: {
   label: string;
@@ -98,8 +98,8 @@ function FilterChip({
       onClick={onClick}
       className="shrink-0 rounded-md border px-3 py-1.5 font-mono text-[11px] font-bold transition hover:scale-[1.02]"
       style={{
-        borderColor: active ? color : "#2a2a4a",
-        color: active ? color : "#9ba1a6",
+        borderColor: active ? color : "var(--mt-steel-line)",
+        color: active ? color : "var(--mt-muted)",
         background: active ? `${color}22` : "transparent",
       }}
     >
@@ -114,7 +114,7 @@ function ArchiveSkeleton() {
       {Array.from({ length: 9 }).map((_, index) => (
         <div
           key={index}
-          className="h-32 animate-pulse rounded-lg border border-white/10 bg-[#141830]"
+          className="mt-panel h-32 animate-pulse"
         />
       ))}
     </div>
@@ -129,8 +129,8 @@ function EmptyState({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-[#141830] px-6 py-14 text-center">
-      <p className="font-mono text-sm text-white/65">{children}</p>
+    <div className="mt-panel px-6 py-14 text-center">
+      <p className="text-sm text-[var(--mt-muted)]">{children}</p>
       {action ? <div className="mt-4">{action}</div> : null}
     </div>
   );
@@ -203,34 +203,37 @@ function ArchiveList() {
     <>
       <div className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-start">
         <div>
-          <h1 className="font-mono text-4xl font-black leading-none text-[#00d9ff] md:text-5xl">
-            BALANCE
+          <h1 className="text-4xl font-black uppercase leading-none text-[var(--mt-off-white)] md:text-5xl">
+            Balance
             <br />
-            ARCHIVE
+            Archive
           </h1>
-          <p className="mt-3 max-w-3xl font-mono text-sm leading-6 text-white/60">
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--mt-muted)]">
             Weapons, gadgets, and specializations with full change history.
           </p>
         </div>
-        <div className="w-fit rounded-full border border-[#ff00ff] bg-[#ff00ff]/10 px-4 py-2 font-mono text-xs font-bold text-[#ff00ff]">
+        <div className="w-fit rounded-full border border-[var(--mt-gold)]/60 bg-[var(--mt-gold)]/10 px-4 py-2 font-mono text-xs font-bold text-[var(--mt-gold-bright)]">
           {isLoading ? "..." : `${weapons?.length ?? 0} ITEMS`}
         </div>
       </div>
 
-      <div className="mb-4 flex items-center gap-3 rounded-lg border border-[#2a2a4a] bg-[#141830] px-4 py-3">
-        <Search className="h-4 w-4 shrink-0 text-white/45" aria-hidden="true" />
+      <div className="mb-4 flex items-center gap-3 rounded-lg border border-[var(--mt-steel-line)] bg-[var(--mt-charcoal-raised)] px-4 py-3">
+        <Search
+          className="h-4 w-4 shrink-0 text-[var(--mt-muted)]"
+          aria-hidden="true"
+        />
         <input
           value={search}
           onChange={event => setSearch(event.target.value)}
           placeholder="Search archive items..."
-          className="min-w-0 flex-1 bg-transparent font-mono text-sm text-white outline-none placeholder:text-white/40"
+          className="min-w-0 flex-1 bg-transparent text-sm text-[var(--mt-off-white)] outline-none placeholder:text-[var(--mt-muted)]"
           aria-label="Search archive items"
         />
         {search ? (
           <button
             type="button"
             onClick={() => setSearch("")}
-            className="text-white/45 transition hover:text-white"
+            className="text-[var(--mt-muted)] transition hover:text-[var(--mt-off-white)]"
           >
             <X className="h-4 w-4" aria-hidden="true" />
             <span className="sr-only">Clear search</span>
@@ -246,7 +249,7 @@ function ArchiveList() {
               label={filter.label}
               active={classFilter === filter.key}
               color={
-                filter.key === "all" ? "#00d9ff" : getClassColor(filter.key)
+                filter.key === "all" ? "#e8c766" : getClassColor(filter.key)
               }
               onClick={() => setClassFilter(filter.key)}
             />
@@ -263,7 +266,7 @@ function ArchiveList() {
           ))}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-mono text-[11px] font-bold text-white/45">
+          <span className="font-mono text-[11px] font-bold text-[var(--mt-muted)]">
             SORT:
           </span>
           {SORT_OPTIONS.map(option => (
@@ -277,7 +280,7 @@ function ArchiveList() {
         </div>
       </div>
 
-      <div className="mb-5 h-px bg-[#00d9ff]/15" />
+      <div className="mb-5 h-px bg-[var(--mt-steel-line)]" />
 
       {isLoading ? (
         <ArchiveSkeleton />
@@ -303,7 +306,7 @@ function ArchiveList() {
               <button
                 type="button"
                 onClick={resetFilters}
-                className="font-mono text-sm text-[#00d9ff] underline"
+                className="font-mono text-sm text-[var(--mt-gold-bright)] underline"
               >
                 Clear filters
               </button>
@@ -317,65 +320,68 @@ function ArchiveList() {
           {weapons.map(item => {
             const classColor = getClassColor(item.class);
             return (
-              <Link
-                key={item.slug}
-                href={`/balance-archive/${item.slug}`}
-                className="group block rounded-lg border bg-[#141830] transition duration-200 hover:-translate-y-0.5 hover:bg-[#171d3a]"
-                style={{
-                  borderColor: `${classColor}44`,
-                  borderLeftColor: classColor,
-                  borderLeftWidth: 4,
-                }}
-                aria-label={`View ${item.name} change history`}
-              >
-                <div className="flex items-center gap-3 p-3">
-                  <WeaponThumb
-                    imageUrl={item.imageUrl}
-                    name={item.name}
-                    color={classColor}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <h2 className="truncate font-mono text-base font-bold text-white">
-                        {item.name}
-                      </h2>
-                      {item.class ? (
-                        <span
-                          className="shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px] font-black"
-                          style={{
-                            borderColor: classColor,
-                            color: classColor,
-                            background: `${classColor}22`,
-                          }}
-                        >
-                          {item.class.toUpperCase()}
-                        </span>
-                      ) : null}
+              <Link key={item.slug} href={`/balance-archive/${item.slug}`}>
+                <a
+                  className="mt-hover-lift group block rounded-lg border bg-[var(--mt-charcoal)] transition duration-200"
+                  style={{
+                    borderColor: `${classColor}44`,
+                    borderLeftColor: classColor,
+                    borderLeftWidth: 4,
+                  }}
+                  aria-label={`View ${item.name} change history`}
+                >
+                  <div className="flex items-center gap-3 p-3">
+                    <WeaponThumb
+                      imageUrl={item.imageUrl}
+                      name={item.name}
+                      color={classColor}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <h2 className="truncate text-base font-bold text-[var(--mt-off-white)]">
+                          {item.name}
+                        </h2>
+                        {item.class ? (
+                          <span
+                            className="shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px] font-black"
+                            style={{
+                              borderColor: classColor,
+                              color: classColor,
+                              background: `${classColor}22`,
+                            }}
+                          >
+                            {item.class.toUpperCase()}
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="mt-1 font-mono text-xs text-[var(--mt-muted)]">
+                        {item.category ?? "Unknown"}
+                      </p>
                     </div>
                     <p className="mt-1 font-mono text-xs text-white/50">
                       {item.category ?? "Unknown"}
                     </p>
                   </div>
-                </div>
-                <div
-                  className="flex items-center gap-3 border-t px-3 py-2"
-                  style={{ borderColor: `${classColor}22` }}
-                >
-                  <span className="inline-flex min-w-0 items-center gap-1.5 font-mono text-[11px] text-white/55">
-                    <Clock3 className="h-3 w-3 shrink-0" aria-hidden="true" />
-                    {item.changeCount}{" "}
-                    {item.changeCount === 1 ? "change" : "changes"}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-[#4ADE80]">
-                    {item.latestPatch
-                      ? `v${item.latestPatch}`
-                      : "No changes logged"}
-                  </span>
-                  <ChevronRight
-                    className="h-4 w-4 text-white/45 transition group-hover:text-[#00d9ff]"
-                    aria-hidden="true"
-                  />
-                </div>
+                  <div
+                    className="flex items-center gap-3 border-t px-3 py-2"
+                    style={{ borderColor: "var(--mt-steel-line)" }}
+                  >
+                    <span className="inline-flex min-w-0 items-center gap-1.5 font-mono text-[11px] text-[var(--mt-muted)]">
+                      <Clock3 className="h-3 w-3 shrink-0" aria-hidden="true" />
+                      {item.changeCount}{" "}
+                      {item.changeCount === 1 ? "change" : "changes"}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-[#4ADE80]">
+                      {item.latestPatch
+                        ? `v${item.latestPatch}`
+                        : "No changes logged"}
+                    </span>
+                    <ChevronRight
+                      className="h-4 w-4 text-[var(--mt-muted)] transition group-hover:text-[var(--mt-gold-bright)]"
+                      aria-hidden="true"
+                    />
+                  </div>
+                </a>
               </Link>
             );
           })}
@@ -388,7 +394,7 @@ function ArchiveList() {
 function DetailStat({
   label,
   value,
-  color = "#00d9ff",
+  color = "#e8c766",
 }: {
   label: string;
   value: string | number;
@@ -396,7 +402,7 @@ function DetailStat({
 }) {
   return (
     <div className="flex-1 text-center">
-      <div className="font-mono text-[10px] font-bold tracking-wide text-white/45">
+      <div className="font-mono text-[10px] font-bold tracking-wide text-[var(--mt-muted)]">
         {label}
       </div>
       <div
@@ -449,7 +455,7 @@ function ArchiveDetail({ slug }: { slug: string }) {
           <button
             type="button"
             onClick={() => navigate("/balance-archive")}
-            className="inline-flex items-center gap-2 rounded-md border border-[#00d9ff] px-4 py-2 font-mono text-xs font-bold text-[#00d9ff]"
+            className="inline-flex items-center gap-2 rounded-md border border-[var(--mt-gold)] px-4 py-2 font-mono text-xs font-bold text-[var(--mt-gold-bright)]"
           >
             <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
             Balance Archive
@@ -466,16 +472,15 @@ function ArchiveDetail({ slug }: { slug: string }) {
 
   return (
     <>
-      <Link
-        href="/balance-archive"
-        className="mb-4 inline-flex items-center gap-2 font-mono text-sm text-[#00d9ff] underline"
-      >
-        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-        Balance Archive
+      <Link href="/balance-archive">
+        <a className="mb-4 inline-flex items-center gap-2 font-mono text-sm text-[var(--mt-gold-bright)] underline">
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          Balance Archive
+        </a>
       </Link>
 
       <div
-        className="mb-5 overflow-hidden rounded-xl border bg-[#141830]"
+        className="mb-5 overflow-hidden rounded-xl border bg-[var(--mt-charcoal)]"
         style={{
           borderColor: `${classColor}44`,
           borderLeftColor: classColor,
@@ -489,7 +494,7 @@ function ArchiveDetail({ slug }: { slug: string }) {
             color={classColor}
           />
           <div className="min-w-0 flex-1">
-            <h1 className="font-mono text-3xl font-black leading-tight text-white">
+            <h1 className="text-3xl font-black leading-tight text-[var(--mt-off-white)]">
               {weapon.name}
             </h1>
             <div className="mt-2 flex flex-wrap gap-2">
@@ -506,23 +511,23 @@ function ArchiveDetail({ slug }: { slug: string }) {
                 </span>
               ) : null}
               {weapon.category ? (
-                <span className="rounded border border-white/10 bg-[#1a1a3a] px-2 py-1 font-mono text-[10px] font-bold text-white/55">
+                <span className="rounded border border-[var(--mt-steel-line)] bg-[var(--mt-charcoal-raised)] px-2 py-1 font-mono text-[10px] font-bold text-[var(--mt-muted)]">
                   {weapon.category.toUpperCase()}
                 </span>
               ) : null}
             </div>
             {weapon.description ? (
-              <p className="mt-3 font-mono text-sm leading-6 text-white/55">
+              <p className="mt-3 text-sm leading-6 text-[var(--mt-muted)]">
                 {weapon.description}
               </p>
             ) : null}
           </div>
         </div>
-        <div className="flex border-t border-white/10 px-3 py-3">
+        <div className="flex border-t border-[var(--mt-steel-line)] px-3 py-3">
           <DetailStat label="CHANGES" value={totalChanges} />
-          <div className="w-px bg-white/10" />
+          <div className="w-px bg-[var(--mt-steel-line)]" />
           <DetailStat label="PATCHES" value={history.length} />
-          <div className="w-px bg-white/10" />
+          <div className="w-px bg-[var(--mt-steel-line)]" />
           <DetailStat
             label="LATEST"
             value={latestPatch ? `v${latestPatch}` : "-"}
@@ -530,11 +535,11 @@ function ArchiveDetail({ slug }: { slug: string }) {
           />
           {weapon.fireRate ? (
             <>
-              <div className="w-px bg-white/10" />
+              <div className="w-px bg-[var(--mt-steel-line)]" />
               <DetailStat
                 label="FIRE RATE"
                 value={weapon.fireRate}
-                color="#ffffff"
+                color="#f4f3ef"
               />
             </>
           ) : null}
@@ -553,18 +558,18 @@ function ArchiveDetail({ slug }: { slug: string }) {
         : null}
 
       {isWeapon && detail.baselineStats.length === 0 ? (
-        <div className="mb-5 rounded-lg border border-white/10 bg-[#141830] px-4 py-3 font-mono text-sm text-white/55">
+        <div className="mb-5 rounded-lg border border-[var(--mt-steel-line)] bg-[var(--mt-charcoal)] px-4 py-3 text-sm text-[var(--mt-muted)]">
           Baseline stats unavailable.
         </div>
       ) : null}
 
       <div className="mb-5">
-        <div className="mb-2 font-mono text-[11px] font-bold tracking-wide text-white/45">
+        <div className="mb-2 font-mono text-[11px] font-bold tracking-wide text-[var(--mt-muted)]">
           FILTER BY TYPE:
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1">
           {CHANGE_FILTERS.map(filter => {
-            const cfg = CHANGE_TYPE_CONFIG[filter.key] ?? { color: "#00d9ff" };
+            const cfg = CHANGE_TYPE_CONFIG[filter.key] ?? { color: "#e8c766" };
             return (
               <FilterChip
                 key={filter.key}
@@ -578,7 +583,7 @@ function ArchiveDetail({ slug }: { slug: string }) {
         </div>
       </div>
 
-      <h2 className="mb-3 font-mono text-xs font-bold tracking-wide text-white/45">
+      <h2 className="mb-3 font-mono text-xs font-bold tracking-wide text-[var(--mt-muted)]">
         PATCH HISTORY
       </h2>
       {filteredHistory.length === 0 ? (
@@ -592,9 +597,12 @@ function ArchiveDetail({ slug }: { slug: string }) {
           {filteredHistory.map((entry, entryIndex) => (
             <section key={entry.patch.id} className="space-y-1">
               <div
-                className="flex items-center justify-between gap-4 rounded-lg border bg-[#141830] p-3"
+                className="flex items-center justify-between gap-4 rounded-lg border bg-[var(--mt-charcoal)] p-3"
                 style={{
-                  borderColor: entryIndex === 0 ? "#00d9ff" : "#2a2a4a",
+                  borderColor:
+                    entryIndex === 0
+                      ? "var(--mt-gold)"
+                      : "var(--mt-steel-line)",
                 }}
               >
                 <div className="min-w-0">
@@ -603,26 +611,28 @@ function ArchiveDetail({ slug }: { slug: string }) {
                       href={`/patchnotes?version=${encodeURIComponent(entry.patch.versionLabel)}#patch-${entry.patch.versionLabel.replace(/[^a-zA-Z0-9_-]/g, "-")}`}
                       className="font-mono text-sm font-black text-[#00d9ff] underline decoration-[#00d9ff]/40 underline-offset-4 transition hover:text-white"
                     >
-                      v{entry.patch.versionLabel}
+                      <a className="font-mono text-sm font-black text-[var(--mt-gold-bright)] underline decoration-[var(--mt-gold)]/40 underline-offset-4 transition hover:text-[var(--mt-off-white)]">
+                        v{entry.patch.versionLabel}
+                      </a>
                     </Link>
                     {entryIndex === 0 ? (
-                      <span className="rounded border border-[#00d9ff] bg-[#00d9ff]/10 px-1.5 py-0.5 font-mono text-[8px] font-black text-[#00d9ff]">
+                      <span className="rounded border border-[var(--mt-gold)] bg-[var(--mt-gold)]/10 px-1.5 py-0.5 font-mono text-[8px] font-black text-[var(--mt-gold-bright)]">
                         LATEST
                       </span>
                     ) : null}
                     {entry.patch.seasonLabel ? (
-                      <span className="font-mono text-xs text-white/50">
+                      <span className="font-mono text-xs text-[var(--mt-muted)]">
                         {entry.patch.seasonLabel}
                       </span>
                     ) : null}
                   </div>
                   {entry.patch.patchDate ? (
-                    <div className="mt-1 font-mono text-[11px] text-white/45">
+                    <div className="mt-1 font-mono text-[11px] text-[var(--mt-muted)]">
                       {entry.patch.patchDate}
                     </div>
                   ) : null}
                 </div>
-                <div className="shrink-0 font-mono text-xs text-white/50">
+                <div className="shrink-0 font-mono text-xs text-[var(--mt-muted)]">
                   {entry.changes.length}{" "}
                   {entry.changes.length === 1 ? "change" : "changes"}
                 </div>
@@ -636,9 +646,9 @@ function ArchiveDetail({ slug }: { slug: string }) {
                   return (
                     <article
                       key={change.id}
-                      className="rounded-lg border bg-[#1a1a3a] p-3"
+                      className="rounded-lg border bg-[var(--mt-charcoal-raised)] p-3"
                       style={{
-                        borderColor: "#2a2a4a",
+                        borderColor: "var(--mt-steel-line)",
                         borderLeftColor: cfg.color,
                         borderLeftWidth: 4,
                       }}
@@ -655,12 +665,12 @@ function ArchiveDetail({ slug }: { slug: string }) {
                           {cfg.label}
                         </span>
                         {change.statField ? (
-                          <span className="font-mono text-[11px] text-white/45">
+                          <span className="font-mono text-[11px] text-[var(--mt-muted)]">
                             {change.statField}
                           </span>
                         ) : null}
                       </div>
-                      <p className="font-mono text-sm leading-6 text-white">
+                      <p className="text-sm leading-6 text-[var(--mt-off-white)]">
                         {change.changeSummary ?? change.changeText}
                       </p>
                       {change.oldValue || change.newValue ? (
@@ -671,7 +681,7 @@ function ArchiveDetail({ slug }: { slug: string }) {
                             </span>
                           ) : null}
                           {change.oldValue && change.newValue ? (
-                            <span className="font-mono text-xs text-white/45">
+                            <span className="font-mono text-xs text-[var(--mt-muted)]">
                               to
                             </span>
                           ) : null}
@@ -683,11 +693,11 @@ function ArchiveDetail({ slug }: { slug: string }) {
                         </div>
                       ) : null}
                       {change.devNote?.trim() ? (
-                        <div className="mt-3 rounded-md border border-[#00d9ff]/30 bg-[#0a0e27] p-3">
-                          <div className="mb-1 font-mono text-[10px] font-black text-[#00d9ff]">
+                        <div className="mt-3 rounded-md border border-[var(--mt-gold)]/30 bg-[var(--mt-black)] p-3">
+                          <div className="mb-1 font-mono text-[10px] font-black text-[var(--mt-gold-bright)]">
                             DEV NOTE
                           </div>
-                          <p className="font-mono text-xs leading-5 text-white/60">
+                          <p className="text-xs leading-5 text-[var(--mt-muted)]">
                             {change.devNote}
                           </p>
                         </div>
@@ -706,7 +716,7 @@ function ArchiveDetail({ slug }: { slug: string }) {
 
 export default function WeaponBalanceArchive({ mode }: { mode: ArchiveMode }) {
   return (
-    <div className="min-h-screen bg-[#0a0e27] py-10">
+    <div className="py-10">
       <div className="container max-w-[1200px]">
         {mode.kind === "list" ? (
           <ArchiveList />

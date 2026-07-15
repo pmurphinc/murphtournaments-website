@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
-import GlitchText from "@/components/GlitchText";
-import NeonCard from "@/components/NeonCard";
 import LoadingThrobber from "@/components/LoadingThrobber";
+import SectionHeading from "@/components/public/SectionHeading";
+import { PublicEmptyState } from "@/components/public/PublicStates";
 import { ChevronDown } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
@@ -72,6 +72,19 @@ const parsePatchDate = (date: string) => {
   return Date.UTC(year, month - 1, day);
 };
 
+/** Display-only formatting — the underlying `date` string ("YYYY.MM.DD") is
+ * kept as-is for sorting via parsePatchDate above. */
+const formatPatchDateForDisplay = (date: string) => {
+  const timestamp = parsePatchDate(date);
+  if (!timestamp) return date;
+  return new Date(timestamp).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+};
+
 const sortPatchNotesNewestFirst = (
   a: PatchNoteListItem,
   b: PatchNoteListItem
@@ -111,13 +124,10 @@ const combinePatchNotes = (patchNotesData: PatchNoteListItem[] | undefined) => {
 
 /**
  * Patch Notes Page
- * Cyberpunk Neon Rebellion Design
  * - Fetches Game Updates from the database via tRPC
- * - Displays newest first with expandable dropdown menus
- * - Shows patch title and date in header
- * - Reveals full patch note content when expanded
+ * - Displays newest first with expandable accordion rows
+ * - Supports deep-linking via ?version= and #patch-{version} anchors
  */
-
 export default function PatchNotes() {
   const [location] = useLocation();
   const requestedVersion = useMemo(() => {
@@ -144,65 +154,63 @@ export default function PatchNotes() {
   const activeExpandedId = expandedId ?? requestedPatch?.id ?? null;
 
   return (
-    <div className="min-h-screen bg-dark-charcoal py-20">
-      <div className="container">
-        {/* Header */}
-        <div className="mb-16">
-          <GlitchText size="xl" variant="magenta" className="mb-4">
-            Game Updates
-          </GlitchText>
-          <p className="text-lg text-white/80 font-mono max-w-2xl">
-            Latest patch notes and game updates for The Finals. Stay informed
-            about balance changes, new features, and bug fixes.
-          </p>
+    <div>
+      <div className="border-b border-[var(--mt-steel-line)] py-16 sm:py-20">
+        <div className="container">
+          <SectionHeading
+            level="h1"
+            eyebrow="News"
+            title="Game Updates"
+            description="Latest patch notes and game updates for THE FINALS. Stay informed about balance changes, new features, and bug fixes."
+          />
         </div>
+      </div>
 
-        {/* Patch Notes List */}
-        <div>
-          <h2 className="text-2xl font-bold font-mono text-neon-cyan mb-6 uppercase">
+      <section className="py-12 sm:py-16">
+        <div className="container">
+          <h2 className="mb-6 text-xl font-bold uppercase tracking-wide text-[var(--mt-off-white)]">
             Recent Updates
           </h2>
           {patches.length === 0 ? (
-            <NeonCard variant="cyan">
-              <p className="text-white/60 font-mono text-center py-8">
-                No game updates available yet. Check back soon.
-              </p>
-            </NeonCard>
+            <PublicEmptyState
+              title="No game updates available yet"
+              description="Check back soon."
+            />
           ) : (
-            <div className="grid grid-cols-1 gap-4">
-              {patches.map(patch => (
-                <div
-                  key={patch.id}
-                  id={`patch-${(patch.version ?? String(patch.id)).replace(/[^a-zA-Z0-9_-]/g, "-")}`}
-                  className="scroll-mt-24"
-                >
-                  <NeonCard variant="cyan">
+            <div className="grid grid-cols-1 gap-3">
+              {patches.map(patch => {
+                const expanded = activeExpandedId === patch.id;
+                return (
+                  <div
+                    key={patch.id}
+                    id={`patch-${(patch.version ?? String(patch.id)).replace(/[^a-zA-Z0-9_-]/g, "-")}`}
+                    className="mt-panel scroll-mt-24 overflow-hidden"
+                  >
                     <button
                       onClick={() => toggleExpanded(patch.id)}
-                      className="w-full text-left"
+                      aria-expanded={expanded}
+                      className="w-full p-5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mt-gold-bright)]"
                     >
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <h3 className="text-lg font-bold font-mono text-white mb-1">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-mono text-xs uppercase tracking-widest text-[var(--mt-muted)]">
+                            {formatPatchDateForDisplay(patch.date)}
+                          </p>
+                          <h3 className="mt-1 text-lg font-bold text-[var(--mt-off-white)]">
                             {patch.title}
                           </h3>
-                          <p className="text-sm text-white/60 font-mono">
-                            {patch.date}
-                          </p>
                         </div>
-                        <div className="ml-4 flex-shrink-0">
-                          <ChevronDown
-                            className={`w-6 h-6 text-neon-cyan transition-transform ${
-                              activeExpandedId === patch.id ? "rotate-180" : ""
-                            }`}
-                          />
-                        </div>
+                        <ChevronDown
+                          aria-hidden="true"
+                          className={`mt-1 size-5 shrink-0 text-[var(--mt-gold-bright)] transition-transform ${
+                            expanded ? "rotate-180" : ""
+                          }`}
+                        />
                       </div>
 
-                      {/* Expanded Content */}
-                      {activeExpandedId === patch.id && (
-                        <div className="space-y-3 border-t border-white/10 pt-4 mt-4">
-                          <p className="text-sm font-mono text-white/80 whitespace-pre-wrap leading-relaxed">
+                      {expanded && (
+                        <div className="mt-4 space-y-3 border-t border-[var(--mt-steel-line)] pt-4">
+                          <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--mt-muted)]">
                             {patch.content}
                           </p>
                           <a
@@ -212,20 +220,20 @@ export default function PatchNotes() {
                             }
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-block mt-4 px-4 py-2 bg-neon-magenta/20 border-2 border-neon-magenta text-neon-magenta font-mono text-xs uppercase transition-all duration-200 rounded cursor-pointer hover:bg-neon-magenta/40 hover:shadow-[0_0_20px_rgba(255,0,127,0.6)] hover:shadow-neon-magenta"
+                            className="inline-block rounded-md border border-[var(--mt-gold)]/50 px-4 py-2 font-mono text-xs font-bold uppercase tracking-widest text-[var(--mt-gold-bright)] transition hover:bg-[var(--mt-gold)]/10"
                           >
                             View on Official Website →
                           </a>
                         </div>
                       )}
                     </button>
-                  </NeonCard>
-                </div>
-              ))}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
-      </div>
+      </section>
     </div>
   );
 }

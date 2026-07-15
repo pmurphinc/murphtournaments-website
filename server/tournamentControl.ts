@@ -555,6 +555,28 @@ async function requireDb() {
   return db;
 }
 
+/**
+ * Used only by public, single-resource read procedures (getBySlug,
+ * getResultsArchive). Unlike a list endpoint, a specific requested
+ * tournament can't be honestly reported as "empty" or "not found" when we
+ * can't actually check — that would mislead someone with a real, working
+ * link. This still throws (same as requireDb), but with a message distinct
+ * from a genuine NOT_FOUND and with server-side logging so a real outage
+ * doesn't disappear silently.
+ */
+async function requireDbForPublicRead(context: string) {
+  const db = await getDb();
+  if (!db) {
+    console.error(`[Database] ${context}: database not available`);
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message:
+        "Tournament data is temporarily unavailable. Please try again shortly.",
+    });
+  }
+  return db;
+}
+
 async function lockTournamentForBoardMutation(
   db: QueryExecutor,
   tournamentId: number
@@ -3578,7 +3600,18 @@ async function publishTournament(
 }
 
 async function listCommunityTournaments() {
-  const db = await requireDb();
+  // Public, read-only listing: degrade to an empty result when the database
+  // isn't configured (mirrors getTournamentHistory's pattern in server/db.ts)
+  // instead of throwing, since "no tournaments to show" is an honest
+  // representation of a degraded directory. Unlike getBySlug/getResultsArchive,
+  // there's no specific requested resource here to mis-report.
+  const db = await getDb();
+  if (!db) {
+    console.warn(
+      "[Database] Cannot list community tournaments: database not available"
+    );
+    return [];
+  }
   return db
     .select({
       id: tournaments.id,
@@ -4537,7 +4570,9 @@ export const communityTournamentsRouter = router({
   getResultsArchive: publicProcedure
     .input(tournamentIdSchema)
     .query(async ({ input, ctx }) => {
-      const db = await requireDb();
+      const db = await requireDbForPublicRead(
+        `getResultsArchive(tournamentId=${input.tournamentId})`
+      );
       const [tournament] = await db
         .select()
         .from(tournaments)
@@ -4605,7 +4640,7 @@ export const communityTournamentsRouter = router({
   getBySlug: publicProcedure
     .input(z.object({ slug: z.string().trim().min(1).max(120) }))
     .query(async ({ input }) => {
-      const db = await requireDb();
+      const db = await requireDbForPublicRead(`getBySlug(slug=${input.slug})`);
       const [row] = await db
         .select({ tournament: tournaments, owner: users })
         .from(tournaments)

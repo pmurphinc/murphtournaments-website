@@ -1,5 +1,4 @@
-import GlitchText from "@/components/GlitchText";
-import NeonCard from "@/components/NeonCard";
+import SectionHeading from "@/components/public/SectionHeading";
 import {
   DEFAULT_COMPETITIVE_MAP_IDS,
   THE_FINALS_MAPS,
@@ -191,50 +190,50 @@ export default function MapRandomizer() {
   const canRoll = selectedMaps.length > 0 && count > 0;
 
   return (
-    <div className="min-h-screen bg-dark-charcoal">
-      <section className="relative overflow-hidden border-b border-neon-gold/20 py-12 md:py-16">
-        <div className="absolute inset-0 scan-lines opacity-10 pointer-events-none" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,215,0,0.16),transparent_38%),radial-gradient(circle_at_bottom_left,rgba(0,217,255,0.12),transparent_34%)] pointer-events-none" />
-        <div className="container relative z-10">
-          <p className="mb-3 font-mono text-xs font-bold uppercase tracking-[0.35em] text-neon-gold">
-            Tournament Tool
-          </p>
-          <GlitchText size="xl" variant="gold" className="mb-5">
-            THE FINALS Map Randomizer
-          </GlitchText>
-          <p className="max-w-3xl font-mono text-sm leading-7 text-white/75 md:text-base">
-            Randomly select maps for tournaments, scrims, warmups, or practice
-            blocks. Default competitive rolls skip Seoul, Kyoto, and Galaxy Estates. Choose your
-            pool, pick how many maps you need, and roll instantly.
-          </p>
+    <div>
+      <div className="border-b border-[var(--mt-steel-line)] py-12 sm:py-16">
+        <div className="container">
+          <SectionHeading
+            level="h1"
+            eyebrow="Tournament Tool"
+            title="THE FINALS Map Randomizer"
+            description="Randomly select maps for tournaments, scrims, warmups, or practice blocks. Default competitive rolls skip Seoul, Kyoto, and Galaxy Estates. Choose your pool, pick how many maps you need, and roll instantly."
+          />
         </div>
-      </section>
+      </div>
 
-      <section className="container grid gap-6 py-8 lg:grid-cols-[minmax(0,1fr)_minmax(340px,0.72fr)]">
+      <section className="container grid gap-6 py-10 sm:py-12 lg:grid-cols-[minmax(0,1fr)_minmax(340px,0.72fr)]">
         <aside className="lg:sticky lg:top-24 lg:col-start-2 lg:row-start-1 lg:self-start">
-          <NeonCard variant="gold" className="bg-black/70">
+          <div className="mt-panel p-6">
             <div className="mb-5 flex items-center justify-between gap-4">
               <div>
-                <h2 className="font-mono text-2xl font-bold uppercase tracking-widest text-neon-gold">
+                <h2 className="text-xl font-bold uppercase tracking-wide text-[var(--mt-off-white)]">
                   Results
                 </h2>
-                <p className="font-mono text-xs uppercase tracking-widest text-white/45">
+                <p className="font-mono text-xs uppercase tracking-widest text-[var(--mt-muted)]">
                   {rollLabel}
                 </p>
               </div>
-              <Shuffle className="text-neon-gold" aria-hidden="true" />
+              <Shuffle
+                className="text-[var(--mt-gold-bright)]"
+                aria-hidden="true"
+              />
             </div>
 
-            <p className="mb-4 font-mono text-xs uppercase tracking-widest text-white/50">
-              Current pool: <span className="text-white">{selectedMaps.length}</span>{" "}
-              maps • Drawing <span className="text-white">{count}</span>
+            <p className="mb-4 font-mono text-xs uppercase tracking-widest text-[var(--mt-muted)]">
+              Current pool:{" "}
+              <span className="text-[var(--mt-off-white)]">
+                {selectedMaps.length}
+              </span>{" "}
+              maps • Drawing{" "}
+              <span className="text-[var(--mt-off-white)]">{count}</span>
             </p>
 
             <button
               type="button"
               onClick={rollMaps}
               disabled={!canRoll}
-              className="mb-4 flex w-full items-center justify-center gap-3 rounded-sm border-2 border-neon-magenta bg-neon-magenta px-6 py-4 font-mono text-sm font-bold uppercase tracking-widest text-dark-black transition-all hover-glow-magenta disabled:cursor-not-allowed disabled:border-white/15 disabled:bg-white/10 disabled:text-white/35"
+              className="mb-4 flex w-full items-center justify-center gap-3 rounded-md bg-[var(--mt-gold)] px-6 py-4 font-mono text-sm font-bold uppercase tracking-widest text-[var(--mt-gold-foreground)] transition-colors hover:bg-[var(--mt-gold-bright)] disabled:cursor-not-allowed disabled:bg-[var(--mt-steel)] disabled:text-[var(--mt-muted)]"
             >
               <RotateCcw size={18} /> Randomize Maps
             </button>
@@ -243,7 +242,7 @@ export default function MapRandomizer() {
               type="button"
               onClick={copyResults}
               disabled={results.length === 0}
-              className="mb-6 flex w-full items-center justify-center gap-3 rounded-sm border border-neon-cyan px-5 py-3 font-mono text-xs font-bold uppercase tracking-widest text-neon-cyan transition-all hover-glow-cyan disabled:cursor-not-allowed disabled:border-white/15 disabled:text-white/35"
+              className="mb-6 flex w-full items-center justify-center gap-3 rounded-md border border-[var(--mt-steel-line)] px-5 py-3 font-mono text-xs font-bold uppercase tracking-widest text-[var(--mt-off-white)] transition-colors hover:border-[var(--mt-gold)] hover:text-[var(--mt-gold-bright)] disabled:cursor-not-allowed disabled:border-[var(--mt-steel-line)] disabled:text-[var(--mt-muted)]"
             >
               <Clipboard size={16} /> {copyLabel}
             </button>
@@ -253,60 +252,64 @@ export default function MapRandomizer() {
                 {results.map((map, index) => (
                   <li
                     key={map.id}
-                    className="rounded-sm border border-neon-gold/45 bg-dark-charcoal/90 p-4"
+                    className="mt-panel-raised p-4"
                   >
-                    <div className="font-mono text-xs uppercase tracking-widest text-neon-cyan">
+                    <div className="font-mono text-xs uppercase tracking-widest text-[var(--mt-gold-bright)]">
                       Map {index + 1}
                     </div>
-                    <div className="mt-1 text-2xl font-bold font-mono text-white">
+                    <div className="mt-1 text-2xl font-bold text-[var(--mt-off-white)]">
                       {map.name}
                     </div>
                   </li>
                 ))}
               </ol>
             ) : (
-              <div className="rounded-sm border border-dashed border-white/20 bg-dark-charcoal/60 p-6 text-center font-mono text-sm text-white/55">
+              <div className="mt-panel border-dashed p-6 text-center text-sm text-[var(--mt-muted)]">
                 {canRoll
                   ? "Tap Randomize Maps to draw from the current pool."
                   : "Select at least one map to enable randomization."}
               </div>
             )}
-          </NeonCard>
+          </div>
         </aside>
 
         <div className="space-y-6 lg:col-start-1 lg:row-start-1">
-          <NeonCard variant="cyan" className="bg-black/55">
+          <div className="mt-panel p-6">
             <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
               <div>
-                <h2 className="text-2xl font-mono font-bold uppercase tracking-widest text-neon-cyan">
+                <h2 className="text-xl font-bold uppercase tracking-wide text-[var(--mt-off-white)]">
                   Roll Setup
                 </h2>
-                <p className="mt-2 font-mono text-sm text-white/60">
-                  Selected pool: {" "}
-                  <strong className="text-white">{selectedMaps.length}</strong>{" "}
+                <p className="mt-2 text-sm text-[var(--mt-muted)]">
+                  Selected pool:{" "}
+                  <strong className="text-[var(--mt-off-white)]">
+                    {selectedMaps.length}
+                  </strong>{" "}
                   / {THE_FINALS_MAPS.length} maps
                 </p>
               </div>
               <div
-                className="flex items-center gap-3 rounded-sm border border-neon-cyan/40 bg-dark-charcoal/80 p-2"
+                className="flex items-center gap-3 rounded-md border border-[var(--mt-steel-line)] bg-[var(--mt-charcoal-raised)] p-2"
                 aria-label="Choose number of maps to draw"
               >
                 <button
-                  className="px-3 py-2 text-neon-cyan disabled:text-white/25"
+                  className="px-3 py-2 text-[var(--mt-gold-bright)] disabled:text-[var(--mt-muted)]"
                   onClick={() => setCount(value => Math.max(1, value - 1))}
                   disabled={count <= 1}
                   aria-label="Draw fewer maps"
                 >
                   <Minus size={18} />
                 </button>
-                <div className="min-w-20 text-center font-mono">
-                  <div className="text-3xl font-bold text-white">{count}</div>
-                  <div className="text-[10px] uppercase tracking-widest text-white/45">
+                <div className="min-w-20 text-center">
+                  <div className="text-3xl font-bold text-[var(--mt-off-white)]">
+                    {count}
+                  </div>
+                  <div className="font-mono text-[10px] uppercase tracking-widest text-[var(--mt-muted)]">
                     Maps
                   </div>
                 </div>
                 <button
-                  className="px-3 py-2 text-neon-cyan disabled:text-white/25"
+                  className="px-3 py-2 text-[var(--mt-gold-bright)] disabled:text-[var(--mt-muted)]"
                   onClick={() =>
                     setCount(value => Math.min(selectedMaps.length, value + 1))
                   }
@@ -346,30 +349,20 @@ export default function MapRandomizer() {
               />
               <PresetButton label="Clear" active={selectedIds.length === 0} onClick={() => applySelection([])} />
             </div>
-          </NeonCard>
+          </div>
 
           {Object.entries(groupedMaps).map(([category, maps]) => (
-            <NeonCard
-              key={category}
-              variant={
-                category === "main"
-                  ? "gold"
-                  : category === "compact"
-                    ? "magenta"
-                    : "lime"
-              }
-              className="bg-black/45"
-            >
+            <div key={category} className="mt-panel p-6">
               <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                  <h2 className="font-mono text-xl font-bold uppercase tracking-widest text-white">
+                  <h2 className="text-lg font-bold uppercase tracking-wide text-[var(--mt-off-white)]">
                     {categoryLabels[category as FinalsMapCategory]}
                   </h2>
-                  <p className="font-mono text-xs text-white/55">
+                  <p className="text-xs text-[var(--mt-muted)]">
                     {categoryDescriptions[category as FinalsMapCategory]}
                   </p>
                 </div>
-                <span className="font-mono text-xs uppercase tracking-widest text-neon-cyan">
+                <span className="font-mono text-xs uppercase tracking-widest text-[var(--mt-gold-bright)]">
                   {maps.filter(map => selectedIds.includes(map.id)).length}/
                   {maps.length} selected
                 </span>
@@ -383,11 +376,11 @@ export default function MapRandomizer() {
                       type="button"
                       aria-pressed={selected}
                       onClick={() => toggleMap(map.id)}
-                      className={`flex items-center justify-between gap-3 rounded-sm border px-4 py-3 text-left font-mono transition-all ${selected ? "border-neon-gold bg-[rgba(255,215,0,0.15)] text-white shadow-[0_0_18px_rgba(255,215,0,0.18)]" : "border-white/15 bg-dark-charcoal/70 text-white/65 hover:border-neon-cyan hover:text-white"}`}
+                      className={`flex items-center justify-between gap-3 rounded-md border px-4 py-3 text-left text-sm transition-colors ${selected ? "border-[var(--mt-gold)] bg-[var(--mt-gold)]/15 text-[var(--mt-off-white)]" : "border-[var(--mt-steel-line)] bg-[var(--mt-charcoal-raised)] text-[var(--mt-muted)] hover:border-[var(--mt-gold)]/50 hover:text-[var(--mt-off-white)]"}`}
                     >
                       <span>{map.name}</span>
                       <span
-                        className={`flex h-6 w-6 items-center justify-center rounded-sm border ${selected ? "border-neon-gold bg-[#ffd700] text-black" : "border-white/25 text-white/30"}`}
+                        className={`flex h-6 w-6 items-center justify-center rounded-sm border ${selected ? "border-[var(--mt-gold)] bg-[var(--mt-gold)] text-[var(--mt-gold-foreground)]" : "border-[var(--mt-steel-line)] text-[var(--mt-muted)]"}`}
                         aria-hidden="true"
                       >
                         {selected ? <Check size={15} strokeWidth={3} /> : null}
@@ -396,7 +389,7 @@ export default function MapRandomizer() {
                   );
                 })}
               </div>
-            </NeonCard>
+            </div>
           ))}
         </div>
       </section>
@@ -418,7 +411,7 @@ function PresetButton({
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`rounded-sm border px-3 py-2 font-mono text-xs font-bold uppercase tracking-widest transition-all ${active ? "border-neon-gold bg-neon-gold text-black shadow-[0_0_18px_rgba(255,215,0,0.22)]" : "border-white/15 bg-dark-charcoal/80 text-white/70 hover:border-neon-gold hover:text-neon-gold"}`}
+      className={`rounded-md border px-3 py-2 font-mono text-xs font-bold uppercase tracking-widest transition-colors ${active ? "border-[var(--mt-gold)] bg-[var(--mt-gold)] text-[var(--mt-gold-foreground)]" : "border-[var(--mt-steel-line)] bg-[var(--mt-charcoal-raised)] text-[var(--mt-muted)] hover:border-[var(--mt-gold)] hover:text-[var(--mt-gold-bright)]"}`}
     >
       {label}
     </button>

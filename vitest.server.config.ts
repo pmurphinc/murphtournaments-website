@@ -3,7 +3,10 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    include: ["server/tournamentControlRevisionSafety.test.ts"],
+    include: [
+      "server/tournamentControlRevisionSafety.test.ts",
+      "server/communityTournaments.test.ts",
+    ],
     environment: "node",
   },
   resolve: {
