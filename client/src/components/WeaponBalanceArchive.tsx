@@ -317,65 +317,65 @@ function ArchiveList() {
           {weapons.map(item => {
             const classColor = getClassColor(item.class);
             return (
-              <Link key={item.slug} href={`/balance-archive/${item.slug}`}>
-                <a
-                  className="group block rounded-lg border bg-[#141830] transition duration-200 hover:-translate-y-0.5 hover:bg-[#171d3a]"
-                  style={{
-                    borderColor: `${classColor}44`,
-                    borderLeftColor: classColor,
-                    borderLeftWidth: 4,
-                  }}
-                  aria-label={`View ${item.name} change history`}
-                >
-                  <div className="flex items-center gap-3 p-3">
-                    <WeaponThumb
-                      imageUrl={item.imageUrl}
-                      name={item.name}
-                      color={classColor}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <h2 className="truncate font-mono text-base font-bold text-white">
-                          {item.name}
-                        </h2>
-                        {item.class ? (
-                          <span
-                            className="shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px] font-black"
-                            style={{
-                              borderColor: classColor,
-                              color: classColor,
-                              background: `${classColor}22`,
-                            }}
-                          >
-                            {item.class.toUpperCase()}
-                          </span>
-                        ) : null}
-                      </div>
-                      <p className="mt-1 font-mono text-xs text-white/50">
-                        {item.category ?? "Unknown"}
-                      </p>
+              <Link
+                key={item.slug}
+                href={`/balance-archive/${item.slug}`}
+                className="group block rounded-lg border bg-[#141830] transition duration-200 hover:-translate-y-0.5 hover:bg-[#171d3a]"
+                style={{
+                  borderColor: `${classColor}44`,
+                  borderLeftColor: classColor,
+                  borderLeftWidth: 4,
+                }}
+                aria-label={`View ${item.name} change history`}
+              >
+                <div className="flex items-center gap-3 p-3">
+                  <WeaponThumb
+                    imageUrl={item.imageUrl}
+                    name={item.name}
+                    color={classColor}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <h2 className="truncate font-mono text-base font-bold text-white">
+                        {item.name}
+                      </h2>
+                      {item.class ? (
+                        <span
+                          className="shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px] font-black"
+                          style={{
+                            borderColor: classColor,
+                            color: classColor,
+                            background: `${classColor}22`,
+                          }}
+                        >
+                          {item.class.toUpperCase()}
+                        </span>
+                      ) : null}
                     </div>
+                    <p className="mt-1 font-mono text-xs text-white/50">
+                      {item.category ?? "Unknown"}
+                    </p>
                   </div>
-                  <div
-                    className="flex items-center gap-3 border-t px-3 py-2"
-                    style={{ borderColor: `${classColor}22` }}
-                  >
-                    <span className="inline-flex min-w-0 items-center gap-1.5 font-mono text-[11px] text-white/55">
-                      <Clock3 className="h-3 w-3 shrink-0" aria-hidden="true" />
-                      {item.changeCount}{" "}
-                      {item.changeCount === 1 ? "change" : "changes"}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-[#4ADE80]">
-                      {item.latestPatch
-                        ? `v${item.latestPatch}`
-                        : "No changes logged"}
-                    </span>
-                    <ChevronRight
-                      className="h-4 w-4 text-white/45 transition group-hover:text-[#00d9ff]"
-                      aria-hidden="true"
-                    />
-                  </div>
-                </a>
+                </div>
+                <div
+                  className="flex items-center gap-3 border-t px-3 py-2"
+                  style={{ borderColor: `${classColor}22` }}
+                >
+                  <span className="inline-flex min-w-0 items-center gap-1.5 font-mono text-[11px] text-white/55">
+                    <Clock3 className="h-3 w-3 shrink-0" aria-hidden="true" />
+                    {item.changeCount}{" "}
+                    {item.changeCount === 1 ? "change" : "changes"}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-[#4ADE80]">
+                    {item.latestPatch
+                      ? `v${item.latestPatch}`
+                      : "No changes logged"}
+                  </span>
+                  <ChevronRight
+                    className="h-4 w-4 text-white/45 transition group-hover:text-[#00d9ff]"
+                    aria-hidden="true"
+                  />
+                </div>
               </Link>
             );
           })}
@@ -466,11 +466,12 @@ function ArchiveDetail({ slug }: { slug: string }) {
 
   return (
     <>
-      <Link href="/balance-archive">
-        <a className="mb-4 inline-flex items-center gap-2 font-mono text-sm text-[#00d9ff] underline">
-          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-          Balance Archive
-        </a>
+      <Link
+        href="/balance-archive"
+        className="mb-4 inline-flex items-center gap-2 font-mono text-sm text-[#00d9ff] underline"
+      >
+        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+        Balance Archive
       </Link>
 
       <div
@@ -600,10 +601,9 @@ function ArchiveDetail({ slug }: { slug: string }) {
                   <div className="flex flex-wrap items-center gap-2">
                     <Link
                       href={`/patchnotes?version=${encodeURIComponent(entry.patch.versionLabel)}#patch-${entry.patch.versionLabel.replace(/[^a-zA-Z0-9_-]/g, "-")}`}
+                      className="font-mono text-sm font-black text-[#00d9ff] underline decoration-[#00d9ff]/40 underline-offset-4 transition hover:text-white"
                     >
-                      <a className="font-mono text-sm font-black text-[#00d9ff] underline decoration-[#00d9ff]/40 underline-offset-4 transition hover:text-white">
-                        v{entry.patch.versionLabel}
-                      </a>
+                      v{entry.patch.versionLabel}
                     </Link>
                     {entryIndex === 0 ? (
                       <span className="rounded border border-[#00d9ff] bg-[#00d9ff]/10 px-1.5 py-0.5 font-mono text-[8px] font-black text-[#00d9ff]">
