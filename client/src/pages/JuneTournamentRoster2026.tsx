@@ -1,6 +1,7 @@
 import { Link } from "wouter";
-import NeonCard from "@/components/NeonCard";
-import GlitchText from "@/components/GlitchText";
+import SectionHeading from "@/components/public/SectionHeading";
+import StatDisplay from "@/components/public/StatDisplay";
+import CtaButton from "@/components/public/CtaButton";
 import { discordUrl } from "./JuneTournament2026";
 
 interface RosterTeam {
@@ -9,12 +10,6 @@ interface RosterTeam {
   captain: string;
   players: readonly string[];
   substitute?: string;
-}
-
-interface StatCard {
-  label: string;
-  value: string;
-  variant: "gold" | "cyan" | "magenta";
 }
 
 const rosterTeams: readonly RosterTeam[] = [
@@ -79,7 +74,7 @@ const rosterTeams: readonly RosterTeam[] = [
     name: "spynix",
     captain: "Ronthedon.tt#0093",
     players: ["SkilfulPython10#1048", "Yaboiivo#1975"],
-    substitute: "\u0046emboy_enjoyer#8043",
+    substitute: "Femboy_enjoyer#8043",
   },
   {
     id: 11,
@@ -96,7 +91,7 @@ const rosterTeams: readonly RosterTeam[] = [
   },
   {
     id: 13,
-    name: "Sup3r Mario Bro’s",
+    name: "Sup3r Mario Bro's",
     captain: "BMvrph#7255",
     players: ["SUP3R#5259", "Mario_vmanTTV#9301"],
   },
@@ -120,160 +115,124 @@ const rosterTeams: readonly RosterTeam[] = [
   },
 ];
 
-const statCards: readonly StatCard[] = [
-  { label: "Registered Teams", value: "16", variant: "gold" },
-  { label: "Starting Players", value: "48", variant: "cyan" },
-  { label: "Registered Substitutes", value: "5", variant: "magenta" },
-];
-
-const rosterCardVariants: readonly ("gold" | "cyan" | "magenta")[] = [
-  "gold",
-  "cyan",
-  "magenta",
+const statCards = [
+  { label: "Registered Teams", value: "16" },
+  { label: "Starting Players", value: "48" },
+  { label: "Registered Substitutes", value: "5" },
 ];
 
 export default function JuneTournamentRoster2026() {
   return (
-    <div className="min-h-screen bg-dark-charcoal">
-      <section className="relative overflow-hidden py-20 md:py-28 border-b border-neon-gold/30">
-        <div className="absolute inset-0 scan-lines opacity-5 pointer-events-none" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,184,0,0.16),transparent_35%),radial-gradient(circle_at_bottom_left,rgba(0,217,255,0.1),transparent_35%)] pointer-events-none" />
-        <div className="container relative z-10">
-          <div className="max-w-5xl space-y-6">
-            <p className="text-sm text-neon-gold font-mono uppercase tracking-widest font-bold">
-              Murph Tournaments Presents
-            </p>
-            <div className="flex flex-col items-start gap-2 md:flex-row md:items-baseline md:gap-4">
-              <GlitchText size="2xl" variant="gold">
-                June 2026
-              </GlitchText>
-              <GlitchText size="2xl" variant="cyan">
-                Event Roster
-              </GlitchText>
-            </div>
-            <p className="text-neon-cyan font-mono font-bold uppercase tracking-widest">
+    <div>
+      <div className="border-b border-[var(--mt-steel-line)] py-16 sm:py-20">
+        <div className="container">
+          <div className="max-w-4xl space-y-6">
+            <SectionHeading
+              level="h1"
+              eyebrow="Murph Tournaments Presents"
+              title="June 2026 Event Roster"
+              description="The full 16-team field for the completed June Tournament, archived for public reference alongside event results."
+            />
+            <p className="font-mono text-sm font-bold uppercase tracking-widest text-[var(--mt-gold-bright)]">
               June 28, 2026 — 5 PM Pacific / 8 PM Eastern
             </p>
-            <p className="text-white/80 font-mono leading-relaxed max-w-3xl">
-              The full 16-team field for the completed June Tournament, archived
-              for public reference alongside event results.
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-4xl">
+            <div className="grid max-w-2xl grid-cols-3 gap-3">
               {statCards.map(stat => (
-                <NeonCard
+                <StatDisplay
                   key={stat.label}
-                  variant={stat.variant}
-                  className="bg-black/50 py-5"
-                >
-                  <p className="text-3xl font-bold font-mono text-white mb-2">
-                    {stat.value}
-                  </p>
-                  <p className="text-xs text-white/60 font-mono uppercase tracking-widest">
-                    {stat.label}
-                  </p>
-                </NeonCard>
+                  label={stat.label}
+                  value={stat.value}
+                />
               ))}
             </div>
-            <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex flex-col gap-3 sm:flex-row">
               <Link href="/tournaments/june-2026">
-                <button className="w-full sm:w-auto px-8 py-3 border-2 border-neon-cyan text-neon-cyan font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all">
-                  Back to Tournament Details
-                </button>
+                <CtaButton tone="outline">Back to Tournament Details</CtaButton>
               </Link>
               <a href={discordUrl} target="_blank" rel="noopener noreferrer">
-                <button className="w-full sm:w-auto px-8 py-3 border-2 border-neon-gold text-neon-gold font-bold font-mono uppercase tracking-widest hover-glow-gold rounded-sm transition-all">
-                  Join Discord
-                </button>
+                <CtaButton tone="gold">Join Discord</CtaButton>
               </a>
             </div>
           </div>
         </div>
-      </section>
+      </div>
 
-      <section className="py-16 md:py-24 border-b border-neon-magenta/20">
+      <section className="py-12 sm:py-16">
         <div className="container">
-          <div className="mb-10">
-            <h2 className="text-3xl md:text-4xl font-bold font-mono text-neon-cyan uppercase tracking-widest mb-4">
-              Tournament Roster
-            </h2>
-            <p className="text-white/70 font-mono leading-relaxed max-w-3xl">
-              Teams are listed in registration order. This display is not
-              tournament seeding.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {rosterTeams.map((team, index) => (
-              <NeonCard
-                key={`${team.id}-${team.name}`}
-                variant={rosterCardVariants[index % rosterCardVariants.length]}
-                className="bg-black/50 h-full flex flex-col"
-              >
-                <p className="text-xs text-white/45 font-mono uppercase tracking-widest mb-3">
+          <h2 className="mb-2 text-xl font-bold uppercase tracking-wide text-[var(--mt-off-white)]">
+            Tournament Roster
+          </h2>
+          <p className="mb-8 max-w-2xl text-sm text-[var(--mt-muted)]">
+            Teams are listed in registration order. This display is not
+            tournament seeding.
+          </p>
+
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {rosterTeams.map(team => (
+              <div key={team.id} className="mt-panel flex h-full flex-col p-5">
+                <p className="mb-2 font-mono text-[11px] uppercase tracking-widest text-[var(--mt-muted)]">
                   Registered Team {String(team.id).padStart(2, "0")}
                 </p>
-                <h3 className="text-2xl text-white font-bold font-mono mb-5 leading-tight">
+                <h3 className="mb-4 text-lg font-bold text-[var(--mt-off-white)]">
                   {team.name}
                 </h3>
                 <ul
-                  className="space-y-3 flex-1"
+                  className="flex-1 space-y-2"
                   aria-label={`${team.name} starting players`}
                 >
-                  <li className="border border-neon-gold/30 bg-dark-charcoal/70 px-4 py-3 rounded-sm">
-                    <p className="text-[10px] text-neon-gold font-bold font-mono uppercase tracking-widest mb-1">
+                  <li className="rounded border border-[var(--mt-gold)]/25 bg-[var(--mt-charcoal-raised)] px-3 py-2">
+                    <p className="mb-0.5 font-mono text-[10px] font-bold uppercase tracking-widest text-[var(--mt-gold-bright)]">
                       Team Leader
                     </p>
-                    <p className="text-sm text-white font-mono break-words">
+                    <p className="break-words text-sm text-[var(--mt-off-white)]">
                       {team.captain}
                     </p>
                   </li>
                   {team.players.map(player => (
                     <li
                       key={`${team.id}-${player}`}
-                      className="border border-white/10 bg-dark-charcoal/50 px-4 py-3 rounded-sm"
+                      className="rounded border border-[var(--mt-steel-line)] bg-[var(--mt-charcoal)] px-3 py-2"
                     >
-                      <p className="text-[10px] text-neon-cyan font-bold font-mono uppercase tracking-widest mb-1">
+                      <p className="mb-0.5 font-mono text-[10px] uppercase tracking-widest text-[var(--mt-muted)]">
                         Starting Player
                       </p>
-                      <p className="text-sm text-white/85 font-mono break-words">
+                      <p className="break-words text-sm text-[var(--mt-off-white)]">
                         {player}
                       </p>
                     </li>
                   ))}
                 </ul>
                 {team.substitute ? (
-                  <div className="mt-5 pt-5 border-t border-neon-magenta/30">
-                    <div className="border border-neon-magenta/40 bg-neon-magenta/10 px-4 py-3 rounded-sm">
-                      <p className="text-[10px] text-neon-magenta font-bold font-mono uppercase tracking-widest mb-1">
+                  <div className="mt-4 border-t border-[var(--mt-steel-line)] pt-4">
+                    <div className="rounded border border-[var(--mt-steel-line)] bg-[var(--mt-charcoal-raised)] px-3 py-2">
+                      <p className="mb-0.5 font-mono text-[10px] uppercase tracking-widest text-[var(--mt-muted)]">
                         Substitute
                       </p>
-                      <p className="text-sm text-white/90 font-mono break-words">
+                      <p className="break-words text-sm text-[var(--mt-off-white)]">
                         {team.substitute}
                       </p>
                     </div>
                   </div>
                 ) : null}
-              </NeonCard>
+              </div>
             ))}
           </div>
-          <NeonCard variant="magenta" className="bg-black/60 mt-10">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
-              <p className="text-white/80 font-mono leading-relaxed max-w-4xl">
-                Registration and standby entries for the June 2026 event are
-                closed. This roster remains available as an archive of the
-                completed tournament field.
-              </p>
-              <a
-                href={discordUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="shrink-0"
-              >
-                <button className="w-full sm:w-auto px-6 py-3 border-2 border-neon-cyan text-neon-cyan font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all">
-                  Join Discord for Updates
-                </button>
-              </a>
-            </div>
-          </NeonCard>
+
+          <div className="mt-panel mt-10 flex flex-col items-start gap-4 p-6 lg:flex-row lg:items-center lg:justify-between">
+            <p className="max-w-3xl text-sm leading-relaxed text-[var(--mt-muted)]">
+              Registration and standby entries for the June 2026 event are
+              closed. This roster remains available as an archive of the
+              completed tournament field.
+            </p>
+            <a
+              href={discordUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0"
+            >
+              <CtaButton tone="outline">Join Discord for Updates</CtaButton>
+            </a>
+          </div>
         </div>
       </section>
     </div>
