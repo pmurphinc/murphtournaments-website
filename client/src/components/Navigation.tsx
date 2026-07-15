@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Menu, X, ChevronDown, LogOut } from "lucide-react";
+import { ChevronDown, LogOut, Menu } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getDiscordLoginUrl } from "@/lib/discordLogin";
 import {
@@ -11,27 +11,56 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import CtaButton from "@/components/public/CtaButton";
 
 /**
- * Navigation Component
- * Cyberpunk Neon Rebellion Design
- * - Asymmetric layout with neon accents
- * - Glowing borders on hover
- * - Primary colors: magenta, cyan, gold
+ * Murph Tournaments — global site navigation.
+ * Black/charcoal/metallic-gold identity, shared across every public route
+ * (and, as a small compatibility adjustment, the admin/TCR chrome too —
+ * their page *content* is untouched, see index.css `.public-theme`).
  */
 
 interface NavItem {
   label: string;
   href: string;
   submenu?: NavItem[];
-  isDropdownOnly?: boolean;
 }
 
+const NAV_ITEMS: NavItem[] = [
+  { label: "Home", href: "/" },
+  {
+    label: "Tournaments",
+    href: "/tournaments/june-2026",
+    submenu: [
+      { label: "Current Event", href: "/tournaments/june-2026" },
+      { label: "Browse Tournaments", href: "/tournaments/community" },
+      { label: "Results & Archive", href: "/tournaments" },
+    ],
+  },
+  { label: "Players", href: "/players" },
+  { label: "Watch", href: "/watch" },
+  { label: "News", href: "/patchnotes" },
+  { label: "Weapon Archive", href: "/balance-archive" },
+  { label: "Map RNG", href: "/maprng" },
+  { label: "About", href: "/about" },
+];
+
+const DISCORD_URL = "https://discord.gg/kcmdxmBgnC";
+
 export default function Navigation() {
-  const [isOpen, setIsOpen] = useState(false);
-  const [bracketOpen, setBracketOpen] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [tournamentOpen, setTournamentOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
+  const [openMobileSubmenu, setOpenMobileSubmenu] = useState<string | null>(
+    null
+  );
   const [location] = useLocation();
   const { user, logout, loading } = useAuth();
   const isDiscordUser = user?.loginMethod === "discord";
@@ -40,18 +69,11 @@ export default function Navigation() {
   const username = user?.discordUsername;
   const navRef = useRef<HTMLElement | null>(null);
 
-  const closeCustomMenus = () => {
-    setIsOpen(false);
-    setBracketOpen(false);
-    setHistoryOpen(false);
-    setTournamentOpen(false);
-  };
-
   useEffect(() => {
     const handleDocumentPointerDown = (event: PointerEvent) => {
       const target = event.target;
       if (target instanceof Node && navRef.current?.contains(target)) return;
-      closeCustomMenus();
+      setOpenSubmenu(null);
     };
 
     document.addEventListener("pointerdown", handleDocumentPointerDown);
@@ -60,78 +82,24 @@ export default function Navigation() {
     };
   }, []);
 
-  const navItems: NavItem[] = [
-    { label: "Home", href: "/" },
-    { label: "Map RNG", href: "/maprng" },
-    { label: "Weapon Archive", href: "/balance-archive" },
-    {
-      label: "Tournament",
-      href: "/tournaments/june-2026",
-      submenu: [
-        { label: "June", href: "/tournaments/june-2026" },
-        { label: "Roster", href: "/tournaments/june-2026/roster" },
-      ],
-    },
-    {
-      label: "History",
-      href: "/tournaments",
-      submenu: [
-        { label: "Tournament History", href: "/tournaments" },
-        { label: "Player Archive", href: "/players" },
-        { label: "Patch Notes", href: "/patchnotes" },
-        // { label: 'Loadout Tracker', href: '/loadout-tracker' }, // Temporarily hidden for direct URL testing
-      ],
-    },
-    // {
-    //   label: 'Bracket',
-    //   href: '#',
-    //   isDropdownOnly: true,
-    //   submenu: [
-    //     { label: 'Murph Tournament Community', href: '/bracket' },
-    //     { label: '7th Circle', href: '/bracket2' },
-    //   ]
-    // },
-    { label: "About", href: "/about" },
-    { label: "Watch", href: "/watch" },
-  ];
-
-  const closeMobileMenu = closeCustomMenus;
-
   const isRouteActive = (href: string) => location === href;
   const isItemActive = (item: NavItem) =>
     isRouteActive(item.href) ||
-    item.submenu?.some(subitem => isRouteActive(subitem.href));
+    Boolean(item.submenu?.some(subitem => isRouteActive(subitem.href)));
 
-  const getTopLevelClassName = (active: boolean) =>
-    `text-sm font-mono uppercase tracking-widest ${active ? "text-neon-magenta" : "text-white/80"} hover:text-neon-magenta transition-colors hover-glow-magenta px-3 py-2 flex items-center gap-1`;
+  const topLevelClass = (active: boolean) =>
+    `flex items-center gap-1 px-3 py-2 font-mono text-xs font-bold uppercase tracking-widest transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mt-gold-bright)] ${
+      active
+        ? "text-[var(--mt-gold-bright)]"
+        : "text-[var(--mt-muted)] hover:text-[var(--mt-off-white)]"
+    }`;
 
-  const getMobileItemClassName = (active: boolean) =>
-    `flex w-full items-center justify-between px-3 py-2 text-left font-mono text-sm uppercase tracking-widest ${active ? "text-neon-magenta" : "text-white/80"} transition-colors hover:text-neon-magenta`;
-
-  const getSubmenuClassName = (active: boolean, mobile = false) =>
-    mobile
-      ? `cursor-pointer px-3 py-2 font-mono text-xs ${active ? "text-neon-magenta" : "text-white/70"} transition-all duration-200 hover:bg-neon-magenta/10 hover:font-bold hover:text-neon-magenta hover:glow-magenta`
-      : `block w-full px-4 py-3 text-sm font-mono ${active ? "text-neon-magenta" : "text-white/80"} hover:text-neon-magenta hover:font-bold hover:bg-neon-magenta/20 transition-all duration-200 cursor-pointer first:rounded-t last:rounded-b border-b border-neon-magenta/30 last:border-b-0 hover:border-b-neon-magenta/50 hover:glow-magenta`;
-
-  const toggleDropdown = (label: string) => {
-    if (label === "Bracket") {
-      setBracketOpen(open => !open);
-      setHistoryOpen(false);
-      setTournamentOpen(false);
-    }
-
-    if (label === "History") {
-      setHistoryOpen(open => !open);
-      setBracketOpen(false);
-      setTournamentOpen(false);
-    }
-
-    if (label === "Tournament") {
-      setTournamentOpen(open => !open);
-      setBracketOpen(false);
-      setHistoryOpen(false);
-    }
-  };
+  const mobileItemClass = (active: boolean) =>
+    `flex w-full items-center justify-between rounded-md px-3 py-3 text-left font-mono text-sm font-bold uppercase tracking-widest ${
+      active
+        ? "bg-[var(--mt-charcoal-raised)] text-[var(--mt-gold-bright)]"
+        : "text-[var(--mt-muted)] hover:text-[var(--mt-off-white)]"
+    }`;
 
   const accountMenu =
     isDiscordUser && user ? (
@@ -139,21 +107,22 @@ export default function Navigation() {
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            className="flex h-10 min-h-10 min-w-10 flex-none shrink-0 items-center gap-2 rounded-full border border-yellow-400/40 bg-black/60 px-1.5 py-1 text-left transition hover:border-yellow-400 hover:bg-yellow-400/10 focus:outline-none focus:ring-2 focus:ring-yellow-400/60 2xl:px-2"
+            className="flex h-10 min-h-10 min-w-10 flex-none shrink-0 items-center gap-2 rounded-full border border-[var(--mt-gold)]/40 bg-[var(--mt-black)]/60 px-1.5 py-1 text-left transition hover:border-[var(--mt-gold)] hover:bg-[var(--mt-gold)]/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mt-gold-bright)] 2xl:px-2"
             aria-label="Open Discord account menu"
           >
             <img
               src={user.discordAvatarUrl || undefined}
               alt=""
-              className="h-8 w-8 min-w-8 flex-none shrink-0 rounded-full border border-neon-cyan/40 bg-dark-purple object-cover"
+              className="h-8 w-8 min-w-8 flex-none shrink-0 rounded-full border border-[var(--mt-steel-line)] bg-[var(--mt-charcoal)] object-cover"
               referrerPolicy="no-referrer"
             />
-            <span className="hidden max-w-36 truncate font-mono text-xs font-bold text-white 2xl:inline">
+            <span className="hidden max-w-36 truncate font-mono text-xs font-bold text-[var(--mt-off-white)] 2xl:inline">
               {displayName}
             </span>
             <ChevronDown
               size={14}
-              className="flex-none shrink-0 text-yellow-400"
+              className="flex-none shrink-0 text-[var(--mt-gold-bright)]"
+              aria-hidden="true"
             />
           </button>
         </DropdownMenuTrigger>
@@ -161,69 +130,61 @@ export default function Navigation() {
           align="end"
           sideOffset={8}
           collisionPadding={12}
-          className="w-[min(18rem,calc(100vw-1.5rem))] border-yellow-400/40 bg-black text-white shadow-[0_0_28px_rgba(250,204,21,0.18)]"
+          className="public-theme w-[min(18rem,calc(100vw-1.5rem))] border-[var(--mt-gold)]/40 bg-[var(--mt-black)] text-[var(--mt-off-white)]"
         >
           <DropdownMenuLabel className="font-mono">
             <div className="flex min-w-0 flex-none shrink-0 items-center gap-2 sm:gap-3">
               <img
                 src={user.discordAvatarUrl || undefined}
                 alt=""
-                className="h-10 w-10 rounded-full border border-neon-cyan/40 object-cover"
+                className="h-10 w-10 rounded-full border border-[var(--mt-steel-line)] object-cover"
                 referrerPolicy="no-referrer"
               />
               <div className="min-w-0">
-                <p className="truncate text-sm text-white">{displayName}</p>
+                <p className="truncate text-sm text-[var(--mt-off-white)]">
+                  {displayName}
+                </p>
                 {username ? (
-                  <p className="truncate text-xs text-white/55">@{username}</p>
+                  <p className="truncate text-xs text-[var(--mt-muted)]">
+                    @{username}
+                  </p>
                 ) : null}
               </div>
             </div>
-            <p className="mt-3 rounded border border-neon-cyan/25 bg-neon-cyan/10 px-2 py-1 text-[11px] uppercase tracking-widest text-neon-cyan">
+            <p className="mt-3 rounded border border-[var(--mt-gold)]/25 bg-[var(--mt-gold)]/10 px-2 py-1 text-[11px] uppercase tracking-widest text-[var(--mt-gold-bright)]">
               Signed in with Discord
             </p>
           </DropdownMenuLabel>
-          <DropdownMenuSeparator className="bg-yellow-400/25" />
-          <DropdownMenuItem
-            asChild
-            className="cursor-pointer font-mono text-white focus:bg-yellow-400/15 focus:text-yellow-200"
-          >
+          <DropdownMenuSeparator className="bg-[var(--mt-gold)]/25" />
+          <DropdownMenuItem asChild className="cursor-pointer font-mono">
             <Link href="/team-finder">Team Finder</Link>
           </DropdownMenuItem>
-          <DropdownMenuSeparator className="bg-yellow-400/25" />
-          <DropdownMenuItem
-            asChild
-            className="cursor-pointer font-mono text-white focus:bg-yellow-400/15 focus:text-yellow-200"
-          >
+          <DropdownMenuSeparator className="bg-[var(--mt-gold)]/25" />
+          <DropdownMenuItem asChild className="cursor-pointer font-mono">
             <Link href="/teams">Team Management</Link>
           </DropdownMenuItem>
-          <DropdownMenuItem
-            asChild
-            className="cursor-pointer font-mono text-white focus:bg-yellow-400/15 focus:text-yellow-200"
-          >
+          <DropdownMenuItem asChild className="cursor-pointer font-mono">
             <Link href="/TCR">TCR</Link>
           </DropdownMenuItem>
           {canSeeTournamentControl && (
-            <DropdownMenuItem
-              asChild
-              className="cursor-pointer font-mono text-white focus:bg-yellow-400/15 focus:text-yellow-200"
-            >
+            <DropdownMenuItem asChild className="cursor-pointer font-mono">
               <Link href="/admin/tournaments/control">MTC Discord TCR</Link>
             </DropdownMenuItem>
           )}
-          <DropdownMenuSeparator className="bg-yellow-400/25" />
+          <DropdownMenuSeparator className="bg-[var(--mt-gold)]/25" />
           <DropdownMenuItem
             onClick={() => void logout()}
             disabled={loading}
-            className="cursor-pointer font-mono text-neon-magenta focus:bg-neon-magenta/15 focus:text-neon-magenta"
+            className="cursor-pointer font-mono text-[var(--mt-danger)] focus:text-[var(--mt-danger)]"
           >
-            <LogOut size={14} /> Sign Out
+            <LogOut size={14} aria-hidden="true" /> Sign Out
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     ) : (
       <a
         href={getDiscordLoginUrl()}
-        className="inline-flex h-10 flex-none shrink-0 items-center justify-center rounded-full border border-[#5865F2]/70 bg-gradient-to-r from-[#5865F2] to-[#3b45b8] px-3 font-mono text-[11px] font-black uppercase tracking-wider text-white shadow-[0_0_18px_rgba(88,101,242,0.32)] transition hover:border-yellow-300 hover:from-[#6875ff] hover:to-[#4b55c8] hover:text-yellow-100 sm:px-4"
+        className="inline-flex h-10 flex-none shrink-0 items-center justify-center rounded-full border border-[#5865F2]/70 bg-gradient-to-r from-[#5865F2] to-[#3b45b8] px-3 font-mono text-[11px] font-black uppercase tracking-wider text-white transition hover:border-[var(--mt-gold)] hover:from-[#6875ff] hover:to-[#4b55c8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mt-gold-bright)] sm:px-4"
       >
         <span className="hidden sm:inline">Sign in with Discord</span>
         <span className="sm:hidden">Discord</span>
@@ -233,56 +194,58 @@ export default function Navigation() {
   return (
     <nav
       ref={navRef}
-      className="fixed top-0 left-0 right-0 z-50 bg-[#0a0e27] border-b border-neon-magenta/30"
+      aria-label="Primary"
+      className="fixed top-0 left-0 right-0 z-50 border-b border-[var(--mt-steel-line)] bg-[var(--mt-black)]"
     >
-      <div className="container flex items-center justify-between h-16">
-        <div className="flex shrink-0 items-center gap-2 sm:gap-3 md:gap-4 lg:gap-6">
-          <Link
-            href="/"
-            aria-label="Murph Tournaments home"
-            className="flex h-14 shrink-0 items-center"
-          >
-            <img
-              src="/images/Murph%20Tournaments_logo.png"
-              alt="Murph Tournaments"
-              className="block h-full w-auto shrink-0 cursor-pointer object-contain transition-opacity hover:opacity-80"
-            />
-          </Link>
-        </div>
+      <div className="container flex h-16 items-center justify-between gap-3">
+        <Link
+          href="/"
+          aria-label="Murph Tournaments home"
+          className="flex h-12 shrink-0 items-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mt-gold-bright)]"
+        >
+          <img
+            src="/images/Murph%20Tournaments_logo.png"
+            alt="Murph Tournaments"
+            className="block h-full w-auto shrink-0 object-contain transition-opacity hover:opacity-80"
+          />
+        </Link>
 
-        <div className="hidden xl:flex items-center gap-8">
-          {navItems.map(item => {
-            const active = Boolean(isItemActive(item));
-            const expanded =
-              (bracketOpen && item.label === "Bracket") ||
-              (historyOpen && item.label === "History") ||
-              (tournamentOpen && item.label === "Tournament");
+        <div className="hidden items-center gap-1 lg:flex">
+          {NAV_ITEMS.map(item => {
+            const active = isItemActive(item);
+            const expanded = openSubmenu === item.label;
 
             return (
               <div key={item.label} className="relative">
                 {item.submenu ? (
                   <button
                     type="button"
-                    className={`${getTopLevelClassName(active)} cursor-pointer`}
+                    className={`${topLevelClass(active)} cursor-pointer`}
                     aria-expanded={expanded}
                     aria-haspopup="true"
-                    onClick={() => toggleDropdown(item.label)}
+                    onClick={() =>
+                      setOpenSubmenu(open =>
+                        open === item.label ? null : item.label
+                      )
+                    }
                   >
                     {item.label}
-                    <ChevronDown size={14} />
+                    <ChevronDown size={14} aria-hidden="true" />
                   </button>
                 ) : (
                   <Link
                     href={item.href}
                     aria-current={active ? "page" : undefined}
-                    className={`${getTopLevelClassName(active)} cursor-pointer`}
+                    className={topLevelClass(active)}
                   >
                     {item.label}
                   </Link>
                 )}
                 {item.submenu && (
                   <div
-                    className={`absolute left-0 mt-0 w-56 overflow-hidden rounded border-2 border-neon-magenta bg-black shadow-lg z-50 ${expanded ? "block" : "hidden"}`}
+                    className={`absolute left-0 top-full mt-1 w-56 overflow-hidden rounded-md border border-[var(--mt-steel-line)] bg-[var(--mt-charcoal)] shadow-lg ${
+                      expanded ? "block" : "hidden"
+                    }`}
                   >
                     {item.submenu.map(subitem => {
                       const subitemActive = isRouteActive(subitem.href);
@@ -291,8 +254,12 @@ export default function Navigation() {
                           key={subitem.href}
                           href={subitem.href}
                           aria-current={subitemActive ? "page" : undefined}
-                          className={getSubmenuClassName(subitemActive)}
-                          onClick={closeCustomMenus}
+                          onClick={() => setOpenSubmenu(null)}
+                          className={`block w-full border-b border-[var(--mt-steel-line)] px-4 py-3 font-mono text-sm last:border-b-0 ${
+                            subitemActive
+                              ? "text-[var(--mt-gold-bright)]"
+                              : "text-[var(--mt-off-white)] hover:bg-[var(--mt-charcoal-raised)] hover:text-[var(--mt-gold-bright)]"
+                          }`}
                         >
                           {subitem.label}
                         </Link>
@@ -306,76 +273,117 @@ export default function Navigation() {
         </div>
 
         <div className="flex min-w-0 flex-none shrink-0 items-center gap-2 sm:gap-3">
-          {accountMenu}
-          <button
-            onClick={() => (isOpen ? closeMobileMenu() : setIsOpen(true))}
-            className="flex h-10 w-10 flex-none shrink-0 items-center justify-center text-neon-cyan transition-colors hover:text-neon-magenta xl:hidden"
-            aria-label="Toggle navigation menu"
+          <a
+            href={DISCORD_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden sm:block"
           >
-            {isOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
+            <CtaButton tone="gold" className="h-9 px-4 text-[11px]">
+              Join Discord
+            </CtaButton>
+          </a>
+          {accountMenu}
+
+          <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+            <SheetTrigger asChild>
+              <button
+                type="button"
+                aria-label="Open navigation menu"
+                className="flex h-10 w-10 flex-none shrink-0 items-center justify-center text-[var(--mt-off-white)] transition-colors hover:text-[var(--mt-gold-bright)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mt-gold-bright)] lg:hidden"
+              >
+                <Menu size={22} aria-hidden="true" />
+              </button>
+            </SheetTrigger>
+            <SheetContent
+              side="right"
+              className="public-theme w-[min(20rem,85vw)] border-[var(--mt-steel-line)] bg-[var(--mt-black)] text-[var(--mt-off-white)]"
+            >
+              <SheetHeader>
+                <SheetTitle className="font-mono uppercase tracking-widest text-[var(--mt-off-white)]">
+                  Menu
+                </SheetTitle>
+              </SheetHeader>
+              <nav
+                aria-label="Mobile"
+                className="flex flex-col gap-1 overflow-y-auto px-4 pb-6"
+              >
+                {NAV_ITEMS.map(item => {
+                  const active = isItemActive(item);
+                  const expanded = openMobileSubmenu === item.label;
+                  return (
+                    <div key={item.label}>
+                      {item.submenu ? (
+                        <button
+                          type="button"
+                          className={mobileItemClass(active)}
+                          aria-expanded={expanded}
+                          onClick={() =>
+                            setOpenMobileSubmenu(open =>
+                              open === item.label ? null : item.label
+                            )
+                          }
+                        >
+                          {item.label}
+                          <ChevronDown
+                            size={14}
+                            aria-hidden="true"
+                            className={`transition-transform ${expanded ? "rotate-180" : ""}`}
+                          />
+                        </button>
+                      ) : (
+                        <SheetClose asChild>
+                          <Link
+                            href={item.href}
+                            aria-current={active ? "page" : undefined}
+                            className={mobileItemClass(active)}
+                          >
+                            {item.label}
+                          </Link>
+                        </SheetClose>
+                      )}
+                      {item.submenu && expanded && (
+                        <div className="ml-3 mt-1 flex flex-col gap-1 border-l-2 border-[var(--mt-gold)]/40 pl-3">
+                          {item.submenu.map(subitem => {
+                            const subitemActive = isRouteActive(subitem.href);
+                            return (
+                              <SheetClose asChild key={subitem.href}>
+                                <Link
+                                  href={subitem.href}
+                                  aria-current={
+                                    subitemActive ? "page" : undefined
+                                  }
+                                  className={`rounded-md px-3 py-2 font-mono text-sm ${
+                                    subitemActive
+                                      ? "text-[var(--mt-gold-bright)]"
+                                      : "text-[var(--mt-muted)] hover:text-[var(--mt-off-white)]"
+                                  }`}
+                                >
+                                  {subitem.label}
+                                </Link>
+                              </SheetClose>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                <a
+                  href={DISCORD_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-4"
+                >
+                  <CtaButton tone="gold" className="w-full">
+                    Join Discord
+                  </CtaButton>
+                </a>
+              </nav>
+            </SheetContent>
+          </Sheet>
         </div>
       </div>
-
-      {isOpen && (
-        <div className="absolute right-4 top-16 w-[min(20rem,calc(100vw-2rem))] border border-neon-magenta/40 bg-[#0a0e27] shadow-[0_12px_28px_rgba(0,0,0,0.55)] xl:hidden sm:right-6 lg:right-8">
-          <div className="flex max-h-[calc(100vh-5rem)] flex-col gap-1 overflow-y-auto p-2">
-            {navItems.map(item => {
-              const active = Boolean(isItemActive(item));
-              const expanded =
-                (bracketOpen && item.label === "Bracket") ||
-                (historyOpen && item.label === "History") ||
-                (tournamentOpen && item.label === "Tournament");
-
-              return (
-                <div key={item.label}>
-                  {item.submenu ? (
-                    <button
-                      type="button"
-                      className={getMobileItemClassName(active)}
-                      aria-expanded={expanded}
-                      onClick={() => toggleDropdown(item.label)}
-                    >
-                      {item.label}
-                      <ChevronDown
-                        size={14}
-                        className={`transition-transform ${expanded ? "rotate-180" : ""}`}
-                      />
-                    </button>
-                  ) : (
-                    <Link
-                      href={item.href}
-                      aria-current={active ? "page" : undefined}
-                      className={getMobileItemClassName(active)}
-                      onClick={closeMobileMenu}
-                    >
-                      {item.label}
-                    </Link>
-                  )}
-                  {item.submenu && expanded && (
-                    <div className="ml-3 mt-1 flex flex-col gap-0 border-l-2 border-neon-magenta/50 pl-3">
-                      {item.submenu.map(subitem => {
-                        const subitemActive = isRouteActive(subitem.href);
-                        return (
-                          <Link
-                            key={subitem.href}
-                            href={subitem.href}
-                            aria-current={subitemActive ? "page" : undefined}
-                            className={getSubmenuClassName(subitemActive, true)}
-                            onClick={closeMobileMenu}
-                          >
-                            {subitem.label}
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </nav>
   );
 }

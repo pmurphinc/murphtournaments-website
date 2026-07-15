@@ -1,6 +1,8 @@
 import { Link } from "wouter";
-import NeonCard from "@/components/NeonCard";
-import GlitchText from "@/components/GlitchText";
+import SectionHeading from "@/components/public/SectionHeading";
+import StatDisplay from "@/components/public/StatDisplay";
+import ChampionCard from "@/components/public/ChampionCard";
+import CtaButton from "@/components/public/CtaButton";
 
 interface PrizeImage {
   src: string;
@@ -8,21 +10,15 @@ interface PrizeImage {
   label: string;
 }
 
-interface InfoCard {
-  label: string;
-  value: string;
-}
-
 interface FormatRound {
   title: string;
   flow: string;
   description: string;
-  accent: "gold" | "cyan" | "magenta";
 }
 
 export const discordUrl = "https://discord.gg/kcmdxmBgnC";
 
-const infoCards: InfoCard[] = [
+const infoCards = [
   { label: "Event Date", value: "June 28, 2026" },
   { label: "Time", value: "5 PM Pacific / 8 PM Eastern" },
   { label: "Entry", value: "Free" },
@@ -39,28 +35,24 @@ const formatRounds: FormatRound[] = [
     flow: "16 Teams → 8 Teams",
     description:
       "4 lobbies ran at once. The top 2 teams from each lobby advanced; the bottom 2 were eliminated.",
-    accent: "gold",
   },
   {
     title: "Cashout Round 2",
     flow: "8 Teams → 4 Teams",
     description:
       "2 lobbies ran at once. The top 2 teams from each lobby advanced; the bottom 2 were eliminated.",
-    accent: "cyan",
   },
   {
     title: "Cashout Round 3",
     flow: "4 Teams → 2 Teams",
     description:
       "1 Cashout lobby remained. The top 2 teams advanced to the Grand Final; the bottom 2 were eliminated.",
-    accent: "magenta",
   },
   {
     title: "Grand Final",
     flow: "BO5 Final Round Championship Series",
     description:
       "Final Round 3v3 BO5. First team to 3 map wins took the tournament.",
-    accent: "gold",
   },
 ];
 
@@ -106,240 +98,177 @@ const prizeImages: PrizeImage[] = [
   },
 ];
 
+const QUICK_NAV = [
+  { href: "#overview", label: "Overview" },
+  { href: "#format", label: "Format & Rules" },
+  { href: "#prizes", label: "Prizes" },
+];
+
 export default function JuneTournament2026() {
   return (
-    <div className="min-h-screen bg-dark-charcoal">
-      <section className="relative overflow-hidden py-20 md:py-28 border-b border-neon-gold/30">
-        <div className="absolute inset-0 scan-lines opacity-5 pointer-events-none" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,184,0,0.16),transparent_35%),radial-gradient(circle_at_bottom_left,rgba(0,217,255,0.1),transparent_35%)] pointer-events-none" />
-
+    <div>
+      <div className="relative overflow-hidden border-b border-[var(--mt-steel-line)] py-16 sm:py-20">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(circle at 15% 20%, rgba(201,169,74,0.08), transparent 45%), radial-gradient(circle at 85% 0%, rgba(201,169,74,0.05), transparent 40%)",
+          }}
+        />
         <div className="container relative z-10">
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_0.85fr] gap-10 lg:gap-14 items-center">
-            <div className="space-y-6">
-              <p className="text-sm text-neon-gold font-mono uppercase tracking-widest font-bold">
-                Murph Tournaments Presents
-              </p>
-              <div>
-                <GlitchText size="2xl" variant="gold">
-                  June 2026
-                </GlitchText>
-                <GlitchText size="2xl" variant="cyan">
-                  Tournament
-                </GlitchText>
-              </div>
-              <p className="text-neon-cyan font-mono font-bold uppercase tracking-widest">
+          <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16">
+            <div className="max-w-2xl space-y-6">
+              <SectionHeading
+                level="h1"
+                eyebrow="Murph Tournaments Presents"
+                title="June 2026 Tournament"
+                description="Archived results for the June 28, 2026 THE FINALS tournament: Cashout elimination lobbies, a Final Round BO5 Championship Series, and Seismic crowned as champions."
+              />
+              <p className="font-mono text-sm font-bold uppercase tracking-widest text-[var(--mt-gold-bright)]">
                 June 28, 2026 — 5:00 PM Pacific / 8:00 PM Eastern
               </p>
-              <p className="text-white/80 font-mono leading-relaxed max-w-2xl">
-                Archived results for the June 28, 2026 THE FINALS tournament:
-                Cashout elimination lobbies, a Final Round BO5 Championship
-                Series, and Seismic crowned as champions.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex flex-col gap-3 sm:flex-row">
                 <a href={discordUrl} target="_blank" rel="noopener noreferrer">
-                  <button className="w-full sm:w-auto px-8 py-3 border-2 border-neon-gold text-neon-gold font-bold font-mono uppercase tracking-widest hover-glow-gold rounded-sm transition-all">
-                    Join Discord
-                  </button>
+                  <CtaButton tone="gold">Join Discord</CtaButton>
                 </a>
                 <Link href="/tournaments/june-2026/roster">
-                  <button className="w-full sm:w-auto px-8 py-3 border-2 border-neon-cyan text-neon-cyan font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all">
-                    View Event Roster
-                  </button>
+                  <CtaButton tone="outline">View Event Roster</CtaButton>
                 </Link>
               </div>
+              <nav
+                aria-label="Jump to section"
+                className="flex flex-wrap gap-2 pt-2"
+              >
+                {QUICK_NAV.map(item => (
+                  <a
+                    key={item.href}
+                    href={item.href}
+                    className="rounded-md border border-[var(--mt-steel-line)] px-3 py-2 font-mono text-xs uppercase tracking-widest text-[var(--mt-muted)] hover:border-[var(--mt-gold)] hover:text-[var(--mt-gold-bright)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mt-gold-bright)]"
+                  >
+                    {item.label}
+                  </a>
+                ))}
+              </nav>
             </div>
 
-            <NeonCard variant="gold" className="bg-black/60">
-              <p className="text-xs text-white/50 font-mono uppercase tracking-widest mb-3">
-                June 2026 Champions
-              </p>
-              <p className="text-4xl md:text-5xl font-bold font-mono text-neon-gold uppercase tracking-widest mb-4">
-                Seismic
-              </p>
-              <p className="text-sm text-white/75 font-mono leading-relaxed mb-5">
-                Congratulations to Seismic, champions of the June 28, 2026 Murph
-                Tournaments event.
-              </p>
-              <div className="space-y-3">
-                {championRoster.map(player => (
-                  <div
-                    key={player}
-                    className="border border-neon-gold/25 bg-dark-charcoal/70 px-4 py-3 rounded-sm"
-                  >
-                    <p className="text-sm text-white font-bold font-mono">
-                      {player}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </NeonCard>
+            <ChampionCard
+              champion={{
+                teamName: "Seismic",
+                members: championRoster,
+                eventName: "June 2026",
+              }}
+            />
           </div>
         </div>
-      </section>
+      </div>
 
-      <section className="py-16 md:py-24 border-b border-neon-magenta/20">
+      <section
+        id="overview"
+        className="scroll-mt-20 border-b border-[var(--mt-steel-line)] py-12 sm:py-16"
+      >
         <div className="container">
-          <div className="mb-10">
-            <h2 className="text-3xl md:text-4xl font-bold font-mono text-neon-cyan uppercase tracking-widest mb-4">
-              Tournament Overview
-            </h2>
-            <p className="text-white/70 font-mono leading-relaxed max-w-4xl">
-              The June Tournament used Cashout elimination lobbies to narrow the
-              field from 16 teams to the final 2. Each Cashout lobby eliminated
-              the bottom 2 teams, while the top 2 advanced. The final two teams
-              then faced off in a Final Round 3v3 Best-of-5 Championship Series.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <h2 className="mb-4 text-xl font-bold uppercase tracking-wide text-[var(--mt-off-white)]">
+            Overview
+          </h2>
+          <p className="mb-8 max-w-3xl text-sm leading-relaxed text-[var(--mt-muted)]">
+            The June Tournament used Cashout elimination lobbies to narrow the
+            field from 16 teams to the final 2. Each Cashout lobby eliminated
+            the bottom 2 teams, while the top 2 advanced. The final two teams
+            then faced off in a Final Round 3v3 Best-of-5 Championship Series.
+          </p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {infoCards.map(card => (
-              <NeonCard key={card.label} variant="cyan" className="bg-black/40">
-                <p className="text-xs text-white/50 font-mono uppercase tracking-widest mb-3">
-                  {card.label}
-                </p>
-                <p className="text-lg text-white font-bold font-mono leading-snug">
-                  {card.value}
-                </p>
-              </NeonCard>
+              <StatDisplay
+                key={card.label}
+                label={card.label}
+                value={card.value}
+              />
             ))}
           </div>
         </div>
       </section>
 
-      <section className="py-16 md:py-24 border-b border-neon-gold/20 bg-black/20">
+      <section
+        id="format"
+        className="scroll-mt-20 border-b border-[var(--mt-steel-line)] py-12 sm:py-16"
+      >
         <div className="container">
-          <div className="mb-10">
-            <h2 className="text-3xl md:text-4xl font-bold font-mono text-neon-gold uppercase tracking-widest mb-4">
-              Format Breakdown
-            </h2>
-            <p className="text-white/70 font-mono leading-relaxed max-w-4xl">
-              Cashout phase lobbies were 3v3v3v3. Each Cashout lobby eliminated
-              the bottom 2 teams, while the top 2 teams advanced. Once a team
-              finished bottom 2 in a Cashout lobby, they were eliminated from
-              the tournament.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
+          <h2 className="mb-4 text-xl font-bold uppercase tracking-wide text-[var(--mt-off-white)]">
+            Format &amp; Rules
+          </h2>
+          <p className="mb-8 max-w-3xl text-sm leading-relaxed text-[var(--mt-muted)]">
+            Cashout phase lobbies were 3v3v3v3. Each Cashout lobby eliminated
+            the bottom 2 teams, while the top 2 teams advanced. Once a team
+            finished bottom 2 in a Cashout lobby, they were eliminated from the
+            tournament.
+          </p>
+          <ol className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {formatRounds.map((round, index) => (
-              <NeonCard
-                key={round.title}
-                variant={round.accent}
-                className="relative bg-black/50"
-              >
-                <p className="text-xs text-white/40 font-mono uppercase tracking-widest mb-3">
+              <li key={round.title} className="mt-panel p-5">
+                <p className="font-mono text-xs uppercase tracking-widest text-[var(--mt-gold-bright)]">
                   Stage {index + 1}
                 </p>
-                <h3 className="text-lg text-white font-bold font-mono uppercase tracking-wider mb-3">
+                <h3 className="mt-1 font-bold uppercase tracking-wide text-[var(--mt-off-white)]">
                   {round.title}
                 </h3>
-                <p className="text-base text-neon-cyan font-bold font-mono mb-4">
+                <p className="mt-1 font-mono text-xs text-[var(--mt-muted)]">
                   {round.flow}
                 </p>
-                <p className="text-sm text-white/70 font-mono leading-relaxed">
+                <p className="mt-3 text-sm leading-relaxed text-[var(--mt-muted)]">
                   {round.description}
                 </p>
-              </NeonCard>
+              </li>
+            ))}
+          </ol>
+
+          <div className="mt-panel mt-6 border-[var(--mt-gold)]/40 p-5">
+            <p className="font-mono text-xs font-bold uppercase tracking-widest text-[var(--mt-gold-bright)]">
+              Important Format Note
+            </p>
+            <p className="mt-3 text-sm leading-relaxed text-[var(--mt-muted)]">
+              This was not a double-elimination bracket. Once a team finished
+              bottom 2 in a Cashout lobby, they were eliminated. The final two
+              teams played a Final Round 3v3 Best-of-5 Championship Series.
+              First team to 3 map wins became champion. There was no bracket
+              reset.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="prizes" className="scroll-mt-20 py-12 sm:py-16">
+        <div className="container">
+          <h2 className="mb-4 text-xl font-bold uppercase tracking-wide text-[var(--mt-off-white)]">
+            Prizes
+          </h2>
+          <p className="mb-6 max-w-3xl text-sm leading-relaxed text-[var(--mt-muted)]">
+            1st place took home the 3D printed prize bundle: M11, Alien Nade,
+            Cashbox/Vault/Cashout display pieces, and sponsor keychains.
+          </p>
+          <div className="mb-10 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {firstPlacePrizes.map(prize => (
+              <div
+                key={prize}
+                className="mt-panel px-4 py-3 text-sm text-[var(--mt-off-white)]"
+              >
+                {prize}
+              </div>
             ))}
           </div>
 
-          <NeonCard variant="magenta" className="bg-black/60 mt-6">
-            <p className="text-sm text-neon-magenta font-bold font-mono uppercase tracking-widest mb-3">
-              Important Format Note
-            </p>
-            <p className="text-white/80 font-mono leading-relaxed">
-              This was not a double-elimination bracket. Once a team finished
-              bottom 2 in a Cashout lobby, they were eliminated.
-            </p>
-            <p className="text-white/80 font-mono leading-relaxed mt-3">
-              The final two teams played a Final Round 3v3 Best-of-5
-              Championship Series. First team to 3 map wins became champion.
-              There was no bracket reset.
-            </p>
-          </NeonCard>
-
-          <p className="text-sm text-white/60 font-mono leading-relaxed mt-6">
-            Archived runtime guidance: the event was planned for approximately 2
-            hours, with a 1 hour 45 minute to 2 hour 15 minute target window and
-            a hard buffer of up to 2.5 hours.
-          </p>
-        </div>
-      </section>
-
-      <section className="py-16 md:py-24 border-b border-neon-gold/20">
-        <div className="container">
-          <div className="grid grid-cols-1 lg:grid-cols-[0.95fr_1.05fr] gap-8 lg:gap-12">
-            <NeonCard variant="gold" className="bg-black/60">
-              <p className="text-sm text-neon-gold font-mono uppercase tracking-widest font-bold mb-4">
-                1st Place Team
-              </p>
-              <p className="text-4xl font-bold font-mono text-neon-gold mb-3">
-                3D Printed Prize Bundle
-              </p>
-              <p className="text-sm text-white/70 font-mono leading-relaxed mb-6">
-                1st place took home the 3D printed prize bundle: M11, Alien
-                Nade, Cashbox/Vault/Cashout display pieces, and sponsor
-                keychains.
-              </p>
-              <div className="space-y-3">
-                {firstPlacePrizes.map(prize => (
-                  <div
-                    key={prize}
-                    className="border border-neon-gold/20 bg-dark-charcoal/70 px-4 py-3 rounded-sm"
-                  >
-                    <p className="text-sm text-white/80 font-mono">{prize}</p>
-                  </div>
-                ))}
-              </div>
-            </NeonCard>
-
-            <NeonCard variant="magenta" className="bg-black/50">
-              <p className="text-sm text-neon-magenta font-mono uppercase tracking-widest font-bold mb-4">
-                Completed Event Archive
-              </p>
-              <p className="text-white/70 font-mono leading-relaxed mb-6">
-                Registration and standby entries for the June 2026 event are
-                closed. This page remains available as an archive for the
-                completed tournament, its format, roster, and prize details.
-              </p>
-              <a href={discordUrl} target="_blank" rel="noopener noreferrer">
-                <button className="w-full sm:w-auto px-6 py-3 border-2 border-neon-cyan text-neon-cyan font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all">
-                  Join Discord for Future Updates
-                </button>
-              </a>
-            </NeonCard>
-          </div>
-        </div>
-      </section>
-
-      <section className="py-16 md:py-24">
-        <div className="container">
-          <div className="mb-10">
-            <h2 className="text-3xl md:text-4xl font-bold font-mono text-neon-gold uppercase tracking-widest mb-4">
-              Prize Gallery
-            </h2>
-            <p className="text-white/70 font-mono leading-relaxed max-w-3xl">
-              Physical prize photos for the June 2026 first-place package,
-              including the M11, Alien Nade, cashbox display pieces, and sponsor
-              keychains.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
             {prizeImages.map(image => (
-              <figure
-                key={image.src}
-                className="group border-2 border-neon-gold/40 bg-black/60 rounded-sm overflow-hidden transition-all duration-300 hover:border-neon-gold hover-glow-gold"
-              >
-                <div className="aspect-[4/3] bg-dark-charcoal overflow-hidden">
+              <figure key={image.src} className="mt-panel overflow-hidden">
+                <div className="aspect-[4/3] overflow-hidden bg-[var(--mt-black)]">
                   <img
                     src={image.src}
                     alt={image.alt}
-                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    className="h-full w-full object-cover"
                     loading="lazy"
                   />
                 </div>
-                <figcaption className="px-5 py-4 text-sm text-neon-gold font-bold font-mono uppercase tracking-widest">
+                <figcaption className="px-5 py-4 font-mono text-xs font-bold uppercase tracking-widest text-[var(--mt-gold-bright)]">
                   {image.label}
                 </figcaption>
               </figure>

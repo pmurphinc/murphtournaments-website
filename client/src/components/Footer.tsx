@@ -1,68 +1,87 @@
 import { Link } from "wouter";
 
-/**
- * Footer Component
- * Cyberpunk Neon Rebellion Design
- * - Minimal asymmetric layout
- * - Neon accent colors
- * - Social links and Discord integration
- */
-
 export default function Footer() {
   return (
-    <footer className="bg-dark-charcoal border-t border-neon-magenta/30 mt-20 py-12">
+    <footer className="mt-20 border-t border-[var(--mt-steel-line)] bg-[var(--mt-charcoal)] py-12 text-[var(--mt-off-white)]">
       <div className="container">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
-          {/* Brand */}
+        <div className="mb-8 grid grid-cols-1 gap-8 md:grid-cols-4">
           <div>
-            <div className="text-lg font-bold font-mono text-white mb-2">
-              MURPH TOURNAMENTS
+            <div className="font-mono text-lg font-bold uppercase tracking-widest text-[var(--mt-off-white)]">
+              Murph Tournaments
             </div>
-            <p className="text-sm text-white/60 font-mono">
+            <p className="mt-2 text-sm text-[var(--mt-muted)]">
               Competitive THE FINALS tournaments. Built by players. For players.
             </p>
           </div>
 
-          {/* Quick Links */}
           <div>
-            <h3 className="text-sm font-bold font-mono text-neon-cyan mb-4 uppercase">
-              Navigation
+            <h3 className="mb-4 font-mono text-xs font-bold uppercase tracking-widest text-[var(--mt-gold-bright)]">
+              Tournaments
             </h3>
-            <div className="space-y-2">
-              <Link href="/tournaments">
-                <div className="text-sm text-white/60 hover:text-neon-magenta transition-colors cursor-pointer">
-                  Tournaments
-                </div>
+            <div className="flex flex-col gap-2 text-sm text-[var(--mt-muted)]">
+              <Link
+                href="/tournaments/community"
+                className="hover:text-[var(--mt-off-white)]"
+              >
+                Browse Tournaments
               </Link>
-              <Link href="/dev-division">
-                <div className="text-sm text-white/60 hover:text-neon-magenta transition-colors cursor-pointer">
-                  Dev Division
-                </div>
+              <Link
+                href="/tournaments"
+                className="hover:text-[var(--mt-off-white)]"
+              >
+                Results &amp; Archive
               </Link>
-              <Link href="/about">
-                <div className="text-sm text-white/60 hover:text-neon-magenta transition-colors cursor-pointer">
-                  About
-                </div>
+              <Link
+                href="/tournaments/june-2026"
+                className="hover:text-[var(--mt-off-white)]"
+              >
+                Current Event
               </Link>
-              <Link href="/maprng">
-                <div className="text-sm text-white/60 hover:text-neon-magenta transition-colors cursor-pointer">
-                  Map RNG
-                </div>
+              <Link
+                href="/players"
+                className="hover:text-[var(--mt-off-white)]"
+              >
+                Player Archive
               </Link>
             </div>
           </div>
 
-          {/* Community */}
           <div>
-            <h3 className="text-sm font-bold font-mono text-neon-cyan mb-4 uppercase">
+            <h3 className="mb-4 font-mono text-xs font-bold uppercase tracking-widest text-[var(--mt-gold-bright)]">
+              Site
+            </h3>
+            <div className="flex flex-col gap-2 text-sm text-[var(--mt-muted)]">
+              <Link href="/watch" className="hover:text-[var(--mt-off-white)]">
+                Watch
+              </Link>
+              <Link
+                href="/patchnotes"
+                className="hover:text-[var(--mt-off-white)]"
+              >
+                News
+              </Link>
+              <Link
+                href="/balance-archive"
+                className="hover:text-[var(--mt-off-white)]"
+              >
+                Weapon Archive
+              </Link>
+              <Link href="/about" className="hover:text-[var(--mt-off-white)]">
+                About
+              </Link>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="mb-4 font-mono text-xs font-bold uppercase tracking-widest text-[var(--mt-gold-bright)]">
               Community
             </h3>
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2 text-sm text-[var(--mt-muted)]">
               <a
                 href="https://www.twitch.tv/pmurphinc"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm text-white/60 hover:text-neon-magenta transition-colors"
+                className="hover:text-[var(--mt-off-white)]"
               >
                 Twitch
               </a>
@@ -70,7 +89,7 @@ export default function Footer() {
                 href="https://discord.gg/kcmdxmBgnC"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm text-white/60 hover:text-neon-magenta transition-colors"
+                className="hover:text-[var(--mt-off-white)]"
               >
                 Discord
               </a>
@@ -78,38 +97,27 @@ export default function Footer() {
                 href="https://www.tiktok.com/@pmurphinc"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm text-white/60 hover:text-neon-magenta transition-colors"
+                className="hover:text-[var(--mt-off-white)]"
               >
                 TikTok
               </a>
             </div>
-          </div>
-
-          {/* Contact */}
-          <div>
-            <h3 className="text-sm font-bold font-mono text-neon-cyan mb-4 uppercase">
-              Contact
-            </h3>
-            <p className="text-sm text-white/60 font-mono mb-4">
-              Join our Discord for tournament updates and community.
-            </p>
             <a
               href="https://discord.gg/kcmdxmBgnC"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-block px-4 py-2 bg-neon-magenta text-dark-black font-bold font-mono text-xs uppercase tracking-widest hover-glow-magenta rounded-sm transition-all"
+              className="mt-4 inline-block rounded-md bg-[var(--mt-gold)] px-4 py-2 font-mono text-xs font-bold uppercase tracking-widest text-[var(--mt-gold-foreground)] transition hover:bg-[var(--mt-gold-bright)]"
             >
               Join Discord
             </a>
           </div>
         </div>
 
-        {/* Bottom Bar */}
-        <div className="border-t border-neon-magenta/20 pt-8 flex justify-center">
-          <p className="text-xs text-white/40 font-mono">
-            © 2026 Murph Tournaments. All rights reserved.
-          </p>
-        </div>
+        <div className="mt-hairline mb-8" />
+
+        <p className="text-center font-mono text-xs text-[var(--mt-muted)]">
+          © 2026 Murph Tournaments. All rights reserved.
+        </p>
       </div>
     </footer>
   );

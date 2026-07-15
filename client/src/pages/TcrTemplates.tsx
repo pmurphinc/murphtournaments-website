@@ -17,7 +17,10 @@ import { getDiscordLoginUrl } from "@/lib/discordLogin";
 import { getSafeTournamentControlErrorMessage } from "@/lib/tcrError";
 
 const goldButtonClass =
-  "border border-[#FFD700] bg-[#FFD700] px-5 font-mono font-black uppercase tracking-wider text-black shadow-[0_0_18px_rgba(255,215,0,0.28)] hover:bg-[#D4AF37] hover:text-black";
+  "border border-[var(--mt-gold)] bg-[var(--mt-gold)] px-5 font-mono font-black uppercase tracking-wider text-[var(--mt-gold-foreground)] hover:bg-[var(--mt-gold-bright)] hover:text-[var(--mt-gold-foreground)]";
+
+const outlineButtonClass =
+  "border-[var(--mt-steel-line)] text-[var(--mt-off-white)] hover:border-[var(--mt-gold)] hover:text-[var(--mt-gold-bright)]";
 
 type Visibility = "private" | "public";
 type Template = {
@@ -119,13 +122,13 @@ export function TcrTemplateBrowser({ compact = false }: { compact?: boolean }) {
     );
 
   return (
-    <div className="rounded-lg border border-neon-gold/30 bg-zinc-950/80 p-5">
+    <div className="rounded-lg border border-[var(--mt-steel-line)] bg-[var(--mt-charcoal)]/80 p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="font-mono text-2xl font-black uppercase text-neon-gold">
+          <h2 className="font-mono text-2xl font-black uppercase text-[var(--mt-gold-bright)]">
             Create from Template
           </h2>
-          <p className="mt-1 text-sm text-white/60">
+          <p className="mt-1 text-sm text-[var(--mt-muted)]">
             Use public layouts or templates you saved from your own rooms.
           </p>
         </div>
@@ -133,7 +136,7 @@ export function TcrTemplateBrowser({ compact = false }: { compact?: boolean }) {
           <Button
             variant={view === "public" ? "default" : "outline"}
             className={
-              view === "public" ? goldButtonClass : "border-white/20 text-white"
+              view === "public" ? goldButtonClass : outlineButtonClass
             }
             onClick={() => setView("public")}
           >
@@ -142,7 +145,7 @@ export function TcrTemplateBrowser({ compact = false }: { compact?: boolean }) {
           <Button
             variant={view === "mine" ? "default" : "outline"}
             className={
-              view === "mine" ? goldButtonClass : "border-white/20 text-white"
+              view === "mine" ? goldButtonClass : outlineButtonClass
             }
             onClick={() => setView("mine")}
           >
@@ -152,7 +155,7 @@ export function TcrTemplateBrowser({ compact = false }: { compact?: boolean }) {
             <Button
               asChild
               variant="outline"
-              className="border-white/20 text-white"
+              className={outlineButtonClass}
             >
               <Link href="/TCR/templates">Manage Templates</Link>
             </Button>
@@ -163,28 +166,28 @@ export function TcrTemplateBrowser({ compact = false }: { compact?: boolean }) {
         {templates.map(template => (
           <article
             key={template.id}
-            className="rounded-lg border border-white/10 bg-black/60 p-4"
+            className="rounded-lg border border-[var(--mt-steel-line)] bg-[var(--mt-black)]/60 p-4"
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="font-mono text-lg font-bold text-white">
+                <h3 className="font-mono text-lg font-bold text-[var(--mt-off-white)]">
                   {template.name}
                 </h3>
-                <p className="mt-1 text-xs text-white/50">
+                <p className="mt-1 text-xs text-[var(--mt-muted)]">
                   By {creatorName(template)}
                 </p>
               </div>
-              <span className="rounded-full border border-neon-gold/40 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-neon-gold">
+              <span className="rounded-full border border-[var(--mt-gold)]/40 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-[var(--mt-gold-bright)]">
                 {template.visibility}
               </span>
             </div>
-            <dl className="mt-4 grid grid-cols-2 gap-2 text-xs text-white/55">
+            <dl className="mt-4 grid grid-cols-2 gap-2 text-xs text-[var(--mt-muted)]">
               <div>
-                <dt className="font-mono uppercase text-white/35">Updated</dt>
+                <dt className="font-mono uppercase text-[var(--mt-muted)]">Updated</dt>
                 <dd>{formatDate(template.updatedAt ?? template.createdAt)}</dd>
               </div>
               <div>
-                <dt className="font-mono uppercase text-white/35">Lobbies</dt>
+                <dt className="font-mono uppercase text-[var(--mt-muted)]">Lobbies</dt>
                 <dd>{template.lobbyCount}</dd>
               </div>
             </dl>
@@ -202,7 +205,7 @@ export function TcrTemplateBrowser({ compact = false }: { compact?: boolean }) {
                 <>
                   <Button
                     variant="outline"
-                    className="border-white/20 text-white"
+                    className={outlineButtonClass}
                     onClick={() => {
                       setRenameTarget(template);
                       setRenameValue(template.name);
@@ -212,7 +215,7 @@ export function TcrTemplateBrowser({ compact = false }: { compact?: boolean }) {
                   </Button>
                   <Button
                     variant="outline"
-                    className="border-white/20 text-white"
+                    className={outlineButtonClass}
                     disabled={setTemplateVisibility.isPending}
                     onClick={() =>
                       setTemplateVisibility.mutate({
@@ -254,9 +257,9 @@ export function TcrTemplateBrowser({ compact = false }: { compact?: boolean }) {
         open={useTarget !== null}
         onOpenChange={open => !open && setUseTarget(null)}
       >
-        <DialogContent className="border-neon-gold/40 bg-zinc-950 text-white">
+        <DialogContent className="border-[var(--mt-gold)]/40 bg-[var(--mt-charcoal)] text-[var(--mt-off-white)]">
           <DialogHeader>
-            <DialogTitle className="font-mono text-neon-gold">
+            <DialogTitle className="font-mono text-[var(--mt-gold-bright)]">
               Use Template
             </DialogTitle>
             <DialogDescription>
@@ -267,7 +270,7 @@ export function TcrTemplateBrowser({ compact = false }: { compact?: boolean }) {
             value={newTournamentName}
             onChange={event => setNewTournamentName(event.target.value)}
             placeholder="New tournament name"
-            className="border-white/15 bg-black/60 text-white"
+            className="border-[var(--mt-steel-line)] bg-[var(--mt-black)]/60 text-[var(--mt-off-white)]"
           />
           {createFromTemplate.error && (
             <p className="text-sm text-red-200">
@@ -277,7 +280,7 @@ export function TcrTemplateBrowser({ compact = false }: { compact?: boolean }) {
           <DialogFooter>
             <Button
               variant="outline"
-              className="border-white/20 text-white"
+              className={outlineButtonClass}
               onClick={() => setUseTarget(null)}
             >
               Cancel
@@ -307,16 +310,16 @@ export function TcrTemplateBrowser({ compact = false }: { compact?: boolean }) {
         open={renameTarget !== null}
         onOpenChange={open => !open && setRenameTarget(null)}
       >
-        <DialogContent className="border-neon-gold/40 bg-zinc-950 text-white">
+        <DialogContent className="border-[var(--mt-gold)]/40 bg-[var(--mt-charcoal)] text-[var(--mt-off-white)]">
           <DialogHeader>
-            <DialogTitle className="font-mono text-neon-gold">
+            <DialogTitle className="font-mono text-[var(--mt-gold-bright)]">
               Rename Template
             </DialogTitle>
           </DialogHeader>
           <Input
             value={renameValue}
             onChange={event => setRenameValue(event.target.value)}
-            className="border-white/15 bg-black/60 text-white"
+            className="border-[var(--mt-steel-line)] bg-[var(--mt-black)]/60 text-[var(--mt-off-white)]"
           />
           <DialogFooter>
             <Button
@@ -344,9 +347,9 @@ export function TcrTemplateBrowser({ compact = false }: { compact?: boolean }) {
         open={deleteTarget !== null}
         onOpenChange={open => !open && setDeleteTarget(null)}
       >
-        <DialogContent className="border-neon-gold/40 bg-zinc-950 text-white">
+        <DialogContent className="border-[var(--mt-gold)]/40 bg-[var(--mt-charcoal)] text-[var(--mt-off-white)]">
           <DialogHeader>
-            <DialogTitle className="font-mono text-neon-gold">
+            <DialogTitle className="font-mono text-[var(--mt-gold-bright)]">
               Delete Template?
             </DialogTitle>
             <DialogDescription>
@@ -357,7 +360,7 @@ export function TcrTemplateBrowser({ compact = false }: { compact?: boolean }) {
           <DialogFooter>
             <Button
               variant="outline"
-              className="border-white/20 text-white"
+              className={outlineButtonClass}
               onClick={() => setDeleteTarget(null)}
             >
               Cancel
@@ -387,10 +390,10 @@ function TemplateState({
   description?: string;
 }) {
   return (
-    <div className="rounded-lg border border-dashed border-neon-gold/25 bg-black/40 p-6 text-center">
-      <h3 className="font-mono text-lg font-black text-neon-gold">{title}</h3>
+    <div className="rounded-lg border border-dashed border-[var(--mt-gold)]/25 bg-[var(--mt-black)]/40 p-6 text-center">
+      <h3 className="font-mono text-lg font-black text-[var(--mt-gold-bright)]">{title}</h3>
       {description && (
-        <p className="mt-2 text-sm text-white/60">{description}</p>
+        <p className="mt-2 text-sm text-[var(--mt-muted)]">{description}</p>
       )}
     </div>
   );
@@ -408,17 +411,17 @@ export default function TcrTemplatesPage() {
       />
     );
   return (
-    <section className="min-h-screen bg-black px-6 py-12 text-white">
+    <section className="min-h-screen bg-[var(--mt-black)] px-6 py-12 text-[var(--mt-off-white)]">
       <div className="mx-auto max-w-6xl">
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="font-mono text-xs uppercase tracking-[0.35em] text-neon-gold">
+            <p className="font-mono text-xs uppercase tracking-[0.35em] text-[var(--mt-gold-bright)]">
               Tournament Organizer
             </p>
             <h1 className="mt-2 font-mono text-4xl font-black uppercase">
               TCR Templates
             </h1>
-            <p className="mt-3 text-sm text-white/60">
+            <p className="mt-3 text-sm text-[var(--mt-muted)]">
               Browse public templates and manage your saved private or public
               layouts.
             </p>
@@ -443,16 +446,16 @@ function State({
   showDiscordSignIn?: boolean;
 }) {
   return (
-    <section className="min-h-screen bg-black px-6 py-20 text-white">
-      <div className="mx-auto max-w-xl rounded border border-neon-gold/30 bg-zinc-950 p-8">
-        <h1 className="font-mono text-2xl font-black text-neon-gold">
+    <section className="min-h-screen bg-[var(--mt-black)] px-6 py-20 text-[var(--mt-off-white)]">
+      <div className="mx-auto max-w-xl rounded border border-[var(--mt-steel-line)] bg-[var(--mt-charcoal)] p-8">
+        <h1 className="font-mono text-2xl font-black text-[var(--mt-gold-bright)]">
           {title}
         </h1>
-        {description && <p className="mt-3 text-white/60">{description}</p>}
+        {description && <p className="mt-3 text-[var(--mt-muted)]">{description}</p>}
         {showDiscordSignIn && (
           <a
             href={getDiscordLoginUrl()}
-            className="mt-6 inline-flex rounded border border-[#5865F2]/70 bg-[#5865F2] px-4 py-2 font-mono text-sm font-bold uppercase tracking-wider text-white hover:border-neon-gold"
+            className="mt-6 inline-flex rounded border border-[#5865F2]/70 bg-[#5865F2] px-4 py-2 font-mono text-sm font-bold uppercase tracking-wider text-white hover:border-[var(--mt-gold)]"
           >
             Sign in with Discord
           </a>

@@ -309,8 +309,14 @@ describe("Tournament Control Room alpha badge", () => {
     for (const source of [personalIndexSource, adminIndexSource, adminSource]) {
       expect(source).toContain("ALPHA");
       expect(source).toContain("Tournament Control Room is a work in progress");
-      expect(source).toContain("border-[#FFD700]/60");
     }
+    // The personal /TCR index and the admin control-room index use the
+    // public mt-* gold token; the node-based control room itself
+    // intentionally keeps the original literal gold hex (out of scope for
+    // the public retheme).
+    expect(personalIndexSource).toContain("border-[var(--mt-gold)]/60");
+    expect(adminIndexSource).toContain("border-[var(--mt-gold)]/60");
+    expect(adminSource).toContain("border-[#FFD700]/60");
   });
 });
 

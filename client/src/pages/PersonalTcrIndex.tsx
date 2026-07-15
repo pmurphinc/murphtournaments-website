@@ -18,11 +18,14 @@ import { getSafeTournamentControlErrorMessage } from "@/lib/tcrError";
 import { TcrTemplateBrowser } from "./TcrTemplates";
 
 const goldButtonClass =
-  "border border-[#FFD700] bg-[#FFD700] px-5 font-mono font-black uppercase tracking-wider text-black shadow-[0_0_18px_rgba(255,215,0,0.28)] hover:bg-[#D4AF37] hover:text-black";
+  "border border-[var(--mt-gold)] bg-[var(--mt-gold)] px-5 font-mono font-black uppercase tracking-wider text-[var(--mt-gold-foreground)] hover:bg-[var(--mt-gold-bright)] hover:text-[var(--mt-gold-foreground)]";
+
+const outlineButtonClass =
+  "border-[var(--mt-steel-line)] text-[var(--mt-off-white)] hover:border-[var(--mt-gold)] hover:text-[var(--mt-gold-bright)]";
 
 const alphaBadge = (
   <span
-    className="inline-flex rounded-full border border-[#FFD700]/60 bg-[#FFD700]/10 px-2.5 py-1 align-middle font-mono text-xs font-black uppercase tracking-[0.22em] text-[#FFD700] shadow-[0_0_14px_rgba(255,215,0,0.18)]"
+    className="inline-flex rounded-full border border-[var(--mt-gold)]/60 bg-[var(--mt-gold)]/10 px-2.5 py-1 align-middle font-mono text-xs font-black uppercase tracking-[0.22em] text-[var(--mt-gold-bright)]"
     title="Tournament Control Room is a work in progress"
   >
     ALPHA
@@ -106,11 +109,11 @@ export default function PersonalTcrIndex() {
     );
 
   return (
-    <section className="min-h-screen bg-black px-6 py-12 text-white">
+    <section className="min-h-screen bg-[var(--mt-black)] px-6 py-12 text-[var(--mt-off-white)]">
       <div className="mx-auto max-w-6xl">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="font-mono text-xs uppercase tracking-[0.35em] text-neon-gold">
+            <p className="font-mono text-xs uppercase tracking-[0.35em] text-[var(--mt-gold-bright)]">
               Tournament Organizer
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-3">
@@ -119,10 +122,10 @@ export default function PersonalTcrIndex() {
               </h1>
               {alphaBadge}
             </div>
-            <p className="mt-3 max-w-2xl text-sm text-white/60">
+            <p className="mt-3 max-w-2xl text-sm text-[var(--mt-muted)]">
               Create and manage your own tournaments with Discord sign-in.
             </p>
-            <p className="mt-2 text-xs text-white/45">
+            <p className="mt-2 text-xs text-[var(--mt-muted)]">
               Signed in as{" "}
               {auth.user.discordDisplayName ||
                 auth.user.discordUsername ||
@@ -131,11 +134,7 @@ export default function PersonalTcrIndex() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              className="border-white/20 text-white"
-              asChild
-            >
+            <Button variant="outline" className={outlineButtonClass} asChild>
               <Link href="/TCR/templates">Manage Templates</Link>
             </Button>
             <Button
@@ -163,42 +162,42 @@ export default function PersonalTcrIndex() {
             return (
               <div
                 key={tournament.id}
-                className="rounded-lg border border-neon-gold/30 bg-zinc-950 p-5"
+                className="rounded-lg border border-[var(--mt-steel-line)] bg-[var(--mt-charcoal)] p-5"
               >
-                <h2 className="font-mono text-xl font-bold text-neon-gold">
+                <h2 className="font-mono text-xl font-bold text-[var(--mt-gold-bright)]">
                   <Link
                     href={`/TCR/${tournament.id}`}
-                    className="rounded outline-none transition hover:text-[#FFD700] hover:underline focus-visible:ring-2 focus-visible:ring-[#FFD700] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
+                    className="rounded outline-none transition hover:text-[var(--mt-gold-bright)] hover:underline focus-visible:ring-2 focus-visible:ring-[var(--mt-gold-bright)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--mt-charcoal)]"
                   >
                     {tournament.name}
                   </Link>
                 </h2>
-                <p className="mt-2 text-sm text-white/60">
+                <p className="mt-2 text-sm text-[var(--mt-muted)]">
                   {tournament.eventStatus} · {tournament.currentStage}
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2 text-xs font-mono uppercase">
-                  <span className="rounded-full border border-white/15 px-3 py-1 text-white/60">
+                  <span className="rounded-full border border-[var(--mt-steel-line)] px-3 py-1 text-[var(--mt-muted)]">
                     {tournament.visibility}
                   </span>
-                  <span className="rounded-full border border-neon-gold/30 px-3 py-1 text-neon-gold/80">
+                  <span className="rounded-full border border-[var(--mt-gold)]/40 px-3 py-1 text-[var(--mt-gold-bright)]/90">
                     {tournament.staffRole === "collaborator"
                       ? "Collaborator"
                       : "Owner"}
                   </span>
-                  <span className="rounded-full border border-white/15 px-3 py-1 text-white/60">
+                  <span className="rounded-full border border-[var(--mt-steel-line)] px-3 py-1 text-[var(--mt-muted)]">
                     {tournament.publishedAt ? "Published" : "Unpublished"}
                   </span>
-                  <span className="rounded-full border border-white/15 px-3 py-1 text-white/60">
+                  <span className="rounded-full border border-[var(--mt-steel-line)] px-3 py-1 text-[var(--mt-muted)]">
                     Registration{" "}
                     {tournament.registrationOpen === 1 ? "open" : "closed"}
                   </span>
                 </div>
-                <p className="mt-3 text-sm text-white/60">
+                <p className="mt-3 text-sm text-[var(--mt-muted)]">
                   {pendingCount} pending team approval
                   {pendingCount === 1 ? "" : "s"}
                 </p>
                 {tournament.eventNote && (
-                  <p className="mt-3 line-clamp-2 text-sm text-white/45">
+                  <p className="mt-3 line-clamp-2 text-sm text-[var(--mt-muted)]">
                     {tournament.eventNote}
                   </p>
                 )}
@@ -210,7 +209,7 @@ export default function PersonalTcrIndex() {
                   </Button>
                   <Button
                     variant="outline"
-                    className="border-white/20 text-white"
+                    className={outlineButtonClass}
                     onClick={() =>
                       toggleRegistration.mutate({
                         tournamentId: tournament.id,
@@ -224,7 +223,7 @@ export default function PersonalTcrIndex() {
                   </Button>
                   <Button
                     variant="outline"
-                    className="border-white/20 text-white"
+                    className={outlineButtonClass}
                     onClick={() =>
                       setTournamentVisibility.mutate({
                         tournamentId: tournament.id,
@@ -241,7 +240,7 @@ export default function PersonalTcrIndex() {
                   {tournament.visibility === "public" && (
                     <Button
                       variant="outline"
-                      className="border-white/20 text-white"
+                      className={outlineButtonClass}
                       onClick={() =>
                         publishTournament.mutate({
                           tournamentId: tournament.id,
@@ -254,7 +253,7 @@ export default function PersonalTcrIndex() {
                   )}
                   <Button
                     variant="outline"
-                    className="border-white/20 text-white"
+                    className={outlineButtonClass}
                     onClick={() => {
                       void utils.personalTcr.getPrivateInviteLink
                         .fetch({ tournamentId: tournament.id })
@@ -266,7 +265,7 @@ export default function PersonalTcrIndex() {
                   {publicUrl && (
                     <Button
                       variant="outline"
-                      className="border-white/20 text-white"
+                      className={outlineButtonClass}
                       onClick={() => void copyText(publicUrl)}
                     >
                       Copy Public Link
@@ -274,7 +273,7 @@ export default function PersonalTcrIndex() {
                   )}
                   <Button
                     variant="outline"
-                    className="border-white/20 text-white"
+                    className={outlineButtonClass}
                     onClick={() =>
                       viewerLink.mutate(
                         { tournamentId: tournament.id },
@@ -286,7 +285,7 @@ export default function PersonalTcrIndex() {
                   </Button>
                   <Button
                     variant="outline"
-                    className="border-white/20 text-white"
+                    className={outlineButtonClass}
                     onClick={() => {
                       setRenameTarget({
                         id: tournament.id,
@@ -313,11 +312,11 @@ export default function PersonalTcrIndex() {
             );
           })}
           {query.data?.length === 0 && (
-            <div className="md:col-span-2 rounded-lg border border-dashed border-neon-gold/30 bg-zinc-950/70 p-8 text-center">
-              <h2 className="font-mono text-2xl font-black text-neon-gold">
+            <div className="md:col-span-2 rounded-lg border border-dashed border-[var(--mt-gold)]/30 bg-[var(--mt-charcoal)]/70 p-8 text-center">
+              <h2 className="font-mono text-2xl font-black text-[var(--mt-gold-bright)]">
                 No personal tournaments yet.
               </h2>
-              <p className="mt-3 text-sm text-white/60">
+              <p className="mt-3 text-sm text-[var(--mt-muted)]">
                 Create your first private TCR and invite teams when ready.
               </p>
             </div>
@@ -325,9 +324,9 @@ export default function PersonalTcrIndex() {
         </div>
       </div>
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="border-neon-gold/40 bg-zinc-950 text-white">
+        <DialogContent className="border-[var(--mt-gold)]/40 bg-[var(--mt-charcoal)] text-[var(--mt-off-white)]">
           <DialogHeader>
-            <DialogTitle className="font-mono text-neon-gold">
+            <DialogTitle className="font-mono text-[var(--mt-gold-bright)]">
               Create Tournament
             </DialogTitle>
             <DialogDescription>
@@ -339,16 +338,16 @@ export default function PersonalTcrIndex() {
             value={name}
             onChange={event => setName(event.target.value)}
             placeholder="Tournament name"
-            className="border-white/15 bg-black/60 text-white"
+            className="border-[var(--mt-steel-line)] bg-[var(--mt-black)]/60 text-[var(--mt-off-white)]"
           />
           <Textarea
             value={eventNote}
             onChange={event => setEventNote(event.target.value)}
             placeholder="Event note (optional)"
-            className="border-white/15 bg-black/60 text-white"
+            className="border-[var(--mt-steel-line)] bg-[var(--mt-black)]/60 text-[var(--mt-off-white)]"
           />
           <select
-            className="rounded border border-white/15 bg-black/60 px-3 py-2 text-white"
+            className="rounded border border-[var(--mt-steel-line)] bg-[var(--mt-black)]/60 px-3 py-2 text-[var(--mt-off-white)]"
             value={visibility}
             onChange={event => setVisibility(event.target.value as Visibility)}
           >
@@ -363,7 +362,7 @@ export default function PersonalTcrIndex() {
           <DialogFooter>
             <Button
               variant="outline"
-              className="border-white/20 text-white"
+              className={outlineButtonClass}
               onClick={() => setCreateOpen(false)}
             >
               Cancel
@@ -388,16 +387,16 @@ export default function PersonalTcrIndex() {
         open={renameTarget !== null}
         onOpenChange={open => !open && setRenameTarget(null)}
       >
-        <DialogContent className="border-neon-gold/40 bg-zinc-950 text-white">
+        <DialogContent className="border-[var(--mt-gold)]/40 bg-[var(--mt-charcoal)] text-[var(--mt-off-white)]">
           <DialogHeader>
-            <DialogTitle className="font-mono text-neon-gold">
+            <DialogTitle className="font-mono text-[var(--mt-gold-bright)]">
               Rename Tournament
             </DialogTitle>
           </DialogHeader>
           <Input
             value={renameValue}
             onChange={event => setRenameValue(event.target.value)}
-            className="border-white/15 bg-black/60 text-white"
+            className="border-[var(--mt-steel-line)] bg-[var(--mt-black)]/60 text-[var(--mt-off-white)]"
           />
           <DialogFooter>
             <Button
@@ -430,16 +429,18 @@ function State({
   showDiscordSignIn?: boolean;
 }) {
   return (
-    <section className="min-h-screen bg-black px-6 py-20 text-white">
-      <div className="mx-auto max-w-xl rounded border border-neon-gold/30 bg-zinc-950 p-8">
-        <h1 className="font-mono text-2xl font-black text-neon-gold">
+    <section className="min-h-screen bg-[var(--mt-black)] px-6 py-20 text-[var(--mt-off-white)]">
+      <div className="mx-auto max-w-xl rounded border border-[var(--mt-steel-line)] bg-[var(--mt-charcoal)] p-8">
+        <h1 className="font-mono text-2xl font-black text-[var(--mt-gold-bright)]">
           {title}
         </h1>
-        {description && <p className="mt-3 text-white/60">{description}</p>}
+        {description && (
+          <p className="mt-3 text-[var(--mt-muted)]">{description}</p>
+        )}
         {showDiscordSignIn && (
           <a
             href={getDiscordLoginUrl()}
-            className="mt-6 inline-flex rounded border border-[#5865F2]/70 bg-[#5865F2] px-4 py-2 font-mono text-sm font-bold uppercase tracking-wider text-white hover:border-neon-gold"
+            className="mt-6 inline-flex rounded border border-[#5865F2]/70 bg-[#5865F2] px-4 py-2 font-mono text-sm font-bold uppercase tracking-wider text-white hover:border-[var(--mt-gold)]"
           >
             Sign in with Discord
           </a>

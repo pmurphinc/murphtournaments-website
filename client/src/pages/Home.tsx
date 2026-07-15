@@ -1,324 +1,316 @@
-import { Link } from "wouter";
-import NeonCard from "@/components/NeonCard";
-import GlitchText from "@/components/GlitchText";
+import { PlayCircle, Radio, Shuffle, Swords, Trophy, Video } from "lucide-react";
+import { trpc } from "@/lib/trpc";
+import { useCommunityDirectory } from "@/lib/communityDirectory";
+import Hero from "@/components/public/Hero";
+import CtaButton from "@/components/public/CtaButton";
+import SectionHeading from "@/components/public/SectionHeading";
+import StatDisplay from "@/components/public/StatDisplay";
+import TournamentCard from "@/components/public/TournamentCard";
+import MediaCard from "@/components/public/MediaCard";
+import {
+  PublicEmptyState,
+  PublicErrorState,
+  PublicLoadingCards,
+} from "@/components/public/PublicStates";
+
+const DISCORD_URL = "https://discord.gg/kcmdxmBgnC";
 
 /**
- * Home Page
- * Cyberpunk Neon Rebellion Design
- * - Hero section with CTA buttons
- * - June 2026 tournament results
- * - About Murph section
- * - Featured clips section
+ * Murph Tournaments homepage.
+ * Real data sources: `communityTournaments.list` (live/upcoming directory),
+ * `patchNotes.getAll` (news). Champion callout, About stats, and media links
+ * are the site's existing published content (previously hardcoded in this
+ * same file), just restyled — not new or sample data.
  */
-
-const championRoster = ["Kzoe#0633", "NiceBoy#1697", "Pluto#8051"];
-
-const eventFacts = [
-  { label: "Event", value: "June 28, 2026" },
-  { label: "Champions", value: "Seismic" },
-  { label: "Format", value: "Cashout Elim → BO5 Final" },
-  { label: "Prize", value: "3D Printed Prize Bundle" },
-];
-
 export default function Home() {
+  const directory = useCommunityDirectory();
+  const newsQuery = trpc.patchNotes.getAll.useQuery();
+
   return (
-    <div className="min-h-screen bg-dark-charcoal">
-      {/* Hero Section */}
-      <section className="relative pt-24 pb-20 md:pt-32 md:pb-32 overflow-hidden">
-        <div className="absolute inset-0 scan-lines opacity-5 pointer-events-none" />
+    <div>
+      <Hero
+        eyebrow="Murph Tournaments"
+        title={
+          <>
+            Competitive <span className="mt-gold-text">THE FINALS</span>{" "}
+            tournaments
+          </>
+        }
+        description="Built by players, for players. Tournament production, live brackets, and a competitive community hub for THE FINALS esports scene."
+        actions={
+          <>
+            <a href={DISCORD_URL} target="_blank" rel="noopener noreferrer">
+              <CtaButton tone="gold">Join Discord</CtaButton>
+            </a>
+            <a href="/watch">
+              <CtaButton tone="outline">Watch Live</CtaButton>
+            </a>
+          </>
+        }
+      />
 
-        <div className="container relative z-10">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
-            <div className="space-y-6 max-w-full lg:max-w-none">
-              <div className="max-w-full lg:max-w-none overflow-wrap break-word">
-                <GlitchText size="2xl" variant="magenta">
-                  COMPETITIVE
-                </GlitchText>
-                <GlitchText size="2xl" variant="cyan">
-                  THE FINALS
-                </GlitchText>
-                <GlitchText size="2xl" variant="gold">
-                  TOURNAMENTS
-                </GlitchText>
+      <section className="border-b border-[var(--mt-steel-line)] py-12 sm:py-16">
+        <div className="container">
+          <SectionHeading eyebrow="Player Tools" title="Prep for Your Next Match" />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <a
+              href="/maprng"
+              className="mt-panel mt-hover-lift group flex items-start gap-4 p-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mt-gold-bright)]"
+            >
+              <div
+                aria-hidden="true"
+                className="flex size-12 shrink-0 items-center justify-center rounded border border-[var(--mt-steel-line)] bg-[var(--mt-black)] text-[var(--mt-gold-bright)]"
+              >
+                <Shuffle className="size-5" aria-hidden="true" />
               </div>
-
-              <p className="text-lg text-white/80 font-mono leading-relaxed max-w-full lg:max-w-md">
-                Built by players. For players.
-              </p>
-
-              <p className="text-sm text-white/60 font-mono leading-relaxed max-w-md">
-                Competitive tournament showcase, live production, tournament
-                history, and community hub for THE FINALS competitive scene.
-              </p>
-
-              <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                <a
-                  href="https://discord.gg/kcmdxmBgnC"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <button className="px-8 py-3 bg-neon-magenta text-dark-black font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all border-2 border-neon-magenta">
-                    Join Discord
-                  </button>
-                </a>
-                <Link href="/watch">
-                  <button className="px-8 py-3 border-2 border-neon-cyan text-neon-cyan font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all">
-                    Watch Live
-                  </button>
-                </Link>
+              <div>
+                <h3 className="font-bold text-[var(--mt-off-white)] group-hover:text-[var(--mt-gold-bright)]">
+                  Map Randomizer
+                </h3>
+                <p className="mt-1 text-sm leading-relaxed text-[var(--mt-muted)]">
+                  Draw random competitive maps for scrims and practice, with
+                  presets for main arenas, compact modes, and training.
+                </p>
               </div>
-            </div>
-
-            <div className="hidden lg:flex items-center justify-center">
-              <div className="relative w-full h-96 bg-gradient-to-br from-neon-magenta/10 to-neon-gold/10 border-2 border-neon-gold rounded-sm p-8 flex flex-col justify-center">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,184,0,0.14),transparent_45%)] pointer-events-none" />
-                <div className="relative text-center space-y-4">
-                  <div className="text-neon-gold font-mono text-sm uppercase tracking-widest font-bold">
-                    June 2026 Champions
-                  </div>
-                  <h3 className="text-3xl font-bold font-mono text-neon-gold uppercase tracking-widest">
-                    Seismic Takes the Crown
-                  </h3>
-                  <p className="text-white/80 font-mono text-sm leading-relaxed">
-                    Congratulations to Seismic, champions of the June 28, 2026
-                    Murph Tournaments event.
-                  </p>
-                  <Link href="/tournaments/june-2026">
-                    <button className="inline-block mt-4 px-6 py-2 border-2 border-neon-cyan text-neon-cyan font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all">
-                      View June Event Details
-                    </button>
-                  </Link>
-                </div>
+            </a>
+            <a
+              href="/balance-archive"
+              className="mt-panel mt-hover-lift group flex items-start gap-4 p-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mt-gold-bright)]"
+            >
+              <div
+                aria-hidden="true"
+                className="flex size-12 shrink-0 items-center justify-center rounded border border-[var(--mt-steel-line)] bg-[var(--mt-black)] text-[var(--mt-gold-bright)]"
+              >
+                <Swords className="size-5" aria-hidden="true" />
               </div>
-            </div>
+              <div>
+                <h3 className="font-bold text-[var(--mt-off-white)] group-hover:text-[var(--mt-gold-bright)]">
+                  Weapon Archive
+                </h3>
+                <p className="mt-1 text-sm leading-relaxed text-[var(--mt-muted)]">
+                  Track buffs, nerfs, and balance changes for every weapon,
+                  gadget, and specialization across patches.
+                </p>
+              </div>
+            </a>
           </div>
         </div>
       </section>
 
-      {/* June 2026 Tournament Results */}
-      <section className="py-16 md:py-24 border-t border-neon-gold/30 bg-gradient-to-b from-dark-charcoal via-neon-gold/5 to-dark-charcoal">
+      {/* Highest-priority content: what's happening now, is registration open, where to browse. */}
+      <section className="border-b border-[var(--mt-steel-line)] py-12 sm:py-16">
         <div className="container">
-          <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-8 lg:gap-12 items-stretch">
-            <NeonCard variant="gold" className="relative overflow-hidden">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,184,0,0.18),transparent_35%)] pointer-events-none" />
-              <div className="relative z-10 space-y-6">
-                <div>
-                  <p className="text-sm text-neon-gold font-mono uppercase tracking-widest font-bold mb-3">
-                    June 2026 Champions
-                  </p>
-                  <GlitchText size="xl" variant="gold" className="mb-4">
-                    Seismic
-                  </GlitchText>
-                  <p className="text-white/75 font-mono leading-relaxed max-w-2xl">
-                    Congratulations to Seismic, champions of the June 28, 2026
-                    Murph Tournaments event.
-                  </p>
-                </div>
+          <SectionHeading
+            eyebrow="Right Now"
+            title="Live &amp; Upcoming Tournaments"
+            description="The public tournament directory: registration status, format, and team caps per event."
+            action={
+              <a href="/tournaments/community">
+                <CtaButton tone="outline">Browse All Tournaments</CtaButton>
+              </a>
+            }
+          />
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {eventFacts.map(fact => (
-                    <div
-                      key={fact.label}
-                      className="border border-neon-gold/30 bg-black/40 p-4 rounded-sm"
-                    >
-                      <p className="text-xs text-white/50 font-mono uppercase tracking-widest">
-                        {fact.label}
-                      </p>
-                      <p className="text-sm text-white font-mono font-bold mt-2">
-                        {fact.value}
-                      </p>
-                    </div>
-                  ))}
-                </div>
+          {directory.isLoading ? (
+            <PublicLoadingCards label="Loading tournaments" />
+          ) : null}
 
-                <Link href="/tournaments/june-2026">
-                  <button className="w-full sm:w-auto px-8 py-3 bg-neon-gold text-dark-black font-bold font-mono uppercase tracking-widest hover-glow-gold rounded-sm transition-all border-2 border-neon-gold">
-                    View June Tournament Results
-                  </button>
-                </Link>
+          {directory.errorMessage ? (
+            <PublicErrorState message={directory.errorMessage} />
+          ) : null}
+
+          {!directory.isLoading && !directory.errorMessage ? (
+            directory.isEmpty ? (
+              <PublicEmptyState
+                title="No tournaments are open or upcoming right now"
+                description="Join the Discord to hear about the next Murph Tournaments event as soon as it's announced."
+                action={
+                  <a
+                    href={DISCORD_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <CtaButton tone="gold">Join Discord for Updates</CtaButton>
+                  </a>
+                }
+              />
+            ) : (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {directory.cards.slice(0, 3).map(tournament => (
+                  <TournamentCard key={tournament.id} tournament={tournament} />
+                ))}
               </div>
-            </NeonCard>
+            )
+          ) : null}
+        </div>
+      </section>
 
-            <div className="grid grid-cols-1 gap-6">
-              <NeonCard variant="cyan" className="bg-black/60">
-                <p className="text-xs text-white/50 font-mono uppercase tracking-widest mb-3">
-                  Champion Roster
-                </p>
-                <div className="space-y-3">
-                  {championRoster.map(player => (
-                    <div
-                      key={player}
-                      className="border border-neon-cyan/25 bg-dark-charcoal/70 px-4 py-3 rounded-sm"
-                    >
-                      <p className="text-lg text-neon-cyan font-bold font-mono">
-                        {player}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </NeonCard>
-
-              <NeonCard variant="magenta" className="bg-black/60">
-                <p className="text-xs text-neon-magenta font-mono uppercase tracking-widest font-bold mb-3">
-                  Next Event Status
-                </p>
-                <p className="text-sm text-white/75 font-mono leading-relaxed mb-5">
-                  Murph Tournaments is exploring a possible August event.
-                  Nothing is confirmed yet—no date, format, registration, prize,
-                  or other details are official.
-                </p>
-                <a
-                  href="https://discord.gg/kcmdxmBgnC"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <button className="w-full px-6 py-3 border-2 border-neon-cyan text-neon-cyan font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all">
-                    Join Discord for Updates
-                  </button>
-                </a>
-              </NeonCard>
+      <section className="border-b border-[var(--mt-steel-line)] py-8 sm:py-10">
+        <div className="container">
+          <a
+            href="/tournaments"
+            className="mt-panel mt-hover-lift group flex flex-col items-start gap-3 p-5 sm:flex-row sm:items-center sm:justify-between focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mt-gold-bright)]"
+          >
+            <div className="flex items-center gap-3">
+              <Trophy
+                className="size-5 shrink-0 text-[var(--mt-gold-bright)]"
+                aria-hidden="true"
+              />
+              <p className="text-sm text-[var(--mt-off-white)]">
+                <span className="font-mono text-xs uppercase tracking-widest text-[var(--mt-muted)]">
+                  Most recent champion —{" "}
+                </span>
+                <span className="font-bold">Seismic</span>, June 2026 Tournament
+                (completed)
+              </p>
             </div>
+            <span className="shrink-0 font-mono text-xs font-bold uppercase tracking-widest text-[var(--mt-gold-bright)] group-hover:underline">
+              View Full Results &amp; Archive →
+            </span>
+          </a>
+        </div>
+      </section>
+
+      <section className="border-b border-[var(--mt-steel-line)] py-12 sm:py-16">
+        <div className="container">
+          <SectionHeading
+            eyebrow="Coverage"
+            title="Latest News &amp; Updates"
+          />
+          {newsQuery.isLoading ? (
+            <PublicLoadingCards count={3} label="Loading latest news" />
+          ) : null}
+          {newsQuery.error ? (
+            <PublicEmptyState
+              title="News unavailable right now"
+              description="Could not load the latest patch notes."
+            />
+          ) : null}
+          {!newsQuery.isLoading &&
+          !newsQuery.error &&
+          (newsQuery.data?.length ?? 0) === 0 ? (
+            <PublicEmptyState
+              title="No news posted yet"
+              description="Patch notes and updates will appear here once published."
+            />
+          ) : null}
+          {!newsQuery.isLoading &&
+          !newsQuery.error &&
+          (newsQuery.data?.length ?? 0) > 0 ? (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {newsQuery.data!.slice(0, 3).map(note => {
+                const NewsTag = note.url ? "a" : "div";
+                return (
+                  <NewsTag
+                    key={note.id}
+                    {...(note.url
+                      ? {
+                          href: note.url,
+                          target: "_blank",
+                          rel: "noopener noreferrer",
+                        }
+                      : {})}
+                    className="mt-panel mt-hover-lift flex flex-col gap-2 p-5"
+                  >
+                    <p className="font-mono text-[11px] uppercase tracking-widest text-[var(--mt-muted)]">
+                      {note.date}
+                    </p>
+                    <h3 className="text-sm font-bold text-[var(--mt-off-white)]">
+                      {note.title}
+                    </h3>
+                  </NewsTag>
+                );
+              })}
+            </div>
+          ) : null}
+        </div>
+      </section>
+
+      <section className="border-b border-[var(--mt-steel-line)] py-12 sm:py-16">
+        <div className="container grid grid-cols-1 gap-10 lg:grid-cols-[1.3fr_1fr] lg:items-center">
+          <div>
+            <SectionHeading
+              eyebrow="Who We Are"
+              title="About Murph Tournaments"
+              description="Tournament organizer, league operator, and competitive systems builder within THE FINALS ecosystem."
+            />
+            <p className="text-sm leading-relaxed text-[var(--mt-muted)]">
+              Founder · FCL Season 1 Producer · Murph Tournaments x14 · Gaming
+              since '92. Mission: run professional tournaments, produce
+              competitive broadcasts, and build a THE FINALS community that
+              values skill and dedication.
+            </p>
+            <a href="/about" className="mt-5 inline-block">
+              <CtaButton tone="outline">Learn More About Murph</CtaButton>
+            </a>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <StatDisplay label="Tournaments Hosted" value="14+" />
+            <StatDisplay label="Prize Pool Awarded" value="$2,500+" />
+            <StatDisplay label="Players Competed" value="100+ Verified" />
+            <StatDisplay label="Events Produced" value="20+ Incl. FCL" />
           </div>
         </div>
       </section>
 
-      {/* About Murph Section */}
-      <section className="py-16 md:py-24 border-t border-neon-magenta/20">
+      <section className="border-b border-[var(--mt-steel-line)] py-12 sm:py-16">
         <div className="container">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+          <SectionHeading
+            eyebrow="Media"
+            title="Watch &amp; Featured Content"
+          />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <MediaCard
+              media={{
+                title: "Live on Twitch",
+                description: "Tournament nights, 9 PM – 12 AM PST",
+                href: "https://www.twitch.tv/pmurphinc",
+                platformLabel: "Twitch — Watch Live",
+                icon: <Radio className="size-5" aria-hidden="true" />,
+              }}
+            />
+            <MediaCard
+              media={{
+                title: "TikTok Highlights",
+                description: "Fast-paced tournament clips",
+                href: "https://www.tiktok.com/@pmurphinc",
+                platformLabel: "TikTok — Watch VOD",
+                icon: <Video className="size-5" aria-hidden="true" />,
+              }}
+            />
+            <MediaCard
+              media={{
+                title: "YouTube Highlights",
+                description: "Full match replays and recaps",
+                href: "https://www.youtube.com/shorts/QTgm-CL5BYY",
+                platformLabel: "YouTube — Watch VOD",
+                icon: <PlayCircle className="size-5" aria-hidden="true" />,
+              }}
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="py-10 sm:py-12">
+        <div className="container">
+          <div className="mt-panel flex flex-col items-start gap-3 p-6 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-4xl font-bold font-mono text-neon-cyan mb-6 uppercase tracking-widest">
-                About Murph
-              </h2>
-              <p className="text-white/80 font-mono mb-4">
-                Tournament organizer, league operator, and competitive systems
-                builder within THE FINALS ecosystem.
+              <p className="font-mono text-xs uppercase tracking-widest text-[var(--mt-gold-bright)]">
+                Sponsors &amp; Partners
               </p>
-              <p className="text-white/80 font-mono mb-4">
-                - Murph Tournaments Founder
-                <br />
-                - FCL Season 1 Producer
-                <br />
-                - Murph Tournaments x14
-                <br />- Gaming Since '92
+              <p className="mt-1 text-sm text-[var(--mt-muted)]">
+                Interested in partnering with Murph Tournaments? We'd love to
+                hear from you.
               </p>
-              <p className="text-white/80 font-mono mb-6">
-                Mission: run professional tournaments, produce competitive
-                broadcasts, and build a THE FINALS community that values skill
-                and dedication.
-              </p>
-              <Link href="/about">
-                <button className="px-6 py-2 border-2 border-neon-gold text-neon-gold font-bold font-mono uppercase tracking-widest hover-glow-magenta rounded-sm transition-all">
-                  Learn More
-                </button>
-              </Link>
             </div>
-
-            <NeonCard variant="cyan">
-              <div className="space-y-4">
-                <div className="text-sm font-mono text-neon-cyan uppercase tracking-widest">
-                  Stats
-                </div>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center border-b border-neon-cyan/20 pb-2 gap-4">
-                    <span className="text-white/60 font-mono">
-                      Tournaments Hosted
-                    </span>
-                    <span className="text-2xl font-bold text-neon-cyan font-mono">
-                      14+
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center border-b border-neon-cyan/20 pb-2 gap-4">
-                    <span className="text-white/60 font-mono">
-                      Total Prize Pool Awarded
-                    </span>
-                    <span className="text-2xl font-bold text-neon-gold font-mono">
-                      $2,500+
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center border-b border-neon-cyan/20 pb-2 gap-4">
-                    <span className="text-white/60 font-mono">
-                      Players Competed
-                    </span>
-                    <span className="text-2xl font-bold text-neon-magenta font-mono text-right">
-                      100+ Verified
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center gap-4">
-                    <span className="text-white/60 font-mono">
-                      Events Produced
-                    </span>
-                    <span className="text-2xl font-bold text-neon-lime font-mono text-right">
-                      20+ Including FCL
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </NeonCard>
+            <a
+              href="https://discord.gg/kcmdxmBgnC"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <CtaButton tone="outline">Get In Touch on Discord</CtaButton>
+            </a>
           </div>
-        </div>
-      </section>
-
-      {/* Featured Clips Section */}
-      <section className="py-16 md:py-24 border-t border-neon-magenta/20">
-        <div className="container">
-          <h2 className="text-4xl font-bold font-mono text-neon-lime mb-12 uppercase tracking-widest">
-            Featured Clips
-          </h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <NeonCard variant="lime">
-              <a
-                href="https://www.tiktok.com/@pmurphinc/video/7446651252408110366"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block"
-              >
-                <div className="aspect-video bg-dark-charcoal rounded-sm flex items-center justify-center border border-neon-lime/30 hover:border-neon-lime/60 transition-all cursor-pointer">
-                  <div className="text-center">
-                    <div className="text-4xl mb-2 font-mono text-neon-lime">
-                      TT
-                    </div>
-                    <p className="text-sm text-white/60 font-mono">
-                      TikTok Highlights
-                    </p>
-                    <p className="text-xs text-neon-lime mt-2">
-                      Click to watch
-                    </p>
-                  </div>
-                </div>
-              </a>
-            </NeonCard>
-
-            <NeonCard variant="lime">
-              <a
-                href="https://www.youtube.com/shorts/QTgm-CL5BYY"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block"
-              >
-                <div className="aspect-video bg-dark-charcoal rounded-sm flex items-center justify-center border border-neon-lime/30 hover:border-neon-lime/60 transition-all cursor-pointer">
-                  <div className="text-center">
-                    <div className="text-4xl mb-2 font-mono text-neon-lime">
-                      YT
-                    </div>
-                    <p className="text-sm text-white/60 font-mono">
-                      YouTube Highlights
-                    </p>
-                    <p className="text-xs text-neon-lime mt-2">
-                      Click to watch
-                    </p>
-                  </div>
-                </div>
-              </a>
-            </NeonCard>
-          </div>
-
-          <Link href="/watch">
-            <button className="px-8 py-3 bg-neon-lime text-dark-black font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all border-2 border-neon-lime">
-              Watch More Content
-            </button>
-          </Link>
         </div>
       </section>
     </div>

@@ -42,11 +42,12 @@ import TournamentResultsArchive from "./pages/TournamentResultsArchive";
 import { useEffect } from "react";
 
 /**
- * PMURPHINC Website
- * Cyberpunk Neon Rebellion Design
- * - Dark cyberpunk aesthetic with neon accents
- * - Responsive mobile-first layout
- * - Tournament-focused content structure
+ * Murph Tournaments Website
+ * Black / charcoal / metallic-gold public esports identity, applied via the
+ * `.public-theme` scope in index.css. /admin/* and /TCR keep the original
+ * theme tokens for their own page content (see the isProtectedRoute check
+ * below); only the shared Navigation/Footer chrome picks up the new palette
+ * everywhere.
  */
 function PersonalTournamentControlRoomRoute() {
   return <TournamentControlRoom mode="personal" />;
@@ -63,11 +64,23 @@ function Router() {
     window.scrollTo(0, 0);
   }, [location]);
 
+  // Admin and TCR pages keep the shared Navigation/Footer chrome (a small,
+  // explicitly-permitted compatibility adjustment) but their own page
+  // content must NOT pick up the new public palette: those pages already
+  // use components/ui/* primitives styled against the original theme
+  // tokens, and remapping those tokens here would restyle their buttons,
+  // dialogs, and inputs. See index.css `.public-theme` for the scoped
+  // override this class applies.
+  const isProtectedRoute =
+    location.startsWith("/admin") || location.toLowerCase().startsWith("/tcr");
+
   // make sure to consider if you need authentication for certain routes
   return (
     <div className="flex flex-col min-h-screen">
       <Navigation />
-      <main className="flex-1 pt-16">
+      <main
+        className={`flex-1 pt-16 ${isProtectedRoute ? "" : "public-theme"}`}
+      >
         <Switch>
           <Route path={"/"} component={Home} />
           <Route
