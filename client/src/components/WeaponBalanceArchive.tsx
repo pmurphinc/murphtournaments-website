@@ -358,6 +358,9 @@ function ArchiveList() {
                         {item.category ?? "Unknown"}
                       </p>
                     </div>
+                    <p className="mt-1 font-mono text-xs text-white/50">
+                      {item.category ?? "Unknown"}
+                    </p>
                   </div>
                   <div
                     className="flex items-center gap-3 border-t px-3 py-2"
@@ -606,6 +609,7 @@ function ArchiveDetail({ slug }: { slug: string }) {
                   <div className="flex flex-wrap items-center gap-2">
                     <Link
                       href={`/patchnotes?version=${encodeURIComponent(entry.patch.versionLabel)}#patch-${entry.patch.versionLabel.replace(/[^a-zA-Z0-9_-]/g, "-")}`}
+                      className="font-mono text-sm font-black text-[#00d9ff] underline decoration-[#00d9ff]/40 underline-offset-4 transition hover:text-white"
                     >
                       <a className="font-mono text-sm font-black text-[var(--mt-gold-bright)] underline decoration-[var(--mt-gold)]/40 underline-offset-4 transition hover:text-[var(--mt-off-white)]">
                         v{entry.patch.versionLabel}
