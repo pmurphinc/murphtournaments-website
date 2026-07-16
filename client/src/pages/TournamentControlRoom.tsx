@@ -3311,7 +3311,7 @@ export default function TournamentControlRoom({
         }
         onOpenChange={open => !open && setDialogState(null)}
       >
-        <DialogContent>
+        <DialogContent className="border-white/10 bg-zinc-950 text-zinc-100">
           <DialogHeader>
             <DialogTitle>
               {dialogState?.type === "create-team"
@@ -3352,6 +3352,7 @@ export default function TournamentControlRoom({
                 event.stopPropagation();
                 submitDialog();
               }}
+              className="border-white/15 bg-black/60 text-white"
               placeholder={
                 dialogState?.type === "create-team"
                   ? "Team name"
@@ -3369,6 +3370,7 @@ export default function TournamentControlRoom({
           </div>
           <DialogFooter>
             <Button
+              className="border border-[#FFD700] bg-[#FFD700] text-black hover:bg-[#D4AF37]"
               disabled={
                 dialogState?.type === "rename-tournament"
                   ? formName.trim().length < 2 ||
