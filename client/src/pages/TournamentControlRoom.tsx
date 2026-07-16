@@ -3018,6 +3018,9 @@ export default function TournamentControlRoom({
                               else next.add(game.id);
                               return next;
                             });
+                            setSelectedGameId(null);
+                            setSelectedConnectionId(null);
+                            setSelectedAssignmentId(null);
                             return;
                           }
                           setSelectedGameId(game.id);
