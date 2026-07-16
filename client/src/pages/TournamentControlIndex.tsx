@@ -9,6 +9,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
@@ -20,6 +28,15 @@ const goldButtonClass =
 
 const outlineButtonClass =
   "border-[var(--mt-steel-line)] text-[var(--mt-off-white)] hover:border-[var(--mt-gold)] hover:text-[var(--mt-gold-bright)]";
+
+const menuContentClass =
+  "border-[var(--mt-steel-line)] bg-[var(--mt-charcoal)] text-[var(--mt-off-white)]";
+
+const menuItemClass =
+  "cursor-pointer focus:bg-[var(--mt-gold)]/15 focus:text-[var(--mt-gold-bright)]";
+
+const menuLabelClass =
+  "font-mono text-[10px] uppercase tracking-widest text-[var(--mt-muted)]";
 
 const alphaBadge = (
   <span
@@ -43,6 +60,7 @@ export default function TournamentControlIndex() {
   const [renameTarget, setRenameTarget] = useState<{ id: number; name: string } | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
+  const [search, setSearch] = useState("");
   const query = trpc.tournamentControl.listTournaments.useQuery(undefined, {
     enabled: auth.user?.loginMethod === "discord",
     retry: false,
@@ -106,6 +124,12 @@ export default function TournamentControlIndex() {
     );
 
   const tournaments = query.data ?? [];
+  const term = search.trim().toLowerCase();
+  const visibleTournaments = term
+    ? tournaments.filter(tournament =>
+        tournament.name.toLowerCase().includes(term)
+      )
+    : tournaments;
   const canSubmit = name.trim().length >= 2 && !createTournament.isPending;
   const ownerName = (owner?: { id: number | null; discordDisplayName?: string | null; discordUsername?: string | null; name?: string | null } | null) => owner ? (owner.discordDisplayName || owner.discordUsername || owner.name || `User #${owner.id}`) : "Unassigned";
 
@@ -132,22 +156,25 @@ export default function TournamentControlIndex() {
             Create Tournament
           </Button>
         </div>
-        <div className="mt-8 rounded-lg border border-[var(--mt-gold)]/25 bg-[var(--mt-charcoal)] p-5">
-          <h2 className="font-mono text-xl font-black text-[var(--mt-gold-bright)]">Create from Template</h2>
-          <p className="mt-1 text-sm text-[var(--mt-muted)]">Reuse a saved control-room layout without private lobby codes or assigned teams.</p>
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
-            {(templatesQuery.data ?? []).map(template => (
-              <div key={template.id} className="rounded border border-[var(--mt-steel-line)] bg-[var(--mt-black)]/50 p-4">
-                <p className="font-mono font-bold text-[var(--mt-off-white)]">{template.name}</p>
-                <p className="mt-1 font-mono text-xs uppercase text-[var(--mt-muted)]">{template.visibility}</p>
-                <Button className={`mt-3 ${goldButtonClass}`} disabled={createFromTemplate.isPending} onClick={() => { const name = window.prompt("New tournament name", `${template.name} Tournament`); if (name) createFromTemplate.mutate({ templateId: template.id, name }); }}>Create Tournament</Button>
-              </div>
-            ))}
-            {templatesQuery.data?.length === 0 && <p className="text-sm text-[var(--mt-muted)]">No templates saved yet.</p>}
-          </div>
+        <div className="mt-10 flex flex-col gap-3 border-b border-[var(--mt-steel-line)] pb-4 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="font-mono text-sm uppercase tracking-[0.28em] text-[var(--mt-muted)]">
+            Control Rooms
+            <span className="ml-2 text-[var(--mt-gold-bright)]">
+              {tournaments.length}
+            </span>
+          </h2>
+          {tournaments.length > 0 && (
+            <Input
+              value={search}
+              onChange={event => setSearch(event.target.value)}
+              placeholder="Filter by name…"
+              aria-label="Filter tournaments by name"
+              className="h-9 w-full border-[var(--mt-steel-line)] bg-[var(--mt-black)]/60 text-[var(--mt-off-white)] sm:w-64"
+            />
+          )}
         </div>
-        <div className="mt-8 grid gap-4 md:grid-cols-2">
-          {tournaments.map(tournament => {
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
+          {visibleTournaments.map(tournament => {
             const pendingCount = submissionsQuery.data?.filter(submission => submission.tournamentId === tournament.id && submission.status === "pending").length ?? 0;
             return (
             <div
@@ -158,10 +185,12 @@ export default function TournamentControlIndex() {
                 <h2 className="font-mono text-xl font-bold text-[var(--mt-gold-bright)]">{tournament.name}</h2>
               </Link>
               <p className="mt-2 text-sm text-[var(--mt-muted)]">{tournament.eventStatus} · {tournament.currentStage}</p>
-              <p className={`mt-3 inline-flex rounded-full border px-3 py-1 font-mono text-xs uppercase ${tournament.registrationOpen === 1 ? "border-emerald-400/40 text-emerald-200" : "border-[var(--mt-steel-line)] text-[var(--mt-muted)]"}`}>Registration {tournament.registrationOpen === 1 ? "open" : "closed"}</p>
-              <p className="mt-3 text-sm text-[var(--mt-muted)]">{pendingCount} pending team approval{pendingCount === 1 ? "" : "s"}</p>
+              <div className="mt-3 flex flex-wrap gap-2 font-mono text-xs uppercase">
+                <span className={`rounded-full border px-3 py-1 ${tournament.registrationOpen === 1 ? "border-emerald-400/40 text-emerald-200" : "border-[var(--mt-steel-line)] text-[var(--mt-muted)]"}`}>Registration {tournament.registrationOpen === 1 ? "open" : "closed"}</span>
+                {pendingCount > 0 && <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-3 py-1 text-amber-200">{pendingCount} pending approval{pendingCount === 1 ? "" : "s"}</span>}
+              </div>
               {tournament.eventNote && <p className="mt-3 line-clamp-2 text-sm text-[var(--mt-muted)]">{tournament.eventNote}</p>}
-              <div className="mt-3">
+              <div className="mt-4">
                 <label className="mb-1 block font-mono text-[10px] uppercase tracking-widest text-[var(--mt-muted)]">Owner</label>
                 <select className="w-full rounded border border-[var(--mt-steel-line)] bg-[var(--mt-black)]/60 px-2 py-1 text-sm text-[var(--mt-off-white)]" value={tournament.ownerUserId ?? ""} onChange={event => setTournamentOwner.mutate({ tournamentId: tournament.id, ownerUserId: event.target.value ? Number(event.target.value) : null })}>
                   <option value="">Clear Owner / Unassigned</option>
@@ -169,12 +198,24 @@ export default function TournamentControlIndex() {
                 </select>
                 <p className="mt-1 text-xs text-[var(--mt-muted)]">Current: {ownerName(tournament.owner)}</p>
               </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Button variant="outline" className={outlineButtonClass} onClick={() => toggleRegistration.mutate({ tournamentId: tournament.id, registrationOpen: tournament.registrationOpen !== 1 })}>{tournament.registrationOpen === 1 ? "Close Registration" : "Open Registration"}</Button>
-                <Button className={goldButtonClass} onClick={() => setReviewTournamentId(tournament.id)}>Team Approvals</Button>
-                <Button variant="outline" className={outlineButtonClass} onClick={() => { setRenameTarget({ id: tournament.id, name: tournament.name }); setRenameValue(tournament.name); }}>Rename</Button>
-                <Button variant="destructive" onClick={() => setDeleteTarget({ id: tournament.id, name: tournament.name })}>Delete</Button>
-                <Button asChild variant="outline" className="border-[var(--mt-gold)]/40 text-[var(--mt-gold-bright)] hover:bg-[var(--mt-gold)]/10"><Link href={`/admin/tournaments/${tournament.id}/control`}>Open Room</Link></Button>
+              <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[var(--mt-steel-line)]/60 pt-4">
+                <Button asChild className={goldButtonClass}><Link href={`/admin/tournaments/${tournament.id}/control`}>Open Room</Link></Button>
+                <Button variant="outline" className={outlineButtonClass} onClick={() => setReviewTournamentId(tournament.id)}>
+                  Team Approvals
+                  {pendingCount > 0 && <span className="ml-2 rounded-full bg-amber-400/20 px-2 py-0.5 font-mono text-xs text-amber-200">{pendingCount}</span>}
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" aria-label={`Manage ${tournament.name}`} className={`${outlineButtonClass} px-3`}>⋯</Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className={menuContentClass}>
+                    <DropdownMenuLabel className={menuLabelClass}>Registration</DropdownMenuLabel>
+                    <DropdownMenuItem className={menuItemClass} onSelect={() => toggleRegistration.mutate({ tournamentId: tournament.id, registrationOpen: tournament.registrationOpen !== 1 })}>{tournament.registrationOpen === 1 ? "Close registration" : "Open registration"}</DropdownMenuItem>
+                    <DropdownMenuSeparator className="bg-[var(--mt-steel-line)]" />
+                    <DropdownMenuItem className={menuItemClass} onSelect={() => { setRenameTarget({ id: tournament.id, name: tournament.name }); setRenameValue(tournament.name); }}>Rename</DropdownMenuItem>
+                    <DropdownMenuItem className="cursor-pointer text-red-300 focus:bg-red-500/15 focus:text-red-200" onSelect={() => setDeleteTarget({ id: tournament.id, name: tournament.name })}>Delete</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           );})}
@@ -195,6 +236,27 @@ export default function TournamentControlIndex() {
               </Button>
             </div>
           )}
+          {tournaments.length > 0 && visibleTournaments.length === 0 && (
+            <p className="md:col-span-2 rounded-lg border border-dashed border-[var(--mt-steel-line)] p-8 text-center text-sm text-[var(--mt-muted)]">
+              No tournaments match “{search.trim()}”.
+            </p>
+          )}
+        </div>
+        <div className="mt-12 border-t border-[var(--mt-steel-line)] pt-8">
+          <h2 className="font-mono text-sm uppercase tracking-[0.28em] text-[var(--mt-muted)]">Create from Template</h2>
+          <p className="mt-2 text-sm text-[var(--mt-muted)]">Reuse a saved control-room layout without private lobby codes or assigned teams.</p>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            {(templatesQuery.data ?? []).map(template => (
+              <div key={template.id} className="flex items-center justify-between gap-3 rounded border border-[var(--mt-steel-line)] bg-[var(--mt-charcoal)] p-4">
+                <div className="min-w-0">
+                  <p className="truncate font-mono font-bold text-[var(--mt-off-white)]">{template.name}</p>
+                  <p className="mt-1 font-mono text-xs uppercase text-[var(--mt-muted)]">{template.visibility}</p>
+                </div>
+                <Button variant="outline" className={`${outlineButtonClass} shrink-0`} disabled={createFromTemplate.isPending} onClick={() => { const name = window.prompt("New tournament name", `${template.name} Tournament`); if (name) createFromTemplate.mutate({ templateId: template.id, name }); }}>Use Template</Button>
+              </div>
+            ))}
+            {templatesQuery.data?.length === 0 && <p className="text-sm text-[var(--mt-muted)]">No templates saved yet.</p>}
+          </div>
         </div>
       </div>
 
