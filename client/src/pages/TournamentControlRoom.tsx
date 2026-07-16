@@ -64,6 +64,7 @@ import {
 } from "@/lib/tournamentControlBoard";
 export { resolveConnectionDropTargetGameId } from "@/lib/tournamentControlBoard";
 import { rebaseBoardUndoHistoryAfterRestore } from "@/lib/tournamentControlUndo";
+import { useNowTick } from "@/hooks/useNowTick";
 import { Input } from "@/components/ui/input";
 import {
   ContextMenu,
@@ -796,6 +797,8 @@ export default function TournamentControlRoom({
   const assignments = (query.data?.assignments ?? []) as AssignmentView[];
   const connections = (query.data?.connections ?? []) as ConnectionView[];
   const tournamentName = query.data?.tournament.name ?? "";
+  const hasLiveLobby = games.some(game => game.status === "live");
+  const nowMs = useNowTick(hasLiveLobby);
 
   const captureUndoSnapshot = useCallback(
     (): BoardUndoSnapshot => ({
@@ -3095,6 +3098,7 @@ export default function TournamentControlRoom({
                           <TcrLobbyNode
                             key={game.id}
                             game={game}
+                            nowMs={nowMs}
                             assignments={gameAssignments}
                             teamsById={teamsById}
                             tournamentName={query.data.tournament.name}

@@ -6,6 +6,8 @@ export default defineConfig({
     include: [
       "server/tournamentControlRevisionSafety.test.ts",
       "server/communityTournaments.test.ts",
+      "server/tournamentControlLobbyTimer.test.ts",
+      "server/teamManagement.test.ts",
     ],
     environment: "node",
   },

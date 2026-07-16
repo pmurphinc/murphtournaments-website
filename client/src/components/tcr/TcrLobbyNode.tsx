@@ -25,6 +25,7 @@ import {
 import { DEFAULT_COMPETITIVE_MAP_IDS, THE_FINALS_MAPS } from "@/lib/finalsMaps";
 import {
   getGameStatusClasses,
+  getLobbyTimerDisplay,
   hasOpenLobbySlot,
   isTeamEliminated,
   type CanvasPoint,
@@ -32,6 +33,12 @@ import {
   type GameStatus,
 } from "@/lib/tournamentControlBoard";
 import TcrTeamCard from "./TcrTeamCard";
+import {
+  tcrDangerMenuItemClass,
+  tcrMenuContentClass,
+  tcrMenuItemClass,
+  tcrMenuSeparatorClass,
+} from "./tcrStyles";
 import {
   formatPlacement,
   gameStatusLabels,
@@ -66,6 +73,8 @@ const statusIcons: Record<GameStatus, typeof CircleDashed> = {
 
 export type TcrLobbyNodeProps = {
   game: ControlGameView;
+  /** Shared page-level clock tick (ms since epoch) driving the live elapsed-time display. */
+  nowMs: number;
   assignments: AssignmentView[];
   teamsById: ReadonlyMap<number, ControlTeamView>;
   tournamentName: string;
@@ -377,6 +386,18 @@ export default function TcrLobbyNode(props: TcrLobbyNodeProps) {
   const isComplete = game.status === "complete";
   const statusClasses = getGameStatusClasses(game.status);
   const StatusIcon = statusIcons[game.status];
+  const timer = getLobbyTimerDisplay({
+    status: game.status,
+    liveStartedAt: game.liveStartedAt,
+    liveEndedAt: game.liveEndedAt,
+    nowMs: props.nowMs,
+  });
+  const timerClasses =
+    timer.state === "live"
+      ? "border-emerald-400/50 bg-emerald-400/15 text-emerald-100"
+      : timer.state === "final"
+        ? "border-[#FFD700]/40 bg-[#FFD700]/10 text-[#FFD700]"
+        : "border-white/10 bg-white/5 text-zinc-500";
 
   const handleDrop = (
     event: ReactDragEvent<HTMLElement>,
@@ -507,6 +528,13 @@ export default function TcrLobbyNode(props: TcrLobbyNodeProps) {
               >
                 <StatusIcon className="h-3 w-3" aria-hidden="true" />
                 {gameStatusLabels[game.status]}
+              </span>
+              <span
+                className={`inline-flex shrink-0 items-center rounded-md border px-2 py-1 font-mono text-xs tabular-nums ${timerClasses}`}
+                aria-label={`${game.displayLabel} elapsed time: ${timer.label}`}
+                title="Lobby elapsed time"
+              >
+                {timer.label}
               </span>
               <select
                 data-no-node-drag="true"
@@ -657,7 +685,7 @@ export default function TcrLobbyNode(props: TcrLobbyNodeProps) {
           )}
         </div>
       </ContextMenuTrigger>
-      <ContextMenuContent>
+      <ContextMenuContent className={tcrMenuContentClass}>
         {isComplete ? (
           <>
             {statuses
@@ -665,6 +693,7 @@ export default function TcrLobbyNode(props: TcrLobbyNodeProps) {
               .map(status => (
                 <ContextMenuItem
                   key={status}
+                  className={tcrMenuItemClass}
                   onClick={() => props.onUpdateStatus(status)}
                 >
                   Reopen Game as {status}
@@ -673,43 +702,57 @@ export default function TcrLobbyNode(props: TcrLobbyNodeProps) {
           </>
         ) : (
           <>
-            <ContextMenuItem onClick={props.onRename}>
+            <ContextMenuItem
+              className={tcrMenuItemClass}
+              onClick={props.onRename}
+            >
               Rename Game
             </ContextMenuItem>
-            <ContextMenuItem onClick={props.onEditLobbyCode}>
+            <ContextMenuItem
+              className={tcrMenuItemClass}
+              onClick={props.onEditLobbyCode}
+            >
               Set/Clear Lobby Code
             </ContextMenuItem>
-            <ContextMenuItem onClick={props.onEditBroadcast}>
+            <ContextMenuItem
+              className={tcrMenuItemClass}
+              onClick={props.onEditBroadcast}
+            >
               Set/Clear Broadcast Link
             </ContextMenuItem>
-            <ContextMenuSeparator />
+            <ContextMenuSeparator className={tcrMenuSeparatorClass} />
             {game.gameType === "final_round" && (
               <>
                 {([1, 3, 5] as const).map(value => (
                   <ContextMenuItem
                     key={value}
+                    className={tcrMenuItemClass}
                     onClick={() => props.onSetBestOf(value)}
                   >
                     Set Final Round BO{value}
                   </ContextMenuItem>
                 ))}
-                <ContextMenuSeparator />
+                <ContextMenuSeparator className={tcrMenuSeparatorClass} />
               </>
             )}
             {statuses.map(status => (
               <ContextMenuItem
                 key={status}
+                className={tcrMenuItemClass}
                 onClick={() => props.onUpdateStatus(status)}
               >
                 Mark {status}
               </ContextMenuItem>
             ))}
-            <ContextMenuSeparator />
-            <ContextMenuItem onClick={props.onRemoveAssignedTeams}>
+            <ContextMenuSeparator className={tcrMenuSeparatorClass} />
+            <ContextMenuItem
+              className={tcrMenuItemClass}
+              onClick={props.onRemoveAssignedTeams}
+            >
               Remove Assigned Teams
             </ContextMenuItem>
             <ContextMenuItem
-              className="text-red-300"
+              className={tcrDangerMenuItemClass}
               onClick={props.onRequestDelete}
             >
               Delete Game

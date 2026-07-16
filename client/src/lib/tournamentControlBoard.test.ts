@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatElapsedDuration,
+  getLobbyTimerDisplay,
   getRoundFrameBounds,
   getRoundFrames,
   getRoundFrameTheme,
@@ -372,5 +374,118 @@ describe("zoom preference helpers", () => {
     expect(mod.getInitialZoomPreference(null)).toBe(mod.defaultZoom);
     expect(mod.getInitialZoomPreference(mod.minZoom - 1)).toBe(mod.minZoom);
     expect(mod.getInitialZoomPreference(mod.maxZoom + 1)).toBe(mod.maxZoom);
+  });
+});
+
+describe("formatElapsedDuration", () => {
+  it("formats sub-hour durations as M:SS", () => {
+    expect(formatElapsedDuration(0)).toBe("00:00");
+    expect(formatElapsedDuration(5_000)).toBe("00:05");
+    expect(formatElapsedDuration(65_000)).toBe("01:05");
+    expect(formatElapsedDuration(754_000)).toBe("12:34");
+  });
+
+  it("formats durations of an hour or more as H:MM:SS", () => {
+    expect(formatElapsedDuration(3_600_000)).toBe("01:00:00");
+    expect(formatElapsedDuration(4_354_000)).toBe("01:12:34");
+  });
+
+  it("clamps negative or non-finite input to zero instead of showing NaN or a negative value", () => {
+    expect(formatElapsedDuration(-5_000)).toBe("00:00");
+    expect(formatElapsedDuration(Number.NaN)).toBe("00:00");
+    expect(formatElapsedDuration(Number.POSITIVE_INFINITY)).toBe("00:00");
+  });
+});
+
+describe("getLobbyTimerDisplay", () => {
+  const nowMs = 1_000_000;
+
+  it("shows a muted Not started state for draft lobbies regardless of stale timestamps", () => {
+    expect(
+      getLobbyTimerDisplay({
+        status: "draft",
+        liveStartedAt: new Date(nowMs - 60_000),
+        liveEndedAt: null,
+        nowMs,
+      })
+    ).toEqual({ label: "Not started", state: "not-started" });
+  });
+
+  it("shows a muted Ready state for ready lobbies", () => {
+    expect(
+      getLobbyTimerDisplay({
+        status: "ready",
+        liveStartedAt: null,
+        liveEndedAt: null,
+        nowMs,
+      })
+    ).toEqual({ label: "Ready", state: "ready" });
+  });
+
+  it("shows the live elapsed time counting from liveStartedAt to nowMs", () => {
+    expect(
+      getLobbyTimerDisplay({
+        status: "live",
+        liveStartedAt: new Date(nowMs - 754_000),
+        liveEndedAt: null,
+        nowMs,
+      })
+    ).toEqual({ label: "12:34", state: "live" });
+  });
+
+  it("falls back to Not started for a live lobby missing its start timestamp", () => {
+    expect(
+      getLobbyTimerDisplay({
+        status: "live",
+        liveStartedAt: null,
+        liveEndedAt: null,
+        nowMs,
+      })
+    ).toEqual({ label: "Not started", state: "not-started" });
+  });
+
+  it("shows the frozen final duration for a completed lobby", () => {
+    expect(
+      getLobbyTimerDisplay({
+        status: "complete",
+        liveStartedAt: new Date(nowMs - 4_354_000),
+        liveEndedAt: new Date(nowMs),
+        nowMs: nowMs + 999_999, // later ticks must not change a frozen duration
+      })
+    ).toEqual({ label: "Final: 01:12:34", state: "final" });
+  });
+
+  it("shows a safe placeholder for a completed lobby missing timestamps instead of NaN", () => {
+    expect(
+      getLobbyTimerDisplay({
+        status: "complete",
+        liveStartedAt: null,
+        liveEndedAt: null,
+        nowMs,
+      })
+    ).toEqual({ label: "Final: —", state: "final" });
+  });
+
+  it("clamps to zero instead of a negative duration when liveEndedAt precedes liveStartedAt", () => {
+    expect(
+      getLobbyTimerDisplay({
+        status: "complete",
+        liveStartedAt: new Date(nowMs),
+        liveEndedAt: new Date(nowMs - 60_000),
+        nowMs,
+      })
+    ).toEqual({ label: "Final: 00:00", state: "final" });
+  });
+
+  it("accepts ISO strings and epoch numbers the same as Date instances", () => {
+    const startIso = new Date(nowMs - 65_000).toISOString();
+    expect(
+      getLobbyTimerDisplay({
+        status: "live",
+        liveStartedAt: startIso,
+        liveEndedAt: null,
+        nowMs,
+      })
+    ).toEqual({ label: "01:05", state: "live" });
   });
 });

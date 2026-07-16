@@ -15,6 +15,8 @@ import {
 } from "../drizzle/schema";
 import { assertManagedTeamSubmissionAllowed } from "./tournamentTeamSubmissions";
 import { DEFAULT_COMPETITIVE_MAP_IDS } from "../shared/finalsMaps";
+import { sendDiscordDm } from "./discordDm";
+import { getDiscordUserId } from "./discordTournamentRoles";
 
 export type TeamManagementAction =
   | "rename"
@@ -332,10 +334,46 @@ export async function disbandManagedTeam(
   return { success: true } as const;
 }
 
+export type TeamInviteDiscordDelivery =
+  | { delivered: true }
+  | { delivered: false; reason: string };
+
+/**
+ * Sends the "you've been invited" DM for a team invite. Delivery is
+ * best-effort and never throws: the website invitation this follows has
+ * already been created or reactivated, and a Discord hiccup (DMs disabled,
+ * bot unreachable, Discord down, not configured locally) must not roll that
+ * back. Callers report the returned delivery state to the captain instead.
+ */
+async function sendTeamInviteDiscordDm(input: {
+  discordUserId: string | null;
+  teamName: string;
+  origin: string;
+}): Promise<TeamInviteDiscordDelivery> {
+  if (!input.discordUserId)
+    return {
+      delivered: false,
+      reason: "Recipient has no linked Discord account.",
+    };
+  try {
+    await sendDiscordDm(
+      input.discordUserId,
+      `You've been invited to join ${input.teamName} on Murph Tournaments.\nReview and respond to your invitation here:\n${input.origin}/teams`
+    );
+    return { delivered: true };
+  } catch (error) {
+    return {
+      delivered: false,
+      reason: error instanceof Error ? error.message : "Discord DM failed.",
+    };
+  }
+}
+
 export async function inviteManagedTeamByDiscordUsername(
   userId: number,
   teamId: number,
-  discordUsername: string
+  discordUsername: string,
+  origin: string
 ) {
   const db = await dbOrThrow();
   await assertCaptain(db, teamId, userId);
@@ -381,7 +419,17 @@ export async function inviteManagedTeamByDiscordUsername(
         updatedAt: sql`now()`,
       })
       .where(eq(managedTeamInvites.id, existingInvite.id));
-    return { success: true, reactivated: true } as const;
+    const [team] = await db
+      .select()
+      .from(managedTeams)
+      .where(eq(managedTeams.id, teamId))
+      .limit(1);
+    const discordDelivery = await sendTeamInviteDiscordDm({
+      discordUserId: getDiscordUserId(invited),
+      teamName: team?.name ?? "your team",
+      origin,
+    });
+    return { success: true, reactivated: true, discordDelivery } as const;
   }
   if (existingInvite)
     throw new TRPCError({
@@ -394,7 +442,17 @@ export async function inviteManagedTeamByDiscordUsername(
     createdByUserId: userId,
     status: "pending",
   });
-  return { success: true, reactivated: false } as const;
+  const [team] = await db
+    .select()
+    .from(managedTeams)
+    .where(eq(managedTeams.id, teamId))
+    .limit(1);
+  const discordDelivery = await sendTeamInviteDiscordDm({
+    discordUserId: getDiscordUserId(invited),
+    teamName: team?.name ?? "your team",
+    origin,
+  });
+  return { success: true, reactivated: false, discordDelivery } as const;
 }
 
 export async function respondToManagedTeamInvite(
