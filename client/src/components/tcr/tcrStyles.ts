@@ -36,6 +36,16 @@ export const tcrSecondaryButtonClass =
 export const tcrDangerButtonClass =
   "inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-red-400/30 bg-red-950/30 px-3 text-sm font-medium text-red-200 transition-colors hover:bg-red-950/60 hover:text-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/70 disabled:pointer-events-none disabled:opacity-40";
 
+/** Dropdown/context menu surface matching the panel chrome. */
+export const tcrMenuContentClass =
+  "border-white/10 bg-zinc-950 text-zinc-200 shadow-lg shadow-black/50";
+
+/** Standard entries inside dropdown/context menus. */
+export const tcrMenuItemClass = "focus:bg-white/10 focus:text-zinc-50";
+
+/** Separators inside dropdown/context menus. */
+export const tcrMenuSeparatorClass = "bg-white/10";
+
 /** Destructive entries inside dropdown/context menus. */
 export const tcrDangerMenuItemClass =
   "text-red-300 focus:bg-red-950/50 focus:text-red-200";

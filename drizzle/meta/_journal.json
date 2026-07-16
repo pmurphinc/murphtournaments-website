@@ -211,6 +211,13 @@
       "when": 1784937600000,
       "tag": "0029_add_tournament_board_revision",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "5",
+      "when": 1785024000000,
+      "tag": "0030_add_tournament_game_live_timestamps",
+      "breakpoints": true
     }
   ]
 }

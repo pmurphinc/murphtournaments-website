@@ -713,6 +713,68 @@ export function getConnectionPath(source: CanvasPoint, target: CanvasPoint) {
   return `M ${source.x} ${source.y} C ${source.x} ${source.y + distance}, ${target.x} ${target.y - distance}, ${target.x} ${target.y}`;
 }
 
+/** A timestamp as it may arrive over the wire: a Date, an ISO string, epoch ms, or absent. */
+export type LobbyTimestamp = string | number | Date | null | undefined;
+
+function toEpochMs(value: LobbyTimestamp): number | null {
+  if (value === null || value === undefined) return null;
+  const ms =
+    value instanceof Date ? value.getTime() : new Date(value).getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
+
+/**
+ * Formats a duration in milliseconds as "M:SS" (or "H:MM:SS" past one hour).
+ * Negative or non-finite input clamps to zero so callers never render NaN or
+ * a negative duration.
+ */
+export function formatElapsedDuration(durationMs: number): string {
+  const totalSeconds = Math.max(
+    0,
+    Math.floor((Number.isFinite(durationMs) ? durationMs : 0) / 1000)
+  );
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const pad = (value: number) => value.toString().padStart(2, "0");
+  return hours > 0
+    ? `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
+    : `${pad(minutes)}:${pad(seconds)}`;
+}
+
+export type LobbyTimerState = "not-started" | "ready" | "live" | "final";
+export type LobbyTimerDisplay = { label: string; state: LobbyTimerState };
+
+/**
+ * Resolves what a lobby's stopwatch badge should show for its current status.
+ * Handles missing/malformed timestamps and end-before-start data safely.
+ */
+export function getLobbyTimerDisplay(input: {
+  status: GameStatus;
+  liveStartedAt: LobbyTimestamp;
+  liveEndedAt: LobbyTimestamp;
+  nowMs: number;
+}): LobbyTimerDisplay {
+  if (input.status === "draft")
+    return { label: "Not started", state: "not-started" };
+  if (input.status === "ready") return { label: "Ready", state: "ready" };
+  const startMs = toEpochMs(input.liveStartedAt);
+  if (input.status === "live") {
+    if (startMs === null) return { label: "Not started", state: "not-started" };
+    return {
+      label: formatElapsedDuration(input.nowMs - startMs),
+      state: "live",
+    };
+  }
+  const endMs = toEpochMs(input.liveEndedAt);
+  if (startMs === null || endMs === null)
+    return { label: "Final: —", state: "final" };
+  return {
+    label: `Final: ${formatElapsedDuration(endMs - startMs)}`,
+    state: "final",
+  };
+}
+
 export type EliminationInput = {
   gameType: GameType;
   status: GameStatus;

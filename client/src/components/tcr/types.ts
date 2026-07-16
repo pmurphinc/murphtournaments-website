@@ -30,6 +30,10 @@ export type ControlGameView = {
   roundLabel?: string | null;
   roundColor?: RoundFrameColorId | null;
   roundLocked?: number;
+  /** Server-set when status transitions into "live". Null until the lobby's first live run. */
+  liveStartedAt?: string | number | Date | null;
+  /** Server-set when a live lobby transitions to "complete". */
+  liveEndedAt?: string | number | Date | null;
 };
 
 export type AssignmentView = {

@@ -210,7 +210,16 @@ export default function TeamManagement() {
     onError: e => toast.error(e.message),
   });
   const invite = trpc.teamManagement.inviteByDiscordUsername.useMutation({
-    onSuccess: () => ok("Invite sent."),
+    onSuccess: data => {
+      if (data.discordDelivery.delivered) {
+        ok("Invite sent and the player was notified on Discord.");
+        return;
+      }
+      toast.warning(
+        "Invite sent, but the Discord notification could not be delivered. The player can still see it after signing into /teams."
+      );
+      invalidate();
+    },
     onError: e => toast.error(e.message),
   });
   const cancelInvite = trpc.teamManagement.cancelInvite.useMutation({

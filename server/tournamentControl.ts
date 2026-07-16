@@ -61,6 +61,7 @@ import {
   getValidPlacementsForGameType,
 } from "../shared/tournamentResults";
 import { shouldCreateTournamentTeamForApproval } from "./tournamentTeamSubmissions";
+import { sendDiscordDm } from "./discordDm";
 
 type Database = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 type QueryExecutor = Pick<
@@ -74,7 +75,6 @@ function hashToken(token: string) {
 function createTokenPath(prefix: string, token: string) {
   return `${prefix}/${encodeURIComponent(token)}`;
 }
-const DISCORD_API_BASE = "https://discord.com/api/v10";
 export type ConnectionFlowType = "winner" | "loser";
 const connectionFlowTypeSchema = z.enum(["winner", "loser"]);
 export const PERSONAL_TCR_LIMITS = {
@@ -844,6 +844,7 @@ async function updateGameStatusAndFetch(
       });
     if (gameInTx.status === status) return false;
     const context = await fetchGameContext(tx, gameInTx.tournamentId);
+    const isReopen = gameInTx.status === "complete";
     if (status === "complete") {
       // Qualifier advancement validation happens in the same transaction and rolls back with the status change.
     } else if (
@@ -851,8 +852,7 @@ async function updateGameStatusAndFetch(
         status as (typeof activeTournamentGameStatuses)[number]
       )
     ) {
-      if (gameInTx.status === "complete")
-        validateReopenPlan({ ...context, gameId });
+      if (isReopen) validateReopenPlan({ ...context, gameId });
       else {
         const assignedRows = context.assignments.filter(
           assignment => assignment.gameId === gameId
@@ -866,9 +866,24 @@ async function updateGameStatusAndFetch(
           });
       }
     }
+    // Stopwatch lifecycle: entering "live" always starts a fresh, server-timed
+    // run (covers draft/ready -> live and reopening straight to live).
+    // Completing a run that actually went live freezes its duration.
+    // Reopening to a non-live status clears the prior run so the next
+    // transition to live starts a new stopwatch, per the required lifecycle.
+    const timerPatch =
+      status === "live"
+        ? { liveStartedAt: sql`now()`, liveEndedAt: null }
+        : status === "complete"
+          ? gameInTx.liveStartedAt && !gameInTx.liveEndedAt
+            ? { liveEndedAt: sql`now()` }
+            : {}
+          : isReopen
+            ? { liveStartedAt: null, liveEndedAt: null }
+            : {};
     await tx
       .update(tournamentGames)
-      .set({ status })
+      .set({ status, ...timerPatch })
       .where(eq(tournamentGames.id, gameId));
     if (status === "complete")
       await advanceCompletedGameQualifiers(tx, gameInTx);
@@ -2554,46 +2569,6 @@ async function getLobbyCodeRecipients(
     discordConfigured: Boolean(process.env.DISCORD_BOT_TOKEN),
     recipients,
   };
-}
-
-async function sendDiscordDm(discordUserId: string, content: string) {
-  const token = process.env.DISCORD_BOT_TOKEN;
-  if (!token)
-    throw new TRPCError({
-      code: "PRECONDITION_FAILED",
-      message: "Discord sending not configured: DISCORD_BOT_TOKEN is missing.",
-    });
-
-  const channelResponse = await fetch(
-    `${DISCORD_API_BASE}/users/@me/channels`,
-    {
-      method: "POST",
-      headers: {
-        authorization: `Bot ${token}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({ recipient_id: discordUserId }),
-    }
-  );
-  if (!channelResponse.ok)
-    throw new Error(`Discord DM channel failed (${channelResponse.status})`);
-  const channel = (await channelResponse.json()) as { id?: string };
-  if (!channel.id)
-    throw new Error("Discord DM channel response was missing an id");
-
-  const messageResponse = await fetch(
-    `${DISCORD_API_BASE}/channels/${channel.id}/messages`,
-    {
-      method: "POST",
-      headers: {
-        authorization: `Bot ${token}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({ content }),
-    }
-  );
-  if (!messageResponse.ok)
-    throw new Error(`Discord DM failed (${messageResponse.status})`);
 }
 
 async function releaseLobbyCodeDeliveries(
@@ -5121,5 +5096,6 @@ export const __tournamentControlTestInternals = {
   getOrCreateViewerLink,
   regenerateViewerLink,
   updateGameFieldAndFetch,
+  updateGameStatusAndFetch,
   restoreTournamentBoardSnapshot,
 };

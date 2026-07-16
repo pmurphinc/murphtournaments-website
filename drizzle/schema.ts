@@ -440,6 +440,10 @@ export const tournamentGames = mysqlTable(
     broadcastUrl: varchar("broadcastUrl", { length: 1024 }),
     mapId: varchar("mapId", { length: 64 }),
     seriesBestOf: int("seriesBestOf").default(1).notNull(),
+    /** Server-set when status transitions into "live". Null until the lobby's first live run. */
+    liveStartedAt: timestamp("liveStartedAt"),
+    /** Server-set when a live lobby transitions to "complete". Paired with liveStartedAt to freeze the final duration. */
+    liveEndedAt: timestamp("liveEndedAt"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
