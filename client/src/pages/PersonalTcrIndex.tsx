@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import {
@@ -133,6 +133,26 @@ export default function PersonalTcrIndex() {
         tournament.name.toLowerCase().includes(term)
       )
     : tournaments;
+  // Live rooms first, then upcoming; finished tournaments sink into their
+  // own section at the bottom. Newest first within each group.
+  const statusRank: Record<string, number> = {
+    live: 0,
+    "not-live": 1,
+    complete: 2,
+  };
+  const byStatusThenNewest = (
+    a: (typeof visibleTournaments)[number],
+    b: (typeof visibleTournaments)[number]
+  ) =>
+    (statusRank[a.eventStatus] ?? 1) - (statusRank[b.eventStatus] ?? 1) ||
+    b.id - a.id;
+  const activeTournaments = visibleTournaments
+    .filter(tournament => tournament.eventStatus !== "complete")
+    .sort(byStatusThenNewest);
+  const finishedTournaments = visibleTournaments
+    .filter(tournament => tournament.eventStatus === "complete")
+    .sort(byStatusThenNewest);
+  const orderedTournaments = [...activeTournaments, ...finishedTournaments];
 
   return (
     <section className="min-h-screen bg-[var(--mt-black)] px-6 py-12 text-[var(--mt-off-white)]">
@@ -189,7 +209,7 @@ export default function PersonalTcrIndex() {
           )}
         </div>
         <div className="mt-6 grid gap-4 md:grid-cols-2">
-          {visibleTournaments.map(tournament => {
+          {orderedTournaments.map(tournament => {
             const pendingCount =
               submissionsQuery.data?.filter(
                 submission =>
@@ -199,11 +219,24 @@ export default function PersonalTcrIndex() {
             const publicUrl = tournament.publicSlug
               ? `/tournaments/community/${tournament.publicSlug}`
               : null;
+            const isFinished = tournament.eventStatus === "complete";
+            const startsFinishedSection =
+              isFinished && tournament.id === finishedTournaments[0]?.id;
             return (
-              <div
-                key={tournament.id}
-                className="rounded-lg border border-[var(--mt-steel-line)] bg-[var(--mt-charcoal)] p-5"
-              >
+              <Fragment key={tournament.id}>
+                {startsFinishedSection && (
+                  <h3 className="mt-4 font-mono text-sm uppercase tracking-[0.28em] text-[var(--mt-muted)] md:col-span-2">
+                    Finished
+                    <span className="ml-2 text-[var(--mt-gold-bright)]">
+                      {finishedTournaments.length}
+                    </span>
+                  </h3>
+                )}
+                <div
+                  className={`rounded-lg border border-[var(--mt-steel-line)] bg-[var(--mt-charcoal)] p-5 ${
+                    isFinished ? "opacity-75" : ""
+                  }`}
+                >
                 <div className="flex items-start justify-between gap-3">
                   <h2 className="font-mono text-xl font-bold text-[var(--mt-gold-bright)]">
                     <Link
@@ -220,6 +253,12 @@ export default function PersonalTcrIndex() {
                   </span>
                 </div>
                 <p className="mt-2 text-sm text-[var(--mt-muted)]">
+                  {tournament.eventStatus === "live" && (
+                    <span
+                      className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400 align-middle"
+                      aria-hidden
+                    />
+                  )}
                   {tournament.eventStatus} · {tournament.currentStage}
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2 text-xs font-mono uppercase">
@@ -388,7 +427,8 @@ export default function PersonalTcrIndex() {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
-              </div>
+                </div>
+              </Fragment>
             );
           })}
           {tournaments.length === 0 && (

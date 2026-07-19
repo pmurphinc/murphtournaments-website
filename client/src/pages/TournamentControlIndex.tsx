@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import {
@@ -130,6 +130,26 @@ export default function TournamentControlIndex() {
         tournament.name.toLowerCase().includes(term)
       )
     : tournaments;
+  // Live rooms first, then upcoming; finished tournaments sink into their
+  // own section at the bottom. Newest first within each group.
+  const statusRank: Record<string, number> = {
+    live: 0,
+    "not-live": 1,
+    complete: 2,
+  };
+  const byStatusThenNewest = (
+    a: (typeof visibleTournaments)[number],
+    b: (typeof visibleTournaments)[number]
+  ) =>
+    (statusRank[a.eventStatus] ?? 1) - (statusRank[b.eventStatus] ?? 1) ||
+    b.id - a.id;
+  const activeTournaments = visibleTournaments
+    .filter(tournament => tournament.eventStatus !== "complete")
+    .sort(byStatusThenNewest);
+  const finishedTournaments = visibleTournaments
+    .filter(tournament => tournament.eventStatus === "complete")
+    .sort(byStatusThenNewest);
+  const orderedTournaments = [...activeTournaments, ...finishedTournaments];
   const canSubmit = name.trim().length >= 2 && !createTournament.isPending;
   const ownerName = (owner?: { id: number | null; discordDisplayName?: string | null; discordUsername?: string | null; name?: string | null } | null) => owner ? (owner.discordDisplayName || owner.discordUsername || owner.name || `User #${owner.id}`) : "Unassigned";
 
@@ -174,17 +194,36 @@ export default function TournamentControlIndex() {
           )}
         </div>
         <div className="mt-6 grid gap-4 md:grid-cols-2">
-          {visibleTournaments.map(tournament => {
+          {orderedTournaments.map(tournament => {
             const pendingCount = submissionsQuery.data?.filter(submission => submission.tournamentId === tournament.id && submission.status === "pending").length ?? 0;
+            const isFinished = tournament.eventStatus === "complete";
+            const startsFinishedSection =
+              isFinished && tournament.id === finishedTournaments[0]?.id;
             return (
+            <Fragment key={tournament.id}>
+            {startsFinishedSection && (
+              <h3 className="mt-4 font-mono text-sm uppercase tracking-[0.28em] text-[var(--mt-muted)] md:col-span-2">
+                Finished
+                <span className="ml-2 text-[var(--mt-gold-bright)]">
+                  {finishedTournaments.length}
+                </span>
+              </h3>
+            )}
             <div
-              key={tournament.id}
-              className="rounded-lg border border-[var(--mt-steel-line)] bg-[var(--mt-charcoal)] p-5 transition hover:border-[var(--mt-gold)]"
+              className={`rounded-lg border border-[var(--mt-steel-line)] bg-[var(--mt-charcoal)] p-5 transition hover:border-[var(--mt-gold)] ${isFinished ? "opacity-75" : ""}`}
             >
               <Link href={`/admin/tournaments/${tournament.id}/control`}>
                 <h2 className="font-mono text-xl font-bold text-[var(--mt-gold-bright)]">{tournament.name}</h2>
               </Link>
-              <p className="mt-2 text-sm text-[var(--mt-muted)]">{tournament.eventStatus} · {tournament.currentStage}</p>
+              <p className="mt-2 text-sm text-[var(--mt-muted)]">
+                {tournament.eventStatus === "live" && (
+                  <span
+                    className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400 align-middle"
+                    aria-hidden
+                  />
+                )}
+                {tournament.eventStatus} · {tournament.currentStage}
+              </p>
               <div className="mt-3 flex flex-wrap gap-2 font-mono text-xs uppercase">
                 <span className={`rounded-full border px-3 py-1 ${tournament.registrationOpen === 1 ? "border-emerald-400/40 text-emerald-200" : "border-[var(--mt-steel-line)] text-[var(--mt-muted)]"}`}>Registration {tournament.registrationOpen === 1 ? "open" : "closed"}</span>
                 {pendingCount > 0 && <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-3 py-1 text-amber-200">{pendingCount} pending approval{pendingCount === 1 ? "" : "s"}</span>}
@@ -218,6 +257,7 @@ export default function TournamentControlIndex() {
                 </DropdownMenu>
               </div>
             </div>
+            </Fragment>
           );})}
           {tournaments.length === 0 && (
             <div className="md:col-span-2 rounded-lg border border-dashed border-[var(--mt-gold)]/30 bg-[var(--mt-charcoal)]/70 p-8 text-center">
