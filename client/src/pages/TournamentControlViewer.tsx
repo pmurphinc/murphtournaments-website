@@ -582,7 +582,7 @@ export default function TournamentControlViewer() {
               </div>
             ))}
             <svg
-              className="absolute inset-0 z-[1] overflow-visible"
+              className="pointer-events-none absolute inset-0 z-[1] overflow-visible"
               width={logicalCanvasSize.width}
               height={logicalCanvasSize.height}
             >
