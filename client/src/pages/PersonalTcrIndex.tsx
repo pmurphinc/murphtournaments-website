@@ -51,6 +51,42 @@ const alphaBadge = (
 
 type Visibility = "private" | "public";
 
+type CardOwner = {
+  name: string | null;
+  discordDisplayName: string | null;
+  discordUsername: string | null;
+  discordAvatarUrl: string | null;
+} | null;
+
+/** Creator's Discord avatar, with a lettered fallback when none is set. */
+function CreatorAvatar({ owner }: { owner: CardOwner }) {
+  const creatorName =
+    owner?.discordDisplayName ||
+    owner?.discordUsername ||
+    owner?.name ||
+    "Unassigned";
+  const label = `Created by ${creatorName}`;
+  if (owner?.discordAvatarUrl)
+    return (
+      <img
+        src={owner.discordAvatarUrl}
+        alt={label}
+        title={label}
+        referrerPolicy="no-referrer"
+        className="h-10 w-10 shrink-0 rounded-full border border-[var(--mt-gold)]/40 bg-[var(--mt-black)]/60 object-cover"
+      />
+    );
+  return (
+    <span
+      title={label}
+      aria-label={label}
+      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--mt-steel-line)] bg-[var(--mt-black)]/60 font-mono text-sm font-bold text-[var(--mt-muted)]"
+    >
+      {creatorName.charAt(0).toUpperCase()}
+    </span>
+  );
+}
+
 export default function PersonalTcrIndex() {
   const auth = useAuth();
   const [, navigate] = useLocation();
@@ -238,14 +274,17 @@ export default function PersonalTcrIndex() {
                   }`}
                 >
                 <div className="flex items-start justify-between gap-3">
-                  <h2 className="font-mono text-xl font-bold text-[var(--mt-gold-bright)]">
-                    <Link
-                      href={`/TCR/${tournament.id}`}
-                      className="rounded outline-none transition hover:text-[var(--mt-gold-bright)] hover:underline focus-visible:ring-2 focus-visible:ring-[var(--mt-gold-bright)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--mt-charcoal)]"
-                    >
-                      {tournament.name}
-                    </Link>
-                  </h2>
+                  <div className="flex min-w-0 items-center gap-3">
+                    <CreatorAvatar owner={tournament.owner} />
+                    <h2 className="min-w-0 font-mono text-xl font-bold text-[var(--mt-gold-bright)]">
+                      <Link
+                        href={`/TCR/${tournament.id}`}
+                        className="rounded outline-none transition hover:text-[var(--mt-gold-bright)] hover:underline focus-visible:ring-2 focus-visible:ring-[var(--mt-gold-bright)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--mt-charcoal)]"
+                      >
+                        {tournament.name}
+                      </Link>
+                    </h2>
+                  </div>
                   <span className="shrink-0 rounded-full border border-[var(--mt-gold)]/40 px-3 py-1 font-mono text-xs uppercase text-[var(--mt-gold-bright)]/90">
                     {tournament.staffRole === "collaborator"
                       ? "Collaborator"

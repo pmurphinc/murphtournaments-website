@@ -47,6 +47,42 @@ const alphaBadge = (
   </span>
 );
 
+type CardOwner = {
+  name: string | null;
+  discordDisplayName: string | null;
+  discordUsername: string | null;
+  discordAvatarUrl: string | null;
+} | null;
+
+/** Creator's Discord avatar, with a lettered fallback when none is set. */
+function CreatorAvatar({ owner }: { owner: CardOwner }) {
+  const creatorName =
+    owner?.discordDisplayName ||
+    owner?.discordUsername ||
+    owner?.name ||
+    "Unassigned";
+  const label = `Created by ${creatorName}`;
+  if (owner?.discordAvatarUrl)
+    return (
+      <img
+        src={owner.discordAvatarUrl}
+        alt={label}
+        title={label}
+        referrerPolicy="no-referrer"
+        className="h-10 w-10 shrink-0 rounded-full border border-[var(--mt-gold)]/40 bg-[var(--mt-black)]/60 object-cover"
+      />
+    );
+  return (
+    <span
+      title={label}
+      aria-label={label}
+      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--mt-steel-line)] bg-[var(--mt-black)]/60 font-mono text-sm font-bold text-[var(--mt-muted)]"
+    >
+      {creatorName.charAt(0).toUpperCase()}
+    </span>
+  );
+}
+
 export default function TournamentControlIndex() {
   const auth = useAuth();
   const [, navigate] = useLocation();
@@ -212,9 +248,12 @@ export default function TournamentControlIndex() {
             <div
               className={`rounded-lg border border-[var(--mt-steel-line)] bg-[var(--mt-charcoal)] p-5 transition hover:border-[var(--mt-gold)] ${isFinished ? "opacity-75" : ""}`}
             >
-              <Link href={`/admin/tournaments/${tournament.id}/control`}>
-                <h2 className="font-mono text-xl font-bold text-[var(--mt-gold-bright)]">{tournament.name}</h2>
-              </Link>
+              <div className="flex min-w-0 items-center gap-3">
+                <CreatorAvatar owner={tournament.owner} />
+                <Link href={`/admin/tournaments/${tournament.id}/control`} className="min-w-0">
+                  <h2 className="font-mono text-xl font-bold text-[var(--mt-gold-bright)]">{tournament.name}</h2>
+                </Link>
+              </div>
               <p className="mt-2 text-sm text-[var(--mt-muted)]">
                 {tournament.eventStatus === "live" && (
                   <span
