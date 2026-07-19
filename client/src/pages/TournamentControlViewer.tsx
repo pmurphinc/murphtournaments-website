@@ -581,8 +581,14 @@ export default function TournamentControlViewer() {
                 </span>
               </div>
             ))}
+            {/*
+              The connector layer paints above the nodes (z-[1]); without
+              pointer-events-none its box swallows clicks on the node beneath it
+              (e.g. the Watch Broadcast link). The lines are decorative, so let
+              events pass through to the nodes.
+            */}
             <svg
-              className="absolute inset-0 z-[1] overflow-visible"
+              className="pointer-events-none absolute inset-0 z-[1] overflow-visible"
               width={logicalCanvasSize.width}
               height={logicalCanvasSize.height}
             >
