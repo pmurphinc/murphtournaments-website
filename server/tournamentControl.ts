@@ -1090,6 +1090,7 @@ async function listTournamentRows(db: QueryExecutor) {
         name: users.name,
         discordDisplayName: users.discordDisplayName,
         discordUsername: users.discordUsername,
+        discordAvatarUrl: users.discordAvatarUrl,
       },
     })
     .from(tournaments)
