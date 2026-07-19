@@ -677,25 +677,53 @@ export default function TournamentControlRoom({
       },
       onError: (error: { message: string }) => toast.error(error.message),
     });
-  const copyViewerLinkToClipboard = async (path: string) => {
+  // Copies text produced by an async op while keeping the click's user
+  // gesture. navigator.clipboard.writeText must run inside a transient user
+  // activation, which is gone by the time an awaited mutation resolves — so we
+  // hand ClipboardItem the pending Blob as a promise, which the browser is
+  // allowed to fulfil later while still counting the click as authorization.
+  const copyPromisedText = async (textPromise: Promise<string>) => {
+    if (
+      typeof ClipboardItem !== "undefined" &&
+      typeof navigator.clipboard?.write === "function"
+    ) {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "text/plain": textPromise.then(
+            text => new Blob([text], { type: "text/plain" })
+          ),
+        }),
+      ]);
+      return;
+    }
+    await navigator.clipboard.writeText(await textPromise);
+  };
+  const copyViewerLink = async (linkPromise: Promise<{ path: string }>) => {
+    const urlPromise = linkPromise.then(
+      data => `${window.location.origin}${data.path}`
+    );
     try {
-      await navigator.clipboard.writeText(`${window.location.origin}${path}`);
+      await copyPromisedText(urlPromise);
       toast.success("Viewer link copied");
     } catch {
-      toast.error(
-        "Viewer link created, but clipboard copy failed. Please copy it manually from your browser."
+      // A failed mutation is already surfaced by its onError handler; only warn
+      // about manual copying when the link itself was created successfully.
+      const created = await urlPromise.then(
+        () => true,
+        () => false
       );
+      if (created) {
+        toast.error(
+          "Viewer link created, but clipboard copy failed. Please copy it manually from your browser."
+        );
+      }
     }
   };
   const enableViewerLink = controlApi.enableViewerLink.useMutation({
-    onSuccess: data => copyViewerLinkToClipboard(data.path),
     onError: (error: { message: string }) => toast.error(error.message),
   });
   const regenerateViewerLink = controlApi.regenerateViewerLink.useMutation({
-    onSuccess: data => {
-      setRegenerateViewerDialogOpen(false);
-      void copyViewerLinkToClipboard(data.path);
-    },
+    onSuccess: () => setRegenerateViewerDialogOpen(false),
     onError: (error: { message: string }) => toast.error(error.message),
   });
   const createStaffInviteLink = trpc.personalTcr.getStaffInviteLink.useMutation(
@@ -2133,7 +2161,11 @@ export default function TournamentControlRoom({
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               disabled={regenerateViewerLink.isPending}
-              onClick={() => regenerateViewerLink.mutate({ tournamentId })}
+              onClick={() =>
+                void copyViewerLink(
+                  regenerateViewerLink.mutateAsync({ tournamentId })
+                )
+              }
             >
               Regenerate Viewer Link
             </AlertDialogAction>
@@ -2189,7 +2221,9 @@ export default function TournamentControlRoom({
         viewerLinkPending={
           enableViewerLink.isPending || regenerateViewerLink.isPending
         }
-        onCopyViewerLink={() => enableViewerLink.mutate({ tournamentId })}
+        onCopyViewerLink={() =>
+          void copyViewerLink(enableViewerLink.mutateAsync({ tournamentId }))
+        }
         onRegenerateViewerLink={() => setRegenerateViewerDialogOpen(true)}
         onSaveTemplate={() => {
           setTemplateName(`${query.data.tournament.name} Template`);
