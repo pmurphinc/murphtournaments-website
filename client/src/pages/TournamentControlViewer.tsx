@@ -128,6 +128,26 @@ export function resetViewerLayoutState() {
   };
 }
 
+// Normalizes a stored broadcast URL into a safe, absolute href for the viewer's
+// "Watch Broadcast" link. Legacy rows (saved before URL validation existed) can
+// hold scheme-less values like "twitch.tv/foo"; rendered raw, the browser reads
+// those as relative and navigates within the app instead of opening the stream.
+// Scheme-less/protocol-relative input defaults to https; non-web schemes
+// (javascript:, data:, …) are rejected so the link can't be abused.
+export function toSafeBroadcastHref(
+  raw: string | null | undefined
+): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return null;
+  const schemeMatch = /^([a-zA-Z][a-zA-Z0-9+.-]*):/.exec(trimmed);
+  if (schemeMatch) {
+    const scheme = schemeMatch[1].toLowerCase();
+    return scheme === "http" || scheme === "https" ? trimmed : null;
+  }
+  return trimmed.startsWith("//") ? `https:${trimmed}` : `https://${trimmed}`;
+}
+
 export default function TournamentControlViewer() {
   const params = useParams<{ viewerToken: string }>();
   const canvasRef = useRef<HTMLDivElement | null>(null);
@@ -608,6 +628,7 @@ export default function TournamentControlViewer() {
                   )
                 : null;
               const statusClasses = getGameStatusClasses(game.status);
+              const broadcastHref = toSafeBroadcastHref(game.broadcastUrl);
               const hasOutgoingLoserConnection = query.data.connections.some(
                 connection =>
                   connection.sourceGameId === game.id &&
@@ -708,10 +729,10 @@ export default function TournamentControlViewer() {
                   </div>
                   {!isMinimized && (
                     <>
-                      {game.broadcastUrl && (
+                      {broadcastHref && (
                         <a
                           data-no-node-drag="true"
-                          href={game.broadcastUrl}
+                          href={broadcastHref}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="mt-3 inline-flex w-full items-center justify-center rounded border border-[#FFD700] bg-[#FFD700] px-3 py-2 font-mono text-xs font-black uppercase tracking-wider text-black shadow-[0_0_18px_rgba(255,215,0,0.24)] hover:bg-[#D4AF37]"

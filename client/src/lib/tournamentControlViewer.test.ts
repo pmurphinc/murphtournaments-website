@@ -10,8 +10,37 @@ import {
   getViewerLocalPosition,
   getViewerVisualPosition,
   resetViewerLayoutState,
+  toSafeBroadcastHref,
   type NodeDragState,
 } from "../pages/TournamentControlViewer";
+
+describe("toSafeBroadcastHref", () => {
+  it("passes through absolute http(s) URLs unchanged", () => {
+    expect(toSafeBroadcastHref("https://twitch.tv/foo")).toBe(
+      "https://twitch.tv/foo"
+    );
+    expect(toSafeBroadcastHref("http://example.com/live")).toBe(
+      "http://example.com/live"
+    );
+  });
+
+  it("upgrades scheme-less and protocol-relative values to https", () => {
+    expect(toSafeBroadcastHref("twitch.tv/foo")).toBe("https://twitch.tv/foo");
+    expect(toSafeBroadcastHref("  youtube.com/watch?v=x  ")).toBe(
+      "https://youtube.com/watch?v=x"
+    );
+    expect(toSafeBroadcastHref("//twitch.tv/foo")).toBe("https://twitch.tv/foo");
+  });
+
+  it("rejects empty and non-web-scheme values", () => {
+    expect(toSafeBroadcastHref(null)).toBeNull();
+    expect(toSafeBroadcastHref(undefined)).toBeNull();
+    expect(toSafeBroadcastHref("   ")).toBeNull();
+    // eslint-disable-next-line no-script-url
+    expect(toSafeBroadcastHref("javascript:alert(1)")).toBeNull();
+    expect(toSafeBroadcastHref("data:text/html,<h1>x</h1>")).toBeNull();
+  });
+});
 
 describe("Tournament Control Viewer local board state", () => {
   const game = {

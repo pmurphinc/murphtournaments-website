@@ -412,7 +412,12 @@ export const broadcastUrlSchema = z.preprocess(
   value => {
     if (typeof value !== "string") return value;
     const trimmed = value.trim();
-    return trimmed.length === 0 ? null : trimmed;
+    if (trimmed.length === 0) return null;
+    // Default scheme-less input ("twitch.tv/foo") and protocol-relative input
+    // ("//twitch.tv/foo") to https so the stored URL is always absolute; a
+    // scheme-less value would render as a relative (broken) link in the viewer.
+    if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmed)) return trimmed;
+    return trimmed.startsWith("//") ? `https:${trimmed}` : `https://${trimmed}`;
   },
   z
     .string()
