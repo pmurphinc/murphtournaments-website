@@ -5,12 +5,6 @@ import path from "node:path";
 const source = path.join(process.cwd(), "server", "data", "weapon-archive");
 const target = path.join(process.cwd(), "dist", "server", "data", "weapon-archive");
 const publicImagesRoot = path.join(process.cwd(), "client", "public", "images", "weapons");
-const localReferenceTsv = path.join(
-  process.cwd(),
-  "data",
-  "reference",
-  "kromes-weapon-data-10.6.0-overview.tsv",
-);
 
 function normalizeName(value) {
   return String(value ?? "")
@@ -70,12 +64,6 @@ async function reportBaselineStatsCoverage() {
   const missing = weaponItems.filter(item => {
     return !statsByWeaponId.has(item.id) && !statsByName.has(normalizeName(item.name));
   });
-
-  if (existsSync(localReferenceTsv)) {
-    console.log(`[weapon-archive] Baseline source: ${localReferenceTsv}`);
-  } else {
-    console.warn(`[weapon-archive] Baseline source TSV not found: ${localReferenceTsv}`);
-  }
 
   const label = baselineBatch
     ? `${baselineBatch.sourceLabel} (${baselineBatch.id})`

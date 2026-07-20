@@ -405,7 +405,7 @@ export async function getWeaponArchiveDetail(slug: string): Promise<WeaponArchiv
     baselineSource: baselineBatch
       ? {
           sourceLabel: baselineBatch.sourceLabel,
-          versionLabel: baselineBatch.id.match(/(\d+_\d+_\d+)/)?.[1]?.replace(/_/g, ".") ?? "10.3.0",
+          versionLabel: baselineBatch.id.match(/(\d+_\d+_\d+)/)?.[1]?.replace(/_/g, ".") ?? "11.0.0",
           snapshotDate: baselineBatch.snapshotDate,
         }
       : null,

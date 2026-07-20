@@ -1,7 +1,7 @@
 {
-  "id": "baseline_kromes_spreadsheet_10_6_0",
+  "id": "baseline_kromes_spreadsheet_11_0_0",
   "sourceLabel": "Krome's Spreadsheet",
-  "snapshotDate": "2026-05-24",
+  "snapshotDate": "2026-07-20",
   "sourceType": "manual",
-  "notes": "Baseline reference snapshot reconciled cell-by-cell to Krome's Weapon Data Sheet 10.6.0."
+  "notes": "Baseline reference snapshot reconciled cell-by-cell to Krome's Weapon Data Sheet 11.0.0."
 }
