@@ -192,7 +192,7 @@ export default function BaselineStatsCard({ weaponName, stat, source }: Baseline
   const heavyTtk = deriveTtk(stat, CLASS_HEALTH.Heavy);
   const sourceText = source
     ? `Source: ${source.sourceLabel} - ${source.versionLabel} Baseline`
-    : "Source: Krome's Spreadsheet - 10.6.0 Baseline";
+    : "Source: Krome's Spreadsheet - 11.0.0 Baseline";
 
   if (stat.weaponType === "melee") {
     return <MeleeStatsCard weaponName={weaponName} stat={stat} sourceText={sourceText} />;

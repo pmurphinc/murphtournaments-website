@@ -1,6 +1,6 @@
 [
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_93r",
     "class": "Light",
     "name": "93R",
@@ -14,15 +14,15 @@
     "shotsPerBurst": 3,
     "delayUntilNextBurstSeconds": 0.275,
     "ttkVsLightBodySeconds": 0.81,
-    "stkLightBody": 6,
+    "stkLightBody": 7,
     "ttkVsLightHeadSeconds": 0.46,
     "stkLightHead": 4,
     "ttkVsMediumBodySeconds": 1.27,
-    "stkMediumBody": 10,
+    "stkMediumBody": 11,
     "ttkVsMediumHeadSeconds": 0.81,
     "stkMediumHead": 7,
     "ttkVsHeavyBodySeconds": 1.74,
-    "stkHeavyBody": 14,
+    "stkHeavyBody": 15,
     "ttkVsHeavyHeadSeconds": 1.21,
     "stkHeavyHead": 10,
     "damageDropoffMinRange": 30,
@@ -32,7 +32,7 @@
     "rawValues": "{\"bodyDamageRaw\":\"24\",\"headDamageRaw\":\"36\",\"magazineRaw\":\"27\",\"damagePerMagazineRaw\":\"648\",\"headDamagePerMagazineRaw\":\"972\",\"tacticalReloadRaw\":\"1.45\",\"emptyReloadRaw\":\"1.75\",\"damageDropoffMinRange\":\"30m\",\"damageDropoffMaxRange\":\"37.5m\",\"damageDropoffModifierAtMaxRange\":\"~50%\"}"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_arn-220",
     "class": "Light",
     "name": "Arn-220",
@@ -64,7 +64,7 @@
     "rawValues": "{\"bodyDamageRaw\":\"17\",\"headDamageRaw\":\"25.5\",\"magazineRaw\":\"60 (30)\",\"damagePerMagazineRaw\":\"1020 (510)\",\"headDamagePerMagazineRaw\":\"1530 (765)\",\"tacticalReloadRaw\":\"2.45\",\"emptyReloadRaw\":\"2.80 (0.80)\",\"damageDropoffMinRange\":\"37.5m\",\"damageDropoffMaxRange\":\"45m\",\"damageDropoffModifierAtMaxRange\":\"~72%\"}"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_dagger",
     "class": "Light",
     "name": "Dagger",
@@ -97,7 +97,7 @@
     "weaponType": "melee"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_dagger_alt",
     "class": "Light",
     "name": "Dagger (Alt.)",
@@ -125,16 +125,16 @@
     "damageDropoffMinRange": null,
     "damageDropoffMaxRange": null,
     "damageDropoffModifierAtMaxRange": null,
-    "sourceNotes": "Cannot hit multiple targets in one stab.  Has an 800ms wind-up time.",
+    "sourceNotes": "Cannot hit multiple targets in one stab.  Has an 650ms wind-up time.",
     "rawValues": "{\"bodyDamageRaw\":\"75\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}",
     "weaponType": "melee"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_dagger_alt_backstab",
     "class": "Light",
     "name": "Dagger (Alt. w/ Backstab)",
-    "bodyDamage": 320,
+    "bodyDamage": 337.5,
     "headDamage": null,
     "rateOfFireRpm": null,
     "magazineSize": null,
@@ -158,12 +158,12 @@
     "damageDropoffMinRange": null,
     "damageDropoffMaxRange": null,
     "damageDropoffModifierAtMaxRange": null,
-    "sourceNotes": "Cannot hit multiple targets in one stab.  Has an 800ms wind-up time. Backstab angle is 150 degrees.",
-    "rawValues": "{\"bodyDamageRaw\":\"320\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}",
+    "sourceNotes": "Cannot hit multiple targets in one stab.  Has an 650ms wind-up time. Backstab angle is 150 degrees.",
+    "rawValues": "{\"bodyDamageRaw\":\"337.5\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}",
     "weaponType": "melee"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_lh1",
     "class": "Light",
     "name": "Lh1",
@@ -195,7 +195,7 @@
     "rawValues": "{\"bodyDamageRaw\":\"44\",\"headDamageRaw\":\"88\",\"magazineRaw\":\"15\",\"damagePerMagazineRaw\":\"660\",\"headDamagePerMagazineRaw\":\"1320\",\"tacticalReloadRaw\":\"1.95\",\"emptyReloadRaw\":\"2.85\",\"damageDropoffMinRange\":\"50m\",\"damageDropoffMaxRange\":\"55m\",\"damageDropoffModifierAtMaxRange\":\"~72%\"}"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_m11",
     "class": "Light",
     "name": "M11",
@@ -227,7 +227,7 @@
     "rawValues": "{\"bodyDamageRaw\":\"16\",\"headDamageRaw\":\"24\",\"magazineRaw\":\"40\",\"damagePerMagazineRaw\":\"640\",\"headDamagePerMagazineRaw\":\"960\",\"tacticalReloadRaw\":\"1.55\",\"emptyReloadRaw\":\"1.85\",\"damageDropoffMinRange\":\"10m\",\"damageDropoffMaxRange\":\"20m\",\"damageDropoffModifierAtMaxRange\":\"~45%\"}"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_m26_matter",
     "class": "Light",
     "name": "M26 Matter",
@@ -259,7 +259,7 @@
     "rawValues": "{\"bodyDamageRaw\":\"121\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"8\",\"damagePerMagazineRaw\":\"968\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"2.05\",\"emptyReloadRaw\":\"2.45\",\"damageDropoffMinRange\":\"15m\",\"damageDropoffMaxRange\":\"25m\",\"damageDropoffModifierAtMaxRange\":\"~64%\"}"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_recurve_bow_uncharged",
     "class": "Light",
     "name": "Recurve Bow (Uncharged)",
@@ -291,7 +291,7 @@
     "rawValues": "{\"bodyDamageRaw\":\"60\",\"headDamageRaw\":\"90\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_recurve_bow_charged",
     "class": "Light",
     "name": "Recurve Bow (Charged)",
@@ -323,7 +323,7 @@
     "rawValues": "{\"bodyDamageRaw\":\"124\",\"headDamageRaw\":\"186\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_sh1900",
     "class": "Light",
     "name": "Sh1900",
@@ -355,7 +355,7 @@
     "rawValues": "{\"bodyDamageRaw\":\"180\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"2\",\"damagePerMagazineRaw\":\"360\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"2.2\",\"emptyReloadRaw\":\"2.6\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_sr-84",
     "class": "Light",
     "name": "Sr-84",
@@ -387,7 +387,7 @@
     "rawValues": "{\"bodyDamageRaw\":\"118\",\"headDamageRaw\":\"236\",\"magazineRaw\":\"6\",\"damagePerMagazineRaw\":\"708\",\"headDamagePerMagazineRaw\":\"1416\",\"tacticalReloadRaw\":\"1.95\",\"emptyReloadRaw\":\"3.35\",\"damageDropoffMinRange\":\"80m\",\"damageDropoffMaxRange\":\"100m\",\"damageDropoffModifierAtMaxRange\":\"~75%\"}"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_sword",
     "class": "Light",
     "name": "Sword",
@@ -420,7 +420,7 @@
     "weaponType": "melee"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_sword_alt",
     "class": "Light",
     "name": "Sword (Alt.)",
@@ -453,7 +453,7 @@
     "weaponType": "melee"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_throwing_knives",
     "class": "Light",
     "name": "Throwing Knives",
@@ -485,7 +485,7 @@
     "rawValues": "{\"bodyDamageRaw\":\"60\",\"headDamageRaw\":\"90\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_throwing_knives_alt",
     "class": "Light",
     "name": "Throwing Knives (Alt.)",
@@ -517,7 +517,7 @@
     "rawValues": "{\"bodyDamageRaw\":\"140\",\"headDamageRaw\":\"210\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_v9s",
     "class": "Light",
     "name": "V9S",
@@ -549,7 +549,7 @@
     "rawValues": "{\"bodyDamageRaw\":\"38\",\"headDamageRaw\":\"57\",\"magazineRaw\":\"18\",\"damagePerMagazineRaw\":\"684\",\"headDamagePerMagazineRaw\":\"1026\",\"tacticalReloadRaw\":\"1.25\",\"emptyReloadRaw\":\"1.5\",\"damageDropoffMinRange\":\"15m\",\"damageDropoffMaxRange\":\"20m\",\"damageDropoffModifierAtMaxRange\":\"~65%\"}"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_xp-54",
     "class": "Light",
     "name": "Xp-54",
@@ -581,7 +581,7 @@
     "rawValues": "{\"bodyDamageRaw\":\"16\",\"headDamageRaw\":\"24\",\"magazineRaw\":\"36\",\"damagePerMagazineRaw\":\"576\",\"headDamagePerMagazineRaw\":\"864\",\"tacticalReloadRaw\":\"2.25\",\"emptyReloadRaw\":\"2.5\",\"damageDropoffMinRange\":\"22.5m\",\"damageDropoffMaxRange\":\"32.5m\",\"damageDropoffModifierAtMaxRange\":\"~52%\"}"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_akm",
     "class": "Medium",
     "name": "Akm",
@@ -613,7 +613,7 @@
     "rawValues": "{\"bodyDamageRaw\":\"20\",\"headDamageRaw\":\"30\",\"magazineRaw\":\"34\",\"damagePerMagazineRaw\":\"680\",\"headDamagePerMagazineRaw\":\"1020\",\"tacticalReloadRaw\":\"2.35\",\"emptyReloadRaw\":\"2.35\",\"damageDropoffMinRange\":\"30m\",\"damageDropoffMaxRange\":\"37.5m\",\"damageDropoffModifierAtMaxRange\":\"~55%\"}"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_cb_01_repeater",
     "class": "Medium",
     "name": "Cb-01 Repeater",
@@ -645,7 +645,7 @@
     "rawValues": "{\"bodyDamageRaw\":\"84\",\"headDamageRaw\":\"126\",\"magazineRaw\":\"8\",\"damagePerMagazineRaw\":\"672\",\"headDamagePerMagazineRaw\":\"1008\",\"tacticalReloadRaw\":\"(varies)\",\"emptyReloadRaw\":\"5.05\",\"damageDropoffMinRange\":\"35m\",\"damageDropoffMaxRange\":\"40m\",\"damageDropoffModifierAtMaxRange\":\"~64%\"}"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_cerberus_12ga",
     "class": "Medium",
     "name": "Cerberus 12Ga",
@@ -677,7 +677,7 @@
     "rawValues": "{\"bodyDamageRaw\":\"104\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"3\",\"damagePerMagazineRaw\":\"312\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"(varies)\",\"emptyReloadRaw\":\"2.95\",\"damageDropoffMinRange\":\"10m\",\"damageDropoffMaxRange\":\"17.5m\",\"damageDropoffModifierAtMaxRange\":\"~63%\"}"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_chimera_xb",
     "class": "Medium",
     "name": "Chimera-Xb",
@@ -709,7 +709,7 @@
     "rawValues": "{\"bodyDamageRaw\":\"45\",\"headDamageRaw\":\"67.5\",\"magazineRaw\":\"15\",\"damagePerMagazineRaw\":\"675\",\"headDamagePerMagazineRaw\":\"1012.5\",\"tacticalReloadRaw\":\"2.15\",\"emptyReloadRaw\":\"2.15\",\"damageDropoffMinRange\":\"17.5m\",\"damageDropoffMaxRange\":\"27.5m\",\"damageDropoffModifierAtMaxRange\":\"~53%\"}"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_cl40",
     "class": "Medium",
     "name": "Cl-40 (Direct)",
@@ -741,7 +741,7 @@
     "rawValues": "{\"bodyDamageRaw\":\"105\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"5\",\"damagePerMagazineRaw\":\"525\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"(varies)\",\"emptyReloadRaw\":\"3.95\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_cl-40_splash",
     "class": "Medium",
     "name": "Cl-40 (Splash)",
@@ -773,11 +773,11 @@
     "rawValues": "{\"bodyDamageRaw\":\"90\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"5\",\"damagePerMagazineRaw\":\"450\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"(varies)\",\"emptyReloadRaw\":\"3.95\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_dual_blades",
     "class": "Medium",
     "name": "Dual Blades",
-    "bodyDamage": null,
+    "bodyDamage": 114,
     "headDamage": null,
     "rateOfFireRpm": null,
     "magazineSize": null,
@@ -787,15 +787,15 @@
     "shotsPerBurst": null,
     "delayUntilNextBurstSeconds": null,
     "ttkVsLightBodySeconds": null,
-    "stkLightBody": null,
+    "stkLightBody": 2,
     "ttkVsLightHeadSeconds": null,
     "stkLightHead": null,
     "ttkVsMediumBodySeconds": null,
-    "stkMediumBody": null,
+    "stkMediumBody": 3,
     "ttkVsMediumHeadSeconds": null,
     "stkMediumHead": null,
     "ttkVsHeavyBodySeconds": null,
-    "stkHeavyBody": null,
+    "stkHeavyBody": 4,
     "ttkVsHeavyHeadSeconds": null,
     "stkHeavyHead": null,
     "damageDropoffMinRange": null,
@@ -806,7 +806,7 @@
     "weaponType": "melee"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_famas",
     "class": "Medium",
     "name": "Famas",
@@ -838,7 +838,7 @@
     "rawValues": "{\"bodyDamageRaw\":\"23\",\"headDamageRaw\":\"34.5\",\"magazineRaw\":\"27\",\"damagePerMagazineRaw\":\"621\",\"headDamagePerMagazineRaw\":\"931.5\",\"tacticalReloadRaw\":\"2.15\",\"emptyReloadRaw\":\"2.6\",\"damageDropoffMinRange\":\"35m\",\"damageDropoffMaxRange\":\"42.5m\",\"damageDropoffModifierAtMaxRange\":\"~50%\"}"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_fcar",
     "class": "Medium",
     "name": "Fcar",
@@ -851,15 +851,15 @@
     "emptyReloadTimeSeconds": 2.1,
     "shotsPerBurst": null,
     "delayUntilNextBurstSeconds": null,
-    "ttkVsLightBodySeconds": 0.67,
+    "ttkVsLightBodySeconds": 0.68,
     "stkLightBody": 7,
     "ttkVsLightHeadSeconds": 0.44,
     "stkLightHead": 5,
-    "ttkVsMediumBodySeconds": 1.11,
+    "ttkVsMediumBodySeconds": 1.13,
     "stkMediumBody": 11,
     "ttkVsMediumHeadSeconds": 0.78,
     "stkMediumHead": 8,
-    "ttkVsHeavyBodySeconds": 1.67,
+    "ttkVsHeavyBodySeconds": 1.7,
     "stkHeavyBody": 16,
     "ttkVsHeavyHeadSeconds": 1.11,
     "stkHeavyHead": 11,
@@ -870,7 +870,7 @@
     "rawValues": "{\"bodyDamageRaw\":\"23\",\"headDamageRaw\":\"34.5\",\"magazineRaw\":\"25\",\"damagePerMagazineRaw\":\"575\",\"headDamagePerMagazineRaw\":\"862.5\",\"tacticalReloadRaw\":\"2.1\",\"emptyReloadRaw\":\"2.1\",\"damageDropoffMinRange\":\"35m\",\"damageDropoffMaxRange\":\"40m\",\"damageDropoffModifierAtMaxRange\":\"~55%\"}"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_model_1887",
     "class": "Medium",
     "name": "Model 1887",
@@ -891,8 +891,8 @@
     "stkMediumBody": 3,
     "ttkVsMediumHeadSeconds": null,
     "stkMediumHead": null,
-    "ttkVsHeavyBodySeconds": 2.61,
-    "stkHeavyBody": 4,
+    "ttkVsHeavyBodySeconds": 1.74,
+    "stkHeavyBody": 3,
     "ttkVsHeavyHeadSeconds": null,
     "stkHeavyHead": null,
     "damageDropoffMinRange": 20,
@@ -902,7 +902,7 @@
     "rawValues": "{\"bodyDamageRaw\":\"117\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"7\",\"damagePerMagazineRaw\":\"819\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"(varies)\",\"emptyReloadRaw\":\"4.3\",\"damageDropoffMinRange\":\"20m\",\"damageDropoffMaxRange\":\"30m\",\"damageDropoffModifierAtMaxRange\":\"~65%\"}"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_p90",
     "class": "Medium",
     "name": "P90",
@@ -934,7 +934,7 @@
     "rawValues": "{\"bodyDamageRaw\":\"14\",\"headDamageRaw\":\"21\",\"magazineRaw\":\"50\",\"damagePerMagazineRaw\":\"700\",\"headDamagePerMagazineRaw\":\"1050\",\"tacticalReloadRaw\":\"2.45\",\"emptyReloadRaw\":\"2.7\",\"damageDropoffMinRange\":\"18m\",\"damageDropoffMaxRange\":\"24m\",\"damageDropoffModifierAtMaxRange\":\"~62%\"}"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_pike_556",
     "class": "Medium",
     "name": "Pike .556",
@@ -966,7 +966,7 @@
     "rawValues": "{\"bodyDamageRaw\":\"49\",\"headDamageRaw\":\"85.75\",\"magazineRaw\":\"12\",\"damagePerMagazineRaw\":\"588\",\"headDamagePerMagazineRaw\":\"1029\",\"tacticalReloadRaw\":\"2.1\",\"emptyReloadRaw\":\"3.25\",\"damageDropoffMinRange\":\"40m\",\"damageDropoffMaxRange\":\"50m\",\"damageDropoffModifierAtMaxRange\":\"~80%\"}"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_r357",
     "class": "Medium",
     "name": "R.357",
@@ -998,7 +998,7 @@
     "rawValues": "{\"bodyDamageRaw\":\"74\",\"headDamageRaw\":\"148\",\"magazineRaw\":\"6\",\"damagePerMagazineRaw\":\"444\",\"headDamagePerMagazineRaw\":\"888\",\"tacticalReloadRaw\":\"2.2\",\"emptyReloadRaw\":\"2.5\",\"damageDropoffMinRange\":\"27.5m\",\"damageDropoffMaxRange\":\"44m\",\"damageDropoffModifierAtMaxRange\":\"~40%\"}"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_riot_shield",
     "class": "Medium",
     "name": "Riot Shield",
@@ -1016,11 +1016,11 @@
     "ttkVsLightHeadSeconds": null,
     "stkLightHead": null,
     "ttkVsMediumBodySeconds": null,
-    "stkMediumBody": 3,
+    "stkMediumBody": 4,
     "ttkVsMediumHeadSeconds": null,
     "stkMediumHead": null,
     "ttkVsHeavyBodySeconds": null,
-    "stkHeavyBody": 4,
+    "stkHeavyBody": 5,
     "ttkVsHeavyHeadSeconds": null,
     "stkHeavyHead": null,
     "damageDropoffMinRange": null,
@@ -1031,7 +1031,7 @@
     "weaponType": "melee"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_50_akimbo",
     "class": "Heavy",
     "name": ".50 Akimbo",
@@ -1063,7 +1063,7 @@
     "rawValues": "{\"bodyDamageRaw\":\"46\",\"headDamageRaw\":\"92\",\"magazineRaw\":\"14\",\"damagePerMagazineRaw\":\"644\",\"headDamagePerMagazineRaw\":\"1288\",\"tacticalReloadRaw\":\"2.2\",\"emptyReloadRaw\":\"3\",\"damageDropoffMinRange\":\"32m\",\"damageDropoffMaxRange\":\"39m\",\"damageDropoffModifierAtMaxRange\":\"~50%\"}"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_bfr_titan",
     "class": "Heavy",
     "name": "Bfr Titan",
@@ -1095,7 +1095,7 @@
     "rawValues": "{\"bodyDamageRaw\":\"88\",\"headDamageRaw\":\"132\",\"magazineRaw\":\"5\",\"damagePerMagazineRaw\":\"440\",\"headDamagePerMagazineRaw\":\"660\",\"tacticalReloadRaw\":\"(varies)\",\"emptyReloadRaw\":\"5\",\"damageDropoffMinRange\":\"25m\",\"damageDropoffMaxRange\":\"40m\",\"damageDropoffModifierAtMaxRange\":\"~65%\"}"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_flamethrower",
     "class": "Heavy",
     "name": "Flamethrower",
@@ -1127,7 +1127,7 @@
     "rawValues": "{\"bodyDamageRaw\":\"30\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"30\",\"damagePerMagazineRaw\":\"900\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"3.55\",\"emptyReloadRaw\":\"3.55\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_ks_23",
     "class": "Heavy",
     "name": "Ks-23",
@@ -1159,7 +1159,7 @@
     "rawValues": "{\"bodyDamageRaw\":\"110\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"6\",\"damagePerMagazineRaw\":\"660\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"(varies)\",\"emptyReloadRaw\":\"5.55\",\"damageDropoffMinRange\":\"18m\",\"damageDropoffMaxRange\":\"23m\",\"damageDropoffModifierAtMaxRange\":\"~64%\"}"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_lewis_gun",
     "class": "Heavy",
     "name": "Lewis Gun",
@@ -1191,7 +1191,7 @@
     "rawValues": "{\"bodyDamageRaw\":\"23\",\"headDamageRaw\":\"34.5\",\"magazineRaw\":\"47\",\"damagePerMagazineRaw\":\"1081\",\"headDamagePerMagazineRaw\":\"1621.5\",\"tacticalReloadRaw\":\"3.25\",\"emptyReloadRaw\":\"3.55\",\"damageDropoffMinRange\":\"35m\",\"damageDropoffMaxRange\":\"40m\",\"damageDropoffModifierAtMaxRange\":\"~67%\"}"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_m134_minigun",
     "class": "Heavy",
     "name": "M134 Minigun",
@@ -1223,7 +1223,7 @@
     "rawValues": "{\"bodyDamageRaw\":\"11\",\"headDamageRaw\":\"14.6\",\"magazineRaw\":\"300\",\"damagePerMagazineRaw\":\"3300\",\"headDamagePerMagazineRaw\":\"4380\",\"tacticalReloadRaw\":\"5\",\"emptyReloadRaw\":\"5.25\",\"damageDropoffMinRange\":\"30m\",\"damageDropoffMaxRange\":\"50m\",\"damageDropoffModifierAtMaxRange\":\"~53%\"}"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_m60",
     "class": "Heavy",
     "name": "M60",
@@ -1255,7 +1255,7 @@
     "rawValues": "{\"bodyDamageRaw\":\"20\",\"headDamageRaw\":\"30\",\"magazineRaw\":\"70\",\"damagePerMagazineRaw\":\"1400\",\"headDamagePerMagazineRaw\":\"2100\",\"tacticalReloadRaw\":\"3.55\",\"emptyReloadRaw\":\"3.55\",\"damageDropoffMinRange\":\"25m\",\"damageDropoffMaxRange\":\"35m\",\"damageDropoffModifierAtMaxRange\":\"~50%\"}"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_mgl-32",
     "class": "Heavy",
     "name": "Mgl-32",
@@ -1287,7 +1287,7 @@
     "rawValues": "{\"bodyDamageRaw\":\"83\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"6\",\"damagePerMagazineRaw\":\"498\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"2.85\",\"emptyReloadRaw\":\"3.1\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_sa1216",
     "class": "Heavy",
     "name": "Sa1216",
@@ -1319,7 +1319,7 @@
     "rawValues": "{\"bodyDamageRaw\":\"72\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"16 (4)\",\"damagePerMagazineRaw\":\"1152 (288)\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"2.35\",\"emptyReloadRaw\":\"3.25 (0.80)\",\"damageDropoffMinRange\":\"12.5m\",\"damageDropoffMaxRange\":\"20m\",\"damageDropoffModifierAtMaxRange\":\"~67%\"}"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_shak-50",
     "class": "Heavy",
     "name": "Shak-50",
@@ -1351,7 +1351,7 @@
     "rawValues": "{\"bodyDamageRaw\":\"30\",\"headDamageRaw\":\"45\",\"magazineRaw\":\"20\",\"damagePerMagazineRaw\":\"600\",\"headDamagePerMagazineRaw\":\"900\",\"tacticalReloadRaw\":\"2.4\",\"emptyReloadRaw\":\"3.2\",\"damageDropoffMinRange\":\"15m\",\"damageDropoffMaxRange\":\"25m\",\"damageDropoffModifierAtMaxRange\":\"~67%\"}"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_sledgehammer",
     "class": "Heavy",
     "name": "Sledgehammer",
@@ -1373,7 +1373,7 @@
     "ttkVsMediumHeadSeconds": null,
     "stkMediumHead": null,
     "ttkVsHeavyBodySeconds": null,
-    "stkHeavyBody": 4,
+    "stkHeavyBody": 3,
     "ttkVsHeavyHeadSeconds": null,
     "stkHeavyHead": null,
     "damageDropoffMinRange": null,
@@ -1384,7 +1384,7 @@
     "weaponType": "melee"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_sledgehammer_alt",
     "class": "Heavy",
     "name": "Sledgehammer (Alt.)",
@@ -1417,10 +1417,43 @@
     "weaponType": "melee"
   },
   {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
     "weaponId": "weapon_spear",
     "class": "Heavy",
     "name": "Spear",
+    "bodyDamage": 74,
+    "headDamage": null,
+    "rateOfFireRpm": null,
+    "magazineSize": null,
+    "damagePerMagazine": null,
+    "tacticalReloadTimeSeconds": null,
+    "emptyReloadTimeSeconds": null,
+    "shotsPerBurst": null,
+    "delayUntilNextBurstSeconds": null,
+    "ttkVsLightBodySeconds": null,
+    "stkLightBody": 3,
+    "ttkVsLightHeadSeconds": null,
+    "stkLightHead": null,
+    "ttkVsMediumBodySeconds": null,
+    "stkMediumBody": 4,
+    "ttkVsMediumHeadSeconds": null,
+    "stkMediumHead": null,
+    "ttkVsHeavyBodySeconds": null,
+    "stkHeavyBody": 5,
+    "ttkVsHeavyHeadSeconds": null,
+    "stkHeavyHead": null,
+    "damageDropoffMinRange": null,
+    "damageDropoffMaxRange": null,
+    "damageDropoffModifierAtMaxRange": null,
+    "sourceNotes": "Season 11 melee rework: primary precise 74, glancing 55; stamina recovery 3s.",
+    "rawValues": "{\"bodyDamageRaw\":\"74 precise / 55 glancing\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}",
+    "weaponType": "melee"
+  },
+  {
+    "batchId": "baseline_kromes_spreadsheet_11_0_0",
+    "weaponId": "weapon_spear_alt",
+    "class": "Heavy",
+    "name": "Spear (Alt.)",
     "bodyDamage": null,
     "headDamage": null,
     "rateOfFireRpm": null,
@@ -1440,39 +1473,6 @@
     "stkMediumHead": null,
     "ttkVsHeavyBodySeconds": null,
     "stkHeavyBody": null,
-    "ttkVsHeavyHeadSeconds": null,
-    "stkHeavyHead": null,
-    "damageDropoffMinRange": null,
-    "damageDropoffMaxRange": null,
-    "damageDropoffModifierAtMaxRange": null,
-    "sourceNotes": "Season 11 melee rework: primary precise 74, glancing 55; stamina recovery 3s.",
-    "rawValues": "{\"bodyDamageRaw\":\"74 precise / 55 glancing\",\"headDamageRaw\":\"-\",\"magazineRaw\":\"-\",\"damagePerMagazineRaw\":\"-\",\"headDamagePerMagazineRaw\":\"-\",\"tacticalReloadRaw\":\"-\",\"emptyReloadRaw\":\"-\",\"damageDropoffMinRange\":\"-\",\"damageDropoffMaxRange\":\"-\",\"damageDropoffModifierAtMaxRange\":\"-\"}",
-    "weaponType": "melee"
-  },
-  {
-    "batchId": "baseline_kromes_spreadsheet_10_6_0",
-    "weaponId": "weapon_spear_alt",
-    "class": "Heavy",
-    "name": "Spear (Alt.)",
-    "bodyDamage": null,
-    "headDamage": null,
-    "rateOfFireRpm": null,
-    "magazineSize": null,
-    "damagePerMagazine": null,
-    "tacticalReloadTimeSeconds": null,
-    "emptyReloadTimeSeconds": null,
-    "shotsPerBurst": null,
-    "delayUntilNextBurstSeconds": null,
-    "ttkVsLightBodySeconds": null,
-    "stkLightBody": 2,
-    "ttkVsLightHeadSeconds": null,
-    "stkLightHead": null,
-    "ttkVsMediumBodySeconds": null,
-    "stkMediumBody": 3,
-    "ttkVsMediumHeadSeconds": null,
-    "stkMediumHead": null,
-    "ttkVsHeavyBodySeconds": null,
-    "stkHeavyBody": 4,
     "ttkVsHeavyHeadSeconds": null,
     "stkHeavyHead": null,
     "damageDropoffMinRange": null,
