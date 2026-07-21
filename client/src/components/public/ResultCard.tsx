@@ -8,9 +8,17 @@ export interface ResultCardData {
   teams: number;
   prizePool: string;
   description?: string;
-  /** e.g. a VOD replay link for this specific event. */
-  action?: { label: string; href: string };
+  /** e.g. a details page or VOD replay link for this specific event. */
+  actions?: ResultCardAction[];
 }
+
+export interface ResultCardAction {
+  label: string;
+  /** Absolute (http) hrefs open in a new tab. */
+  href: string;
+}
+
+const isExternal = (href: string) => /^https?:\/\//.test(href);
 
 export default function ResultCard({ result }: { result: ResultCardData }) {
   return (
@@ -37,13 +45,21 @@ export default function ResultCard({ result }: { result: ResultCardData }) {
         <span>{result.teams} Teams</span>
         <span>{result.prizePool}</span>
       </div>
-      {result.action ? (
-        <a
-          href={result.action.href}
-          className="inline-flex w-fit items-center gap-1 font-mono text-xs font-bold uppercase tracking-widest text-[var(--mt-gold-bright)] hover:underline"
-        >
-          {result.action.label} →
-        </a>
+      {result.actions?.length ? (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          {result.actions.map(action => (
+            <a
+              key={action.href}
+              href={action.href}
+              {...(isExternal(action.href)
+                ? { target: "_blank", rel: "noopener noreferrer" }
+                : {})}
+              className="inline-flex w-fit items-center gap-1 font-mono text-xs font-bold uppercase tracking-widest text-[var(--mt-gold-bright)] hover:underline"
+            >
+              {action.label} →
+            </a>
+          ))}
+        </div>
       ) : null}
     </div>
   );

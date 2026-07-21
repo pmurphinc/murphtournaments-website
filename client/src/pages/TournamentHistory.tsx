@@ -24,7 +24,13 @@ const juneEntry: ResultCardData = {
   format: "Cashout Elim → BO5 Final",
   teams: 16,
   prizePool: "3D Printed Prize Bundle",
-  action: { label: "View Tournament Details", href: "/tournaments/june-2026" },
+  actions: [
+    { label: "View Tournament Details", href: "/tournaments/june-2026" },
+    {
+      label: "Watch Replay",
+      href: "https://www.twitch.tv/videos/2807784152",
+    },
+  ],
 };
 
 const pastTournaments: ResultCardData[] = [
@@ -37,7 +43,7 @@ const pastTournaments: ResultCardData[] = [
     format: "Finals Contender League, Grand Finals",
     description:
       "The grand finals of the Finals Contender League. 1 Up claimed the championship title after 5 weeks of league play.",
-    action: { label: "Watch Replay", href: fclReplayRoutes.day6 },
+    actions: [{ label: "Watch Replay", href: fclReplayRoutes.day6 }],
   },
   {
     name: "FCL – Day 5",
@@ -48,7 +54,7 @@ const pastTournaments: ResultCardData[] = [
     format: "Finals Contender League",
     description:
       "Day 5 of the Finals Contender League. League play week with no individual day winner.",
-    action: { label: "Watch Replay", href: fclReplayRoutes.day5 },
+    actions: [{ label: "Watch Replay", href: fclReplayRoutes.day5 }],
   },
   {
     name: "FCL – Day 4",
@@ -59,7 +65,7 @@ const pastTournaments: ResultCardData[] = [
     format: "Finals Contender League",
     description:
       "Day 4 of the Finals Contender League. League play week with no individual day winner.",
-    action: { label: "Watch Replay", href: fclReplayRoutes.day4 },
+    actions: [{ label: "Watch Replay", href: fclReplayRoutes.day4 }],
   },
   {
     name: "FCL – Day 3",
@@ -70,7 +76,7 @@ const pastTournaments: ResultCardData[] = [
     format: "Finals Contender League",
     description:
       "Day 3 of the Finals Contender League. League play week with no individual day winner.",
-    action: { label: "Watch Replay", href: fclReplayRoutes.day3 },
+    actions: [{ label: "Watch Replay", href: fclReplayRoutes.day3 }],
   },
   {
     name: "FCL – Day 2",
