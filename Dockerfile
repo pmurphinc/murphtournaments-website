@@ -17,4 +17,5 @@ RUN pnpm build
 FROM base AS runtime
 ENV NODE_ENV=production
 COPY --from=build /app /app
-CMD ["sh", "-c", "pnpm db:migrate && echo 'Database migrations completed successfully.' && pnpm start"]
+# Migrations run from Railway's pre-deploy command, not here.
+CMD ["pnpm", "start"]
