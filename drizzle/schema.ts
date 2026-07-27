@@ -371,6 +371,12 @@ export const teams = mysqlTable("teams", {
   managedTeamId: int("managedTeamId").references(() => managedTeams.id),
   name: varchar("name", { length: 255 }).notNull(),
   frp: int("frp").default(0).notNull(),
+  /**
+   * Map ban recorded when the managed team entered this tournament. Kept
+   * separate from `managed_teams.mapBanId` so a captain changing their ban
+   * later does not rewrite the ban an in-flight tournament was built on.
+   */
+  mapBanId: varchar("mapBanId", { length: 64 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

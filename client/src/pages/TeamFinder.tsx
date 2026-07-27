@@ -6,7 +6,6 @@ import TeamFinderListingCard from "@/components/TeamFinderListingCard";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
-import { DEFAULT_COMPETITIVE_MAP_IDS, THE_FINALS_MAPS } from "@/lib/finalsMaps";
 import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "../../../server/routers";
 
@@ -67,8 +66,6 @@ export default function TeamFinder() {
   const report = trpc.teamFinder.report.useMutation({ onSuccess: () => toast.success("Listing reported."), onError: e => toast.error(e.message) });
   const setHidden = trpc.teamFinder.setHidden.useMutation({ onSuccess: () => { toast.success("Listing moderation updated."); utils.teamFinder.list.invalidate(); }, onError: e => toast.error(e.message) });
   const invite = trpc.teamManagement.inviteByDiscordUsername.useMutation({ onSuccess: () => { toast.success("Team invitation sent."); utils.teamManagement.myTeams.invalidate(); }, onError: e => toast.error(e.data?.code === "CONFLICT" ? e.message : e.message) });
-  const updateMapBan = trpc.teamManagement.updateMapBan.useMutation({ onSuccess: () => { toast.success("Map ban saved."); utils.teamManagement.myTeams.invalidate(); }, onError: e => toast.error(e.message) });
-
 
   const sendInvite = (listing: TeamFinderListing) => {
     if (!listing.discordUsername) return toast.error("That player does not have a Discord username available.");
@@ -93,11 +90,6 @@ export default function TeamFinder() {
       <div className="mb-8 rounded-lg border border-yellow-400/25 bg-black/60 p-5">
         {!isDiscordUser ? <div className="flex flex-wrap items-center justify-between gap-4"><p className="text-white/75">Continue with Discord to post, edit, delete, or report listings.</p><Button asChild><a href="/api/auth/discord/login">Continue with Discord</a></Button></div> : <div className="flex flex-wrap items-center justify-between gap-4"><p className="flex items-center gap-2 text-sm text-white/70">Signed in as {user?.discordAvatarUrl ? <img src={user.discordAvatarUrl} alt="" className="h-7 w-7 rounded-full border border-neon-cyan/40 object-cover" referrerPolicy="no-referrer" /> : null}<span className="text-white">{displayName}</span>{user?.discordUsername ? <span className="text-white/50">(@{user.discordUsername})</span> : null}</p><Button onClick={() => { setEditingId(null); setForm(defaults); setFormOpen(v => !v); }}>{formOpen ? "Close form" : "Post listing"}</Button></div>}
       </div>
-
-      {isDiscordUser && captainTeams.length > 0 && <section className="mb-8 rounded-lg border border-neon-cyan/25 bg-black/60 p-5">
-        <h2 className="mb-3 font-mono text-sm font-black uppercase tracking-widest text-neon-cyan">Team Map Bans</h2>
-        <div className="grid gap-3 md:grid-cols-2">{captainTeams.map(team => <label key={team.id} className="grid gap-1 text-sm text-white/75"><span className="font-mono uppercase tracking-wider text-white/50">{team.name}</span><select value={team.mapBanId ?? ""} disabled={updateMapBan.isPending} onChange={event => updateMapBan.mutate({ teamId: team.id, mapBanId: event.target.value || null })} className="rounded border border-white/15 bg-black px-3 py-2 text-white"><option value="">No Map Ban</option>{DEFAULT_COMPETITIVE_MAP_IDS.map(mapId => <option key={mapId} value={mapId}>{THE_FINALS_MAPS.find(map => map.id === mapId)?.name ?? mapId}</option>)}</select></label>)}</div>
-      </section>}
 
       {formOpen && isDiscordUser && <form className="mb-8 grid gap-5 rounded-lg border border-neon-cyan/25 bg-black/70 p-5" onSubmit={e => { e.preventDefault(); editingId ? update.mutate({ id: editingId, ...payload }) : create.mutate(payload); }}>
         <Segmented label="Goal" value={form.listingType} options={groups.listingType} onChange={listingType => setForm({ ...form, listingType })} />

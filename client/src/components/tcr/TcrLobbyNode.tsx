@@ -24,6 +24,12 @@ import {
 } from "@/components/ui/context-menu";
 import { DEFAULT_COMPETITIVE_MAP_IDS, THE_FINALS_MAPS } from "@/lib/finalsMaps";
 import {
+  buildMapBanLookup,
+  formatBannedMapOptionLabel,
+  formatMapBanSummary,
+  getLobbyMapBans,
+} from "@/lib/tcrMapBans";
+import {
   getGameStatusClasses,
   getLobbyTimerDisplay,
   hasOpenLobbySlot,
@@ -398,6 +404,9 @@ export default function TcrLobbyNode(props: TcrLobbyNodeProps) {
       : timer.state === "final"
         ? "border-[#FFD700]/40 bg-[#FFD700]/10 text-[#FFD700]"
         : "border-white/10 bg-white/5 text-zinc-500";
+  const mapBans = getLobbyMapBans(assignments, props.teamsById);
+  const mapBansById = buildMapBanLookup(mapBans);
+  const selectedMapBan = game.mapId ? mapBansById.get(game.mapId) : undefined;
 
   const handleDrop = (
     event: ReactDragEvent<HTMLElement>,
@@ -559,13 +568,45 @@ export default function TcrLobbyNode(props: TcrLobbyNodeProps) {
                     Legacy map: {mapsById.get(game.mapId) ?? game.mapId}
                   </option>
                 )}
-                {competitiveMaps.map(map => (
-                  <option key={map.id} value={map.id}>
-                    {map.name}
-                  </option>
-                ))}
+                {competitiveMaps.map(map => {
+                  const ban = mapBansById.get(map.id);
+                  return (
+                    <option key={map.id} value={map.id}>
+                      {ban
+                        ? formatBannedMapOptionLabel(map.name, ban)
+                        : map.name}
+                    </option>
+                  );
+                })}
               </select>
             </div>
+            {mapBans.length > 0 && (
+              <p
+                className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5 rounded-md border border-red-400/25 bg-red-500/5 px-1.5 py-1 text-[11px] leading-snug text-zinc-400"
+                title={`Banned: ${formatMapBanSummary(mapBans)}`}
+              >
+                <span className="shrink-0 font-semibold uppercase tracking-wide text-red-200">
+                  Banned
+                </span>
+                {mapBans.map(ban => (
+                  <span key={ban.mapId} className="min-w-0">
+                    <span className="text-red-200/90 line-through">
+                      {ban.mapName}
+                    </span>
+                    <span className="text-zinc-500">
+                      {" "}
+                      ({ban.teamNames.join(", ")})
+                    </span>
+                  </span>
+                ))}
+              </p>
+            )}
+            {selectedMapBan && (
+              <p className="rounded-md border border-amber-400/40 bg-amber-400/10 px-1.5 py-1 text-[11px] leading-snug text-amber-100">
+                {selectedMapBan.mapName} is banned by{" "}
+                {selectedMapBan.teamNames.join(", ")}.
+              </p>
+            )}
             <div className="flex min-w-0 items-center justify-between gap-2">
               {game.broadcastUrl && (
                 <span className="shrink-0 whitespace-nowrap rounded-md border border-cyan-300/30 bg-cyan-300/10 px-1.5 py-0.5 text-[11px] font-medium text-cyan-100">

@@ -981,6 +981,9 @@ async function fetchTournamentRows(db: QueryExecutor, tournamentId: number) {
           createdAt: teams.createdAt,
           updatedAt: teams.updatedAt,
           captainUserId: managedTeams.captainUserId,
+          mapBanId: sql<
+            string | null
+          >`COALESCE(${teams.mapBanId}, ${managedTeams.mapBanId})`,
           captainDiscordOpenId: users.openId,
           captainDisplayName: sql<
             string | null
@@ -1279,7 +1282,14 @@ async function getEligibleMapIdsForGameRandomization(
   gameId: number
 ) {
   const rows = await db
-    .select({ mapBanId: managedTeams.mapBanId })
+    .select({
+      // Prefer the ban logged when the team entered the tournament; fall back
+      // to the managed team's current ban for teams that entered before bans
+      // were recorded on the tournament roster.
+      mapBanId: sql<
+        string | null
+      >`COALESCE(${teams.mapBanId}, ${managedTeams.mapBanId})`,
+    })
     .from(tournamentGameAssignments)
     .innerJoin(teams, eq(tournamentGameAssignments.teamId, teams.id))
     .leftJoin(managedTeams, eq(teams.managedTeamId, managedTeams.id))
@@ -2758,6 +2768,8 @@ async function approveSubmission(submissionId: number) {
         managedTeamId: row.submission.managedTeamId,
         name: row.managedTeam.name,
         frp: 0,
+        // Log the captain's map ban as it stands when the team enters.
+        mapBanId: row.managedTeam.mapBanId,
       });
       changed = true;
     }
