@@ -9,6 +9,8 @@ export type ControlTeamView = {
   id: number;
   name: string;
   managedTeamId?: number | null;
+  /** Map ban logged when this team entered the tournament. */
+  mapBanId?: string | null;
   captainUserId?: number | null;
   captainDiscordId?: string | null;
   captainDisplayName?: string | null;

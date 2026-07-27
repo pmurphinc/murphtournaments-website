@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import {
+  Ban,
   Boxes,
   CheckCircle2,
   CircleDashed,
@@ -20,6 +21,11 @@ import {
   Wand2,
 } from "lucide-react";
 import { DEFAULT_COMPETITIVE_MAP_IDS, THE_FINALS_MAPS } from "@/lib/finalsMaps";
+import {
+  buildMapBanLookup,
+  formatBannedMapOptionLabel,
+  getLobbyMapBans,
+} from "@/lib/tcrMapBans";
 import {
   roundFrameColorIds,
   roundFrameThemes,
@@ -132,6 +138,9 @@ function LobbySection(props: TcrInspectorProps) {
   const locked = props.isFinalized;
   const isComplete = game.status === "complete";
   const hasOpenSlot = !isComplete && assignments.length < capacity;
+  const mapBans = getLobbyMapBans(assignments, props.teamsById);
+  const mapBansById = buildMapBanLookup(mapBans);
+  const selectedMapBan = game.mapId ? mapBansById.get(game.mapId) : undefined;
 
   return (
     <div className="space-y-4">
@@ -213,11 +222,14 @@ function LobbySection(props: TcrInspectorProps) {
                 Legacy map: {mapsById.get(game.mapId) ?? game.mapId}
               </option>
             )}
-            {competitiveMaps.map(map => (
-              <option key={map.id} value={map.id}>
-                {map.name}
-              </option>
-            ))}
+            {competitiveMaps.map(map => {
+              const ban = mapBansById.get(map.id);
+              return (
+                <option key={map.id} value={map.id}>
+                  {ban ? formatBannedMapOptionLabel(map.name, ban) : map.name}
+                </option>
+              );
+            })}
           </select>
           <button
             type="button"
@@ -230,6 +242,36 @@ function LobbySection(props: TcrInspectorProps) {
             <Shuffle className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
+        {mapBans.length > 0 && (
+          <div className="space-y-1 rounded-md border border-red-400/25 bg-red-500/5 px-2.5 py-2">
+            <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-red-200">
+              <Ban className="h-3 w-3 shrink-0" aria-hidden="true" />
+              Team map bans
+            </p>
+            <ul className="space-y-0.5">
+              {mapBans.map(ban => (
+                <li key={ban.mapId} className="text-xs leading-snug">
+                  <span className="font-medium text-red-200/90 line-through">
+                    {ban.mapName}
+                  </span>
+                  <span className="text-zinc-400">
+                    {" "}
+                    — {ban.teamNames.join(", ")}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-[11px] leading-snug text-zinc-500">
+              Randomize skips banned maps. You can still pick one manually.
+            </p>
+          </div>
+        )}
+        {selectedMapBan && (
+          <p className="rounded-md border border-amber-400/40 bg-amber-400/10 px-2.5 py-2 text-xs leading-snug text-amber-100">
+            Heads up: {selectedMapBan.mapName} is currently selected but banned
+            by {selectedMapBan.teamNames.join(", ")}.
+          </p>
+        )}
       </div>
 
       {game.gameType === "final_round" && (

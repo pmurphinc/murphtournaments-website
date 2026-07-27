@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  Ban,
   ExternalLink,
   Copy,
   Crown,
@@ -15,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
+import { DEFAULT_COMPETITIVE_MAP_IDS, THE_FINALS_MAPS } from "@/lib/finalsMaps";
 import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "../../../server/routers";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -168,6 +170,77 @@ function InviteLinks({
   );
 }
 
+const competitiveMaps = DEFAULT_COMPETITIVE_MAP_IDS.map(mapId => ({
+  id: mapId,
+  name: THE_FINALS_MAPS.find(map => map.id === mapId)?.name ?? mapId,
+}));
+
+function MapBan({
+  team,
+  isCaptain,
+  onChange,
+  isBusy,
+}: {
+  team: ManagedTeam;
+  isCaptain: boolean;
+  onChange: (mapBanId: string | null) => void;
+  isBusy: boolean;
+}) {
+  const banName = team.mapBanId
+    ? (competitiveMaps.find(map => map.id === team.mapBanId)?.name ??
+      team.mapBanId)
+    : null;
+  const selectId = `map-ban-${team.id}`;
+  return (
+    <div className="rounded-xl border border-red-400/25 bg-red-500/5 p-4">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="flex items-center gap-2 font-mono text-sm uppercase text-red-200">
+          <Ban className="h-4 w-4" /> Map Ban
+        </h3>
+        <span className="rounded border border-red-400/30 bg-black/40 px-2 py-0.5 text-xs text-white/70">
+          {banName ? (
+            <span className="font-semibold text-red-200 line-through">
+              {banName}
+            </span>
+          ) : (
+            "No map ban"
+          )}
+        </span>
+      </div>
+      {isCaptain ? (
+        <>
+          <label className="sr-only" htmlFor={selectId}>
+            Map ban for {team.name}
+          </label>
+          <select
+            id={selectId}
+            value={team.mapBanId ?? ""}
+            disabled={isBusy}
+            onChange={event => onChange(event.target.value || null)}
+            className="w-full rounded border border-white/15 bg-black px-3 py-2 text-sm text-white disabled:opacity-50"
+          >
+            <option value="">No Map Ban</option>
+            {competitiveMaps.map(map => (
+              <option key={map.id} value={map.id}>
+                {map.name}
+              </option>
+            ))}
+          </select>
+          <p className="mt-2 text-xs leading-relaxed text-white/50">
+            Pick one map your team wants kept out of play. Your ban is recorded
+            when the team is approved into a tournament, and the Control Room
+            randomizer will not draw it for your lobbies.
+          </p>
+        </>
+      ) : (
+        <p className="text-sm text-white/55">
+          Only the captain can change the team map ban.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function TeamManagement() {
   const { user } = useAuth();
   const isDiscordUser = user?.loginMethod === "discord";
@@ -264,6 +337,10 @@ export default function TeamManagement() {
   });
   const revokeJoinLink = trpc.teamManagement.revokeJoinLink.useMutation({
     onSuccess: () => ok("Invite link revoked."),
+    onError: e => toast.error(e.message),
+  });
+  const updateMapBan = trpc.teamManagement.updateMapBan.useMutation({
+    onSuccess: () => ok("Map ban saved."),
     onError: e => toast.error(e.message),
   });
   const hasTeamMembership = (query.data?.teams.length ?? 0) > 0;
@@ -565,6 +642,14 @@ export default function TeamManagement() {
                         ))}
                       </div>
                     </div>
+                    <MapBan
+                      team={team}
+                      isCaptain={isCaptain}
+                      isBusy={updateMapBan.isPending}
+                      onChange={mapBanId =>
+                        updateMapBan.mutate({ teamId: team.id, mapBanId })
+                      }
+                    />
                     <div className="rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/5 p-4">
                       <h3 className="mb-2 flex items-center gap-2 font-mono text-sm uppercase text-yellow-300">
                         <Trophy className="h-4 w-4" /> Tournament Record
