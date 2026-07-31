@@ -8,6 +8,8 @@ export default defineConfig({
       "server/communityTournaments.test.ts",
       "server/tournamentControlLobbyTimer.test.ts",
       "server/teamManagement.test.ts",
+      "server/patchNotes.test.ts",
+      "server/weaponArchiveData.test.ts",
     ],
     environment: "node",
   },

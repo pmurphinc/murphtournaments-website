@@ -80,19 +80,34 @@ describe("patchNotes.getAll", () => {
     const caller = appRouter.createCaller(ctx);
     const result = await caller.patchNotes.getAll();
 
-    expect(result).toHaveLength(3);
+    expect(result).toHaveLength(6);
     expect(result[0]).toMatchObject({
-      id: -1060,
-      title: "Midseason Update 10.6.0",
-      date: "2026.05.07",
-      url: "https://www.reachthefinals.com/patchnotes/10-60",
-      version: "10.6.0",
+      id: -1130,
+      title: "Update 11.3.0",
+      date: "2026.07.30",
+      url: "https://www.reachthefinals.com/patchnotes/11-30",
+      version: "11.3.0",
     });
-    expect(result[0].content).toContain("Dragon’s Claim Limited-Time Mode");
     expect(result[0].content).toContain(
-      "V9S: magazine size decreased from 20 to 18."
+      "C4: cooldown increased from 30s to 45s."
     );
-    expect(result[1]).toEqual({
+    expect(result[0].content).toContain(
+      "Dome Shield: fixed friendly melee attacks damaging the shield."
+    );
+    for (const expectedChange of [
+      "Grappling Hook: cooldown decreased from 7s to 6s.",
+      "BFR: damage increased from 88 to 90",
+      "Dagger: primary and secondary lunge distance increased from 4.5m to 5m",
+      "Dual Blades: Precision zone angle increased from 8° to 9°",
+      "FAMAS: damage increased from 23 to 24",
+      "KS-23: damage decreased from 110 to 104",
+      "Riot Shield: Precision zone angle increased from 9° to 10°",
+      "Spear: primary precise damage increased from 74 to 82",
+    ]) {
+      expect(result[0].content).toContain(expectedChange);
+    }
+
+    expect(result.find(note => note.version === "10.3.0")).toEqual({
       id: 5,
       title: "UPDATE 10.3.0",
       date: "2026.04.17",
@@ -100,7 +115,7 @@ describe("patchNotes.getAll", () => {
       url: "https://www.reachthefinals.com/patchnotes/1030",
       version: "10.3.0",
     });
-    expect(result[2]).toEqual({
+    expect(result.find(note => note.version === "10.0.0")).toEqual({
       id: 4,
       title: "SEASON 10 | FANTASY LEAGUE",
       date: "2026.03.26",
@@ -122,11 +137,11 @@ describe("patchNotes.getAll", () => {
     const caller = appRouter.createCaller(ctx);
     const result = await caller.patchNotes.getAll();
 
-    expect(result).toHaveLength(1);
+    expect(result).toHaveLength(4);
     expect(result[0]).toMatchObject({
-      id: -1060,
-      title: "Midseason Update 10.6.0",
-      version: "10.6.0",
+      id: -1130,
+      title: "Update 11.3.0",
+      version: "11.3.0",
     });
   });
 
@@ -137,11 +152,11 @@ describe("patchNotes.getAll", () => {
     const caller = appRouter.createCaller(ctx);
     const result = await caller.patchNotes.getAll();
 
-    expect(result).toHaveLength(1);
+    expect(result).toHaveLength(4);
     expect(result[0]).toMatchObject({
-      id: -1060,
-      title: "Midseason Update 10.6.0",
-      version: "10.6.0",
+      id: -1130,
+      title: "Update 11.3.0",
+      version: "11.3.0",
     });
   });
 });

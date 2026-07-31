@@ -60,3 +60,64 @@ describe("Model 1887 Season 11 archive data", () => {
     );
   });
 });
+
+describe("Update 11.3.0 archive data", () => {
+  it.each([
+    ["c4-heavy", "Increased cooldown from 30s to 45s"],
+    ["grappling-hook-light", "Decreased cooldown from 7s to 6s"],
+    ["bfm-titan", "Increased damage from 88 to 90"],
+    ["dagger", "Lunge distance and reliability increased"],
+    [
+      "dual-blades",
+      "Precision, lunge, Cross Slash, and Deflect movement improved",
+    ],
+    ["famas", "Increased damage from 23 to 24"],
+    [
+      "ks-23",
+      "Damage decreased from 110 to 104; falloff multiplier increased from 0.64 to 0.675",
+    ],
+    [
+      "riot-shield",
+      "Precision, lunge, damage, and Shield Bash reliability increased",
+    ],
+    ["spear", "Primary and secondary attack damage increased"],
+    [
+      "dome-shield-heavy",
+      "Fixed friendly melee attacks damaging the Dome Shield",
+    ],
+  ])("adds the official 11.3.0 history entry for %s", async (slug, summary) => {
+    const detail = await getWeaponArchiveDetail(slug);
+    const update = detail?.history.find(
+      entry => entry.patch.versionLabel === "11.3.0"
+    );
+
+    expect(update?.patch).toMatchObject({
+      title: "Update 11.3.0",
+      patchDate: "2026-07-30",
+      sourceUrl: "https://www.reachthefinals.com/patchnotes/11-30",
+    });
+    expect(update?.changes.map(change => change.changeSummary)).toContain(
+      summary
+    );
+  });
+
+  it.each([
+    ["bfm-titan", 90, 135, 450],
+    ["famas", 24, 36, 648],
+    ["ks-23", 104, null, 624],
+    ["riot-shield", 83, null, null],
+    ["spear", 82, null, null],
+  ])(
+    "advances the current %s baseline through Update 11.3.0",
+    async (slug, bodyDamage, headDamage, damagePerMagazine) => {
+      const detail = await getWeaponArchiveDetail(slug);
+
+      expect(detail?.baselineSource?.versionLabel).toBe("11.3.0");
+      expect(detail?.baselineStats[0]).toMatchObject({
+        bodyDamage,
+        headDamage,
+        damagePerMagazine,
+      });
+    }
+  );
+});
