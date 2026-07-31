@@ -60,6 +60,38 @@ export const cleanPatchNoteContent = (content: string) => {
 
 export const WEBSITE_PATCH_NOTES: WebsitePatchNote[] = [
   {
+    id: -1130,
+    title: "Update 11.3.0",
+    date: "2026.07.30",
+    version: "11.3.0",
+    url: "https://www.reachthefinals.com/patchnotes/11-30",
+    sourceUrl: "https://www.reachthefinals.com/patchnotes/11-30",
+    isGameUpdate: 1,
+    content: `THE FINALS — Update 11.3.0
+
+Balance Changes
+
+Gadgets
+• C4: cooldown increased from 30s to 45s. The longer cooldown reduces how often Heavy teams can use C4 during a Cashout fight.
+
+Specializations
+• Grappling Hook: cooldown decreased from 7s to 6s. This is a small usage buff that avoids larger changes that could disrupt map pacing or split teams.
+
+Weapons
+• BFR: damage increased from 88 to 90 to improve its performance against other Heavy weapons.
+• Dagger: primary and secondary lunge distance increased from 4.5m to 5m; max lunge speed increased slightly; secondary sweep time increased slightly so backstabs connect more reliably at maximum lunge distance.
+• Dual Blades: Precision zone angle increased from 8° to 9°; primary lunge distance increased from 4.5m to 5m; max lunge speed increased slightly; Cross Slash now lunges forward at full Stamina even without forward input; Deflect movement speed increased by 25%.
+• FAMAS: damage increased from 23 to 24 to bring it closer to the main cluster of Medium weapons.
+• KS-23: damage decreased from 110 to 104; damage falloff multiplier increased from 0.64 to 0.675 so maximum-range damage remains consistent. The weapon retains part of its Season 11 close-range buff while losing several combo and DPS breakpoints.
+• Riot Shield: Precision zone angle increased from 9° to 10°; primary lunge distance increased from 4.25m to 5m; primary damage increased from 82 to 83; Shield Bash now lunges forward at full Stamina without requiring forward input.
+• Spear: primary precise damage increased from 74 to 82; primary base damage increased from 55 to 57; secondary swing sequence increased from 75/100/125 to 75/125/150.
+
+Bug Fixes
+
+Gadgets
+• Dome Shield: fixed friendly melee attacks damaging the shield.`,
+  },
+  {
     id: -1100,
     title: "Season 11 | Galaxy Masters",
     date: "2026.07.09",

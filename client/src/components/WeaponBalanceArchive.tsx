@@ -81,6 +81,24 @@ function getClassColor(value: string | null | undefined) {
   return CLASS_COLORS[value ?? ""] ?? "#9ba1a6";
 }
 
+const normalizeChangeCopy = (value: string | null | undefined) =>
+  (value ?? "")
+    .trim()
+    .replace(/[.!?]+$/g, "")
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+
+export function hasDistinctChangeText(
+  changeSummary: string | null | undefined,
+  changeText: string | null | undefined
+) {
+  const normalizedText = normalizeChangeCopy(changeText);
+  return (
+    normalizedText.length > 0 &&
+    normalizedText !== normalizeChangeCopy(changeSummary)
+  );
+}
+
 function FilterChip({
   label,
   active,
@@ -112,10 +130,7 @@ function ArchiveSkeleton() {
   return (
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
       {Array.from({ length: 9 }).map((_, index) => (
-        <div
-          key={index}
-          className="mt-panel h-32 animate-pulse"
-        />
+        <div key={index} className="mt-panel h-32 animate-pulse" />
       ))}
     </div>
   );
@@ -643,6 +658,10 @@ function ArchiveDetail({ slug }: { slug: string }) {
                   const cfg =
                     CHANGE_TYPE_CONFIG[change.changeType ?? "adjustment"] ??
                     CHANGE_TYPE_CONFIG.adjustment;
+                  const showChangeText = hasDistinctChangeText(
+                    change.changeSummary,
+                    change.changeText
+                  );
                   return (
                     <article
                       key={change.id}
@@ -670,9 +689,14 @@ function ArchiveDetail({ slug }: { slug: string }) {
                           </span>
                         ) : null}
                       </div>
-                      <p className="text-sm leading-6 text-[var(--mt-off-white)]">
+                      <p className="text-sm font-semibold leading-6 text-[var(--mt-off-white)]">
                         {change.changeSummary ?? change.changeText}
                       </p>
+                      {showChangeText ? (
+                        <p className="mt-2 text-sm leading-6 text-[var(--mt-muted)]">
+                          {change.changeText}
+                        </p>
+                      ) : null}
                       {change.oldValue || change.newValue ? (
                         <div className="mt-2 flex flex-wrap items-center gap-2">
                           {change.oldValue ? (

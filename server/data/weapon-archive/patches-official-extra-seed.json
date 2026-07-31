@@ -1,5 +1,14 @@
 [
   {
+    "id": "patch_11_3_0_official",
+    "versionLabel": "11.3.0",
+    "title": "Update 11.3.0",
+    "patchDate": "2026-07-30",
+    "seasonLabel": "Season 11",
+    "sourceUrl": "https://www.reachthefinals.com/patchnotes/11-30",
+    "sourceType": "official"
+  },
+  {
     "id": "patch_11_0_0_official",
     "versionLabel": "11.0.0",
     "title": "Season 11 | Galaxy Masters",
