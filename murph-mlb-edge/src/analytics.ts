@@ -1,0 +1,12 @@
+export type NullableNumber=number|null;
+export const cleanHeader=(s:string)=>s.replace(/^\uFEFF/,'').trim();
+export const value=(s:string):string|number|null=>{const v=s.trim();if(!v||v.toUpperCase()==='N/A')return null;const n=Number(v);return Number.isFinite(n)?n:v};
+export function parseCSV(csv:string){const [head,...lines]=csv.replace(/\r/g,'').split('\n').filter(Boolean);const keys=head.split(',').map(cleanHeader);return lines.map(line=>Object.fromEntries(line.split(',').map((v,i)=>[keys[i],value(v)])));}
+export function joinById<A extends Record<K,unknown>,B extends Record<K,unknown>,K extends string>(a:A[],b:B[],key:K){const m=new Map(b.map(x=>[Number(x[key]),x]));return a.map(x=>({...x,...m.get(Number(x[key]))}));}
+export function percentiles(values:NullableNumber[],reverse=false){const valid=values.filter((v):v is number=>v!==null&&Number.isFinite(v)).sort((a,b)=>a-b);return values.map(v=>v===null||!valid.length?null:(valid.length===1?100:100*(valid.lastIndexOf(v)/(valid.length-1)))) .map(v=>v===null?null:reverse?100-v:v);}
+export function weightedScore(parts:{value:NullableNumber;weight:number}[]){const valid=parts.filter(p=>p.value!==null);const weights=valid.reduce((n,p)=>n+p.weight,0);return weights?valid.reduce((n,p)=>n+(p.value as number)*p.weight,0)/weights:null;}
+export const qualification=(games:number,type:'hitter'|'starter',sample:number)=>sample>=(type==='hitter'?3.1:1)*games;
+export function availability(yesterday:number,threeDays:number,consecutive:number,appeared:boolean){if(!appeared)return 'Fresh';if(yesterday>=35||threeDays>=60||consecutive>=3)return 'Likely unavailable';if(yesterday>=25||threeDays>=45||consecutive>=2)return 'Limited';return 'Available';}
+export function dedupePlayers<T extends {player_id:number;team_id:number;current?:boolean}>(p:T[]){return [...new Map([...p].sort((a,b)=>Number(a.current)-Number(b.current)).map(x=>[x.player_id,x])).values()]}
+export function compare(a:Record<string,number|null>,b:Record<string,number|null>,lower:string[]=[]){return Object.keys(a).map(metric=>({metric,a:a[metric],b:b[metric],winner:a[metric]===null||b[metric]===null?null:a[metric]===b[metric]?'tie':((a[metric] as number)>(b[metric] as number))!==lower.includes(metric)?'a':'b'}));}
+export function market(model:number,market:number){const edge=model-market;const decimal=1/(market/100);const ev=(model/100)*(decimal-1)-(1-model/100);const kelly=Math.max(0,Math.min(.05,((decimal-1)*(model/100)-(1-model/100))/(decimal-1)/4));return{edge,breakEven:market,ev,kelly};}

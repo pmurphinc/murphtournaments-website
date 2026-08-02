@@ -1,0 +1,10 @@
+{
+  "updated": null,
+  "season": 2026,
+  "data": {},
+  "failed": [
+    "/api/v1/teams?sportId=1&season=2026: fetch failed",
+    "/api/v1/standings?leagueId=103,104&season=2026: fetch failed",
+    "/api/v1/schedule?sportId=1&date=2026-08-02&hydrate=probablePitcher,team: fetch failed"
+  ]
+}

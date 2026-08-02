@@ -1,0 +1,9 @@
+import {teams} from './teams';
+export type Snapshot={teams:typeof teams;standings:any[];stats:any[];games:any[];hitters:any[];pitchers:any[];updated:string;failed:string[]};
+const KEY='murph-mlb-edge-snapshot-v1'; export const empty:Snapshot={teams,standings:[],stats:[],games:[],hitters:[],pitchers:[],updated:'',failed:[]};
+export const read=():Snapshot=>{try{return JSON.parse(localStorage.getItem(KEY)||'null')||empty}catch{return empty}};
+export function completeness(s:Snapshot){return Math.round(100*[s.teams.length===30,s.standings.length>0,s.stats.length>0,s.games.length>0,s.hitters.length>0,s.pitchers.length>0].filter(Boolean).length/6)}
+async function get(path:string){const r=await fetch(`https://statsapi.mlb.com${path}`);if(!r.ok)throw new Error(`${path}: HTTP ${r.status}`);return r.json()}
+export async function sync(previous=read(),fetcher=get):Promise<Snapshot>{const season=new Date().getFullYear(),date=new Date().toISOString().slice(0,10),failed:string[]=[];let standings:any[]=[],games:any[]=[];for(const [name,path] of [['standings',`/api/v1/standings?leagueId=103,104&season=${season}&hydrate=team`],['games',`/api/v1/schedule?sportId=1&date=${date}&hydrate=probablePitcher,team`]] as const){try{const j=await fetcher(path);if(name==='standings')standings=j.records?.flatMap((r:any)=>r.teamRecords)||[];else games=j.dates?.flatMap((d:any)=>d.games)||[]}catch(e){failed.push(String(e))}}
+ const next={...previous,standings:standings.length?standings:previous.standings,games:games.length?games:previous.games,failed,updated:standings.length||games.length?new Date().toISOString():previous.updated};if(!standings.length&&!games.length&&previous.updated)return next;localStorage.setItem(KEY,JSON.stringify(next));return next}
+export const clear=()=>localStorage.removeItem(KEY);
