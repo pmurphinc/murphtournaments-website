@@ -529,6 +529,10 @@ export default function TournamentControlRoom({
     },
     onError: (error: { message: string }) => toast.error(error.message),
   });
+  const createCashout =
+    controlApi.createCashoutLobby.useMutation(mutationOptions);
+  const createFinal =
+    controlApi.createFinalRoundMatch.useMutation(mutationOptions);
   const createGameNode = controlApi.createGameNode.useMutation(mutationOptions);
   const moveGame = controlApi.moveGame.useMutation(mutationOptions);
   const moveGames = controlApi.moveGames.useMutation({

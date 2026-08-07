@@ -48,11 +48,7 @@ import {
   type ControlTeamView,
   type InspectorSelection,
 } from "./types";
-import {
-  getTournamentGameMode,
-  tournamentGameModeList,
-  type TournamentGameType,
-} from "../../../../shared/finalsGameModes";
+import { getTournamentGameMode } from "../../../../shared/finalsGameModes";
 
 const competitiveMaps = THE_FINALS_MAPS.filter(map =>
   DEFAULT_COMPETITIVE_MAP_IDS.includes(map.id)
