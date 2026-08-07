@@ -37,12 +37,43 @@ export const users = mysqlTable(
     discordDisplayName: varchar("discordDisplayName", { length: 255 }),
     discordUsername: varchar("discordUsername", { length: 255 }),
     discordAvatarUrl: varchar("discordAvatarUrl", { length: 512 }),
+    developmentDivisionMember: int("developmentDivisionMember")
+      .default(0)
+      .notNull(),
   },
   table => [index("users_discordUsername_idx").on(table.discordUsername)]
 );
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
+
+export const developmentDivisionInviteLinks = mysqlTable(
+  "development_division_invite_links",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    createdByUserId: int("createdByUserId")
+      .notNull()
+      .references(() => users.id),
+    tokenHash: varchar("tokenHash", { length: 64 }).notNull(),
+    status: mysqlEnum("status", ["active", "revoked"])
+      .default("active")
+      .notNull(),
+    expiresAt: timestamp("expiresAt"),
+    maxUses: int("maxUses"),
+    useCount: int("useCount").default(0).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    uniqueIndex("development_division_invite_links_tokenHash_unique").on(
+      table.tokenHash
+    ),
+    index("development_division_invite_links_status_idx").on(table.status),
+  ]
+);
+
+export type DevelopmentDivisionInviteLink =
+  typeof developmentDivisionInviteLinks.$inferSelect;
 
 export const managedTeams = mysqlTable(
   "managed_teams",

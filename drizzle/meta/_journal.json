@@ -225,6 +225,13 @@
       "when": 1785110400000,
       "tag": "0031_add_tournament_team_map_ban",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "5",
+      "when": 1786060800000,
+      "tag": "0032_development_division_membership",
+      "breakpoints": true
     }
   ]
 }
