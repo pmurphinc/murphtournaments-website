@@ -96,8 +96,7 @@ export type TcrInspectorProps = {
   teamsById: ReadonlyMap<number, ControlTeamView>;
   // Board quick actions (empty selection)
   onCreateTeam: () => void;
-  onCreateCashoutLobby: () => void;
-  onCreateFinalRoundMatch: () => void;
+  onCreateGame: (gameType: TournamentGameType) => void;
   onOpenHelp: () => void;
   // Lobby actions
   onRenameLobby: (game: ControlGameView) => void;
@@ -714,22 +713,22 @@ function BoardSection(props: TcrInspectorProps) {
             <Plus className="h-4 w-4" aria-hidden="true" />
             New Team…
           </button>
-          <button
-            type="button"
-            className={tcrSecondaryButtonClass}
-            onClick={props.onCreateCashoutLobby}
-          >
-            <Boxes className="h-4 w-4" aria-hidden="true" />
-            New Cashout Lobby
-          </button>
-          <button
-            type="button"
-            className={tcrSecondaryButtonClass}
-            onClick={props.onCreateFinalRoundMatch}
-          >
-            <Crown className="h-4 w-4" aria-hidden="true" />
-            New Final Round Match
-          </button>
+          {tournamentGameModeList.map(mode => (
+            <button
+              key={mode.id}
+              type="button"
+              className={`${tcrSecondaryButtonClass} justify-between`}
+              onClick={() => props.onCreateGame(mode.id)}
+            >
+              <span className="inline-flex items-center gap-2">
+                <Boxes className="h-4 w-4" aria-hidden="true" />
+                New {mode.nodeLabel}
+              </span>
+              <span className="text-xs text-zinc-500">
+                {mode.teamsPerLobby} × {mode.activePlayersPerTeam}
+              </span>
+            </button>
+          ))}
         </div>
       )}
       <button

@@ -10,6 +10,7 @@ import type {
   ControlTeamView,
   InspectorSelection,
 } from "./types";
+import { tournamentGameModeList } from "../../../../shared/finalsGameModes";
 
 const noop = () => undefined;
 
@@ -88,8 +89,7 @@ function makeInspectorProps(
     championTeamId: null,
     teamsById,
     onCreateTeam: noop,
-    onCreateCashoutLobby: noop,
-    onCreateFinalRoundMatch: noop,
+    onCreateGame: noop,
     onOpenHelp: noop,
     onRenameLobby: noop,
     onSetStatus: noop,
@@ -268,8 +268,23 @@ describe("TcrInspector board and scoreboard", () => {
     );
     expect(html).toContain("Nothing selected");
     expect(html).toContain("New Team…");
-    expect(html).toContain("New Cashout Lobby");
-    expect(html).toContain("New Final Round Match");
+    for (const mode of tournamentGameModeList) {
+      expect(html).toContain(`New ${mode.nodeLabel}`);
+      expect(html).toContain(
+        `${mode.teamsPerLobby} × ${mode.activePlayersPerTeam}`
+      );
+    }
+  });
+
+  it("hides every board creation action when finalized", () => {
+    const html = renderToStaticMarkup(
+      <TcrInspector
+        {...makeInspectorProps({ kind: "board" }, { isFinalized: true })}
+      />
+    );
+    expect(html).not.toContain("New Team…");
+    for (const mode of tournamentGameModeList)
+      expect(html).not.toContain(`New ${mode.nodeLabel}`);
   });
 
   it("renders scoreboard rows with wins, losses, and the champion marker", () => {
