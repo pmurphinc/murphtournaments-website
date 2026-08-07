@@ -232,6 +232,13 @@
       "when": 1786060800000,
       "tag": "0032_development_division_membership",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "5",
+      "when": 1786147200000,
+      "tag": "0033_add_tcr_game_modes",
+      "breakpoints": true
     }
   ]
 }

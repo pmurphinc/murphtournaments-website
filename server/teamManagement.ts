@@ -34,6 +34,38 @@ type ManagedTeamMemberRole = "captain" | "member";
 
 export const MANAGED_TEAM_JOIN_LINK_TTL_DAYS = 14;
 export const DEFAULT_MANAGED_TEAM_JOIN_LINK_MAX_USES = 3;
+export const MANAGED_TEAM_ROSTER_LIMIT = 10;
+
+export function assertManagedTeamRosterCapacity(rosteredPlayerCount: number) {
+  if (rosteredPlayerCount >= MANAGED_TEAM_ROSTER_LIMIT)
+    throw new TRPCError({
+      code: "CONFLICT",
+      message: `A team can have at most ${MANAGED_TEAM_ROSTER_LIMIT} rostered players.`,
+    });
+}
+
+async function assertTeamHasRosterCapacity(
+  db: TeamManagementExecutor,
+  teamId: number
+) {
+  // Serialize all roster additions for this team. The locking member query is
+  // a current read under MySQL's default REPEATABLE READ isolation, so an
+  // acceptance that waited for another transaction sees its committed insert.
+  await db.execute(
+    sql`SELECT id FROM managed_teams WHERE id = ${teamId} FOR UPDATE`
+  );
+  const result: unknown = await db.execute(
+    sql`SELECT id FROM managed_team_members WHERE teamId = ${teamId} FOR UPDATE`
+  );
+  const rows = Array.isArray(result)
+    ? Array.isArray(result[0])
+      ? result[0]
+      : result
+    : result && typeof result === "object" && "rows" in result
+      ? result.rows
+      : [];
+  assertManagedTeamRosterCapacity(Array.isArray(rows) ? rows.length : 0);
+}
 
 export function hashManagedTeamJoinToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
@@ -474,10 +506,12 @@ export async function respondToManagedTeamInvite(
         code: "FORBIDDEN",
         message: "You can only respond to your own invites.",
       });
-    if (response === "accept")
+    if (response === "accept") {
+      await assertTeamHasRosterCapacity(tx, invite.teamId);
       await tx
         .insert(managedTeamMembers)
         .values({ teamId: invite.teamId, userId, role: "member" });
+    }
     await tx
       .update(managedTeamInvites)
       .set({ status: response === "accept" ? "accepted" : "declined" })
@@ -888,6 +922,7 @@ export async function acceptManagedTeamJoinLink(userId: number, token: string) {
         alreadyMember: true,
         role: existing.role,
       } as const;
+    await assertTeamHasRosterCapacity(tx, link.teamId);
     await tx
       .insert(managedTeamMembers)
       .values({ teamId: link.teamId, userId, role: "member" });

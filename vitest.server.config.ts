@@ -10,6 +10,8 @@ export default defineConfig({
       "server/teamManagement.test.ts",
       "server/patchNotes.test.ts",
       "server/weaponArchiveData.test.ts",
+      "server/teamRosterCapacity.test.ts",
+      "shared/finalsGameModes.test.ts",
     ],
     environment: "node",
   },

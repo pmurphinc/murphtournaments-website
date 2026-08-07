@@ -48,6 +48,7 @@ import {
   type ControlTeamView,
   type InspectorSelection,
 } from "./types";
+import { getTournamentGameMode } from "../../../../shared/finalsGameModes";
 
 const competitiveMaps = THE_FINALS_MAPS.filter(map =>
   DEFAULT_COMPETITIVE_MAP_IDS.includes(map.id)
@@ -147,9 +148,11 @@ function LobbySection(props: TcrInspectorProps) {
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-xs text-zinc-500">
-            {game.gameType === "cashout"
-              ? "Cashout Lobby · places 1st–4th"
-              : `Final Round · places 1st–2nd · Best of ${game.seriesBestOf ?? 1}`}
+            {getTournamentGameMode(game.gameType).label} · {capacity} teams ×{" "}
+            {getTournamentGameMode(game.gameType).activePlayersPerTeam} players
+            {game.gameType === "final_round"
+              ? ` · Best of ${game.seriesBestOf ?? 1}`
+              : ""}
           </p>
           <h3 className="truncate text-base font-semibold text-zinc-50">
             {game.displayLabel}
@@ -217,12 +220,19 @@ function LobbySection(props: TcrInspectorProps) {
             }
           >
             <option value="">Map: TBD</option>
-            {game.mapId && !competitiveMapIds.has(game.mapId) && (
-              <option value={game.mapId}>
-                Legacy map: {mapsById.get(game.mapId) ?? game.mapId}
-              </option>
-            )}
-            {competitiveMaps.map(map => {
+            {game.mapId &&
+              !getTournamentGameMode(game.gameType).allowedMapIds.some(
+                id => id === game.mapId
+              ) && (
+                <option value={game.mapId}>
+                  Legacy map: {mapsById.get(game.mapId) ?? game.mapId}
+                </option>
+              )}
+            {THE_FINALS_MAPS.filter(map =>
+              getTournamentGameMode(game.gameType).allowedMapIds.some(
+                id => id === map.id
+              )
+            ).map(map => {
               const ban = mapBansById.get(map.id);
               return (
                 <option key={map.id} value={map.id}>

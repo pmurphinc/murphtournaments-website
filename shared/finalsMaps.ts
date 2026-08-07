@@ -20,7 +20,7 @@ export const THE_FINALS_MAPS = [
   { id: "las-vegas-stadium", name: "Las Vegas Stadium", category: "main" },
   { id: "nozomi-citadel", name: "NOZOMI/CITADEL", category: "main" },
   { id: "fangwai-city", name: "Fangwai City", category: "main" },
-  { id: "galaxy-estates", name: "GALAXY ESTATES", category: "main" },
+  { id: "galaxy-estates", name: "Galaxy Estates", category: "main" },
   { id: "starlight-hollow", name: "Starlight Hollow", category: "compact" },
   { id: "peace-center", name: "P.E.A.C.E. Center", category: "compact" },
   { id: "practice-range", name: "Practice Range", category: "training" },

@@ -21,7 +21,7 @@ describe("Tournament Control Room improvements", () => {
     expect(server).toContain(
       "z.union([z.literal(1), z.literal(3), z.literal(5)])"
     );
-    expect(server).toContain("Cashout lobbies cannot use BO3 or BO5");
+    expect(server).toContain('gameType !== "final_round"');
     expect(server).toContain("setFinalRoundSeriesBestOf");
   });
 
@@ -105,7 +105,7 @@ describe("Tournament Control Room improvements", () => {
     );
     expect(schema).toContain('mapId: varchar("mapId", { length: 64 })');
     expect(userSelectedMapIdSchema.safeParse("monaco").success).toBe(true);
-    expect(userSelectedMapIdSchema.safeParse("seoul").success).toBe(false);
+    expect(userSelectedMapIdSchema.safeParse("seoul").success).toBe(true);
     expect(storedMapIdSchema.safeParse("seoul").success).toBe(true);
     expect(server).toContain("setGameMap");
     expect(server).toContain("randomizeGameMap");
