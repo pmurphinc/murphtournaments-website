@@ -63,7 +63,10 @@ import {
 } from "../shared/tournamentResults";
 import { shouldCreateTournamentTeamForApproval } from "./tournamentTeamSubmissions";
 import { sendDiscordDm } from "./discordDm";
-import { getTournamentGameMode } from "../shared/finalsGameModes";
+import {
+  getModeAdvancingPlacements,
+  getTournamentGameMode,
+} from "../shared/finalsGameModes";
 
 type Database = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 type QueryExecutor = Pick<
@@ -2373,8 +2376,7 @@ export function getAdvancingPlacements(
   gameType: TournamentGameType,
   flowType: ConnectionFlowType = "winner"
 ) {
-  if (gameType === "cashout") return flowType === "winner" ? [1, 2] : [3, 4];
-  return flowType === "winner" ? [1] : [2];
+  return getModeAdvancingPlacements(gameType, flowType);
 }
 
 function getFlowLabel(flowType: ConnectionFlowType) {

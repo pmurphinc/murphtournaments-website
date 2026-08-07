@@ -143,3 +143,15 @@ export function normalizeTournamentGameType(
 export function getTournamentGameMode(gameType: TournamentGameType) {
   return TOURNAMENT_GAME_MODES[gameType];
 }
+
+export function getModeAdvancingPlacements(
+  gameType: TournamentGameType,
+  flowType: "winner" | "loser"
+) {
+  if (gameType === "cashout") return flowType === "winner" ? [1, 2] : [3, 4];
+  if (flowType === "winner") return [1];
+  return Array.from(
+    { length: getTournamentGameMode(gameType).teamsPerLobby - 1 },
+    (_, index) => index + 2
+  );
+}

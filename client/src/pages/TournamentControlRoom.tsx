@@ -111,6 +111,7 @@ import {
   type InspectorSelection,
   type StaffMemberView,
 } from "@/components/tcr/types";
+import { getModeAdvancingPlacements } from "../../../shared/finalsGameModes";
 
 type NodeDragState = {
   gameId: number;
@@ -306,8 +307,7 @@ export function getAdvancingPlacements(
   gameType: GameType,
   flowType: ConnectionFlowType = "winner"
 ) {
-  if (gameType === "cashout") return flowType === "winner" ? [1, 2] : [3, 4];
-  return flowType === "winner" ? [1] : [2];
+  return getModeAdvancingPlacements(gameType, flowType);
 }
 
 function isTypingTarget(target: EventTarget | null) {

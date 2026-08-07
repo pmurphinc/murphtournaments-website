@@ -48,11 +48,23 @@ async function assertTeamHasRosterCapacity(
   db: TeamManagementExecutor,
   teamId: number
 ) {
-  const roster = await db
-    .select({ id: managedTeamMembers.id })
-    .from(managedTeamMembers)
-    .where(eq(managedTeamMembers.teamId, teamId));
-  assertManagedTeamRosterCapacity(roster.length);
+  // Serialize all roster additions for this team. The locking member query is
+  // a current read under MySQL's default REPEATABLE READ isolation, so an
+  // acceptance that waited for another transaction sees its committed insert.
+  await db.execute(
+    sql`SELECT id FROM managed_teams WHERE id = ${teamId} FOR UPDATE`
+  );
+  const result: unknown = await db.execute(
+    sql`SELECT id FROM managed_team_members WHERE teamId = ${teamId} FOR UPDATE`
+  );
+  const rows = Array.isArray(result)
+    ? Array.isArray(result[0])
+      ? result[0]
+      : result
+    : result && typeof result === "object" && "rows" in result
+      ? result.rows
+      : [];
+  assertManagedTeamRosterCapacity(Array.isArray(rows) ? rows.length : 0);
 }
 
 export function hashManagedTeamJoinToken(token: string) {

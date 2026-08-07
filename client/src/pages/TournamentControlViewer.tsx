@@ -628,9 +628,7 @@ export default function TournamentControlViewer() {
               const capacity = mode.teamsPerLobby;
               const isMinimized = minimizedGameIds.has(game.id);
               const mapName = game.mapId
-                ? mapsById.get(
-                    game.mapId as keyof (typeof THE_FINALS_MAPS)[number]
-                  )
+                ? mapsById.get(game.mapId)
                 : null;
               const statusClasses = getGameStatusClasses(game.status);
               const broadcastHref = toSafeBroadcastHref(game.broadcastUrl);
