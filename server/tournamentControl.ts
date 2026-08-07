@@ -50,6 +50,7 @@ import {
   type ControlGame,
   type ControlTeam,
   type TournamentGameType,
+  tournamentGameTypes,
 } from "./tournamentControlRules";
 import {
   THE_FINALS_MAPS,
@@ -62,6 +63,7 @@ import {
 } from "../shared/tournamentResults";
 import { shouldCreateTournamentTeamForApproval } from "./tournamentTeamSubmissions";
 import { sendDiscordDm } from "./discordDm";
+import { getTournamentGameMode } from "../shared/finalsGameModes";
 
 type Database = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 type QueryExecutor = Pick<
@@ -397,16 +399,18 @@ const templateVisibilitySchema = z.enum(["private", "public"]);
 const tokenSchema = z.string().trim().min(16).max(256);
 const adminNoteSchema = z.string().trim().max(1000).nullable().optional();
 const resultPlacementSchema = z.number().int().min(1).max(4).nullable();
-const competitiveMapIds = new Set<string>(DEFAULT_COMPETITIVE_MAP_IDS);
 const legacySafeMapIds = new Set<string>(THE_FINALS_MAPS.map(map => map.id));
+const selectableArenaIds = new Set<string>(
+  THE_FINALS_MAPS.filter(map => map.category !== "training").map(map => map.id)
+);
 export const userSelectedMapIdSchema = z
   .string()
   .trim()
   .max(64)
   .nullable()
   .refine(
-    value => value === null || competitiveMapIds.has(value),
-    "Map must be in the competitive pool"
+    value => value === null || selectableArenaIds.has(value),
+    "Map must be a known Finals arena"
   );
 export const broadcastUrlSchema = z.preprocess(
   value => {
@@ -451,7 +455,7 @@ const boardSnapshotSchema = z.object({
     z.object({
       id: idSchema,
       tournamentId: idSchema,
-      gameType: z.enum(["cashout", "final_round"]),
+      gameType: z.enum(tournamentGameTypes),
       status: z.enum(tournamentGameStatuses),
       displayLabel: labelSchema,
       canvasX: z.number().int().min(-10000).max(10000),
@@ -1065,10 +1069,7 @@ async function createGame(
     await tx.insert(tournamentGames).values({
       tournamentId,
       gameType,
-      displayLabel:
-        gameType === "cashout"
-          ? `Cashout Lobby ${count}`
-          : `Final Round ${count}`,
+      displayLabel: `${getTournamentGameMode(gameType).nodeLabel} ${count}`,
       canvasX: safePosition.x,
       canvasY: safePosition.y,
     });
@@ -1294,8 +1295,15 @@ async function getEligibleMapIdsForGameRandomization(
     .innerJoin(teams, eq(tournamentGameAssignments.teamId, teams.id))
     .leftJoin(managedTeams, eq(teams.managedTeamId, managedTeams.id))
     .where(eq(tournamentGameAssignments.gameId, gameId));
+  const [game] = await db
+    .select({ gameType: tournamentGames.gameType })
+    .from(tournamentGames)
+    .where(eq(tournamentGames.id, gameId))
+    .limit(1);
   return getEligibleCompetitiveMapIds(
-    DEFAULT_COMPETITIVE_MAP_IDS,
+    game
+      ? getTournamentGameMode(game.gameType).allowedMapIds
+      : DEFAULT_COMPETITIVE_MAP_IDS,
     rows.map(row => row.mapBanId)
   );
 }
@@ -1889,10 +1897,10 @@ function assertSeriesBestOf(
   gameType: TournamentGameType,
   seriesBestOf: 1 | 3 | 5
 ) {
-  if (gameType === "cashout" && seriesBestOf !== 1) {
+  if (gameType !== "final_round" && seriesBestOf !== 1) {
     throw new TRPCError({
       code: "BAD_REQUEST",
-      message: "Cashout lobbies cannot use BO3 or BO5.",
+      message: `${getTournamentGameMode(gameType).label} cannot use BO3 or BO5.`,
     });
   }
 }
@@ -4182,6 +4190,27 @@ export const personalTcrRouter = router({
         ctx.user
       );
     }),
+  createGameNode: personalTcrProcedure
+    .input(
+      tournamentIdSchema.extend({
+        gameType: z.enum(tournamentGameTypes),
+        position: positionSchema,
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const db = await requireDb();
+      await getMutableManageableTournamentOrThrow(
+        db,
+        input.tournamentId,
+        ctx.user
+      );
+      return createGame(
+        input.tournamentId,
+        input.gameType,
+        input.position,
+        ctx.user
+      );
+    }),
   createFinalRoundMatch: personalTcrProcedure
     .input(tournamentIdSchema.extend({ position: positionSchema }))
     .mutation(async ({ input, ctx }) => {
@@ -4249,9 +4278,19 @@ export const personalTcrRouter = router({
     .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
       await assertGameBelongsToOwnedTournament(db, input.gameId, ctx.user);
-      return updateGameFieldAndFetch(input.gameId, () => ({
-        mapId: input.mapId,
-      }));
+      return updateGameFieldAndFetch(input.gameId, game => {
+        if (
+          input.mapId &&
+          !getTournamentGameMode(game.gameType).allowedMapIds.some(
+            mapId => mapId === input.mapId
+          )
+        )
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Map is not available for this game mode.",
+          });
+        return { mapId: input.mapId };
+      });
     }),
   setBroadcastUrl: personalTcrProcedure
     .input(gameIdSchema.extend({ broadcastUrl: broadcastUrlSchema }))
@@ -4874,6 +4913,16 @@ export const tournamentControlRouter = router({
     .mutation(({ input }) =>
       createGame(input.tournamentId, "cashout", input.position)
     ),
+  createGameNode: discordTournamentStaffProcedure
+    .input(
+      tournamentIdSchema.extend({
+        gameType: z.enum(tournamentGameTypes),
+        position: positionSchema,
+      })
+    )
+    .mutation(({ input }) =>
+      createGame(input.tournamentId, input.gameType, input.position)
+    ),
   createFinalRoundMatch: discordTournamentStaffProcedure
     .input(tournamentIdSchema.extend({ position: positionSchema }))
     .mutation(({ input }) =>
@@ -4966,7 +5015,19 @@ export const tournamentControlRouter = router({
   setGameMap: discordTournamentStaffProcedure
     .input(gameIdSchema.extend({ mapId: userSelectedMapIdSchema }))
     .mutation(({ input }) =>
-      updateGameFieldAndFetch(input.gameId, () => ({ mapId: input.mapId }))
+      updateGameFieldAndFetch(input.gameId, game => {
+        if (
+          input.mapId &&
+          !getTournamentGameMode(game.gameType).allowedMapIds.some(
+            mapId => mapId === input.mapId
+          )
+        )
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Map is not available for this game mode.",
+          });
+        return { mapId: input.mapId };
+      })
     ),
   randomizeGameMap: discordTournamentStaffProcedure
     .input(gameIdSchema)

@@ -10,15 +10,14 @@ import {
 } from "../../../server/tournamentControl";
 
 describe("TCR map validation", () => {
-  it("accepts normal user-selected maps only from the competitive pool or null", () => {
+  it("accepts known non-training arenas for mode-specific validation", () => {
     for (const mapId of DEFAULT_COMPETITIVE_MAP_IDS) {
       expect(userSelectedMapIdSchema.safeParse(mapId).success).toBe(true);
     }
     expect(userSelectedMapIdSchema.safeParse(null).success).toBe(true);
 
-    for (const mapId of DEFAULT_COMPETITIVE_EXCLUDED_MAP_IDS) {
-      expect(userSelectedMapIdSchema.safeParse(mapId).success).toBe(false);
-    }
+    for (const mapId of DEFAULT_COMPETITIVE_EXCLUDED_MAP_IDS)
+      expect(userSelectedMapIdSchema.safeParse(mapId).success).toBe(true);
     expect(userSelectedMapIdSchema.safeParse("practice-range").success).toBe(
       false
     );

@@ -1,4 +1,9 @@
-export type GameType = "cashout" | "final_round";
+import {
+  getTournamentGameMode,
+  type TournamentGameType,
+} from "../../../shared/finalsGameModes";
+
+export type GameType = TournamentGameType;
 
 export type GameStatus = "draft" | "ready" | "live" | "complete";
 export type GameStatusClasses = {
@@ -79,7 +84,7 @@ export function hasOpenLobbySlot(
   game: { gameType: GameType; status: GameStatus },
   assignedCount: number
 ) {
-  const capacity = game.gameType === "final_round" ? 2 : 4;
+  const capacity = getTournamentGameMode(game.gameType).teamsPerLobby;
   return game.status !== "complete" && assignedCount < capacity;
 }
 
@@ -183,7 +188,7 @@ export function getInitialZoomPreference(
 
 export function getNodeHeight(gameType: GameType, minimized: boolean) {
   if (minimized) return minimizedNodeHeight;
-  return gameType === "cashout"
+  return getTournamentGameMode(gameType).teamsPerLobby >= 3
     ? expandedCashoutNodeHeight
     : expandedFinalNodeHeight;
 }

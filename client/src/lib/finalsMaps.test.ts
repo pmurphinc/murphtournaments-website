@@ -9,7 +9,7 @@ describe("default competitive maps", () => {
   it("includes Galaxy Estates in the main arena collection", () => {
     expect(THE_FINALS_MAPS).toContainEqual({
       id: "galaxy-estates",
-      name: "GALAXY ESTATES",
+      name: "Galaxy Estates",
       category: "main",
     });
   });
