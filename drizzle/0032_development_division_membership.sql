@@ -1,6 +1,6 @@
 ALTER TABLE `users`
   ADD `developmentDivisionMember` int NOT NULL DEFAULT 0;
-
+--> statement-breakpoint
 CREATE TABLE `development_division_invite_links` (
   `id` int AUTO_INCREMENT NOT NULL,
   `createdByUserId` int NOT NULL,
@@ -16,9 +16,9 @@ CREATE TABLE `development_division_invite_links` (
     FOREIGN KEY (`createdByUserId`) REFERENCES `users`(`id`)
     ON DELETE RESTRICT ON UPDATE NO ACTION
 );
-
+--> statement-breakpoint
 CREATE UNIQUE INDEX `development_division_invite_links_tokenHash_unique`
   ON `development_division_invite_links` (`tokenHash`);
-
+--> statement-breakpoint
 CREATE INDEX `development_division_invite_links_status_idx`
   ON `development_division_invite_links` (`status`);

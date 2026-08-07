@@ -1,4 +1,9 @@
-export type TournamentResultGameType = "cashout" | "final_round";
+import {
+  getTournamentGameMode,
+  type TournamentGameType,
+} from "./finalsGameModes";
+
+export type TournamentResultGameType = TournamentGameType;
 export type TournamentResultGameStatus =
   | "draft"
   | "ready"
@@ -34,7 +39,10 @@ export type TournamentScoreboardRow = TournamentRecordBreakdown & {
 export function getValidPlacementsForGameType(
   gameType: TournamentResultGameType
 ) {
-  return gameType === "cashout" ? ([1, 2, 3, 4] as const) : ([1, 2] as const);
+  return Array.from(
+    { length: getTournamentGameMode(gameType).teamsPerLobby },
+    (_, index) => index + 1
+  );
 }
 
 export function calculateTournamentScoreboard(
@@ -89,11 +97,11 @@ export function calculateTournamentScoreboard(
     } else {
       if (assignment.resultPlacement === 1) {
         row.wins += 1;
-        row.finalRoundWins += 1;
+        if (game.gameType === "final_round") row.finalRoundWins += 1;
       }
       if (assignment.resultPlacement === 2) {
         row.losses += 1;
-        row.finalRoundLosses += 1;
+        if (game.gameType === "final_round") row.finalRoundLosses += 1;
       }
     }
   }

@@ -111,6 +111,7 @@ import {
   type InspectorSelection,
   type StaffMemberView,
 } from "@/components/tcr/types";
+import { getModeAdvancingPlacements } from "../../../shared/finalsGameModes";
 
 type NodeDragState = {
   gameId: number;
@@ -306,8 +307,7 @@ export function getAdvancingPlacements(
   gameType: GameType,
   flowType: ConnectionFlowType = "winner"
 ) {
-  if (gameType === "cashout") return flowType === "winner" ? [1, 2] : [3, 4];
-  return flowType === "winner" ? [1] : [2];
+  return getModeAdvancingPlacements(gameType, flowType);
 }
 
 function isTypingTarget(target: EventTarget | null) {
@@ -532,6 +532,7 @@ export default function TournamentControlRoom({
     controlApi.createCashoutLobby.useMutation(mutationOptions);
   const createFinal =
     controlApi.createFinalRoundMatch.useMutation(mutationOptions);
+  const createGameNode = controlApi.createGameNode.useMutation(mutationOptions);
   const moveGame = controlApi.moveGame.useMutation(mutationOptions);
   const moveGames = controlApi.moveGames.useMutation({
     onError: (error: { message: string }) => toast.error(error.message),
@@ -2273,15 +2274,10 @@ export default function TournamentControlRoom({
           <TcrToolbar
             isFinalized={isFinalizedLocked}
             onCreateTeam={() => openDialog({ type: "create-team" })}
-            onCreateCashoutLobby={() =>
-              createCashout.mutate({
+            onCreateGame={gameType =>
+              createGameNode.mutate({
                 tournamentId,
-                position: getCanvasCenterPoint(),
-              })
-            }
-            onCreateFinalRoundMatch={() =>
-              createFinal.mutate({
-                tournamentId,
+                gameType,
                 position: getCanvasCenterPoint(),
               })
             }

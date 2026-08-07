@@ -311,8 +311,7 @@ describe("TcrToolbar", () => {
   const props: TcrToolbarProps = {
     isFinalized: false,
     onCreateTeam: noop,
-    onCreateCashoutLobby: noop,
-    onCreateFinalRoundMatch: noop,
+    onCreateGame: noop,
     canUndo: true,
     onUndo: noop,
     zoomPercent: 100,

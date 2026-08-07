@@ -1,4 +1,11 @@
 import { TRPCError } from "@trpc/server";
+import {
+  getTournamentGameMode,
+  tournamentGameTypes,
+  type TournamentGameType,
+} from "../shared/finalsGameModes";
+
+export { tournamentGameTypes, type TournamentGameType };
 
 export const activeTournamentGameStatuses = ["draft", "ready", "live"] as const;
 export const tournamentGameStatuses = [
@@ -7,9 +14,6 @@ export const tournamentGameStatuses = [
   "live",
   "complete",
 ] as const;
-export const tournamentGameTypes = ["cashout", "final_round"] as const;
-
-export type TournamentGameType = (typeof tournamentGameTypes)[number];
 export type TournamentGameStatus = (typeof tournamentGameStatuses)[number];
 
 export type ControlTeam = { id: number; tournamentId: number; name: string };
@@ -25,10 +29,13 @@ export type ControlAssignment = {
   slotIndex: number;
 };
 
-export const gameCapacity: Record<TournamentGameType, number> = {
-  cashout: 4,
-  final_round: 2,
-};
+export const gameCapacity: Record<TournamentGameType, number> =
+  Object.fromEntries(
+    tournamentGameTypes.map(gameType => [
+      gameType,
+      getTournamentGameMode(gameType).teamsPerLobby,
+    ])
+  ) as Record<TournamentGameType, number>;
 
 export function isActiveGameStatus(status: TournamentGameStatus) {
   return activeTournamentGameStatuses.includes(
@@ -195,7 +202,7 @@ export function assertSlotIsValid(game: ControlGame, slotIndex: number) {
   if (slotIndex < 1 || slotIndex > capacity) {
     throw new TRPCError({
       code: "BAD_REQUEST",
-      message: `${game.gameType === "cashout" ? "Cashout lobbies" : "Final Round matches"} support slots 1-${capacity}`,
+      message: `${getTournamentGameMode(game.gameType).nodeLabel}s support slots 1-${capacity}`,
     });
   }
 }

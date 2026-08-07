@@ -57,6 +57,7 @@ import {
   type ControlTeamView,
   type DragPayload,
 } from "./types";
+import { getTournamentGameMode } from "../../../../shared/finalsGameModes";
 
 const competitiveMaps = THE_FINALS_MAPS.filter(map =>
   DEFAULT_COMPETITIVE_MAP_IDS.includes(map.id)
@@ -485,7 +486,7 @@ export default function TcrLobbyNode(props: TcrLobbyNodeProps) {
           >
             <div className="min-w-0">
               <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
-                {game.gameType === "cashout" ? "Cashout Lobby" : "Final Round"}
+                {getTournamentGameMode(game.gameType).nodeLabel}
               </p>
               <h3 className="truncate text-lg font-bold text-zinc-50">
                 {game.displayLabel}
@@ -563,12 +564,19 @@ export default function TcrLobbyNode(props: TcrLobbyNodeProps) {
               >
                 <option value="">Map: TBD</option>
                 <option value="__random">Randomize Map</option>
-                {game.mapId && !competitiveMapIds.has(game.mapId) && (
-                  <option value={game.mapId}>
-                    Legacy map: {mapsById.get(game.mapId) ?? game.mapId}
-                  </option>
-                )}
-                {competitiveMaps.map(map => {
+                {game.mapId &&
+                  !getTournamentGameMode(game.gameType).allowedMapIds.some(
+                    id => id === game.mapId
+                  ) && (
+                    <option value={game.mapId}>
+                      Legacy map: {mapsById.get(game.mapId) ?? game.mapId}
+                    </option>
+                  )}
+                {THE_FINALS_MAPS.filter(map =>
+                  getTournamentGameMode(game.gameType).allowedMapIds.some(
+                    id => id === map.id
+                  )
+                ).map(map => {
                   const ban = mapBansById.get(map.id);
                   return (
                     <option key={map.id} value={map.id}>
@@ -614,9 +622,12 @@ export default function TcrLobbyNode(props: TcrLobbyNodeProps) {
                 </span>
               )}
               <span className="ml-auto shrink-0 text-[11px] text-zinc-500">
-                {game.gameType === "cashout"
-                  ? "Places 1st–4th"
-                  : `Places 1st–2nd · Best of ${game.seriesBestOf ?? 1}`}
+                {capacity} teams ×{" "}
+                {getTournamentGameMode(game.gameType).activePlayersPerTeam}{" "}
+                players
+                {game.gameType === "final_round"
+                  ? ` · Best of ${game.seriesBestOf ?? 1}`
+                  : ""}
               </span>
             </div>
           </div>
