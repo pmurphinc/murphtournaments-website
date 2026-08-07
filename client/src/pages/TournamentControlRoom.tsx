@@ -2261,10 +2261,10 @@ export default function TournamentControlRoom({
       />
 
       <div className="flex min-h-0 flex-1">
-        {teamsOpen && (
+        {isDesktop && teamsOpen && (
           <aside
             aria-label={availableTeamsToggleLabel}
-            className="hidden w-72 shrink-0 border-r border-white/10 bg-zinc-950 lg:block"
+            className="w-72 shrink-0 border-r border-white/10 bg-zinc-950"
           >
             {teamsPanelElement}
           </aside>
@@ -2322,8 +2322,8 @@ export default function TournamentControlRoom({
             }
           />
 
-          {mobileTeamsOpen && (
-            <div className="max-h-[32dvh] shrink-0 overflow-hidden border-b border-white/10 bg-zinc-950 lg:hidden">
+          {!isDesktop && mobileTeamsOpen && (
+            <div className="max-h-[32dvh] shrink-0 overflow-hidden border-b border-white/10 bg-zinc-950">
               {teamsPanelElement}
             </div>
           )}
@@ -3300,9 +3300,9 @@ export default function TournamentControlRoom({
               </ContextMenuContent>
             </ContextMenu>
 
-            {mobileDockOpen && (
+            {!isDesktop && mobileDockOpen && (
               <div
-                className="absolute inset-x-0 bottom-0 z-[60] flex max-h-[45dvh] flex-col border-t border-white/10 bg-zinc-950 shadow-[0_-8px_24px_rgba(0,0,0,0.5)] lg:hidden"
+                className="absolute inset-x-0 bottom-0 z-[60] flex max-h-[45dvh] flex-col border-t border-white/10 bg-zinc-950 shadow-[0_-8px_24px_rgba(0,0,0,0.5)]"
                 role="region"
                 aria-label="Selection details"
               >
@@ -3324,10 +3324,10 @@ export default function TournamentControlRoom({
           </div>
         </div>
 
-        {inspectorOpen && (
+        {isDesktop && inspectorOpen && (
           <aside
             aria-label="Inspect and Scoreboard panel"
-            className="hidden w-80 shrink-0 border-l border-white/10 bg-zinc-950 lg:block"
+            className="w-80 shrink-0 border-l border-white/10 bg-zinc-950"
           >
             {inspectorElement}
           </aside>
