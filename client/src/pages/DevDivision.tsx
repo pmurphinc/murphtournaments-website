@@ -1,6 +1,6 @@
-import { Link } from 'wouter';
-import NeonCard from '@/components/NeonCard';
-import GlitchText from '@/components/GlitchText';
+import { Link } from "wouter";
+import NeonCard from "@/components/NeonCard";
+import GlitchText from "@/components/GlitchText";
 
 /**
  * Development Division Page
@@ -13,24 +13,27 @@ import GlitchText from '@/components/GlitchText';
 export default function DevDivision() {
   const features = [
     {
-      title: 'Structured Matches',
-      description: 'Competitive matches against skilled opponents in a fair, organized environment.',
-      color: 'magenta' as const,
+      title: "Structured Matches",
+      description:
+        "Competitive matches against skilled opponents in a fair, organized environment.",
+      color: "magenta" as const,
     },
     {
-      title: 'Detailed Feedback',
-      description: 'Receive analysis and feedback on your gameplay to accelerate improvement.',
-      color: 'cyan' as const,
+      title: "Detailed Feedback",
+      description:
+        "Receive analysis and feedback on your gameplay to accelerate improvement.",
+      color: "cyan" as const,
     },
     {
-      title: 'Stream Coverage',
-      description: 'Get noticed. All matches are streamed with professional commentary.',
-      color: 'gold' as const,
+      title: "Stream Coverage",
+      description:
+        "Get noticed. All matches are streamed with professional commentary.",
+      color: "gold" as const,
     },
     {
-      title: 'Monthly Events',
-      description: 'First Friday of every month. Regular competition schedule.',
-      color: 'lime' as const,
+      title: "Monthly Events",
+      description: "First Friday of every month. Regular competition schedule.",
+      color: "lime" as const,
     },
   ];
 
@@ -46,10 +49,13 @@ export default function DevDivision() {
             The Path to Competitive Play
           </p>
           <p className="text-lg text-white/70 font-mono max-w-3xl mb-4">
-            Part of Murph Tournaments. Monthly competitive tournaments for Plat–Diamond players seeking competitive experience, skill development, and exposure.
+            Part of Murph Tournaments. Monthly competitive tournaments for
+            Plat–Diamond players seeking competitive experience, skill
+            development, and exposure.
           </p>
           <p className="text-sm text-white/60 font-mono max-w-3xl">
-            Structured matches, detailed feedback, and professional stream coverage. First Friday of each month, 6 PM PST.
+            Structured matches, detailed feedback, and professional stream
+            coverage. First Friday of each month, 6 PM PST.
           </p>
         </div>
 
@@ -57,17 +63,22 @@ export default function DevDivision() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-16">
           {features.map((feature, idx) => (
             <NeonCard key={idx} variant={feature.color}>
-              <h3 className="text-lg font-bold font-mono mb-3 uppercase" style={{
-                color: feature.color === 'magenta' ? 'rgb(255, 0, 255)' :
-                       feature.color === 'cyan' ? 'rgb(0, 217, 255)' :
-                       feature.color === 'gold' ? 'rgb(255, 215, 0)' :
-                       'rgb(0, 255, 0)',
-              }}>
+              <h3
+                className="text-lg font-bold font-mono mb-3 uppercase"
+                style={{
+                  color:
+                    feature.color === "magenta"
+                      ? "rgb(255, 0, 255)"
+                      : feature.color === "cyan"
+                        ? "rgb(0, 217, 255)"
+                        : feature.color === "gold"
+                          ? "rgb(255, 215, 0)"
+                          : "rgb(0, 255, 0)",
+                }}
+              >
                 {feature.title}
               </h3>
-              <p className="text-white/70 font-mono">
-                {feature.description}
-              </p>
+              <p className="text-white/70 font-mono">{feature.description}</p>
             </NeonCard>
           ))}
         </div>
@@ -75,7 +86,9 @@ export default function DevDivision() {
         {/* Eligibility & Requirements */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-16">
           <NeonCard variant="magenta">
-            <h3 className="text-lg font-bold font-mono text-neon-magenta mb-4 uppercase">Eligibility</h3>
+            <h3 className="text-lg font-bold font-mono text-neon-magenta mb-4 uppercase">
+              Eligibility
+            </h3>
             <ul className="space-y-2 text-sm text-white/70 font-mono">
               <li>✓ Platinum Rank</li>
               <li>✓ Diamond Rank</li>
@@ -86,53 +99,87 @@ export default function DevDivision() {
           </NeonCard>
 
           <NeonCard variant="cyan">
-            <h3 className="text-lg font-bold font-mono text-neon-cyan mb-4 uppercase">Status</h3>
+            <h3 className="text-lg font-bold font-mono text-neon-cyan mb-4 uppercase">
+              Status
+            </h3>
             <p className="text-sm text-white/70 font-mono">
-              All tournaments are currently suspended. Check back for updates or join the Discord for announcements.
+              Team registration now runs directly through Murph Tournaments.
+              Development Division members can claim an exclusive profile badge
+              through the private member invite.
             </p>
           </NeonCard>
         </div>
 
         {/* Progression Path */}
         <div className="mb-16">
-          <h2 className="text-2xl font-bold font-mono text-neon-gold mb-6 uppercase">Progression Path</h2>
+          <h2 className="text-2xl font-bold font-mono text-neon-gold mb-6 uppercase">
+            Progression Path
+          </h2>
           <div className="space-y-4">
             <NeonCard variant="gold">
               <div className="flex items-start gap-4">
-                <div className="text-3xl font-bold font-mono text-neon-gold">01</div>
+                <div className="text-3xl font-bold font-mono text-neon-gold">
+                  01
+                </div>
                 <div>
-                  <h3 className="text-lg font-bold font-mono text-neon-gold mb-2">Join Dev Division</h3>
-                  <p className="text-white/70 font-mono">Register through Discord and complete your player profile.</p>
+                  <h3 className="text-lg font-bold font-mono text-neon-gold mb-2">
+                    Join Dev Division
+                  </h3>
+                  <p className="text-white/70 font-mono">
+                    Sign in with Discord, claim your member badge, and create or
+                    join your team on Murph Tournaments.
+                  </p>
                 </div>
               </div>
             </NeonCard>
 
             <NeonCard variant="gold">
               <div className="flex items-start gap-4">
-                <div className="text-3xl font-bold font-mono text-neon-cyan">02</div>
+                <div className="text-3xl font-bold font-mono text-neon-cyan">
+                  02
+                </div>
                 <div>
-                  <h3 className="text-lg font-bold font-mono text-neon-cyan mb-2">Compete Monthly</h3>
-                  <p className="text-white/70 font-mono">Play in structured matches, receive professional feedback, and improve your skills.</p>
+                  <h3 className="text-lg font-bold font-mono text-neon-cyan mb-2">
+                    Compete Monthly
+                  </h3>
+                  <p className="text-white/70 font-mono">
+                    Play in structured matches, receive professional feedback,
+                    and improve your skills.
+                  </p>
                 </div>
               </div>
             </NeonCard>
 
             <NeonCard variant="gold">
               <div className="flex items-start gap-4">
-                <div className="text-3xl font-bold font-mono text-neon-magenta">03</div>
+                <div className="text-3xl font-bold font-mono text-neon-magenta">
+                  03
+                </div>
                 <div>
-                  <h3 className="text-lg font-bold font-mono text-neon-magenta mb-2">Get Noticed</h3>
-                  <p className="text-white/70 font-mono">Build reputation, gain stream exposure, and attract team opportunities.</p>
+                  <h3 className="text-lg font-bold font-mono text-neon-magenta mb-2">
+                    Get Noticed
+                  </h3>
+                  <p className="text-white/70 font-mono">
+                    Build reputation, gain stream exposure, and attract team
+                    opportunities.
+                  </p>
                 </div>
               </div>
             </NeonCard>
 
             <NeonCard variant="gold">
               <div className="flex items-start gap-4">
-                <div className="text-3xl font-bold font-mono text-neon-lime">04</div>
+                <div className="text-3xl font-bold font-mono text-neon-lime">
+                  04
+                </div>
                 <div>
-                  <h3 className="text-lg font-bold font-mono text-neon-lime mb-2">Advance to Pro</h3>
-                  <p className="text-white/70 font-mono">Qualify for main tournaments, join competitive teams, or become a league player.</p>
+                  <h3 className="text-lg font-bold font-mono text-neon-lime mb-2">
+                    Advance to Pro
+                  </h3>
+                  <p className="text-white/70 font-mono">
+                    Qualify for main tournaments, join competitive teams, or
+                    become a league player.
+                  </p>
                 </div>
               </div>
             </NeonCard>
@@ -141,23 +188,33 @@ export default function DevDivision() {
 
         {/* Resources Section */}
         <div className="mb-16">
-          <h2 className="text-2xl font-bold font-mono text-neon-cyan mb-6 uppercase">Resources</h2>
+          <h2 className="text-2xl font-bold font-mono text-neon-cyan mb-6 uppercase">
+            Resources
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <a href="https://docs.google.com/document/d/1zn3uv5U6dIHCcl4UxpWE5SpHYl34iQEL6doh-EFKMDg/edit?usp=sharing" target="_blank" rel="noopener noreferrer">
+            <a
+              href="https://docs.google.com/document/d/1zn3uv5U6dIHCcl4UxpWE5SpHYl34iQEL6doh-EFKMDg/edit?usp=sharing"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               <button className="w-full px-6 py-3 border-2 border-neon-cyan text-neon-cyan font-bold font-mono uppercase tracking-widest hover:bg-neon-cyan hover:text-dark-black hover-glow-cyan transition-all rounded-sm">
                 What is the Development Division?
               </button>
             </a>
-            <a href="https://docs.google.com/document/d/1aMJuTyLSZ1OjIfqXqxbMP31b_BDB3pLbicBr_ug2r4M/edit?usp=sharing" target="_blank" rel="noopener noreferrer">
+            <a
+              href="https://docs.google.com/document/d/1aMJuTyLSZ1OjIfqXqxbMP31b_BDB3pLbicBr_ug2r4M/edit?usp=sharing"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               <button className="w-full px-6 py-3 border-2 border-neon-magenta text-neon-magenta font-bold font-mono uppercase tracking-widest hover:bg-neon-magenta hover:text-dark-black hover-glow-magenta transition-all rounded-sm">
                 Rulebook
               </button>
             </a>
-            <a href="https://forms.gle/MzLNqg3YmPMk7gwK8" target="_blank" rel="noopener noreferrer">
+            <Link href="/teams">
               <button className="w-full px-6 py-3 border-2 border-neon-lime text-neon-lime font-bold font-mono uppercase tracking-widest hover:bg-neon-lime hover:text-dark-black hover-glow-lime transition-all rounded-sm">
-                Sign-Up Here
+                Register Your Team
               </button>
-            </a>
+            </Link>
           </div>
         </div>
 
@@ -166,11 +223,11 @@ export default function DevDivision() {
           <p className="text-lg text-white/80 font-mono mb-6">
             Ready to compete and improve?
           </p>
-              <a href="https://discord.gg/kcmdxmBgnC" target="_blank" rel="noopener noreferrer">
-                <button className="px-8 py-3 bg-neon-cyan text-dark-black font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all">
-                  Join Discord
-                </button>
-              </a>
+          <Link href="/teams">
+            <button className="px-8 py-3 bg-neon-cyan text-dark-black font-bold font-mono uppercase tracking-widest hover-glow-cyan rounded-sm transition-all">
+              Create or Manage Team
+            </button>
+          </Link>
         </div>
       </div>
     </div>

@@ -31,6 +31,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import DevelopmentDivisionAvatar from "@/components/DevelopmentDivisionAvatar";
 
 type TeamManagementData =
   inferRouterOutputs<AppRouter>["teamManagement"]["myTeams"];
@@ -567,15 +568,15 @@ export default function TeamManagement() {
                             className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/5 p-3"
                           >
                             <div className="flex min-w-0 items-center gap-3">
-                              {row.user.discordAvatarUrl ? (
-                                <img
-                                  src={row.user.discordAvatarUrl}
-                                  alt=""
-                                  className="h-10 w-10 rounded-full border border-neon-cyan/40"
-                                />
-                              ) : (
-                                <div className="h-10 w-10 rounded-full bg-yellow-400/20" />
-                              )}
+                              <DevelopmentDivisionAvatar
+                                src={row.user.discordAvatarUrl}
+                                displayName={displayUser(row.user)}
+                                isDevelopmentDivisionMember={
+                                  row.user.developmentDivisionMember
+                                }
+                                className="h-10 w-10"
+                                avatarClassName="border-neon-cyan/40"
+                              />
                               <div className="min-w-0">
                                 <p className="truncate font-semibold">
                                   {displayUser(row.user)}

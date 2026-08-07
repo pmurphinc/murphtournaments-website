@@ -12,6 +12,8 @@ import JuneTournament2026 from "./pages/JuneTournament2026";
 import JuneTournamentRoster2026 from "./pages/JuneTournamentRoster2026";
 import LiveBracket from "./pages/LiveBracket";
 import DevDivision from "./pages/DevDivision";
+import DevelopmentDivisionInvite from "./pages/DevelopmentDivisionInvite";
+import DevelopmentDivisionAdmin from "./pages/DevelopmentDivisionAdmin";
 import About from "./pages/About";
 import Watch from "./pages/Watch";
 import FclReplay from "./pages/FclReplay";
@@ -110,6 +112,10 @@ function Router() {
           />
           <Route path={"/bracket"} component={LiveBracket} />
           <Route path={"/dev-division"} component={DevDivision} />
+          <Route
+            path={"/invite/development-division/:token"}
+            component={DevelopmentDivisionInvite}
+          />
           <Route path={"/about"} component={About} />
           <Route path={"/watch"} component={Watch} />
           <Route path={"/watch/fcl/:slug"} component={FclReplay} />
@@ -158,6 +164,10 @@ function Router() {
           <Route
             path={"/admin/tournaments/control"}
             component={TournamentControlIndex}
+          />
+          <Route
+            path={"/admin/development-division"}
+            component={DevelopmentDivisionAdmin}
           />
           <Route
             path={"/admin/tournaments/:tournamentId/control"}

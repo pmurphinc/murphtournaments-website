@@ -20,6 +20,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import CtaButton from "@/components/public/CtaButton";
+import DevelopmentDivisionAvatar from "@/components/DevelopmentDivisionAvatar";
 
 /**
  * Murph Tournaments — global site navigation.
@@ -110,11 +111,11 @@ export default function Navigation() {
             className="flex h-10 min-h-10 min-w-10 flex-none shrink-0 items-center gap-2 rounded-full border border-[var(--mt-gold)]/40 bg-[var(--mt-black)]/60 px-1.5 py-1 text-left transition hover:border-[var(--mt-gold)] hover:bg-[var(--mt-gold)]/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mt-gold-bright)] 2xl:px-2"
             aria-label="Open Discord account menu"
           >
-            <img
+            <DevelopmentDivisionAvatar
               src={user.discordAvatarUrl || undefined}
-              alt=""
-              className="h-8 w-8 min-w-8 flex-none shrink-0 rounded-full border border-[var(--mt-steel-line)] bg-[var(--mt-charcoal)] object-cover"
-              referrerPolicy="no-referrer"
+              displayName={displayName}
+              isDevelopmentDivisionMember={user.developmentDivisionMember}
+              className="h-8 w-8 min-w-8 flex-none shrink-0"
             />
             <span className="hidden max-w-36 truncate font-mono text-xs font-bold text-[var(--mt-off-white)] 2xl:inline">
               {displayName}
@@ -134,11 +135,11 @@ export default function Navigation() {
         >
           <DropdownMenuLabel className="font-mono">
             <div className="flex min-w-0 flex-none shrink-0 items-center gap-2 sm:gap-3">
-              <img
+              <DevelopmentDivisionAvatar
                 src={user.discordAvatarUrl || undefined}
-                alt=""
-                className="h-10 w-10 rounded-full border border-[var(--mt-steel-line)] object-cover"
-                referrerPolicy="no-referrer"
+                displayName={displayName}
+                isDevelopmentDivisionMember={user.developmentDivisionMember}
+                className="h-10 w-10"
               />
               <div className="min-w-0">
                 <p className="truncate text-sm text-[var(--mt-off-white)]">
@@ -154,6 +155,11 @@ export default function Navigation() {
             <p className="mt-3 rounded border border-[var(--mt-gold)]/25 bg-[var(--mt-gold)]/10 px-2 py-1 text-[11px] uppercase tracking-widest text-[var(--mt-gold-bright)]">
               Signed in with Discord
             </p>
+            {user.developmentDivisionMember === 1 ? (
+              <p className="mt-2 rounded border border-[var(--mt-gold)]/45 bg-[var(--mt-black)] px-2 py-1 text-[11px] uppercase tracking-widest text-[var(--mt-gold-bright)]">
+                Development Division Member
+              </p>
+            ) : null}
           </DropdownMenuLabel>
           <DropdownMenuSeparator className="bg-[var(--mt-gold)]/25" />
           <DropdownMenuItem asChild className="cursor-pointer font-mono">
@@ -167,9 +173,16 @@ export default function Navigation() {
             <Link href="/TCR">TCR</Link>
           </DropdownMenuItem>
           {canSeeTournamentControl && (
-            <DropdownMenuItem asChild className="cursor-pointer font-mono">
-              <Link href="/admin/tournaments/control">MTC Discord TCR</Link>
-            </DropdownMenuItem>
+            <>
+              <DropdownMenuItem asChild className="cursor-pointer font-mono">
+                <Link href="/admin/tournaments/control">MTC Discord TCR</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild className="cursor-pointer font-mono">
+                <Link href="/admin/development-division">
+                  DD Member Invites
+                </Link>
+              </DropdownMenuItem>
+            </>
           )}
           <DropdownMenuSeparator className="bg-[var(--mt-gold)]/25" />
           <DropdownMenuItem
