@@ -33,13 +33,16 @@ import {
   tcrToolButtonActiveClass,
   tcrToolButtonClass,
 } from "./tcrStyles";
+import {
+  tournamentGameModeList,
+  type TournamentGameType,
+} from "../../../../shared/finalsGameModes";
 
 export type TcrToolbarProps = {
   isFinalized: boolean;
   // Creation
   onCreateTeam: () => void;
-  onCreateCashoutLobby: () => void;
-  onCreateFinalRoundMatch: () => void;
+  onCreateGame: (gameType: TournamentGameType) => void;
   // Undo
   canUndo: boolean;
   onUndo: () => void;
@@ -143,14 +146,17 @@ export default function TcrToolbar(props: TcrToolbarProps) {
             New Team…
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={props.onCreateCashoutLobby}>
-            Cashout Lobby
-            <span className="ml-auto text-xs text-zinc-500">4 teams</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={props.onCreateFinalRoundMatch}>
-            Final Round Match
-            <span className="ml-auto text-xs text-zinc-500">2 teams</span>
-          </DropdownMenuItem>
+          {tournamentGameModeList.map(mode => (
+            <DropdownMenuItem
+              key={mode.id}
+              onClick={() => props.onCreateGame(mode.id)}
+            >
+              {mode.nodeLabel}
+              <span className="ml-auto text-xs text-zinc-500">
+                {mode.teamsPerLobby} teams × {mode.activePlayersPerTeam} players
+              </span>
+            </DropdownMenuItem>
+          ))}
         </DropdownMenuContent>
       </DropdownMenu>
 

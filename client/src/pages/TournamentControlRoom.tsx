@@ -64,6 +64,7 @@ import {
 } from "@/lib/tournamentControlBoard";
 export { resolveConnectionDropTargetGameId } from "@/lib/tournamentControlBoard";
 import { rebaseBoardUndoHistoryAfterRestore } from "@/lib/tournamentControlUndo";
+import { tournamentGameModeList } from "../../../shared/finalsGameModes";
 import { useNowTick } from "@/hooks/useNowTick";
 import { Input } from "@/components/ui/input";
 import {
@@ -111,6 +112,7 @@ import {
   type InspectorSelection,
   type StaffMemberView,
 } from "@/components/tcr/types";
+import { getModeAdvancingPlacements } from "../../../shared/finalsGameModes";
 
 type NodeDragState = {
   gameId: number;
@@ -306,8 +308,7 @@ export function getAdvancingPlacements(
   gameType: GameType,
   flowType: ConnectionFlowType = "winner"
 ) {
-  if (gameType === "cashout") return flowType === "winner" ? [1, 2] : [3, 4];
-  return flowType === "winner" ? [1] : [2];
+  return getModeAdvancingPlacements(gameType, flowType);
 }
 
 function isTypingTarget(target: EventTarget | null) {
@@ -528,10 +529,7 @@ export default function TournamentControlRoom({
     },
     onError: (error: { message: string }) => toast.error(error.message),
   });
-  const createCashout =
-    controlApi.createCashoutLobby.useMutation(mutationOptions);
-  const createFinal =
-    controlApi.createFinalRoundMatch.useMutation(mutationOptions);
+  const createGameNode = controlApi.createGameNode.useMutation(mutationOptions);
   const moveGame = controlApi.moveGame.useMutation(mutationOptions);
   const moveGames = controlApi.moveGames.useMutation({
     onError: (error: { message: string }) => toast.error(error.message),
@@ -1957,15 +1955,10 @@ export default function TournamentControlRoom({
       championTeamId={championRow?.teamId ?? null}
       teamsById={teamsById}
       onCreateTeam={() => openDialog({ type: "create-team" })}
-      onCreateCashoutLobby={() =>
-        createCashout.mutate({
+      onCreateGame={gameType =>
+        createGameNode.mutate({
           tournamentId,
-          position: getCanvasCenterPoint(),
-        })
-      }
-      onCreateFinalRoundMatch={() =>
-        createFinal.mutate({
-          tournamentId,
+          gameType,
           position: getCanvasCenterPoint(),
         })
       }
@@ -2273,15 +2266,10 @@ export default function TournamentControlRoom({
           <TcrToolbar
             isFinalized={isFinalizedLocked}
             onCreateTeam={() => openDialog({ type: "create-team" })}
-            onCreateCashoutLobby={() =>
-              createCashout.mutate({
+            onCreateGame={gameType =>
+              createGameNode.mutate({
                 tournamentId,
-                position: getCanvasCenterPoint(),
-              })
-            }
-            onCreateFinalRoundMatch={() =>
-              createFinal.mutate({
-                tournamentId,
+                gameType,
                 position: getCanvasCenterPoint(),
               })
             }
@@ -3277,30 +3265,26 @@ export default function TournamentControlRoom({
                   Create Team
                 </ContextMenuItem>
                 <ContextMenuSeparator />
-                <ContextMenuItem
-                  onClick={() =>
-                    createCashout.mutate({
-                      tournamentId,
-                      position: snapWindowsToGrid
-                        ? snapCanvasPointToGrid(canvasMenuPosition)
-                        : canvasMenuPosition,
-                    })
-                  }
-                >
-                  Create Cashout Lobby
-                </ContextMenuItem>
-                <ContextMenuItem
-                  onClick={() =>
-                    createFinal.mutate({
-                      tournamentId,
-                      position: snapWindowsToGrid
-                        ? snapCanvasPointToGrid(canvasMenuPosition)
-                        : canvasMenuPosition,
-                    })
-                  }
-                >
-                  Create Final Round Match
-                </ContextMenuItem>
+                {tournamentGameModeList.map(mode => (
+                  <ContextMenuItem
+                    key={mode.id}
+                    disabled={isFinalizedLocked}
+                    onClick={() =>
+                      createGameNode.mutate({
+                        tournamentId,
+                        gameType: mode.id,
+                        position: snapWindowsToGrid
+                          ? snapCanvasPointToGrid(canvasMenuPosition)
+                          : canvasMenuPosition,
+                      })
+                    }
+                  >
+                    {mode.nodeLabel}
+                    <span className="ml-auto pl-4 text-xs text-zinc-500">
+                      {mode.teamsPerLobby} × {mode.activePlayersPerTeam}
+                    </span>
+                  </ContextMenuItem>
+                ))}
               </ContextMenuContent>
             </ContextMenu>
 

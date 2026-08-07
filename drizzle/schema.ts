@@ -462,7 +462,14 @@ export const tournamentGames = mysqlTable(
     tournamentId: int("tournamentId")
       .notNull()
       .references(() => tournaments.id, { onDelete: "cascade" }),
-    gameType: mysqlEnum("gameType", ["cashout", "final_round"]).notNull(),
+    gameType: mysqlEnum("gameType", [
+      "cashout",
+      "final_round",
+      "quick_cash",
+      "power_shift",
+      "team_deathmatch",
+      "point_break",
+    ]).notNull(),
     displayLabel: varchar("displayLabel", { length: 80 }).notNull(),
     status: mysqlEnum("status", ["draft", "ready", "live", "complete"])
       .default("draft")
@@ -588,7 +595,14 @@ export const tournamentControlTemplateGames = mysqlTable(
     templateId: int("templateId")
       .notNull()
       .references(() => tournamentControlTemplates.id, { onDelete: "cascade" }),
-    gameType: mysqlEnum("gameType", ["cashout", "final_round"]).notNull(),
+    gameType: mysqlEnum("gameType", [
+      "cashout",
+      "final_round",
+      "quick_cash",
+      "power_shift",
+      "team_deathmatch",
+      "point_break",
+    ]).notNull(),
     displayLabel: varchar("displayLabel", { length: 80 }).notNull(),
     canvasX: int("canvasX").default(120).notNull(),
     canvasY: int("canvasY").default(120).notNull(),

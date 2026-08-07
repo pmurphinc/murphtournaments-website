@@ -4,6 +4,7 @@ import type {
   GameType,
   RoundFrameColorId,
 } from "@/lib/tournamentControlBoard";
+import { getTournamentGameMode } from "../../../../shared/finalsGameModes";
 
 export type ControlTeamView = {
   id: number;
@@ -138,7 +139,7 @@ export const gameStatusLabels: Record<GameStatus, string> = {
 };
 
 export function getLobbyCapacity(gameType: GameType) {
-  return gameType === "cashout" ? 4 : 2;
+  return getTournamentGameMode(gameType).teamsPerLobby;
 }
 
 export function getRecipientWarning(team: ControlTeamView) {

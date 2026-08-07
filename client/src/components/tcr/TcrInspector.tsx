@@ -48,6 +48,11 @@ import {
   type ControlTeamView,
   type InspectorSelection,
 } from "./types";
+import {
+  getTournamentGameMode,
+  tournamentGameModeList,
+  type TournamentGameType,
+} from "../../../../shared/finalsGameModes";
 
 const competitiveMaps = THE_FINALS_MAPS.filter(map =>
   DEFAULT_COMPETITIVE_MAP_IDS.includes(map.id)
@@ -95,8 +100,7 @@ export type TcrInspectorProps = {
   teamsById: ReadonlyMap<number, ControlTeamView>;
   // Board quick actions (empty selection)
   onCreateTeam: () => void;
-  onCreateCashoutLobby: () => void;
-  onCreateFinalRoundMatch: () => void;
+  onCreateGame: (gameType: TournamentGameType) => void;
   onOpenHelp: () => void;
   // Lobby actions
   onRenameLobby: (game: ControlGameView) => void;
@@ -147,9 +151,11 @@ function LobbySection(props: TcrInspectorProps) {
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-xs text-zinc-500">
-            {game.gameType === "cashout"
-              ? "Cashout Lobby · places 1st–4th"
-              : `Final Round · places 1st–2nd · Best of ${game.seriesBestOf ?? 1}`}
+            {getTournamentGameMode(game.gameType).label} · {capacity} teams ×{" "}
+            {getTournamentGameMode(game.gameType).activePlayersPerTeam} players
+            {game.gameType === "final_round"
+              ? ` · Best of ${game.seriesBestOf ?? 1}`
+              : ""}
           </p>
           <h3 className="truncate text-base font-semibold text-zinc-50">
             {game.displayLabel}
@@ -217,12 +223,19 @@ function LobbySection(props: TcrInspectorProps) {
             }
           >
             <option value="">Map: TBD</option>
-            {game.mapId && !competitiveMapIds.has(game.mapId) && (
-              <option value={game.mapId}>
-                Legacy map: {mapsById.get(game.mapId) ?? game.mapId}
-              </option>
-            )}
-            {competitiveMaps.map(map => {
+            {game.mapId &&
+              !getTournamentGameMode(game.gameType).allowedMapIds.some(
+                id => id === game.mapId
+              ) && (
+                <option value={game.mapId}>
+                  Legacy map: {mapsById.get(game.mapId) ?? game.mapId}
+                </option>
+              )}
+            {THE_FINALS_MAPS.filter(map =>
+              getTournamentGameMode(game.gameType).allowedMapIds.some(
+                id => id === map.id
+              )
+            ).map(map => {
               const ban = mapBansById.get(map.id);
               return (
                 <option key={map.id} value={map.id}>
@@ -704,22 +717,22 @@ function BoardSection(props: TcrInspectorProps) {
             <Plus className="h-4 w-4" aria-hidden="true" />
             New Team…
           </button>
-          <button
-            type="button"
-            className={tcrSecondaryButtonClass}
-            onClick={props.onCreateCashoutLobby}
-          >
-            <Boxes className="h-4 w-4" aria-hidden="true" />
-            New Cashout Lobby
-          </button>
-          <button
-            type="button"
-            className={tcrSecondaryButtonClass}
-            onClick={props.onCreateFinalRoundMatch}
-          >
-            <Crown className="h-4 w-4" aria-hidden="true" />
-            New Final Round Match
-          </button>
+          {tournamentGameModeList.map(mode => (
+            <button
+              key={mode.id}
+              type="button"
+              className={`${tcrSecondaryButtonClass} justify-between`}
+              onClick={() => props.onCreateGame(mode.id)}
+            >
+              <span className="inline-flex items-center gap-2">
+                <Boxes className="h-4 w-4" aria-hidden="true" />
+                New {mode.nodeLabel}
+              </span>
+              <span className="text-xs text-zinc-500">
+                {mode.teamsPerLobby} × {mode.activePlayersPerTeam}
+              </span>
+            </button>
+          ))}
         </div>
       )}
       <button

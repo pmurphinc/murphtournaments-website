@@ -10,6 +10,10 @@ import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { THE_FINALS_MAPS } from "@/lib/finalsMaps";
 import {
+  getTournamentGameMode,
+  type TournamentGameType,
+} from "../../../shared/finalsGameModes";
+import {
   baseCanvasSize,
   clampZoom,
   getCanvasPanScroll,
@@ -37,7 +41,7 @@ import {
 type ViewerGame = {
   id: number;
   tournamentId: number;
-  gameType: "cashout" | "final_round";
+  gameType: TournamentGameType;
   status: "draft" | "ready" | "live" | "complete";
   displayLabel: string;
   canvasX: number;
@@ -620,12 +624,11 @@ export default function TournamentControlViewer() {
               const assignments = query.data.assignments
                 .filter(assignment => assignment.gameId === game.id)
                 .sort((a, b) => a.slotIndex - b.slotIndex);
-              const capacity = game.gameType === "cashout" ? 4 : 2;
+              const mode = getTournamentGameMode(game.gameType);
+              const capacity = mode.teamsPerLobby;
               const isMinimized = minimizedGameIds.has(game.id);
               const mapName = game.mapId
-                ? mapsById.get(
-                    game.mapId as keyof (typeof THE_FINALS_MAPS)[number]
-                  )
+                ? mapsById.get(game.mapId)
                 : null;
               const statusClasses = getGameStatusClasses(game.status);
               const broadcastHref = toSafeBroadcastHref(game.broadcastUrl);
@@ -693,9 +696,10 @@ export default function TournamentControlViewer() {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="font-mono text-xs uppercase tracking-widest text-white/45">
-                        {game.gameType === "cashout"
-                          ? "Cashout Lobby"
-                          : `Final Round · BO${game.seriesBestOf ?? 1}`}
+                        {mode.nodeLabel}
+                        {game.gameType === "final_round"
+                          ? ` · BO${game.seriesBestOf ?? 1}`
+                          : ""}
                       </p>
                       <h2 className="mt-1 font-mono text-xl font-black text-white">
                         {game.displayLabel}
