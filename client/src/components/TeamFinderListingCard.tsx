@@ -2,6 +2,7 @@ import { MessageCircle, Send, ShieldAlert } from "lucide-react";
 import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "../../../server/routers";
 import { Button } from "@/components/ui/button";
+import DevelopmentDivisionAvatar from "@/components/DevelopmentDivisionAvatar";
 
 type Listing = inferRouterOutputs<AppRouter>["teamFinder"]["list"][number];
 
@@ -37,18 +38,30 @@ export default function TeamFinderListingCard({
   const isHidden = listing.hiddenByAdmin === 1;
   const isOwner = currentUserId === listing.userId;
   const badge = listing.listingType.toUpperCase();
+  const displayName =
+    listing.discordDisplayName || listing.discordUsername || "Discord player";
 
   return (
     <article className="rounded-lg border border-yellow-400/30 bg-black/70 p-5 shadow-lg shadow-yellow-400/10">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded bg-yellow-400 px-2 py-1 font-mono text-xs font-black text-black">{badge}</span>
-            <h2 className="font-display text-2xl text-white">{listing.title}</h2>
+        <div className="flex min-w-0 items-start gap-4">
+          <DevelopmentDivisionAvatar
+            src={listing.discordAvatarUrl}
+            displayName={displayName}
+            isDevelopmentDivisionMember={listing.developmentDivisionMember}
+            className="h-16 w-16"
+            avatarClassName="border-2 border-yellow-400/50"
+          />
+          <div className="min-w-0 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded bg-yellow-400 px-2 py-1 font-mono text-xs font-black text-black">{badge}</span>
+              <h2 className="font-display text-2xl text-white">{displayName}</h2>
+            </div>
+            <p className="text-sm text-white/55">{listing.title}</p>
+            <p className="font-mono text-xs uppercase tracking-widest text-neon-cyan">
+              {[listing.platform, listing.region, listing.availability, listing.preferredRole].filter(Boolean).join(" • ")}
+            </p>
           </div>
-          <p className="font-mono text-xs uppercase tracking-widest text-neon-cyan">
-            {[listing.platform, listing.region, listing.availability, listing.preferredRole].filter(Boolean).join(" • ")}
-          </p>
         </div>
         {isHidden && (
           <span className="inline-flex items-center gap-2 rounded border border-neon-magenta/50 bg-neon-magenta/10 px-3 py-1 font-mono text-xs uppercase text-neon-magenta">

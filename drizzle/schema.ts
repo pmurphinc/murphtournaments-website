@@ -85,6 +85,7 @@ export const managedTeams = mysqlTable(
       .notNull()
       .references(() => users.id),
     mapBanId: varchar("mapBanId", { length: 64 }),
+    mapPickId: varchar("mapPickId", { length: 64 }),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },

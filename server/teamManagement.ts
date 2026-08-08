@@ -329,11 +329,56 @@ export async function updateManagedTeamMapBan(
       message: "Map ban must be a default competitive map or No Map Ban.",
     });
   }
+  const [team] = await db
+    .select({ mapPickId: managedTeams.mapPickId })
+    .from(managedTeams)
+    .where(eq(managedTeams.id, teamId))
+    .limit(1);
+  if (mapBanId !== null && mapBanId === team?.mapPickId) {
+    throw new TRPCError({
+      code: "CONFLICT",
+      message: "Map Pick and Map Ban must be different maps.",
+    });
+  }
   await db
     .update(managedTeams)
     .set({ mapBanId })
     .where(eq(managedTeams.id, teamId));
   return { success: true, mapBanId } as const;
+}
+
+export async function updateManagedTeamMapPick(
+  userId: number,
+  teamId: number,
+  mapPickId: string | null
+) {
+  const db = await dbOrThrow();
+  await assertCaptain(db, teamId, userId);
+  if (
+    mapPickId !== null &&
+    !(DEFAULT_COMPETITIVE_MAP_IDS as readonly string[]).includes(mapPickId)
+  ) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Map Pick must be a competitive map or No Map Pick.",
+    });
+  }
+  const [team] = await db
+    .select({ mapBanId: managedTeams.mapBanId })
+    .from(managedTeams)
+    .where(eq(managedTeams.id, teamId))
+    .limit(1);
+  if (mapPickId !== null && mapPickId === team?.mapBanId) {
+    throw new TRPCError({
+      code: "CONFLICT",
+      message: "Map Pick and Map Ban must be different maps.",
+    });
+  }
+  await db
+    .update(managedTeams)
+    .set({ mapPickId })
+    .where(eq(managedTeams.id, teamId));
+  return { success: true, mapPickId } as const;
 }
 
 export async function renameManagedTeam(

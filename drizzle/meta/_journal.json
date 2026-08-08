@@ -239,6 +239,13 @@
       "when": 1786147200000,
       "tag": "0033_add_tcr_game_modes",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "5",
+      "when": 1786233600000,
+      "tag": "0034_add_managed_team_map_pick",
+      "breakpoints": true
     }
   ]
 }

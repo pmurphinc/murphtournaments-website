@@ -52,6 +52,8 @@ export async function listTeamFinderListings(isAdmin: boolean) {
       updatedAt: teamFinderListings.updatedAt,
       discordDisplayName: users.discordDisplayName,
       discordUsername: users.discordUsername,
+      discordAvatarUrl: users.discordAvatarUrl,
+      developmentDivisionMember: users.developmentDivisionMember,
       openId: users.openId,
     })
     .from(teamFinderListings)
