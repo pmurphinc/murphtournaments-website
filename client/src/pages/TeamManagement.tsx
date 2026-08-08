@@ -7,6 +7,7 @@ import {
   LinkIcon,
   LogIn,
   Shield,
+  Star,
   Trophy,
   UserPlus,
   Users,
@@ -242,6 +243,65 @@ function MapBan({
   );
 }
 
+function MapPick({
+  team,
+  isCaptain,
+  onChange,
+  isBusy,
+}: {
+  team: ManagedTeam;
+  isCaptain: boolean;
+  onChange: (mapPickId: string | null) => void;
+  isBusy: boolean;
+}) {
+  const pickName = team.mapPickId
+    ? (competitiveMaps.find(map => map.id === team.mapPickId)?.name ??
+      team.mapPickId)
+    : null;
+  const selectId = `map-pick-${team.id}`;
+  return (
+    <div className="rounded-xl border border-neon-cyan/30 bg-neon-cyan/5 p-4">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="flex items-center gap-2 font-mono text-sm uppercase text-neon-cyan">
+          <Star className="h-4 w-4" /> Map Pick
+        </h3>
+        <span className="rounded border border-neon-cyan/30 bg-black/40 px-2 py-0.5 text-xs font-semibold text-neon-cyan">
+          {pickName ?? "No map pick"}
+        </span>
+      </div>
+      {isCaptain ? (
+        <>
+          <label className="sr-only" htmlFor={selectId}>
+            Map pick for {team.name}
+          </label>
+          <select
+            id={selectId}
+            value={team.mapPickId ?? ""}
+            disabled={isBusy}
+            onChange={event => onChange(event.target.value || null)}
+            className="w-full rounded border border-white/15 bg-black px-3 py-2 text-sm text-white disabled:opacity-50"
+          >
+            <option value="">No Map Pick</option>
+            {competitiveMaps.map(map => (
+              <option key={map.id} value={map.id}>
+                {map.name}
+              </option>
+            ))}
+          </select>
+          <p className="mt-2 text-xs leading-relaxed text-white/50">
+            Choose your team's preferred competitive map. This records a
+            preference only; it does not change Control Room randomization.
+          </p>
+        </>
+      ) : (
+        <p className="text-sm text-white/55">
+          Your captain manages the team's preferred map.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function TeamManagement() {
   const { user } = useAuth();
   const isDiscordUser = user?.loginMethod === "discord";
@@ -342,6 +402,10 @@ export default function TeamManagement() {
   });
   const updateMapBan = trpc.teamManagement.updateMapBan.useMutation({
     onSuccess: () => ok("Map ban saved."),
+    onError: e => toast.error(e.message),
+  });
+  const updateMapPick = trpc.teamManagement.updateMapPick.useMutation({
+    onSuccess: () => ok("Map pick saved."),
     onError: e => toast.error(e.message),
   });
   const hasTeamMembership = (query.data?.teams.length ?? 0) > 0;
@@ -643,14 +707,24 @@ export default function TeamManagement() {
                         ))}
                       </div>
                     </div>
-                    <MapBan
-                      team={team}
-                      isCaptain={isCaptain}
-                      isBusy={updateMapBan.isPending}
-                      onChange={mapBanId =>
-                        updateMapBan.mutate({ teamId: team.id, mapBanId })
-                      }
-                    />
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <MapPick
+                        team={team}
+                        isCaptain={isCaptain}
+                        isBusy={updateMapPick.isPending}
+                        onChange={mapPickId =>
+                          updateMapPick.mutate({ teamId: team.id, mapPickId })
+                        }
+                      />
+                      <MapBan
+                        team={team}
+                        isCaptain={isCaptain}
+                        isBusy={updateMapBan.isPending}
+                        onChange={mapBanId =>
+                          updateMapBan.mutate({ teamId: team.id, mapBanId })
+                        }
+                      />
+                    </div>
                     <div className="rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/5 p-4">
                       <h3 className="mb-2 flex items-center gap-2 font-mono text-sm uppercase text-yellow-300">
                         <Trophy className="h-4 w-4" /> Tournament Record

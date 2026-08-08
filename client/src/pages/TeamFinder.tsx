@@ -9,6 +9,14 @@ import { trpc } from "@/lib/trpc";
 import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "../../../server/routers";
 import DevelopmentDivisionAvatar from "@/components/DevelopmentDivisionAvatar";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 type TeamFinderListing =
   inferRouterOutputs<AppRouter>["teamFinder"]["list"][number];
@@ -31,10 +39,6 @@ const defaults: FormState = {
   notes: "",
 };
 const groups = {
-  listingType: [
-    ["lft", "Looking for Team"],
-    ["lfp", "Looking for Players"],
-  ],
   platform: ["PC", "Console", "Crossplay"],
   region: ["NA", "EU", "SA", "OCE", "Asia", "MENA"],
   availability: ["Weeknights", "Weekends", "Flexible"],
@@ -84,6 +88,10 @@ export default function TeamFinder() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<FormState>(defaults);
+  const [inviteListing, setInviteListing] = useState<TeamFinderListing | null>(
+    null
+  );
+  const [inviteTeamId, setInviteTeamId] = useState<number | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -143,6 +151,7 @@ export default function TeamFinder() {
   const invite = trpc.teamManagement.inviteByDiscordUsername.useMutation({
     onSuccess: () => {
       toast.success("Team invitation sent.");
+      setInviteListing(null);
       utils.teamManagement.myTeams.invalidate();
     },
     onError: e =>
@@ -156,22 +165,15 @@ export default function TeamFinder() {
       );
     if (captainTeams.length === 0)
       return toast.error("Only managed-team captains can invite players.");
-    const selectedTeam = captainTeams.length === 1 ? captainTeams[0] : null;
-    const teamId =
-      selectedTeam?.id ??
-      Number(
-        window.prompt(
-          `Invite @${listing.discordUsername} from which team?\n${captainTeams.map(team => `${team.id}: ${team.name}`).join("\n")}`
-        )
-      );
-    const team = captainTeams.find(candidate => candidate.id === teamId);
-    if (!team) return;
-    if (!window.confirm(`Invite @${listing.discordUsername} to ${team.name}?`))
+    if (captainTeams.length === 1) {
+      invite.mutate({
+        teamId: captainTeams[0].id,
+        discordUsername: listing.discordUsername,
+      });
       return;
-    invite.mutate({
-      teamId: team.id,
-      discordUsername: listing.discordUsername,
-    });
+    }
+    setInviteTeamId(captainTeams[0]?.id ?? null);
+    setInviteListing(listing);
   };
 
   const startEdit = (listing: TeamFinderListing) => {
@@ -191,14 +193,17 @@ export default function TeamFinder() {
   };
 
   return (
-    <div className="container py-12">
-      <div className="mb-8 max-w-3xl">
+    <div className="container py-10 md:py-16">
+      <div className="mb-10 max-w-4xl">
+        <p className="mb-3 font-mono text-xs uppercase tracking-[0.35em] text-yellow-400">
+          Find your next squad
+        </p>
         <GlitchText className="mb-4 font-display text-5xl text-white">
-          Team Finder
+          LFT — Looking for Team
         </GlitchText>
         <p className="text-lg text-white/75">
-          A Discord-authenticated, click-first LFT/LFP board for Murph
-          Tournaments players.
+          Put your play style, region, and schedule in front of captains
+          building their next competitive roster.
         </p>
       </div>
 
@@ -235,7 +240,7 @@ export default function TeamFinder() {
                 setFormOpen(v => !v);
               }}
             >
-              {formOpen ? "Close form" : "Post listing"}
+              {formOpen ? "Close form" : "Post your LFT"}
             </Button>
           </div>
         )}
@@ -251,12 +256,6 @@ export default function TeamFinder() {
               : create.mutate(payload);
           }}
         >
-          <Segmented
-            label="Goal"
-            value={form.listingType}
-            options={groups.listingType}
-            onChange={listingType => setForm({ ...form, listingType })}
-          />
           <Segmented
             label="Platform"
             value={form.platform}
@@ -289,7 +288,7 @@ export default function TeamFinder() {
             className="min-h-28 bg-black/60 text-white"
           />
           <Button type="submit" disabled={create.isPending || update.isPending}>
-            {editingId ? "Save listing" : "Post listing"}
+            {editingId ? "Save LFT" : "Post LFT"}
           </Button>
         </form>
       )}
@@ -298,7 +297,7 @@ export default function TeamFinder() {
         <LoadingThrobber />
       ) : listings.isError ? (
         <p className="rounded border border-neon-magenta/50 bg-neon-magenta/10 p-4 text-neon-magenta">
-          Unable to load Team Finder listings.
+          We couldn't load LFT listings. Please try again shortly.
         </p>
       ) : listings.data && listings.data.length > 0 ? (
         <div className="grid gap-5">
@@ -329,9 +328,59 @@ export default function TeamFinder() {
         </div>
       ) : (
         <p className="rounded border border-neon-cyan/30 bg-black/50 p-6 text-white/70">
-          No Team Finder listings are live yet. Check back soon.
+          No players have posted an LFT yet. Sign in with Discord and be the
+          first player captains see.
         </p>
       )}
+      <Dialog
+        open={!!inviteListing}
+        onOpenChange={open => !open && setInviteListing(null)}
+      >
+        <DialogContent className="border-yellow-400/30 bg-black text-white">
+          <DialogHeader>
+            <DialogTitle>Invite player to a team</DialogTitle>
+            <DialogDescription className="text-white/60">
+              Choose which managed team should invite @
+              {inviteListing?.discordUsername}.
+            </DialogDescription>
+          </DialogHeader>
+          <label
+            htmlFor="invite-team"
+            className="font-mono text-xs uppercase text-yellow-300"
+          >
+            Your team
+          </label>
+          <select
+            id="invite-team"
+            value={inviteTeamId ?? ""}
+            onChange={event => setInviteTeamId(Number(event.target.value))}
+            className="w-full rounded border border-white/20 bg-black px-3 py-2 text-white"
+          >
+            {captainTeams.map(team => (
+              <option key={team.id} value={team.id}>
+                {team.name}
+              </option>
+            ))}
+          </select>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setInviteListing(null)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={!inviteTeamId || invite.isPending}
+              onClick={() => {
+                if (inviteTeamId && inviteListing?.discordUsername)
+                  invite.mutate({
+                    teamId: inviteTeamId,
+                    discordUsername: inviteListing.discordUsername,
+                  });
+              }}
+            >
+              {invite.isPending ? "Sending…" : "Send invitation"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

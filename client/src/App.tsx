@@ -138,6 +138,7 @@ function Router() {
           />
           <Route path={"/balance-archive"} component={BalanceArchive} />
           <Route path={"/team-finder"} component={TeamFinder} />
+          <Route path={"/lft"} component={TeamFinder} />
           <Route path={"/teams/claim/:token"} component={TeamClaimLink} />
           <Route path={"/teams/join/:token"} component={TeamJoinInvite} />
           <Route path={"/teams"} component={TeamManagement} />

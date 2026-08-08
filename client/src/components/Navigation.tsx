@@ -163,7 +163,7 @@ export default function Navigation() {
           </DropdownMenuLabel>
           <DropdownMenuSeparator className="bg-[var(--mt-gold)]/25" />
           <DropdownMenuItem asChild className="cursor-pointer font-mono">
-            <Link href="/team-finder">Team Finder</Link>
+            <Link href="/lft">LFT</Link>
           </DropdownMenuItem>
           <DropdownMenuSeparator className="bg-[var(--mt-gold)]/25" />
           <DropdownMenuItem asChild className="cursor-pointer font-mono">

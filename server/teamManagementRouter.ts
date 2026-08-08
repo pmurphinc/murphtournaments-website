@@ -22,6 +22,7 @@ import {
   listAvailableTournamentsForMyTeams,
   submitManagedTeamToTournament,
   updateManagedTeamMapBan,
+  updateManagedTeamMapPick,
 } from "./teamManagement";
 
 const discordProcedure = protectedProcedure.use(async ({ ctx, next }) => {
@@ -117,6 +118,16 @@ export const teamManagementRouter = router({
     )
     .mutation(({ ctx, input }) =>
       updateManagedTeamMapBan(ctx.user.id, input.teamId, input.mapBanId)
+    ),
+  updateMapPick: discordProcedure
+    .input(
+      z.object({
+        teamId,
+        mapPickId: z.string().trim().min(1).max(64).nullable(),
+      })
+    )
+    .mutation(({ ctx, input }) =>
+      updateManagedTeamMapPick(ctx.user.id, input.teamId, input.mapPickId)
     ),
   disband: discordProcedure
     .input(z.object({ teamId, confirmation: z.literal("DISBAND") }))

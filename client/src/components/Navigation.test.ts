@@ -18,8 +18,8 @@ describe("Discord avatar header control", () => {
     expect(source).toContain("lg:hidden");
   });
 
-  it("links the account menu to Team Finder without listing/post duplicates", () => {
-    expect(source).toContain('<Link href="/team-finder">Team Finder</Link>');
+  it("links the account menu to LFT without listing/post duplicates", () => {
+    expect(source).toContain('<Link href="/lft">LFT</Link>');
     expect(source).not.toContain("My Listings");
     expect(source).not.toContain("Post Listing");
     expect(source).not.toContain("/team-finder?post=1");
