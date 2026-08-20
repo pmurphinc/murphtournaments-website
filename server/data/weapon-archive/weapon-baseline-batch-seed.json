@@ -1,7 +1,7 @@
 {
-  "id": "baseline_kromes_spreadsheet_11_3_0",
+  "id": "baseline_kromes_spreadsheet_11_6_0",
   "sourceLabel": "Krome's Spreadsheet + Embark Patch Notes",
-  "snapshotDate": "2026-07-30",
+  "snapshotDate": "2026-08-20",
   "sourceType": "manual",
-  "notes": "Baseline reference snapshot reconciled cell-by-cell to Krome's Weapon Data Sheet 11.0.0, then advanced through official Update 11.3.0 balance changes."
+  "notes": "Baseline reference snapshot reconciled to Krome's Weapon Data Sheet and advanced through official Update 11.6.0. Only values affected by official patches are overridden; unchanged baseline values remain sourced from the existing spreadsheet snapshot."
 }
