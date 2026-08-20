@@ -70,5 +70,52 @@ describe("BaselineStatsCard", () => {
     expect(html).toContain("Head DMG");
     expect(html).toContain("Mag Size");
     expect(html).toContain("Dropoff Start");
+    expect(html).not.toContain("Current Handling");
+  });
+
+  it("surfaces current recoil and dispersion modifiers near the baseline stats", () => {
+    const html = renderToStaticMarkup(
+      <BaselineStatsCard
+        weaponName="M11"
+        stat={{
+          ...meleeStat,
+          weaponId: "weapon_m11",
+          name: "M11",
+          weaponType: undefined,
+          bodyDamage: 16,
+          headDamage: 24,
+          rateOfFireRpm: 1000,
+          magazineSize: 40,
+          damagePerMagazine: 640,
+          tacticalReloadTimeSeconds: 1.55,
+          emptyReloadTimeSeconds: 1.85,
+          damageDropoffMinRange: 10,
+          damageDropoffMaxRange: 20,
+          damageDropoffModifierAtMaxRange: 45,
+          sourceNotes: null,
+          rawValues: JSON.stringify({
+            handlingPatch: "11.6.0",
+            hipFireRecoilModifier: "+75%",
+            adsRecoilModifier: "+25%",
+            adsDispersionModifier: "+25%",
+            airborneAdsDispersionModifier: "+120%",
+          }),
+        }}
+        source={{
+          sourceLabel: "Krome's Spreadsheet + Embark Patch Notes",
+          versionLabel: "11.6.0",
+          snapshotDate: "2026-08-20",
+        }}
+      />,
+    );
+
+    expect(html).toContain("Current Handling");
+    expect(html).toContain("Patch v11.6.0");
+    expect(html).toContain("Hip Recoil");
+    expect(html).toContain("+75%");
+    expect(html).toContain("ADS Recoil");
+    expect(html).toContain("Airborne ADS Dispersion");
+    expect(html).toContain("+120%");
+    expect(html).toContain("relative changes");
   });
 });
