@@ -1,0 +1,125 @@
+[
+  {
+    "weaponId": "weapon_akm",
+    "values": {
+      "bodyDamage": 21,
+      "headDamage": 31.5,
+      "damagePerMagazine": null,
+      "ttkVsLightBodySeconds": null,
+      "stkLightBody": null,
+      "ttkVsMediumBodySeconds": null,
+      "stkMediumBody": null,
+      "ttkVsHeavyBodySeconds": null,
+      "stkHeavyBody": null,
+      "sourceNotes": "Update 11.6 increased base damage from 20 to 21; the existing 1.5x headshot multiplier remains unchanged.",
+      "rawValues": "{\"bodyDamageRaw\":\"21\",\"headDamageRaw\":\"31.5\",\"magazineRaw\":\"34\",\"damagePerMagazineRaw\":\"714\"}"
+    }
+  },
+  {
+    "weaponId": "weapon_arn-220",
+    "values": {
+      "rateOfFireRpm": 750,
+      "emptyReloadTimeSeconds": 2.7,
+      "ttkVsLightBodySeconds": null,
+      "stkLightBody": null,
+      "ttkVsMediumBodySeconds": null,
+      "stkMediumBody": null,
+      "ttkVsHeavyBodySeconds": null,
+      "stkHeavyBody": null,
+      "sourceNotes": "Update 11.6 increased fire rate to 750 RPM, shortened the special quick reload animation to 0.66s, and shortened the empty reload to 2.7s.",
+      "rawValues": "{\"magazineRaw\":\"60 (30)\",\"emptyReloadRaw\":\"2.70 (0.66 quick)\"}"
+    }
+  },
+  {
+    "weaponId": "weapon_dagger",
+    "values": {
+      "bodyDamage": 70,
+      "stkLightBody": 3,
+      "stkMediumBody": 4,
+      "stkHeavyBody": 5,
+      "sourceNotes": "Update 11.6 set primary precise damage to 70 and glancing damage to 49. Primary lunge duration is 0.22s; the 5m lunge distance from 11.3 remains in place.",
+      "rawValues": "{\"bodyDamageRaw\":\"70 precise / 49 glancing\"}"
+    }
+  },
+  {
+    "weaponId": "weapon_dagger_alt",
+    "values": {
+      "bodyDamage": 85,
+      "stkLightBody": 2,
+      "stkMediumBody": 3,
+      "stkHeavyBody": 5,
+      "sourceNotes": "Update 11.6 increased the Backstab secondary base damage to 85 and extended secondary lunge duration to 0.32s.",
+      "rawValues": "{\"bodyDamageRaw\":\"85\"}"
+    }
+  },
+  {
+    "weaponId": "weapon_dagger_alt_backstab",
+    "values": {
+      "bodyDamage": 340,
+      "stkLightBody": 1,
+      "stkMediumBody": 1,
+      "stkHeavyBody": 2,
+      "sourceNotes": "Update 11.6 increased Backstab damage to 340; secondary lunge duration is 0.32s.",
+      "rawValues": "{\"bodyDamageRaw\":\"340\"}"
+    }
+  },
+  {
+    "weaponId": "weapon_recurve_bow_charged",
+    "values": {
+      "bodyDamage": 126,
+      "headDamage": 189,
+      "ttkVsLightBodySeconds": null,
+      "stkLightBody": null,
+      "ttkVsMediumBodySeconds": null,
+      "stkMediumBody": null,
+      "ttkVsHeavyBodySeconds": null,
+      "stkHeavyBody": null,
+      "sourceNotes": "Update 11.6 increased maximum-draw damage from 124 to 126 while uncharged/base damage remains 60. Head damage reflects the unchanged 1.5x multiplier.",
+      "rawValues": "{\"bodyDamageRaw\":\"126\",\"headDamageRaw\":\"189\"}"
+    }
+  },
+  {
+    "weaponId": "weapon_cerberus_12ga",
+    "values": {
+      "bodyDamage": 117,
+      "damagePerMagazine": 351,
+      "ttkVsLightBodySeconds": null,
+      "stkLightBody": null,
+      "ttkVsMediumBodySeconds": null,
+      "stkMediumBody": null,
+      "ttkVsHeavyBodySeconds": null,
+      "stkHeavyBody": null,
+      "sourceNotes": "Update 11.6 increased pellet damage from 8 to 9, bringing a 13-pellet full shot from 104 to 117 damage. The fire damage-over-time behavior is otherwise unchanged.",
+      "rawValues": "{\"bodyDamageRaw\":\"117\",\"magazineRaw\":\"3\",\"damagePerMagazineRaw\":\"351\"}"
+    }
+  },
+  {
+    "weaponId": "weapon_riot_shield",
+    "values": {
+      "bodyDamage": 86,
+      "stkLightBody": 2,
+      "stkMediumBody": 3,
+      "stkHeavyBody": 5,
+      "sourceNotes": "Update 11.6 set primary precise damage to 86 and glancing damage to 60, fixed the intended 5m primary lunge, raised Shield Bash to 50 damage and 100 environmental damage, and increased Bash lunge duration to 0.6s.",
+      "rawValues": "{\"bodyDamageRaw\":\"86 precise / 60 glancing\"}"
+    }
+  },
+  {
+    "weaponId": "weapon_bfr_titan",
+    "values": {
+      "damageDropoffModifierAtMaxRange": 70,
+      "sourceNotes": "Update 11.3 increased damage from 88 to 90. Update 11.6 increased the damage falloff multiplier from 0.65 to 0.70 for stronger ranged damage.",
+      "rawValues": "{\"damageDropoffModifierAtMaxRange\":\"~70%\"}"
+    }
+  },
+  {
+    "weaponId": "weapon_ks_23",
+    "values": {
+      "damageDropoffMinRange": 12,
+      "damageDropoffMaxRange": 22,
+      "damageDropoffModifierAtMaxRange": 58,
+      "sourceNotes": "Update 11.6 reduced effective range: falloff now starts at 12m, ends at 22m, and reaches a 0.58 damage multiplier at maximum range. Base damage remains 104.",
+      "rawValues": "{\"damageDropoffMinRange\":\"12m\",\"damageDropoffMaxRange\":\"22m\",\"damageDropoffModifierAtMaxRange\":\"~58%\"}"
+    }
+  }
+]
