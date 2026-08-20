@@ -73,6 +73,11 @@ type SeedBaselineStat = {
   rawValues?: string | null;
 };
 
+type SeedBaselineOverride = {
+  weaponId: string;
+  values: Partial<Omit<SeedBaselineStat, "weaponId">>;
+};
+
 type SeedBaselineBatch = {
   id: string;
   sourceLabel: string;
@@ -159,30 +164,61 @@ async function readOptionalJsonFile<T>(fileName: string, fallback: T): Promise<T
   });
 }
 
+function applyBaselineOverrides(
+  baselineStats: SeedBaselineStat[],
+  overrides: SeedBaselineOverride[],
+) {
+  const overridesByWeaponId = new Map(
+    overrides.map(override => [override.weaponId, override.values]),
+  );
+
+  return baselineStats.map(stat => {
+    if (!stat.weaponId) return stat;
+    const values = overridesByWeaponId.get(stat.weaponId);
+    return values ? { ...stat, ...values } : stat;
+  });
+}
+
 async function loadArchiveData() {
   archivePromise ??= Promise.all([
     readJsonFile<SeedWeapon[]>("weapons-seed.json"),
     readJsonFile<SeedPatch[]>("patches-seed.json"),
     readOptionalJsonFile<SeedPatch[]>("patches-official-extra-seed.json", []),
+    readOptionalJsonFile<SeedPatch[]>("patches-update-11-6-seed.json", []),
     readJsonFile<SeedChange[]>("weapon-changes-seed.json"),
     readOptionalJsonFile<SeedChange[]>("weapon-changes-corrections-seed.json", []),
     readOptionalJsonFile<SeedChange[]>("weapon-changes-official-extra-seed.json", []),
+    readOptionalJsonFile<SeedChange[]>("weapon-changes-update-11-6-seed.json", []),
     readJsonFile<SeedBaselineStat[]>("weapon-baseline-stats-seed.json"),
-    readJsonFile<SeedBaselineBatch>("weapon-baseline-batch-seed.json").catch(() => null),
+    readOptionalJsonFile<SeedBaselineOverride[]>(
+      "weapon-baseline-overrides-update-11-6-seed.json",
+      [],
+    ),
+    readJsonFile<SeedBaselineBatch>("weapon-baseline-batch-seed.json").catch(
+      () => null,
+    ),
   ]).then(([
     weapons,
     patches,
     extraPatches,
+    update116Patches,
     changes,
     correctionChanges,
     extraChanges,
+    update116Changes,
     baselineStats,
+    baselineOverrides,
     baselineBatch,
   ]) => ({
     weapons,
-    patches: [...patches, ...extraPatches],
-    changes: [...changes, ...correctionChanges, ...extraChanges],
-    baselineStats,
+    patches: [...patches, ...extraPatches, ...update116Patches],
+    changes: [
+      ...changes,
+      ...correctionChanges,
+      ...extraChanges,
+      ...update116Changes,
+    ],
+    baselineStats: applyBaselineOverrides(baselineStats, baselineOverrides),
     baselineBatch,
   }));
 
@@ -214,9 +250,16 @@ function canonicalizeSharedGadgetSlug(slug: string) {
   return SHARED_GADGET_SLUG_TO_CANONICAL[aliasedSlug] ?? aliasedSlug;
 }
 
-function applySharedGadgetClass<T extends { slug: string; category: string | null; class: string | null }>(weapon: T): T {
+function applySharedGadgetClass<
+  T extends { slug: string; category: string | null; class: string | null },
+>(weapon: T): T {
   if ((weapon.category ?? "").toLowerCase() !== "gadget") return weapon;
-  if (!SHARED_GADGET_CANONICAL_SLUGS.has(canonicalizeSharedGadgetSlug(weapon.slug))) return weapon;
+  if (
+    !SHARED_GADGET_CANONICAL_SLUGS.has(
+      canonicalizeSharedGadgetSlug(weapon.slug),
+    )
+  )
+    return weapon;
   return { ...weapon, class: "multi" } as T;
 }
 
@@ -276,28 +319,40 @@ async function buildListItems() {
   const changesByWeapon = new Map<string, SeedChange[]>();
 
   for (const change of dedupedChanges) {
-    changesByWeapon.set(change.weaponId, [...(changesByWeapon.get(change.weaponId) ?? []), change]);
+    changesByWeapon.set(change.weaponId, [
+      ...(changesByWeapon.get(change.weaponId) ?? []),
+      change,
+    ]);
   }
 
   const bySlug = new Map<string, WeaponArchiveListItem>();
 
   for (const weapon of weapons.filter(item => item.isActive !== 0)) {
     const canonicalSlug = canonicalizeSharedGadgetSlug(weapon.slug);
-    const canonicalWeapon = applySharedGadgetClass({ ...weapon, slug: canonicalSlug });
+    const canonicalWeapon = applySharedGadgetClass({
+      ...weapon,
+      slug: canonicalSlug,
+    });
     const weaponChanges = changesByWeapon.get(weapon.id) ?? [];
-    const patchIds = Array.from(new Set(weaponChanges.map(change => change.patchId)));
-    const latestPatch = patchIds
-      .map(patchId => patchById.get(patchId) ?? null)
-      .filter((patch): patch is SeedPatch => Boolean(patch))
-      .sort((a, b) => {
-        const version = compareVersion(b.versionLabel, a.versionLabel);
-        if (version !== 0) return version;
-        return (b.patchDate ?? "").localeCompare(a.patchDate ?? "");
-      })[0] ?? null;
+    const patchIds = Array.from(
+      new Set(weaponChanges.map(change => change.patchId)),
+    );
+    const latestPatch =
+      patchIds
+        .map(patchId => patchById.get(patchId) ?? null)
+        .filter((patch): patch is SeedPatch => Boolean(patch))
+        .sort((a, b) => {
+          const version = compareVersion(b.versionLabel, a.versionLabel);
+          if (version !== 0) return version;
+          return (b.patchDate ?? "").localeCompare(a.patchDate ?? "");
+        })[0] ?? null;
 
     const item: WeaponArchiveListItem = {
       ...canonicalWeapon,
-      imageUrl: resolveWeaponArchiveImageUrl(canonicalSlug, canonicalWeapon.imageUrl),
+      imageUrl: resolveWeaponArchiveImageUrl(
+        canonicalSlug,
+        canonicalWeapon.imageUrl,
+      ),
       changeCount: weaponChanges.length,
       latestPatch: latestPatch?.versionLabel ?? null,
       latestPatchDate: latestPatch?.patchDate ?? null,
@@ -321,7 +376,9 @@ export async function listWeaponArchiveItems(input?: {
   let items = await buildListItems();
 
   if (input?.class) {
-    items = items.filter(item => matchesClassFilter(item, input.class!, input.category));
+    items = items.filter(item =>
+      matchesClassFilter(item, input.class!, input.category),
+    );
   }
 
   if (input?.category) {
@@ -344,10 +401,14 @@ export async function listWeaponArchiveItems(input?: {
 
   const sort = input?.sort ?? "alphabetical";
   if (sort === "most-changed") {
-    items.sort((a, b) => b.changeCount - a.changeCount || a.name.localeCompare(b.name));
+    items.sort(
+      (a, b) => b.changeCount - a.changeCount || a.name.localeCompare(b.name),
+    );
   } else if (sort === "recently-changed") {
     items.sort((a, b) => {
-      const dateCompare = (b.latestPatchDate ?? "").localeCompare(a.latestPatchDate ?? "");
+      const dateCompare = (b.latestPatchDate ?? "").localeCompare(
+        a.latestPatchDate ?? "",
+      );
       if (dateCompare !== 0) return dateCompare;
       return compareVersion(b.latestPatch, a.latestPatch) || a.name.localeCompare(b.name);
     });
@@ -358,9 +419,14 @@ export async function listWeaponArchiveItems(input?: {
   return items;
 }
 
-export async function getWeaponArchiveDetail(slug: string): Promise<WeaponArchiveDetail | null> {
-  const canonicalSlug = canonicalizeSharedGadgetSlug(canonicalizeWeaponSlug(slug));
-  const { weapons, patches, changes, baselineStats, baselineBatch } = await loadArchiveData();
+export async function getWeaponArchiveDetail(
+  slug: string,
+): Promise<WeaponArchiveDetail | null> {
+  const canonicalSlug = canonicalizeSharedGadgetSlug(
+    canonicalizeWeaponSlug(slug),
+  );
+  const { weapons, patches, changes, baselineStats, baselineBatch } =
+    await loadArchiveData();
   const listItems = await buildListItems();
   const weapon = listItems.find(item => item.slug === canonicalSlug);
   if (!weapon) return null;
@@ -369,11 +435,16 @@ export async function getWeaponArchiveDetail(slug: string): Promise<WeaponArchiv
     .filter(item => canonicalizeSharedGadgetSlug(item.slug) === canonicalSlug)
     .map(item => item.id);
   const patchById = new Map(patches.map(patch => [patch.id, patch]));
-  const relevantChanges = dedupeChanges(changes.filter(change => matchingWeaponIds.includes(change.weaponId)));
+  const relevantChanges = dedupeChanges(
+    changes.filter(change => matchingWeaponIds.includes(change.weaponId)),
+  );
   const changesByPatch = new Map<string, SeedChange[]>();
 
   for (const change of relevantChanges) {
-    changesByPatch.set(change.patchId, [...(changesByPatch.get(change.patchId) ?? []), change]);
+    changesByPatch.set(change.patchId, [
+      ...(changesByPatch.get(change.patchId) ?? []),
+      change,
+    ]);
   }
 
   const history = Array.from(changesByPatch.entries())
@@ -382,20 +453,26 @@ export async function getWeaponArchiveDetail(slug: string): Promise<WeaponArchiv
       if (!patch) return null;
       return {
         patch,
-        changes: patchChanges.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
+        changes: patchChanges.sort(
+          (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0),
+        ),
       };
     })
     .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
     .sort((a, b) => {
-      const dateCompare = (b.patch.patchDate ?? "").localeCompare(a.patch.patchDate ?? "");
+      const dateCompare = (b.patch.patchDate ?? "").localeCompare(
+        a.patch.patchDate ?? "",
+      );
       if (dateCompare !== 0) return dateCompare;
       return compareVersion(b.patch.versionLabel, a.patch.versionLabel);
     });
 
   const stats = baselineStats.filter(row => {
     const isDirectMatch =
-      row.weaponId === weapon.id || normalizeBaselineName(row.name) === normalizeBaselineName(weapon.name);
-    const isMeleeVariant = row.weaponType === "melee" && row.weaponId?.startsWith(`${weapon.id}_`);
+      row.weaponId === weapon.id ||
+      normalizeBaselineName(row.name) === normalizeBaselineName(weapon.name);
+    const isMeleeVariant =
+      row.weaponType === "melee" && row.weaponId?.startsWith(`${weapon.id}_`);
     return isDirectMatch || isMeleeVariant;
   });
 
@@ -405,7 +482,10 @@ export async function getWeaponArchiveDetail(slug: string): Promise<WeaponArchiv
     baselineSource: baselineBatch
       ? {
           sourceLabel: baselineBatch.sourceLabel,
-          versionLabel: baselineBatch.id.match(/(\d+_\d+_\d+)/)?.[1]?.replace(/_/g, ".") ?? "11.0.0",
+          versionLabel:
+            baselineBatch.id
+              .match(/(\d+_\d+_\d+)/)?.[1]
+              ?.replace(/_/g, ".") ?? "11.0.0",
           snapshotDate: baselineBatch.snapshotDate,
         }
       : null,
