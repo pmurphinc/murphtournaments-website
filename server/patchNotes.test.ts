@@ -4,11 +4,10 @@ import type { TrpcContext } from "./_core/context";
 
 /**
  * Tests for the patchNotes tRPC router.
- * - patchNotes.getAll: returns patch notes from the database
+ * - patchNotes.getAll: returns patch notes from the database plus website fallbacks
  * - patchNotes.scrapeAndStore: triggers the wiki scraper
  */
 
-// Mock the db module
 vi.mock("./db", async importOriginal => {
   const actual = await importOriginal<typeof import("./db")>();
   return {
@@ -17,7 +16,6 @@ vi.mock("./db", async importOriginal => {
   };
 });
 
-// Mock the patchNoteScraper module
 vi.mock("./patchNoteScraper", () => ({
   scrapeAndStorePatchNotes: vi.fn(),
 }));
@@ -46,7 +44,7 @@ describe("patchNotes.getAll", () => {
     vi.clearAllMocks();
   });
 
-  it("returns mapped patch notes from the database", async () => {
+  it("returns mapped patch notes from the database with current website fallbacks", async () => {
     const mockNotes = [
       {
         id: 5,
@@ -80,18 +78,53 @@ describe("patchNotes.getAll", () => {
     const caller = appRouter.createCaller(ctx);
     const result = await caller.patchNotes.getAll();
 
-    expect(result).toHaveLength(6);
+    expect(result).toHaveLength(7);
     expect(result[0]).toMatchObject({
-      id: -1130,
-      title: "Update 11.3.0",
-      date: "2026.07.30",
-      url: "https://www.reachthefinals.com/patchnotes/11-30",
-      version: "11.3.0",
+      id: -1160,
+      title: "Update 11.6.0",
+      date: "2026.08.20",
+      url: "https://www.reachthefinals.com/patchnotes/11-60",
+      version: "11.6.0",
     });
-    expect(result[0].content).toContain(
+
+    const update116 = result.find(note => note.version === "11.6.0");
+    expect(update116).toBeDefined();
+    for (const expectedContent of [
+      "Orbital Hitters",
+      "Deep Signal",
+      "Sugar Shocker / Sugar Crasher Sets",
+      "Hullwalker Set",
+      "Connection Complete Sticker",
+      "Lockbolt: reload animation duration decreased from 2.2s to 1.75s",
+      "Dematerializer: cooldown decreased from 20s to 15s per charge",
+      "Guardian Turret: activation time decreased from 3.5s to 3s",
+      "AKM: damage increased from 20 to 21",
+      "ARN-220: fire rate increased from 725 RPM to 750 RPM",
+      "BFR Titan: damage falloff multiplier increased from 0.65 to 0.7",
+      "Cerberus 12GA: pellet damage increased from 8 to 9",
+      "Dagger — Primary: base damage increased from 42 to 49",
+      "Dual Blades: primary Precision zone angle increased from 9° to 12°",
+      "KS-23: damage falloff multiplier decreased from 0.675 to 0.58",
+      "M11: hip-fire recoil increased by approximately 75%",
+      "Recurve Bow: maximum-draw damage increased from 124 to 126",
+      "Shield Bash: damage increased from 40 to 50",
+      "Spear — Primary: damage sweep box increased by 60%",
+      "XP-54: recoil curve updated",
+      "gyro-controller users",
+      "KB5121003",
+      "Upgraded Unreal Engine from 5.3 to 5.7",
+      "Dual Blades Deflect",
+      "Riot Shield: fixed missing third-person visual and sound effects",
+    ]) {
+      expect(update116?.content).toContain(expectedContent);
+    }
+
+    const update113 = result.find(note => note.version === "11.3.0");
+    expect(update113).toBeDefined();
+    expect(update113?.content).toContain(
       "C4: cooldown increased from 30s to 45s."
     );
-    expect(result[0].content).toContain(
+    expect(update113?.content).toContain(
       "Dome Shield: fixed friendly melee attacks damaging the shield."
     );
     for (const expectedChange of [
@@ -104,7 +137,7 @@ describe("patchNotes.getAll", () => {
       "Riot Shield: Precision zone angle increased from 9° to 10°",
       "Spear: primary precise damage increased from 74 to 82",
     ]) {
-      expect(result[0].content).toContain(expectedChange);
+      expect(update113?.content).toContain(expectedChange);
     }
 
     expect(result.find(note => note.version === "10.3.0")).toEqual({
@@ -124,7 +157,6 @@ describe("patchNotes.getAll", () => {
       version: "10.0.0",
     });
 
-    // Should not include sourceUrl, isGameUpdate, createdAt, updatedAt in the response
     expect(result[0]).not.toHaveProperty("sourceUrl");
     expect(result[0]).not.toHaveProperty("isGameUpdate");
     expect(result[0]).not.toHaveProperty("createdAt");
@@ -137,11 +169,11 @@ describe("patchNotes.getAll", () => {
     const caller = appRouter.createCaller(ctx);
     const result = await caller.patchNotes.getAll();
 
-    expect(result).toHaveLength(4);
+    expect(result).toHaveLength(5);
     expect(result[0]).toMatchObject({
-      id: -1130,
-      title: "Update 11.3.0",
-      version: "11.3.0",
+      id: -1160,
+      title: "Update 11.6.0",
+      version: "11.6.0",
     });
   });
 
@@ -152,11 +184,11 @@ describe("patchNotes.getAll", () => {
     const caller = appRouter.createCaller(ctx);
     const result = await caller.patchNotes.getAll();
 
-    expect(result).toHaveLength(4);
+    expect(result).toHaveLength(5);
     expect(result[0]).toMatchObject({
-      id: -1130,
-      title: "Update 11.3.0",
-      version: "11.3.0",
+      id: -1160,
+      title: "Update 11.6.0",
+      version: "11.6.0",
     });
   });
 });

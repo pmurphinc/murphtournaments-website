@@ -60,6 +60,161 @@ export const cleanPatchNoteContent = (content: string) => {
 
 export const WEBSITE_PATCH_NOTES: WebsitePatchNote[] = [
   {
+    id: -1160,
+    title: "Update 11.6.0",
+    date: "2026.08.20",
+    version: "11.6.0",
+    url: "https://www.reachthefinals.com/patchnotes/11-60",
+    sourceUrl: "https://www.reachthefinals.com/patchnotes/11-60",
+    isGameUpdate: 1,
+    content: `THE FINALS — Update 11.6.0 | SPACE MAYHEM
+
+Update 11.6.0 brings back a space-themed limited-time mode, launches a new reward-wheel event and Twitch drops, adds new store/DLC sets, makes a broad balance pass across gadgets, specializations and weapons, addresses two anti-cheat/Windows notices, upgrades the game to Unreal Engine 5.7, and includes fixes across animation, audio, cosmetics, gameplay, maps, social, stability, UI and weapons.
+
+LTM | Orbital Hitters
+
+• Orbital Hitters returns the Heavy Hitters-style brawl with Sledgehammers and space-themed knockback gameplay.
+• Contestants use the available tools and arena hazards to knock opponents out of the fight and off the Arena.
+
+Event | Deep Signal
+
+• ENGIMO sponsors a new reward Wheel event running for two weeks.
+• Players can earn up to three tickets per day by completing contracts.
+• The Wheel contains more than 20 rewards.
+• Landing on a duplicate converts that spot into a Golden Ticket.
+• A Golden Ticket guarantees the next spin awards a new item.
+
+DLC | Sugar Shocker / Sugar Crasher Sets
+
+• The Sugar Shocker and Sugar Crasher DLC sets add robotic-feline themed cosmetics.
+• Each set includes an outfit, a Legendary BFR Titan skin with charm, a Legendary emote, and 2,400 Multibucks.
+
+Store | Hullwalker Set
+
+• The Hullwalker Set adds a vacuum/space-work themed cosmetic set built around a sealed helmet and outer-space styling.
+
+Twitch | Beyond Boundaries
+
+• Watch THE FINALS streams with Drops Enabled to earn the new Beyond Boundaries cosmetics.
+• 1 hour: Connection Complete Sticker.
+• 2 hours: Link Established Charm.
+• 4 hours: Meteor Tips Earrings.
+• Drops are available through September 3, 2026.
+
+Game Update | Balance Changes
+
+Gadgets
+• Lockbolt: reload animation duration decreased from 2.2s to 1.75s; ammo restock timing during the reload moved from 1.3s to 1.1s. This is a quality-of-life change intended to make the gadget smoother to use.
+
+Specializations
+• Dematerializer: cooldown decreased from 20s to 15s per charge; item raise time decreased from 0.1s to 0s. Embark wants the specialization to feel more responsive and return to a more viable Medium playstyle.
+• Evasive Dash: cooldown decreased from 6.5s to 6s per charge, partially easing the restriction from prior balance changes.
+• Guardian Turret: activation time decreased from 3.5s to 3s; health increased from 280 to 300; remote-retrieve cooldown decreased from 17.5s to 10s. Hand pickup remains a 3s cooldown and destroyed-turret cooldown remains 35s. The goal is to improve higher-skill viability without making the Turret oppressive for newer players.
+
+Weapons
+• AKM: damage increased from 20 to 21 to bring it closer to FAMAS/FCAR performance.
+• ARN-220: fire rate increased from 725 RPM to 750 RPM; quick reload animation decreased from 0.75s to 0.66s; empty reload decreased from 2.73s to 2.7s. The goal is to bring it closer to the XP-54 and M11.
+• BFR Titan: damage falloff multiplier increased from 0.65 to 0.7, improving ranged damage and reinforcing its longer-range Heavy niche.
+• Cerberus 12GA: pellet damage increased from 8 to 9, raising full-shot damage from 104 to 117. This offsets some of the combo power lost when Quick Melee damage was reduced.
+• Dagger — Primary: base damage increased from 42 to 49; precise damage increased from 60 to 70; lunge duration increased from 0.15s to 0.22s. Backstab: base damage increased from 75 to 85; backstab damage increased from 337 to 340; secondary lunge duration increased from 0.22s to 0.32s. Embark continues to tune Season 11 melee reliability while broader lunge-networking improvements are investigated.
+• Dual Blades: primary Precision zone angle increased from 9° to 12°, making precise hits easier to land, particularly on the second strike.
+• KS-23: damage falloff multiplier decreased from 0.675 to 0.58; falloff start range decreased from 18m to 12m; falloff end range decreased from 23m to 22m. The weapon is now less effective at medium-to-long range so the BFR Titan has more room in its intended niche.
+• M11: hip-fire recoil increased by approximately 75%; ADS recoil increased by approximately 25%; ADS bullet dispersion in most movement stances increased by 25%; airborne ADS dispersion increased by 120%. The change reduces the M11's effective range and overlap with ARN-220/XP-54 engagement distances.
+• Recurve Bow: maximum-draw damage increased from 124 to 126; base damage remains 60. The change restores Quick Melee combo breakpoints lost in the Season 11 melee adjustment.
+• Riot Shield — Primary: base damage increased from 58 to 60; precise damage increased from 83 to 86; the intended primary lunge increase from 4.25m to 5m, previously listed in 11.3 but not working, is now fixed. Shield Bash: damage increased from 40 to 50; environmental damage increased from 50 to 100; lunge duration increased from 0.5s to 0.6s. Embark still wants Riot Shield to be a defense-first objective anchor, but its elimination potential had fallen too far.
+• Spear — Primary: damage sweep box increased by 60%; lunge distance increased from 5m to 6.5m; lunge duration increased from 0.3s to 0.45s; lunge speed increased by 50%. Spin Attack: reset delay before returning to the first attack increased from 0.2s to 0.35s so players have more time to continue the sequence after connecting.
+• XP-54: recoil curve updated so it no longer jumps downward when a full magazine is fired in one burst; airborne ADS bullet dispersion decreased by 8%. These are quality-of-life consistency improvements.
+
+Notice | Anti-Cheat
+
+• A recently deployed anti-cheat rule incorrectly flagged some gyro-controller users as cheaters.
+• Embark updated the rule and is automatically reversing affected bans; impacted players do not need to submit an appeal.
+• Gyro remains a legitimate and supported input method.
+• Embark says its testing process has been adjusted to catch this class of false positive before future enforcement rules go live.
+
+Notice | INPOUTX64.SYS
+
+• Some players may see a startup message requiring the INPOUTX64.SYS driver to be uninstalled after Update 11.6.0.
+• The issue is related to Windows update KB5121003.
+• Embark directs affected players to its official uninstall instructions and support channels if they encounter problems.
+
+Game Update | Bug Fixes
+
+Animation
+• Corrected a small ADS animation offset on the Schwarzschild Blackhole SR-84.
+• Fixed deploy animations that did not blend out smoothly.
+• Fixed Quick Melee kicks failing to cancel correctly when swapping items.
+• Fixed Light and Heavy leg-placement misalignment in the Vesper Salute Emote.
+
+Audio
+• Improved end-of-round music reliability when the audio mix is busy.
+• The SFX Volume slider now also controls replay sound.
+• Fixed revive-interaction audio that could keep looping after a round ended.
+• Fixed timing for the Star Team emote sound.
+
+Cosmetics
+• Fixed some skin trackers showing outdated values.
+• Fixed the House Lights Flashbang skin not showing its light state correctly to other Contestants.
+• Fixed some Gateway skins displaying incorrect materials.
+• Fixed Recurve Bow visual effects failing to load for certain skins.
+• Improved the Burn Notice Pyro Grenade inspect animation and adjusted its audio level.
+
+Gameplay
+• Achievement progression is disabled in bot game modes.
+• Fixed a rare Winch Claw case where it could attach without pulling the target.
+
+Maps | Kyoto
+• Improved stair collision to prevent Contestants falling through.
+• Fixed a location where players could become stuck between a cliff and bamboo.
+• Fixed a weak point that allowed a building to be destroyed too easily.
+
+Maps | Galaxy Estates
+• Fixed several wall-dressing areas that did not take damage correctly, improving wall destruction from all angles.
+• Added a ladder above the covered walkway from Astral Port to Cosmo Physique for access to the highest roof level.
+• Adjusted the outer-wall exhaustion vents on Cosmo Physique so they work more reliably for climbing and added more vents to create additional high-ground contest routes.
+
+Maps | Skyway Stadium
+• Fixed wall dressing that could fail to take damage correctly, improving wall destruction consistency.
+
+Maps | Fangwai City
+• Fixed floating decals/signs that could remain after destruction and corrected a floating sign.
+
+Maps | Las Vegas
+• Fixed visual flickering on surfaces in the parking garage.
+
+Maps | Las Vegas Stadium
+• Fixed environment and lighting issues.
+
+Practice Range
+• Fixed the Cashbox Time-Trial challenge spawning Vaults instead of Cashboxes directly.
+
+Performance
+• Upgraded Unreal Engine from 5.3 to 5.7.
+
+Social
+• Party invites can now be sent and accepted while matchmaking.
+• Fixed the Social screen showing a normal team name and insignia for spectators in Private Match.
+
+Stability
+• Fixed a crash when spectating at the end of a round.
+• Fixed a rare server crash caused when a player's connection stopped acknowledging network packets.
+
+UI
+• Contextual response prompts are now hidden while dead or spectating, when replies are unavailable.
+• Fixed the event HUD displaying incorrectly when moving to the next round in Cashout Bots.
+• Fixed the Active Events bar remaining visible after a round reset.
+• Fixed damage numbers reporting one extra damage in some scenarios.
+• Fixed gamepad navigation in Options getting stuck or skipping items.
+• Added spectator-only team colors for Private Match; these extra colors are hidden from normal team-color selection.
+• Fixed gamepad navigation on the gamepad-bindings page.
+• Fixed Killcam UI failing to appear after elimination in Practice Range.
+
+Weapons | Bug Fixes
+• Dual Blades: fixed primary attacks not consistently dealing 25 environmental damage.
+• Dual Blades Deflect: fixed wide-angle Deflect incorrectly blocking all damage instead of only the center of the Deflect radius; imprecise Deflect damage modifier changed from 0% to 20%, while precise Deflect changed from 20% to 0%.
+• Riot Shield: fixed missing third-person visual and sound effects when attacks impact the shield.`,
+  },
+  {
     id: -1130,
     title: "Update 11.3.0",
     date: "2026.07.30",

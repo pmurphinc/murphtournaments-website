@@ -42,6 +42,17 @@ type RawBaselineValues = {
   damageDropoffModifierAtMaxRange?: string;
   magazineRaw?: string;
   emptyReloadRaw?: string;
+  handlingPatch?: string;
+  hipFireRecoilModifier?: string;
+  adsRecoilModifier?: string;
+  adsDispersionModifier?: string;
+  airborneAdsDispersionModifier?: string;
+  recoilCurveStatus?: string;
+};
+
+type HandlingStat = {
+  label: string;
+  value: string;
 };
 
 const CLASS_HEALTH = {
@@ -90,6 +101,15 @@ const formatTtk = (
   const shots = shotsToKill ?? fallback?.shotsToKill ?? null;
   if (ttk === null || shots === null) return "-";
   return `${formatNumber(ttk, "s")} / ${shots} shots`;
+};
+
+const getHandlingAccent = (value: string) => {
+  const normalized = value.trim().toLowerCase();
+  if (normalized.startsWith("-") || normalized.includes("correct") || normalized.includes("fix")) {
+    return "text-[#4ADE80]";
+  }
+  if (normalized.startsWith("+")) return "text-[#E84B4B]";
+  return "text-[var(--mt-off-white)]";
 };
 
 function StatCell({
@@ -190,6 +210,16 @@ export default function BaselineStatsCard({ weaponName, stat, source }: Baseline
   const lightTtk = deriveTtk(stat, CLASS_HEALTH.Light);
   const mediumTtk = deriveTtk(stat, CLASS_HEALTH.Medium);
   const heavyTtk = deriveTtk(stat, CLASS_HEALTH.Heavy);
+  const handlingStats = [
+    { label: "Hip Recoil", value: raw.hipFireRecoilModifier },
+    { label: "ADS Recoil", value: raw.adsRecoilModifier },
+    { label: "ADS Dispersion", value: raw.adsDispersionModifier },
+    { label: "Airborne ADS Dispersion", value: raw.airborneAdsDispersionModifier },
+    { label: "Recoil Curve", value: raw.recoilCurveStatus },
+  ].filter(
+    (entry): entry is HandlingStat =>
+      typeof entry.value === "string" && entry.value.trim().length > 0,
+  );
   const sourceText = source
     ? `Source: ${source.sourceLabel} - ${source.versionLabel} Baseline`
     : "Source: Krome's Spreadsheet - 11.0.0 Baseline";
@@ -250,6 +280,34 @@ export default function BaselineStatsCard({ weaponName, stat, source }: Baseline
           accent="text-[#E84B4B]"
         />
       </div>
+
+      {handlingStats.length > 0 ? (
+        <div className="border-t border-[var(--mt-steel-line)]">
+          <div className="flex flex-col gap-1 px-4 pt-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="font-mono text-[11px] font-black uppercase tracking-wide text-[var(--mt-muted)]">
+              Current Handling
+            </div>
+            {raw.handlingPatch ? (
+              <div className="font-mono text-[10px] font-black uppercase tracking-wide text-[var(--mt-gold-bright)]">
+                Patch v{raw.handlingPatch}
+              </div>
+            ) : null}
+          </div>
+          <p className="px-4 pt-1 text-xs leading-5 text-[var(--mt-muted)]">
+            Patch modifiers are relative changes from the previous values, not absolute recoil or dispersion units.
+          </p>
+          <div className="mt-2 grid grid-cols-2 divide-x divide-y divide-[var(--mt-steel-line)] border-t border-[var(--mt-steel-line)] sm:grid-cols-4">
+            {handlingStats.map(entry => (
+              <StatCell
+                key={entry.label}
+                label={entry.label}
+                value={entry.value}
+                accent={getHandlingAccent(entry.value)}
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className="border-t border-[var(--mt-steel-line)] px-4 py-3 font-mono text-xs text-[var(--mt-muted)]">{sourceText}</div>
     </section>
