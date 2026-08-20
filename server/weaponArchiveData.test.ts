@@ -230,4 +230,25 @@ describe("Update 11.6.0 archive data", () => {
       stkHeavyBody: 5,
     });
   });
+
+  it("exposes current handling modifiers for M11 and XP-54 baseline cards", async () => {
+    const m11 = await getWeaponArchiveDetail("m11");
+    const xp54 = await getWeaponArchiveDetail("xp-54");
+
+    const m11Raw = JSON.parse(m11?.baselineStats[0]?.rawValues ?? "{}") as Record<string, string>;
+    const xp54Raw = JSON.parse(xp54?.baselineStats[0]?.rawValues ?? "{}") as Record<string, string>;
+
+    expect(m11Raw).toMatchObject({
+      handlingPatch: "11.6.0",
+      hipFireRecoilModifier: "+75%",
+      adsRecoilModifier: "+25%",
+      adsDispersionModifier: "+25%",
+      airborneAdsDispersionModifier: "+120%",
+    });
+    expect(xp54Raw).toMatchObject({
+      handlingPatch: "11.6.0",
+      airborneAdsDispersionModifier: "-8%",
+      recoilCurveStatus: "Corrected",
+    });
+  });
 });
