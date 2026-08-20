@@ -121,5 +121,19 @@
       "sourceNotes": "Update 11.6 reduced effective range: falloff now starts at 12m, ends at 22m, and reaches a 0.58 damage multiplier at maximum range. Base damage remains 104.",
       "rawValues": "{\"damageDropoffMinRange\":\"12m\",\"damageDropoffMaxRange\":\"22m\",\"damageDropoffModifierAtMaxRange\":\"~58%\"}"
     }
+  },
+  {
+    "weaponId": "weapon_m11",
+    "values": {
+      "sourceNotes": "Update 11.6 increased M11 recoil and ADS dispersion to reduce its effective range.",
+      "rawValues": "{\"bodyDamageRaw\":\"16\",\"headDamageRaw\":\"24\",\"magazineRaw\":\"40\",\"damagePerMagazineRaw\":\"640\",\"headDamagePerMagazineRaw\":\"960\",\"tacticalReloadRaw\":\"1.55\",\"emptyReloadRaw\":\"1.85\",\"damageDropoffMinRange\":\"10m\",\"damageDropoffMaxRange\":\"20m\",\"damageDropoffModifierAtMaxRange\":\"~45%\",\"handlingPatch\":\"11.6.0\",\"hipFireRecoilModifier\":\"+75%\",\"adsRecoilModifier\":\"+25%\",\"adsDispersionModifier\":\"+25%\",\"airborneAdsDispersionModifier\":\"+120%\"}"
+    }
+  },
+  {
+    "weaponId": "weapon_xp-54",
+    "values": {
+      "sourceNotes": "Update 11.6 corrected the full-mag recoil curve and decreased airborne ADS dispersion by 8%.",
+      "rawValues": "{\"bodyDamageRaw\":\"16\",\"headDamageRaw\":\"24\",\"magazineRaw\":\"36\",\"damagePerMagazineRaw\":\"576\",\"headDamagePerMagazineRaw\":\"864\",\"tacticalReloadRaw\":\"2.25\",\"emptyReloadRaw\":\"2.5\",\"damageDropoffMinRange\":\"22.5m\",\"damageDropoffMaxRange\":\"32.5m\",\"damageDropoffModifierAtMaxRange\":\"~52%\",\"handlingPatch\":\"11.6.0\",\"airborneAdsDispersionModifier\":\"-8%\",\"recoilCurveStatus\":\"Corrected\"}"
+    }
   }
 ]
