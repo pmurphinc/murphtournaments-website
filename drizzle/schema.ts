@@ -1004,3 +1004,50 @@ export const vodSuggestedEvents = mysqlTable(
 
 export type VodSuggestedEvent = typeof vodSuggestedEvents.$inferSelect;
 export type InsertVodSuggestedEvent = typeof vodSuggestedEvents.$inferInsert;
+
+/**
+ * Wormhole Arcade high scores.
+ *
+ * The arcade itself (wormhole.murphtournaments.com) has no database of its
+ * own, and guests never sign in to play — their bests stay in that device's
+ * localStorage. A row lands here only when a signed-in Discord player chooses
+ * to save a run, which is also what makes them eligible for the global board.
+ */
+export const arcadeScores = mysqlTable(
+  "arcade_scores",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** Which arcade game the run belongs to, so a second game can share the table. */
+    game: varchar("game", { length: 64 }).notNull().default("wormhole"),
+    score: int("score").notNull(),
+    /** Ship frame the run was flown in, for display on the board. */
+    ship: varchar("ship", { length: 64 }),
+    /** "victory" when the rival was eliminated, "defeat" when the ship was lost. */
+    outcome: mysqlEnum("outcome", ["victory", "defeat"]).notNull(),
+    /** Rival integrity left at the end, 0-100. */
+    rivalHealth: int("rivalHealth").notNull().default(0),
+    /** Wall-clock length of the run in seconds. */
+    durationSeconds: int("durationSeconds").notNull().default(0),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [
+    index("arcade_scores_game_score_idx").on(table.game, table.score),
+    index("arcade_scores_user_game_idx").on(table.userId, table.game),
+    index("arcade_scores_createdAt_idx").on(table.createdAt),
+    check("arcade_scores_score_non_negative", sql`${table.score} >= 0`),
+    check(
+      "arcade_scores_rivalHealth_range",
+      sql`${table.rivalHealth} >= 0 AND ${table.rivalHealth} <= 100`
+    ),
+    check(
+      "arcade_scores_durationSeconds_non_negative",
+      sql`${table.durationSeconds} >= 0`
+    ),
+  ]
+);
+
+export type ArcadeScore = typeof arcadeScores.$inferSelect;
+export type InsertArcadeScore = typeof arcadeScores.$inferInsert;

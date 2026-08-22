@@ -1,4 +1,12 @@
-import { PlayCircle, Radio, Shuffle, Swords, Trophy, Video } from "lucide-react";
+import {
+  Gamepad2,
+  PlayCircle,
+  Radio,
+  Shuffle,
+  Swords,
+  Trophy,
+  Video,
+} from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useCommunityDirectory } from "@/lib/communityDirectory";
 import Hero from "@/components/public/Hero";
@@ -12,6 +20,8 @@ import {
   PublicErrorState,
   PublicLoadingCards,
 } from "@/components/public/PublicStates";
+
+import { ARCADE_PUBLIC_URL } from "@shared/arcade";
 
 const DISCORD_URL = "https://discord.gg/kcmdxmBgnC";
 
@@ -93,6 +103,45 @@ export default function Home() {
                 </p>
               </div>
             </a>
+          </div>
+        </div>
+      </section>
+
+      {/* Murph Arcade — free to play, no sign-in, so the CTA goes straight to the game. */}
+      <section className="border-b border-[var(--mt-steel-line)] py-12 sm:py-16">
+        <div className="container">
+          <div className="mt-panel flex flex-col gap-6 p-6 sm:p-8 lg:flex-row lg:items-center lg:justify-between">
+            <div className="max-w-2xl">
+              <p className="mb-2 flex items-center gap-2 font-mono text-xs font-bold uppercase tracking-[0.3em] text-[var(--mt-gold-bright)]">
+                <Gamepad2 className="size-4" aria-hidden="true" />
+                Murph Arcade
+              </p>
+              <h2 className="text-2xl font-bold uppercase tracking-wide text-[var(--mt-off-white)] sm:text-3xl">
+                Play Wormhole Arcade
+              </h2>
+              <p className="mt-3 text-sm leading-relaxed text-[var(--mt-muted)] sm:text-base">
+                Shoot the wormhole, collect the power-up it drops, and send it
+                back at your rival. Opens straight into a run — no account
+                needed. Sign in with Discord after a run to save your score to
+                the global board.
+              </p>
+            </div>
+            <div className="flex shrink-0 flex-col gap-3 sm:flex-row lg:flex-col xl:flex-row">
+              <a
+                href={ARCADE_PUBLIC_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <CtaButton tone="gold" className="w-full">
+                  Play Now
+                </CtaButton>
+              </a>
+              <a href="/arcade">
+                <CtaButton tone="outline" className="w-full">
+                  Leaderboard
+                </CtaButton>
+              </a>
+            </div>
           </div>
         </div>
       </section>

@@ -24,6 +24,7 @@ import PlayerProfile from "./pages/PlayerProfile";
 import PatchNotes from "./pages/PatchNotes";
 import LoadoutTracker from "./pages/LoadoutTracker";
 import MapRandomizer from "./pages/MapRandomizer";
+import Arcade from "./pages/Arcade";
 import BalanceArchive from "./pages/BalanceArchive";
 import BalanceArchiveDetail from "./pages/BalanceArchiveDetail";
 import VodAnalysis from "./pages/VodAnalysis";
@@ -132,6 +133,7 @@ function Router() {
           <Route path={"/patchnotes"} component={PatchNotes} />
           <Route path={"/loadout-tracker"} component={LoadoutTracker} />
           <Route path={"/maprng"} component={MapRandomizer} />
+          <Route path={"/arcade"} component={Arcade} />
           <Route
             path={"/balance-archive/:slug"}
             component={BalanceArchiveDetail}

@@ -66,6 +66,9 @@ export default function Footer() {
               >
                 Weapon Archive
               </Link>
+              <Link href="/arcade" className="hover:text-[var(--mt-off-white)]">
+                Arcade
+              </Link>
               <Link href="/about" className="hover:text-[var(--mt-off-white)]">
                 About
               </Link>

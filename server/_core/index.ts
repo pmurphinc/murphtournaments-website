@@ -7,6 +7,7 @@ import path from "path";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerDiscordOAuthRoutes } from "./discordOAuth";
+import { registerArcadeRoutes } from "../arcade";
 import { handleLogout } from "./logout";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
@@ -62,6 +63,9 @@ async function startServer() {
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
   registerDiscordOAuthRoutes(app);
+  // Wormhole Arcade score + leaderboard endpoints. Cross-origin by design:
+  // the game is served from its own subdomain and calls these with credentials.
+  registerArcadeRoutes(app);
   app.get("/api/auth/logout", handleLogout);
   app.post("/api/auth/logout", handleLogout);
 

@@ -51,6 +51,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "News", href: "/patchnotes" },
   { label: "Weapon Archive", href: "/balance-archive" },
   { label: "Map RNG", href: "/maprng" },
+  { label: "Arcade", href: "/arcade" },
   { label: "About", href: "/about" },
 ];
 

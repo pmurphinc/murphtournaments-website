@@ -6,6 +6,7 @@ import { z } from "zod";
 import * as db from "../db";
 import { getSessionCookieOptions } from "./cookies";
 import { ENV } from "./env";
+import { getArcadeAllowedOrigins } from "../arcade";
 import { sdk } from "./sdk";
 
 const DISCORD_AUTH_URL = "https://discord.com/oauth2/authorize";
@@ -99,10 +100,38 @@ export function sanitizeDiscordReturnPath(value: unknown) {
   }
 }
 
-function redirectError(res: Response, returnPath = "/team-finder") {
-  const safePath = sanitizeDiscordReturnPath(returnPath);
-  const separator = safePath.includes("?") ? "&" : "?";
-  res.redirect(302, `${safePath}${separator}discord=error`);
+/**
+ * Where to send the browser after sign-in.
+ *
+ * Normally a same-site path, but a guest who signed in from Wormhole Arcade
+ * started on another origin and has to land back in the game they were
+ * playing. Absolute URLs are therefore accepted for allowlisted arcade origins
+ * only — everything else still falls back to `sanitizeDiscordReturnPath`, so an
+ * attacker-supplied `returnTo` cannot turn this into an open redirect.
+ */
+export function sanitizeDiscordReturnTarget(
+  value: unknown,
+  allowedOrigins = getArcadeAllowedOrigins()
+) {
+  if (typeof value === "string" && /^https?:\/\//i.test(value)) {
+    try {
+      const parsed = new URL(value);
+      if (allowedOrigins.has(parsed.origin)) {
+        return `${parsed.origin}${parsed.pathname}${parsed.search}${parsed.hash}`;
+      }
+    } catch {
+      // Fall through to the same-site path rules below.
+    }
+    return sanitizeDiscordReturnPath(undefined);
+  }
+
+  return sanitizeDiscordReturnPath(value);
+}
+
+function redirectError(res: Response, returnTarget = "/team-finder") {
+  const safeTarget = sanitizeDiscordReturnTarget(returnTarget);
+  const separator = safeTarget.includes("?") ? "&" : "?";
+  res.redirect(302, `${safeTarget}${separator}discord=error`);
 }
 
 export function registerDiscordOAuthRoutes(app: Express) {
@@ -117,7 +146,9 @@ export function registerDiscordOAuthRoutes(app: Express) {
     }
 
     const state = randomBytes(32).toString("base64url");
-    const returnPath = sanitizeDiscordReturnPath(getQueryParam(req, "returnTo"));
+    const returnPath = sanitizeDiscordReturnTarget(
+      getQueryParam(req, "returnTo")
+    );
     res.cookie(DISCORD_STATE_COOKIE, state, {
       ...getSessionCookieOptions(req),
       httpOnly: true,
@@ -144,7 +175,9 @@ export function registerDiscordOAuthRoutes(app: Express) {
     res.clearCookie(DISCORD_RETURN_PATH_COOKIE, cookieOptions);
 
     const cookies = parseCookieHeader(req.headers.cookie || "");
-    const returnPath = sanitizeDiscordReturnPath(cookies[DISCORD_RETURN_PATH_COOKIE]);
+    const returnPath = sanitizeDiscordReturnTarget(
+      cookies[DISCORD_RETURN_PATH_COOKIE]
+    );
 
     try {
       const code = getQueryParam(req, "code");

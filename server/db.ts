@@ -1,4 +1,4 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser,
@@ -10,6 +10,8 @@ import {
   patchNotes,
   InsertPatchNote,
   PatchNote,
+  arcadeScores,
+  InsertArcadeScore,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -584,4 +586,150 @@ export async function getPatchNoteByVersion(version: string) {
     console.error("[Database] Failed to get patch note by version:", error);
     throw error;
   }
+}
+
+// Arcade queries
+
+export type ArcadeLeaderboardRow = {
+  rank: number;
+  userId: number;
+  displayName: string;
+  discordUsername: string | null;
+  discordAvatarUrl: string | null;
+  bestScore: number;
+  runs: number;
+  lastPlayed: Date | null;
+};
+
+function arcadeDisplayName(user: {
+  discordDisplayName: string | null;
+  name: string | null;
+  discordUsername: string | null;
+}) {
+  return (
+    user.discordDisplayName?.trim() ||
+    user.name?.trim() ||
+    user.discordUsername?.trim() ||
+    "Unknown pilot"
+  );
+}
+
+export async function recordArcadeScore(score: InsertArcadeScore) {
+  const db = await getDb();
+  if (!db) {
+    console.warn(
+      "[Database] Cannot record arcade score: database not available"
+    );
+    return false;
+  }
+
+  await db.insert(arcadeScores).values(score);
+  return true;
+}
+
+/**
+ * One row per player — their best run only — so a single dominant session
+ * cannot fill the whole board. Aggregate-only selects keep this valid under
+ * MySQL's ONLY_FULL_GROUP_BY.
+ */
+export async function getArcadeLeaderboard(
+  game: string,
+  limit: number
+): Promise<ArcadeLeaderboardRow[]> {
+  const db = await getDb();
+  if (!db) {
+    console.warn(
+      "[Database] Cannot read arcade leaderboard: database not available"
+    );
+    return [];
+  }
+
+  const bests = await db
+    .select({
+      userId: arcadeScores.userId,
+      bestScore: sql<number>`max(${arcadeScores.score})`,
+      runs: sql<number>`count(*)`,
+      lastPlayed: sql<Date | null>`max(${arcadeScores.createdAt})`,
+    })
+    .from(arcadeScores)
+    .where(eq(arcadeScores.game, game))
+    .groupBy(arcadeScores.userId)
+    .orderBy(desc(sql`max(${arcadeScores.score})`))
+    .limit(limit);
+
+  if (bests.length === 0) return [];
+
+  const profiles = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      discordDisplayName: users.discordDisplayName,
+      discordUsername: users.discordUsername,
+      discordAvatarUrl: users.discordAvatarUrl,
+    })
+    .from(users)
+    .where(
+      inArray(
+        users.id,
+        bests.map(best => best.userId)
+      )
+    );
+
+  const byId = new Map(profiles.map(profile => [profile.id, profile]));
+
+  return bests.map((best, index) => {
+    const profile = byId.get(best.userId);
+    return {
+      rank: index + 1,
+      userId: best.userId,
+      displayName: profile ? arcadeDisplayName(profile) : "Unknown pilot",
+      discordUsername: profile?.discordUsername ?? null,
+      discordAvatarUrl: profile?.discordAvatarUrl ?? null,
+      bestScore: Number(best.bestScore ?? 0),
+      runs: Number(best.runs ?? 0),
+      lastPlayed: best.lastPlayed ? new Date(best.lastPlayed) : null,
+    };
+  });
+}
+
+/**
+ * A player's saved best and where it places overall. Rank counts the players
+ * whose best beats theirs, so ties share a placing rather than being ordered
+ * arbitrarily.
+ */
+export async function getArcadePlayerStanding(userId: number, game: string) {
+  const db = await getDb();
+  if (!db) {
+    console.warn(
+      "[Database] Cannot read arcade standing: database not available"
+    );
+    return null;
+  }
+
+  const [own] = await db
+    .select({
+      bestScore: sql<number>`max(${arcadeScores.score})`,
+      runs: sql<number>`count(*)`,
+    })
+    .from(arcadeScores)
+    .where(and(eq(arcadeScores.userId, userId), eq(arcadeScores.game, game)));
+
+  const bestScore = Number(own?.bestScore ?? 0);
+  const runs = Number(own?.runs ?? 0);
+  if (runs === 0) return { bestScore: 0, runs: 0, rank: null as number | null };
+
+  const ahead = readExecutionRows(
+    await db.execute(sql`
+      SELECT COUNT(*) AS ahead FROM (
+        SELECT ${arcadeScores.userId}
+        FROM ${arcadeScores}
+        WHERE ${arcadeScores.game} = ${game}
+        GROUP BY ${arcadeScores.userId}
+        HAVING MAX(${arcadeScores.score}) > ${bestScore}
+      ) AS better
+    `)
+  );
+
+  const aheadCount = Number(ahead[0]?.ahead ?? 0);
+  return { bestScore, runs, rank: aheadCount + 1 };
 }
