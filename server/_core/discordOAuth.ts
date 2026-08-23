@@ -87,13 +87,31 @@ async function fetchDiscordUser(accessToken: string) {
   return discordUserSchema.parse(await response.json());
 }
 
+const DISCORD_EXTERNAL_RETURN_ORIGINS = new Set([
+  "https://wormhole.murphtournaments.com",
+]);
+
 export function sanitizeDiscordReturnPath(value: unknown) {
   if (typeof value !== "string") return "/team-finder";
-  if (!value.startsWith("/") || value.startsWith("//")) return "/team-finder";
+
+  // Normal site sign-ins still return to a same-site relative path.
+  if (value.startsWith("/") && !value.startsWith("//")) {
+    try {
+      const parsed = new URL(value, "https://murphtournaments.local");
+      if (parsed.origin !== "https://murphtournaments.local") return "/team-finder";
+      return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    } catch {
+      return "/team-finder";
+    }
+  }
+
+  // Wormhole is a separate Railway deployment on our own fixed subdomain.
+  // Permit only that exact HTTPS origin; never turn returnTo into an open
+  // redirect for arbitrary hosts, lookalike subdomains, or HTTP URLs.
   try {
-    const parsed = new URL(value, "https://murphtournaments.local");
-    if (parsed.origin !== "https://murphtournaments.local") return "/team-finder";
-    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    const parsed = new URL(value);
+    if (!DISCORD_EXTERNAL_RETURN_ORIGINS.has(parsed.origin)) return "/team-finder";
+    return `${parsed.origin}${parsed.pathname}${parsed.search}${parsed.hash}`;
   } catch {
     return "/team-finder";
   }
