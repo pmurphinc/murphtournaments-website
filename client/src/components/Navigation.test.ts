@@ -25,6 +25,15 @@ describe("Discord avatar header control", () => {
     expect(source).not.toContain("/team-finder?post=1");
   });
 
+  it("links signed-in Discord users to the standalone Wormhole Arcade", () => {
+    expect(source).toContain(
+      'href="https://wormhole.murphtournaments.com"'
+    );
+    expect(source).toContain("Wormhole Arcade");
+    expect(source).toContain('target="_blank"');
+    expect(source).toContain('rel="noopener noreferrer"');
+  });
+
   it("keeps management links, TCR, and the admin-only control room link", () => {
     expect(source).toContain('href="/teams"');
     expect(source).toContain('href="/TCR"');
