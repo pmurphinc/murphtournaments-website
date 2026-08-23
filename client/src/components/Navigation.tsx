@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { ChevronDown, LogOut, Menu } from "lucide-react";
+import { ChevronDown, Gamepad2, LogOut, Menu } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getDiscordLoginUrl } from "@/lib/discordLogin";
 import {
@@ -164,6 +164,15 @@ export default function Navigation() {
           <DropdownMenuSeparator className="bg-[var(--mt-gold)]/25" />
           <DropdownMenuItem asChild className="cursor-pointer font-mono">
             <Link href="/lft">LFT</Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild className="cursor-pointer font-mono">
+            <a
+              href="https://wormhole.murphtournaments.com"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Gamepad2 size={14} aria-hidden="true" /> Wormhole Arcade
+            </a>
           </DropdownMenuItem>
           <DropdownMenuSeparator className="bg-[var(--mt-gold)]/25" />
           <DropdownMenuItem asChild className="cursor-pointer font-mono">
