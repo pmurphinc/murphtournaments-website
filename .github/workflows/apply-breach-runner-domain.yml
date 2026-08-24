@@ -1,0 +1,44 @@
+name: Apply Breach Runner Domain Cutover
+
+on:
+  push:
+    branches: [chore/breach-runner-arcade-link-domain]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout cutover branch
+        uses: actions/checkout@v4
+        with:
+          ref: chore/breach-runner-arcade-link-domain
+      - name: Apply guarded rename
+        run: |
+          if grep -q 'https://breachrunner.murphtournaments.com' client/src/components/Navigation.tsx; then
+            echo "Domain cutover already applied."
+            exit 0
+          fi
+          node scripts/breach-runner-domain-cutover.mjs
+          git diff --check
+      - name: Commit cutover
+        run: |
+          git add client/src/components/Navigation.tsx \
+            client/src/components/Navigation.test.ts \
+            client/src/lib/discordOAuthReturnPath.test.ts \
+            server/arcadeScores.ts \
+            server/arcadeScores.test.ts \
+            server/_core/discordOAuth.ts \
+            server/_core/index.ts \
+            drizzle/schema.ts
+          if git diff --cached --quiet; then
+            echo "No cutover changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Rename Wormhole Arcade link to Breach Runner Arcade"
+          git push origin HEAD:chore/breach-runner-arcade-link-domain
