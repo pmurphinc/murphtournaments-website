@@ -1,0 +1,3 @@
+typecheck=passed
+navigation_oauth_tests=passed
+arcade_score_tests=passed
