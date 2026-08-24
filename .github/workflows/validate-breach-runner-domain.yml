@@ -3,6 +3,8 @@ name: Validate Breach Runner Domain PR
 on:
   push:
     branches: [chore/breach-runner-arcade-link-domain]
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: read
