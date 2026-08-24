@@ -66,7 +66,7 @@ async function startServer() {
   app.get("/api/auth/logout", handleLogout);
   app.post("/api/auth/logout", handleLogout);
 
-  // Public, initials-only Wormhole Arcade leaderboard. No login is required.
+  // Public, initials-only Breach Runner Arcade leaderboard. No login is required.
   registerArcadeScoreRoutes(app);
 
   // Webhook endpoint for Discord bot tournament updates

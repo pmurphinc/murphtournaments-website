@@ -4,6 +4,8 @@ import { arcadeScores } from "../drizzle/schema";
 import { getDb } from "./db";
 
 const ARCADE_ORIGINS = new Set([
+  "https://breachrunner.murphtournaments.com",
+  // Legacy alias retained during the custom-domain cutover.
   "https://wormhole.murphtournaments.com",
   "https://wormhole-arcade.pmurphinc.chatgpt.site",
 ]);
