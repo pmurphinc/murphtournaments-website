@@ -5,7 +5,7 @@ import {
   parseArcadeScoreInput,
 } from "./arcadeScores";
 
-describe("Wormhole Arcade public leaderboard", () => {
+describe("Breach Runner Arcade public leaderboard", () => {
   it("normalizes classic three-character initials", () => {
     expect(normalizeArcadeInitials(" p9m ")).toBe("P9M");
     expect(normalizeArcadeInitials("PM")).toBeNull();
@@ -44,8 +44,8 @@ describe("Wormhole Arcade public leaderboard", () => {
 
   it("allows the production arcade origins without credentials", () => {
     expect(
-      allowedArcadeOrigin("https://wormhole.murphtournaments.com")
-    ).toBe("https://wormhole.murphtournaments.com");
+      allowedArcadeOrigin("https://breachrunner.murphtournaments.com")
+    ).toBe("https://breachrunner.murphtournaments.com");
     expect(allowedArcadeOrigin("https://example.com")).toBeNull();
   });
 });

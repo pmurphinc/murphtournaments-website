@@ -7,13 +7,13 @@ describe("Discord OAuth return path validation", () => {
     expect(sanitizeDiscordReturnPath("/admin/tournaments/7/control?tab=rooms#top")).toBe("/admin/tournaments/7/control?tab=rooms#top");
   });
 
-  it("permits the exact Wormhole Arcade production origin", () => {
+  it("permits the exact Breach Runner Arcade production origin", () => {
     expect(
-      sanitizeDiscordReturnPath("https://wormhole.murphtournaments.com/")
-    ).toBe("https://wormhole.murphtournaments.com/");
+      sanitizeDiscordReturnPath("https://breachrunner.murphtournaments.com/")
+    ).toBe("https://breachrunner.murphtournaments.com/");
     expect(
-      sanitizeDiscordReturnPath("https://wormhole.murphtournaments.com/?discord=save#result")
-    ).toBe("https://wormhole.murphtournaments.com/?discord=save#result");
+      sanitizeDiscordReturnPath("https://breachrunner.murphtournaments.com/?discord=save#result")
+    ).toBe("https://breachrunner.murphtournaments.com/?discord=save#result");
   });
 
   it("rejects external and protocol-relative redirect paths", () => {
@@ -21,7 +21,7 @@ describe("Discord OAuth return path validation", () => {
     expect(sanitizeDiscordReturnPath("http://evil.example/path")).toBe("/team-finder");
     expect(sanitizeDiscordReturnPath("//evil.example/path")).toBe("/team-finder");
     expect(sanitizeDiscordReturnPath("http://wormhole.murphtournaments.com/")).toBe("/team-finder");
-    expect(sanitizeDiscordReturnPath("https://wormhole.murphtournaments.com.evil.example/")).toBe("/team-finder");
-    expect(sanitizeDiscordReturnPath("https://evil.example/?next=https://wormhole.murphtournaments.com")).toBe("/team-finder");
+    expect(sanitizeDiscordReturnPath("https://breachrunner.murphtournaments.com.evil.example/")).toBe("/team-finder");
+    expect(sanitizeDiscordReturnPath("https://evil.example/?next=https://breachrunner.murphtournaments.com")).toBe("/team-finder");
   });
 });

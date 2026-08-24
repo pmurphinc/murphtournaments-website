@@ -88,6 +88,8 @@ async function fetchDiscordUser(accessToken: string) {
 }
 
 const DISCORD_EXTERNAL_RETURN_ORIGINS = new Set([
+  "https://breachrunner.murphtournaments.com",
+  // Legacy alias retained during the custom-domain cutover.
   "https://wormhole.murphtournaments.com",
 ]);
 
@@ -105,8 +107,8 @@ export function sanitizeDiscordReturnPath(value: unknown) {
     }
   }
 
-  // Wormhole is a separate Railway deployment on our own fixed subdomain.
-  // Permit only that exact HTTPS origin; never turn returnTo into an open
+  // Breach Runner Arcade is a separate Railway deployment on our own fixed subdomain.
+  // Permit only explicitly listed HTTPS origins; never turn returnTo into an open
   // redirect for arbitrary hosts, lookalike subdomains, or HTTP URLs.
   try {
     const parsed = new URL(value);

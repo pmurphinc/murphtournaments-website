@@ -1006,7 +1006,7 @@ export type VodSuggestedEvent = typeof vodSuggestedEvents.$inferSelect;
 export type InsertVodSuggestedEvent = typeof vodSuggestedEvents.$inferInsert;
 
 /**
- * Classic Wormhole Arcade high scores. Initials are deliberately the only
+ * Breach Runner Arcade high scores. Initials are deliberately the only
  * public identity; no Murph Tournaments or Discord account is required.
  */
 export const arcadeScores = mysqlTable(
