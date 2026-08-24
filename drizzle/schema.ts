@@ -1004,3 +1004,32 @@ export const vodSuggestedEvents = mysqlTable(
 
 export type VodSuggestedEvent = typeof vodSuggestedEvents.$inferSelect;
 export type InsertVodSuggestedEvent = typeof vodSuggestedEvents.$inferInsert;
+
+/**
+ * Classic Wormhole Arcade high scores. Initials are deliberately the only
+ * public identity; no Murph Tournaments or Discord account is required.
+ */
+export const arcadeScores = mysqlTable(
+  "arcade_scores",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    runId: varchar("runId", { length: 64 }).notNull(),
+    initials: varchar("initials", { length: 3 }).notNull(),
+    score: int("score").notNull(),
+    ship: varchar("ship", { length: 64 }).notNull(),
+    difficulty: mysqlEnum("difficulty", ["easy", "difficult", "hard"])
+      .notNull(),
+    durationSeconds: int("durationSeconds").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex("arcade_scores_runId_unique").on(table.runId),
+    index("arcade_scores_score_created_idx").on(
+      table.score,
+      table.createdAt
+    ),
+  ]
+);
+
+export type ArcadeScore = typeof arcadeScores.$inferSelect;
+export type InsertArcadeScore = typeof arcadeScores.$inferInsert;

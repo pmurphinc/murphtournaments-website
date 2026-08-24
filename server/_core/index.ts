@@ -15,6 +15,7 @@ import { handleTournamentWebhook, handleGetTournamentState } from "../webhooks";
 import { scrapeAndStorePatchNotes } from "../patchNoteScraper";
 import { serveVodCaptureFrame } from "../vodCaptureFrameRoute";
 import { logVodFrameCaptureBinaryAvailability } from "../vodFrameCapture";
+import { registerArcadeScoreRoutes } from "../arcadeScores";
 
 function resolveFclMediaDirectory() {
   const candidates = [
@@ -64,6 +65,9 @@ async function startServer() {
   registerDiscordOAuthRoutes(app);
   app.get("/api/auth/logout", handleLogout);
   app.post("/api/auth/logout", handleLogout);
+
+  // Public, initials-only Wormhole Arcade leaderboard. No login is required.
+  registerArcadeScoreRoutes(app);
 
   // Webhook endpoint for Discord bot tournament updates
   app.post("/api/webhooks/tournament", handleTournamentWebhook);

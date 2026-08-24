@@ -11,6 +11,7 @@ export default defineConfig({
       "server/patchNotes.test.ts",
       "server/weaponArchiveData.test.ts",
       "server/teamRosterCapacity.test.ts",
+      "server/arcadeScores.test.ts",
       "shared/finalsGameModes.test.ts",
     ],
     environment: "node",
