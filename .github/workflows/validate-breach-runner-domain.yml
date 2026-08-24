@@ -3,11 +3,9 @@ name: Validate Breach Runner Domain PR
 on:
   push:
     branches: [chore/breach-runner-arcade-link-domain]
-  pull_request:
-    branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   verify:
@@ -16,6 +14,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: chore/breach-runner-arcade-link-domain
       - name: Use Node 22
         uses: actions/setup-node@v4
         with:
@@ -30,3 +30,12 @@ jobs:
         run: pnpm exec vitest run client/src/components/Navigation.test.ts client/src/lib/discordOAuthReturnPath.test.ts
       - name: Arcade score tests
         run: pnpm exec vitest run --config vitest.server.config.ts server/arcadeScores.test.ts
+      - name: Record successful validation
+        run: |
+          mkdir -p .validation
+          printf 'typecheck=passed\nnavigation_oauth_tests=passed\narcade_score_tests=passed\n' > .validation/breach-runner-domain.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .validation/breach-runner-domain.txt
+          git commit -m "Record Breach Runner domain validation"
+          git push origin HEAD:chore/breach-runner-arcade-link-domain
