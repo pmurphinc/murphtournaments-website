@@ -44,6 +44,9 @@ describe("Wormhole Arcade public leaderboard", () => {
 
   it("allows the production arcade origins without credentials", () => {
     expect(
+      allowedArcadeOrigin("https://breachrunner.murphtournaments.com")
+    ).toBe("https://breachrunner.murphtournaments.com");
+    expect(
       allowedArcadeOrigin("https://wormhole.murphtournaments.com")
     ).toBe("https://wormhole.murphtournaments.com");
     expect(allowedArcadeOrigin("https://example.com")).toBeNull();
