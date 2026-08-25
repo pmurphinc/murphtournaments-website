@@ -5,7 +5,6 @@ import { getDb } from "./db";
 
 const ARCADE_ORIGINS = new Set([
   "https://breachrunner.murphtournaments.com",
-  "https://wormhole.murphtournaments.com",
   "https://wormhole-arcade.pmurphinc.chatgpt.site",
 ]);
 
