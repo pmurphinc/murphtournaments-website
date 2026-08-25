@@ -42,10 +42,13 @@ describe("Wormhole Arcade public leaderboard", () => {
     ).toBeNull();
   });
 
-  it("allows the production arcade origins without credentials", () => {
+  it("allows the Breach Runner production origin without credentials", () => {
+    expect(
+      allowedArcadeOrigin("https://breachrunner.murphtournaments.com")
+    ).toBe("https://breachrunner.murphtournaments.com");
     expect(
       allowedArcadeOrigin("https://wormhole.murphtournaments.com")
-    ).toBe("https://wormhole.murphtournaments.com");
+    ).toBeNull();
     expect(allowedArcadeOrigin("https://example.com")).toBeNull();
   });
 });
