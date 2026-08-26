@@ -25,11 +25,11 @@ describe("Discord avatar header control", () => {
     expect(source).not.toContain("/team-finder?post=1");
   });
 
-  it("links signed-in Discord users to the standalone Wormhole Arcade", () => {
+  it("links signed-in Discord users to the standalone Breach Runner Arcade", () => {
     expect(source).toContain(
-      'href="https://wormhole.murphtournaments.com"'
+      'href="https://breachrunner.murphtournaments.com"'
     );
-    expect(source).toContain("Wormhole Arcade");
+    expect(source).toContain("Breach Runner Arcade");
     expect(source).toContain('target="_blank"');
     expect(source).toContain('rel="noopener noreferrer"');
   });

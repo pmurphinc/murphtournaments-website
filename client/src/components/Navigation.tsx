@@ -167,11 +167,11 @@ export default function Navigation() {
           </DropdownMenuItem>
           <DropdownMenuItem asChild className="cursor-pointer font-mono">
             <a
-              href="https://wormhole.murphtournaments.com"
+              href="https://breachrunner.murphtournaments.com"
               target="_blank"
               rel="noopener noreferrer"
             >
-              <Gamepad2 size={14} aria-hidden="true" /> Wormhole Arcade
+              <Gamepad2 size={14} aria-hidden="true" /> Breach Runner Arcade
             </a>
           </DropdownMenuItem>
           <DropdownMenuSeparator className="bg-[var(--mt-gold)]/25" />
