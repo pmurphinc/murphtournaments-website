@@ -252,3 +252,35 @@ describe("Update 11.6.0 archive data", () => {
     });
   });
 });
+
+describe("Update 11.7.0 archive data", () => {
+  it("records the official Shockwave glitch buff as the latest Medium specialization change", async () => {
+    const detail = await getWeaponArchiveDetail("shockwave-medium");
+
+    expect(detail).not.toBeNull();
+    expect(detail?.weapon.latestPatch).toBe("11.7.0");
+    expect(detail?.weapon.latestPatchDate).toBe("2026-08-27");
+
+    const update = detail?.history.find(
+      entry => entry.patch.versionLabel === "11.7.0"
+    );
+
+    expect(update?.patch).toMatchObject({
+      title: "Update 11.7.0",
+      patchDate: "2026-08-27",
+      sourceUrl: "https://www.reachthefinals.com/patchnotes/11-70",
+    });
+
+    expect(update?.changes).toContainEqual(
+      expect.objectContaining({
+        weaponId: "item_shockwave_medium",
+        changeType: "buff",
+        changeSummary:
+          "Hits now apply a 2-second glitch effect to enemy players",
+        statField: "enemy_glitch_duration",
+        oldValue: null,
+        newValue: "2s",
+      })
+    );
+  });
+});
