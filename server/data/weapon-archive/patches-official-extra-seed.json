@@ -1,5 +1,14 @@
 [
   {
+    "id": "patch_11_7_0_official",
+    "versionLabel": "11.7.0",
+    "title": "Update 11.7.0",
+    "patchDate": "2026-08-27",
+    "seasonLabel": "Season 11",
+    "sourceUrl": "https://www.reachthefinals.com/patchnotes/11-70",
+    "sourceType": "official"
+  },
+  {
     "id": "patch_11_3_0_official",
     "versionLabel": "11.3.0",
     "title": "Update 11.3.0",
