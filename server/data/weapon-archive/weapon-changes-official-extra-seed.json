@@ -1,5 +1,21 @@
 [
   {
+    "id": "chg_item_shockwave_medium_11_7_0_official_001",
+    "weaponId": "item_shockwave_medium",
+    "patchId": "patch_11_7_0_official",
+    "sectionLabel": "11.7.0 — shockwave",
+    "changeType": "buff",
+    "changeSummary": "Hits now apply a 2-second glitch effect to enemy players",
+    "changeText": "Shockwave now applies a 2-second glitch effect to enemy players it hits. The glitch effect does not affect friendly players, the user, or deployables.",
+    "devNote": "Embark added the glitch effect to make Shockwave a more desirable Medium specialization and a skill-based counter to specializations such as Mesh Shield, Cloaking Device, and Evasive Dash.",
+    "statField": "enemy_glitch_duration",
+    "oldValue": null,
+    "newValue": "2s",
+    "sortOrder": 1,
+    "sourceType": "official",
+    "confidence": "high"
+  },
+  {
     "id": "chg_item_c4_heavy_11_3_0_official_001",
     "weaponId": "item_c4_heavy",
     "patchId": "patch_11_3_0_official",
