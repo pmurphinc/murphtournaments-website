@@ -78,14 +78,39 @@ describe("patchNotes.getAll", () => {
     const caller = appRouter.createCaller(ctx);
     const result = await caller.patchNotes.getAll();
 
-    expect(result).toHaveLength(7);
+    expect(result).toHaveLength(8);
     expect(result[0]).toMatchObject({
-      id: -1160,
-      title: "Update 11.6.0",
-      date: "2026.08.20",
-      url: "https://www.reachthefinals.com/patchnotes/11-60",
-      version: "11.6.0",
+      id: -11100,
+      title: "Respec Order 3.0",
+      date: "2026.09.16",
+      url: "https://www.reachthefinals.com/patchnotes/s11-respec-order-3",
+      version: "11.10.0",
     });
+
+    const respecOrder3 = result.find(note => note.version === "11.10.0");
+    expect(respecOrder3).toBeDefined();
+    for (const expectedContent of [
+      "Health increased from 150 to 175",
+      "Health decreased from 350 to 325",
+      "Dagger: secondary base damage increased from 85 to 90",
+      "LH1: damage falloff start decreased from 50m to 35m",
+      "Sword: primary base damage decreased from 71 to 65",
+      "CB-01 Repeater: damage increased from 84 to 88",
+      "Chimera-XB: damage increased from 45 to 47",
+      "Dual Blades: primary base damage increased from 37 to 40",
+      "P90: damage increased from 14 to 15",
+      "Pike-556: damage increased from 49 to 56",
+      "Riot Shield: primary base damage increased from 60 to 63",
+      "BFR Titan: damage increased from 90 to 95",
+      "Lewis Gun: fire rate increased from 500 to 520 RPM",
+      "M60: fire rate increased from 580 to 590 RPM",
+      "MGL-32: damage increased from 83 to 97",
+      "Frag Grenade: damage increased from 140 to 150",
+      "Vanish Bomb: cooldown increased from 25s to 30s",
+      "Explosive Mine: damage increased from 120 to 140",
+    ]) {
+      expect(respecOrder3?.content).toContain(expectedContent);
+    }
 
     const update116 = result.find(note => note.version === "11.6.0");
     expect(update116).toBeDefined();
@@ -169,11 +194,11 @@ describe("patchNotes.getAll", () => {
     const caller = appRouter.createCaller(ctx);
     const result = await caller.patchNotes.getAll();
 
-    expect(result).toHaveLength(5);
+    expect(result).toHaveLength(6);
     expect(result[0]).toMatchObject({
-      id: -1160,
-      title: "Update 11.6.0",
-      version: "11.6.0",
+      id: -11100,
+      title: "Respec Order 3.0",
+      version: "11.10.0",
     });
   });
 
@@ -184,11 +209,11 @@ describe("patchNotes.getAll", () => {
     const caller = appRouter.createCaller(ctx);
     const result = await caller.patchNotes.getAll();
 
-    expect(result).toHaveLength(5);
+    expect(result).toHaveLength(6);
     expect(result[0]).toMatchObject({
-      id: -1160,
-      title: "Update 11.6.0",
-      version: "11.6.0",
+      id: -11100,
+      title: "Respec Order 3.0",
+      version: "11.10.0",
     });
   });
 });
