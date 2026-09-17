@@ -60,6 +60,70 @@ export const cleanPatchNoteContent = (content: string) => {
 
 export const WEBSITE_PATCH_NOTES: WebsitePatchNote[] = [
   {
+    id: -11100,
+    title: "Respec Order 3.0",
+    date: "2026.09.16",
+    version: "11.10.0",
+    url: "https://www.reachthefinals.com/patchnotes/s11-respec-order-3",
+    sourceUrl: "https://www.reachthefinals.com/patchnotes/s11-respec-order-3",
+    isGameUpdate: 1,
+    content: `THE FINALS — RESPEC ORDER 3.0
+
+Respec Order returns with Update 11.10 for another two-week Cashout test, running through the launch of Update 11.12. These values apply only in Cashout during the test and are compared with the normal game's current values.
+
+What Embark Is Testing
+
+• Movement Speed: narrower movement-speed differences between body types may help squads stay together.
+• Health Scale: compressing the gap between Light and Heavy may make weapons easier to balance across every matchup.
+• Embark plans to ask players whether the health and movement changes should become permanent, with a decision targeted by the launch of Season 12.
+
+Archetype Changes
+
+Light
+• Health increased from 150 to 175.
+• Health regeneration delay increased from 7s to 8s.
+• Forward sprint decreased from 7m/s to 6.6m/s; sprint strafe decreased from 4.6m/s to 4.4m/s.
+• Forward run decreased from 5.5m/s to 5.1m/s; run strafe decreased from 4.4m/s to 4.2m/s; backpedal decreased from 3.8m/s to 3.7m/s.
+
+Heavy
+• Health decreased from 350 to 325.
+• Forward sprint increased from 5.8m/s to 6m/s; sprint strafe increased from 3.65m/s to 3.8m/s.
+• Forward run increased from 3.8m/s to 4.25m/s; run strafe increased from 3.2m/s to 3.6m/s; backpedal increased from 3m/s to 3.2m/s.
+
+Weapon Changes
+
+Light
+• Dagger: secondary base damage increased from 85 to 90; backstab damage decreased from 340 to 315.
+• LH1: damage falloff start decreased from 50m to 35m; falloff end decreased from 55m to 45m.
+• Sword: primary base damage decreased from 71 to 65; precise-hit damage decreased from 110 to 100.
+
+Medium
+• CB-01 Repeater: damage increased from 84 to 88; damage falloff multiplier increased from 0.64 to 0.66.
+• Chimera-XB: damage increased from 45 to 47.
+• Dual Blades: primary base damage increased from 37 to 40 and precise damage from 57 to 60; Cross Slash base damage increased from 91 to 100 and precise damage from 140 to 150.
+• P90: damage increased from 14 to 15.
+• Pike-556: damage increased from 49 to 56.
+• Riot Shield: primary base damage increased from 60 to 63; precise-hit damage increased from 86 to 90.
+
+Heavy
+• BFR Titan: damage increased from 90 to 95; reload duration decreased.
+• Lewis Gun: fire rate increased from 500 to 520 RPM.
+• M60: fire rate increased from 580 to 590 RPM.
+• MGL-32: damage increased from 83 to 97.
+
+Gadget Changes
+
+• Frag Grenade: damage increased from 140 to 150.
+• Vanish Bomb: cooldown increased from 25s to 30s.
+• Explosive Mine: damage increased from 120 to 140 for Medium and Heavy.
+
+Test Context
+
+• Embark received about 70,000 survey responses for the previous test, with a 3.01 average score out of 5.
+• The win-rate spread between the best and worst squad compositions decreased from 14.7% to 12% during that test.
+• These are temporary Cashout test values, not permanent changes to the main-game balance at this time.`,
+  },
+  {
     id: -1160,
     title: "Update 11.6.0",
     date: "2026.08.20",
