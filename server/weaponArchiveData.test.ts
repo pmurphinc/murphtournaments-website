@@ -252,3 +252,44 @@ describe("Update 11.6.0 archive data", () => {
     });
   });
 });
+
+describe("Respec Order 3.0 archive data", () => {
+  it.each([
+    ["dagger", "Backstab base damage increased, while full backstab damage decreased"],
+    ["lh1", "Damage falloff begins and ends at shorter ranges"],
+    ["sword", "Primary base and precise-hit damage decreased"],
+    ["cb-01-repeater", "Damage and ranged damage increased"],
+    ["chimera-xb", "Damage increased from 45 to 47"],
+    ["dual-blades", "Primary and Cross Slash damage increased"],
+    ["p90", "Damage increased from 14 to 15"],
+    ["pike-556", "Damage increased from 49 to 56"],
+    ["riot-shield", "Primary base and precise-hit damage increased"],
+    ["bfm-titan", "Damage increased and reload duration decreased"],
+    ["lewis-gun", "Fire rate increased from 500 to 520 RPM"],
+    ["m60", "Fire rate increased from 580 to 590 RPM"],
+    ["mgl32", "Damage increased from 83 to 97"],
+  ])("adds the Cashout-only Respec Order history entry for %s", async (slug, summary) => {
+    const detail = await getWeaponArchiveDetail(slug);
+    const update = detail?.history.find(
+      entry => entry.patch.versionLabel === "11.10.0"
+    );
+
+    expect(update?.patch).toMatchObject({
+      title: "Respec Order 3.0",
+      patchDate: "2026-09-16",
+      sourceUrl: "https://www.reachthefinals.com/patchnotes/s11-respec-order-3",
+    });
+    expect(update?.changes.map(change => change.changeSummary)).toContain(
+      summary
+    );
+  });
+
+  it("keeps normal-game baseline stats unchanged by the temporary test", async () => {
+    const pike = await getWeaponArchiveDetail("pike-556");
+    const bfr = await getWeaponArchiveDetail("bfm-titan");
+
+    expect(pike?.baselineSource?.versionLabel).toBe("11.6.0");
+    expect(pike?.baselineStats[0]?.bodyDamage).toBe(49);
+    expect(bfr?.baselineStats[0]?.bodyDamage).toBe(90);
+  });
+});
