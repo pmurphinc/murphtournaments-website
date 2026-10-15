@@ -78,15 +78,22 @@ describe("patchNotes.getAll", () => {
     const caller = appRouter.createCaller(ctx);
     const result = await caller.patchNotes.getAll();
 
-    expect(result).toHaveLength(8);
+    expect(result).toHaveLength(10);
     expect(result[0]).toMatchObject({
-      id: -11100,
-      title: "Respec Order 3.0",
-      date: "2026.09.16",
-      url: "https://www.reachthefinals.com/patchnotes/s11-respec-order-3",
-      version: "11.10.0",
+      id: -11140,
+      title: "Store Update 11.14.0",
+      date: "2026.10.15",
+      url: "https://www.reachthefinals.com/patchnotes/11-140",
+      version: "11.14.0",
     });
 
+    expect(result[0].content).toContain("no weapon, gadget, specialization");
+    const retrospective = result.find(
+      note => note.version === "respec-order-3-retrospective"
+    );
+    expect(retrospective?.content).toContain("Its Cashout test is over");
+    expect(retrospective?.content).toContain("upcoming Season 12 changes");
+    expect(retrospective?.content).toContain("52.6%");
     const respecOrder3 = result.find(note => note.version === "11.10.0");
     expect(respecOrder3).toBeDefined();
     for (const expectedContent of [
@@ -194,11 +201,11 @@ describe("patchNotes.getAll", () => {
     const caller = appRouter.createCaller(ctx);
     const result = await caller.patchNotes.getAll();
 
-    expect(result).toHaveLength(6);
+    expect(result).toHaveLength(8);
     expect(result[0]).toMatchObject({
-      id: -11100,
-      title: "Respec Order 3.0",
-      version: "11.10.0",
+      id: -11140,
+      title: "Store Update 11.14.0",
+      version: "11.14.0",
     });
   });
 
@@ -209,11 +216,11 @@ describe("patchNotes.getAll", () => {
     const caller = appRouter.createCaller(ctx);
     const result = await caller.patchNotes.getAll();
 
-    expect(result).toHaveLength(6);
+    expect(result).toHaveLength(8);
     expect(result[0]).toMatchObject({
-      id: -11100,
-      title: "Respec Order 3.0",
-      version: "11.10.0",
+      id: -11140,
+      title: "Store Update 11.14.0",
+      version: "11.14.0",
     });
   });
 });

@@ -21,10 +21,6 @@ import {
   PublicErrorState,
   PublicLoadingCards,
 } from "@/components/public/PublicStates";
-import {
-  RESPEC_ORDER_3_PATCH_URL,
-  RESPEC_ORDER_3_WEAPONS,
-} from "@/data/respecOrder3";
 
 const DISCORD_URL = "https://discord.gg/kcmdxmBgnC";
 
@@ -75,51 +71,41 @@ export default function Home() {
                   <div className="mb-3 flex flex-wrap items-center gap-2">
                     <span className="inline-flex items-center gap-2 rounded-full border border-[var(--mt-gold)]/60 bg-[var(--mt-black)]/70 px-3 py-1 font-mono text-[10px] font-black uppercase tracking-[0.18em] text-[var(--mt-gold-bright)]">
                       <Megaphone className="size-3.5" aria-hidden="true" />
-                      New Season 11 Update
+                      Season 12 Preview
                     </span>
                     <span className="font-mono text-[10px] uppercase tracking-widest text-[var(--mt-muted)]">
-                      Cashout only · Updates 11.10–11.12
+                      Confirmed by Embark · October 13, 2026
                     </span>
                   </div>
                   <h2 className="text-2xl font-black uppercase leading-tight text-[var(--mt-off-white)] sm:text-3xl">
-                    Respec Order 3.0 is live
+                    Respec changes confirmed for Season 12
                   </h2>
                   <p className="mt-3 text-sm leading-6 text-[var(--mt-muted)]">
-                    Light moves slower with 175 health. Heavy moves faster with
-                    325 health. Thirteen weapons were retuned for the new combat
-                    breakpoints—open any weapon below to see its exact changes.
+                    Embark will make the Light and Heavy health and movement
+                    changes permanent in Season 12: Light will have 175 health
+                    and slower movement; Heavy will have 325 health and faster
+                    movement. The Respec Order 3.0 test has ended.
                   </p>
                 </div>
                 <a
-                  href={RESPEC_ORDER_3_PATCH_URL}
+                  href="/patchnotes?version=respec-order-3-retrospective#patch-respec-order-3-retrospective"
                   className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-md bg-[var(--mt-gold)] px-5 font-mono text-xs font-black uppercase tracking-widest text-[var(--mt-gold-foreground)] transition hover:bg-[var(--mt-gold-bright)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mt-gold-bright)]"
                 >
-                  Read the Update
+                  Read the Retrospective
                   <ArrowRight className="size-4" aria-hidden="true" />
                 </a>
               </div>
 
-              <div className="mt-6 border-t border-[var(--mt-steel-line)] pt-5">
-                <p className="mb-3 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--mt-muted)]">
-                  Affected weapons · select one for full history
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {RESPEC_ORDER_3_WEAPONS.map(weapon => (
-                    <a
-                      key={weapon.slug}
-                      href={`/balance-archive/${weapon.slug}`}
-                      title={`${weapon.name}: ${weapon.summary}`}
-                      className="group inline-flex items-center gap-1.5 rounded-md border border-[var(--mt-steel-line)] bg-[var(--mt-black)]/65 px-3 py-2 font-mono text-[11px] font-bold text-[var(--mt-off-white)] transition hover:border-[var(--mt-gold)] hover:text-[var(--mt-gold-bright)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mt-gold-bright)]"
-                    >
-                      {weapon.name}
-                      <ArrowRight
-                        className="size-3 text-[var(--mt-muted)] transition group-hover:translate-x-0.5 group-hover:text-[var(--mt-gold-bright)]"
-                        aria-hidden="true"
-                      />
-                    </a>
-                  ))}
-                </div>
-              </div>
+              <p className="mt-6 border-t border-[var(--mt-steel-line)] pt-5 text-sm leading-6 text-[var(--mt-muted)]">
+                Latest release: Store Update 11.14.0 (October 15). New store
+                cosmetics; no balance changes listed.{" "}
+                <a
+                  href="/patchnotes?version=11.14.0#patch-11-14-0"
+                  className="font-bold text-[var(--mt-gold-bright)] underline underline-offset-4"
+                >
+                  Read the latest update
+                </a>
+              </p>
             </div>
           </div>
         </div>

@@ -60,6 +60,46 @@ export const cleanPatchNoteContent = (content: string) => {
 
 export const WEBSITE_PATCH_NOTES: WebsitePatchNote[] = [
   {
+    id: -11140,
+    title: "Store Update 11.14.0",
+    date: "2026.10.15",
+    version: "11.14.0",
+    url: "https://www.reachthefinals.com/patchnotes/11-140",
+    sourceUrl: "https://www.reachthefinals.com/patchnotes/11-140",
+    isGameUpdate: 0,
+    content: `THE FINALS — Store Update 11.14.0
+
+Season 11 enters its final week, with Sponsor Showdown continuing and PRIME TIME approaching.
+
+Store
+• On The Clock and Running Hot cosmetic sets are featured in this week's store update.
+• The official post lists no weapon, gadget, specialization, or gameplay balance changes.`,
+  },
+  {
+    id: -11131,
+    title: "Respec Order 3.0 | Retrospective",
+    date: "2026.10.13",
+    version: "respec-order-3-retrospective",
+    url: "https://www.reachthefinals.com/patchnotes/respec-order-3-retrospective",
+    sourceUrl:
+      "https://www.reachthefinals.com/patchnotes/respec-order-3-retrospective",
+    isGameUpdate: 0,
+    content: `THE FINALS — Respec Order 3.0 | Retrospective
+
+Test Concluded
+• Respec Order 3 ran from Update 11.10 until Update 11.12. Its Cashout test is over.
+
+Confirmed for Season 12
+• Embark will permanently adopt the Light and Heavy health and movement-speed changes in Season 12.
+• Light will have 175 health and slower movement; Heavy will have 325 health and faster movement.
+• These are upcoming Season 12 changes, not a new live balance patch for Season 11.
+
+Survey and Next Steps
+• 52.6% of survey respondents supported making the changes permanent; approximately 35% of eligible players responded.
+• Embark also plans a large Season 12 balance patch and closer balance monitoring between Updates 12.0 and 12.3.
+• This retrospective does not publish the full Season 12 weapon balance values. Historical Respec weapon changes remain test records.`,
+  },
+  {
     id: -11100,
     title: "Respec Order 3.0",
     date: "2026.09.16",
