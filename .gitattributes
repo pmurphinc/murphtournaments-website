@@ -1,0 +1,21 @@
+# Normalize all text files to LF in the repository and in the working tree.
+# Without this, core.autocrlf=true gives Windows checkouts CRLF line endings,
+# which breaks tests that assert on multi-line source strings.
+* text=auto eol=lf
+
+# Binary assets must never be line-ending converted.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.avif binary
+*.mp4 binary
+*.webm binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.pdf binary
+*.zip binary
