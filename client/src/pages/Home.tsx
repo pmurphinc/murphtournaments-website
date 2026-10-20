@@ -158,6 +158,30 @@ export default function Home() {
                 </a>
               </div>
 
+              <figure className="mx-auto mt-6 max-w-2xl">
+                <img
+                  src="https://images.squarespace-cdn.com/content/62d66fa29e72c560f8efc020/dd9c2e22-0cff-42cd-a894-acf36ece3004/TF_S12_LIGHT_KA.png?format=1000w"
+                  alt="Official Season 12 Infiltrator equipment artwork featuring the Mimic Device and Translocator on a red background"
+                  width={1000}
+                  height={565}
+                  loading="lazy"
+                  decoding="async"
+                  className="h-auto w-full rounded-lg border border-[var(--mt-steel-line)]"
+                />
+                <figcaption className="mt-2 text-xs leading-5 text-[var(--mt-muted)]">
+                  Infiltrator equipment · Artwork © Embark Studios. From the{" "}
+                  <a
+                    href="https://www.reachthefinals.com/roadmap"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded text-[var(--mt-gold-bright)] underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mt-gold-bright)]"
+                  >
+                    official THE FINALS roadmap
+                  </a>
+                  .
+                </figcaption>
+              </figure>
+
               <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 {SEASON_12_HIGHLIGHTS.map(highlight => (
                   <article
