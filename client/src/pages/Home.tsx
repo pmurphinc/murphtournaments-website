@@ -24,10 +24,71 @@ import {
 
 const DISCORD_URL = "https://discord.gg/kcmdxmBgnC";
 
+// Editorial summaries of Embark's PRIME TIME reveals, checked October 19, 2026.
+const SEASON_12_HIGHLIGHTS = [
+  {
+    title: "The Infiltrator",
+    label: "New Light playstyle",
+    description:
+      "True Sight reveals enemies through smoke and exposes disguises. The Mimic Device lets you become an arena prop, while the Translocator swaps your position with a marked object.",
+    href: "https://www.youtube.com/watch?v=x4OZrRq0z1w",
+  },
+  {
+    title: "Solo Showdown",
+    label: "New mode · Beta",
+    description:
+      "12 solo contestants compete across three rounds drawn from eight mini-modes. Earn cash to survive elimination between rounds and become the last contestant standing.",
+    href: "https://www.youtube.com/watch?v=Zv-sXV5mKs8",
+  },
+  {
+    title: "Classic arenas rebuilt",
+    label: "Monaco · Seoul · Skyway Stadium",
+    description:
+      "Familiar arenas get revised layouts, new traversal options, clearer sightlines, upgraded lighting and materials, and their own Sponsor identities.",
+    href: "https://www.youtube.com/watch?v=TPfoKvvuPz8",
+  },
+  {
+    title: "Destruction evolved",
+    label: "Dynamism upgrade",
+    description:
+      "Floors sag, walls hinge and suspended structures swing before collapsing. Blast waves, debris piles and smoke that reacts to the changing arena create new ways to fight and move.",
+    href: "https://www.youtube.com/watch?v=Zm9sF-ijcB4",
+  },
+  {
+    title: "A new Sponsor Journey",
+    label: "Progression & rewards",
+    description:
+      "Represent OSPUZE, ALFA ACTA or ISEUL-T with a dedicated Handler, story challenges and free cosmetic rewards. Earn Fans to advance your World Tour rank.",
+    href: "https://www.youtube.com/watch?v=vNjItVcJ6ls",
+  },
+  {
+    title: "HUD & menus reworked",
+    label: "Interface upgrade",
+    description:
+      "A more readable, scalable HUD, refreshed menus, a side panel and customizable Quick Settings help keep the information you need within reach.",
+    href: "https://www.youtube.com/watch?v=5ki7JD1IMCo",
+  },
+  {
+    title: "Dynamic Commentary",
+    label: "Game show · Beta",
+    description:
+      "Scotty can react to selected plays with real-time commentary and call contestants out by name. The initial beta respects Anonymous Mode and Streamer Mode.",
+    href: "https://www.youtube.com/watch?v=eA9_Q6d2H-g",
+  },
+  {
+    title: "Respec becomes permanent",
+    label: "Health & movement",
+    description:
+      "Light moves to 175 HP with slightly slower movement; Heavy moves to 325 HP with slightly faster movement. A major balance patch arrives alongside these changes.",
+    href: "/patchnotes?version=respec-order-3-retrospective#patch-respec-order-3-retrospective",
+  },
+];
+
 /**
  * Murph Tournaments homepage.
  * Real data sources: `communityTournaments.list` (live/upcoming directory),
- * `patchNotes.getAll` (news). Champion callout, About stats, and media links
+ * `patchNotes.getAll` (news). Season 12 highlights link to Embark reveals.
+ * Champion callout, About stats, and media links
  * are the site's existing published content (previously hardcoded in this
  * same file), just restyled — not new or sample data.
  */
@@ -71,39 +132,78 @@ export default function Home() {
                   <div className="mb-3 flex flex-wrap items-center gap-2">
                     <span className="inline-flex items-center gap-2 rounded-full border border-[var(--mt-gold)]/60 bg-[var(--mt-black)]/70 px-3 py-1 font-mono text-[10px] font-black uppercase tracking-[0.18em] text-[var(--mt-gold-bright)]">
                       <Megaphone className="size-3.5" aria-hidden="true" />
-                      Season 12 Preview
+                      Season 12 · PRIME TIME
                     </span>
                     <span className="font-mono text-[10px] uppercase tracking-widest text-[var(--mt-muted)]">
-                      Confirmed by Embark · October 13, 2026
+                      Launches October 20, 2026
                     </span>
                   </div>
                   <h2 className="text-2xl font-black uppercase leading-tight text-[var(--mt-off-white)] sm:text-3xl">
-                    Respec changes confirmed for Season 12
+                    PRIME TIME: the Season 12 highlights
                   </h2>
                   <p className="mt-3 text-sm leading-6 text-[var(--mt-muted)]">
-                    Embark will make the Light and Heavy health and movement
-                    changes permanent in Season 12: Light will have 175 health
-                    and slower movement; Heavy will have 325 health and faster
-                    movement. The Respec Order 3.0 test has ended.
+                    A new Light playstyle, a solo tournament mode and a major
+                    evolution of the arenas and game show. Here are the reveals
+                    to catch before Season 12 arrives.
                   </p>
                 </div>
                 <a
-                  href="/patchnotes?version=respec-order-3-retrospective#patch-respec-order-3-retrospective"
+                  href="https://www.reachthefinals.com/roadmap"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-md bg-[var(--mt-gold)] px-5 font-mono text-xs font-black uppercase tracking-widest text-[var(--mt-gold-foreground)] transition hover:bg-[var(--mt-gold-bright)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mt-gold-bright)]"
                 >
-                  Read the Retrospective
+                  Official Season Roadmap
                   <ArrowRight className="size-4" aria-hidden="true" />
                 </a>
               </div>
 
-              <p className="mt-6 border-t border-[var(--mt-steel-line)] pt-5 text-sm leading-6 text-[var(--mt-muted)]">
-                Latest release: Store Update 11.14.0 (October 15). New store
-                cosmetics; no balance changes listed.{" "}
+              <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                {SEASON_12_HIGHLIGHTS.map(highlight => (
+                  <article
+                    key={highlight.title}
+                    className="flex min-w-0 flex-col rounded-lg border border-[var(--mt-steel-line)] bg-[var(--mt-black)]/60 p-4"
+                  >
+                    <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-[var(--mt-gold-bright)]">
+                      {highlight.label}
+                    </p>
+                    <h3 className="mt-2 text-lg font-black leading-tight text-[var(--mt-off-white)]">
+                      {highlight.title}
+                    </h3>
+                    <p className="mb-4 mt-3 text-sm leading-6 text-[var(--mt-muted)]">
+                      {highlight.description}
+                    </p>
+                    <a
+                      href={highlight.href}
+                      target={
+                        highlight.href.startsWith("https://")
+                          ? "_blank"
+                          : undefined
+                      }
+                      rel={
+                        highlight.href.startsWith("https://")
+                          ? "noopener noreferrer"
+                          : undefined
+                      }
+                      aria-label={`Read or watch Embark's reveal: ${highlight.title}`}
+                      className="mt-auto inline-flex items-center gap-2 self-start rounded text-xs font-bold text-[var(--mt-gold-bright)] underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mt-gold-bright)]"
+                    >
+                      {highlight.href.startsWith("https://")
+                        ? "Watch the reveal"
+                        : "Read the retrospective"}
+                      <ArrowRight className="size-3.5" aria-hidden="true" />
+                    </a>
+                  </article>
+                ))}
+              </div>
+              <p className="mt-6 border-t border-[var(--mt-steel-line)] pt-5 text-xs leading-5 text-[var(--mt-muted)]">
+                Based on Embark’s announcements through October 19. Full launch
+                balance details will follow with the Season 12 patch notes.{" "}
                 <a
-                  href="/patchnotes?version=11.14.0#patch-11-14-0"
+                  href="/patchnotes"
                   className="font-bold text-[var(--mt-gold-bright)] underline underline-offset-4"
                 >
-                  Read the latest update
+                  Browse the patch notes
                 </a>
               </p>
             </div>
