@@ -17,6 +17,7 @@ import {
   baseCanvasSize,
   clampZoom,
   getCanvasPanScroll,
+  getGroupDragPositionsFromStart,
   getCenterZoomView,
   getConnectorEndpoints,
   getConnectorPoint,
@@ -36,6 +37,7 @@ import {
   shouldStartCanvasPan,
   type CanvasPanStart,
   type CanvasPoint,
+  type GroupDragPositionStart,
 } from "@/lib/tournamentControlBoard";
 
 type ViewerGame = {
@@ -60,6 +62,52 @@ export type NodeDragState = {
   x: number;
   y: number;
 };
+
+type ViewerGroupDrag = GroupDragPositionStart & {
+  groupId: string;
+  pointerId: number;
+};
+
+export function getViewerGroupStartPositions(
+  games: readonly Pick<
+    ViewerGame,
+    "id" | "canvasX" | "canvasY" | "roundGroupId"
+  >[],
+  localPositions: ReadonlyMap<number, CanvasPoint>,
+  groupId: string
+): Map<number, CanvasPoint> {
+  return new Map(
+    games
+      .filter(game => game.roundGroupId === groupId)
+      .map(game => [game.id, getViewerLocalPosition(game, localPositions)])
+  );
+}
+
+export function getViewerGroupDragPositions(
+  start: GroupDragPositionStart,
+  pointer: { clientX: number; clientY: number },
+  zoom: number
+): Map<number, CanvasPoint> {
+  if (start.startPositions.size === 0) return new Map();
+  // Stop the entire group at the edge so its lobby spacing stays intact.
+  const positions = Array.from(start.startPositions.values());
+  return getGroupDragPositionsFromStart(
+    start,
+    {
+      clientX: Math.max(
+        pointer.clientX,
+        start.clientX -
+          Math.min(...positions.map(position => position.x)) * zoom
+      ),
+      clientY: Math.max(
+        pointer.clientY,
+        start.clientY -
+          Math.min(...positions.map(position => position.y)) * zoom
+      ),
+    },
+    zoom
+  );
+}
 
 type PinchZoomStart = {
   distance: number;
@@ -170,6 +218,7 @@ export default function TournamentControlViewer() {
     () => new Set()
   );
   const [nodeDrag, setNodeDrag] = useState<NodeDragState | null>(null);
+  const [groupDrag, setGroupDrag] = useState<ViewerGroupDrag | null>(null);
   const query = trpc.tournamentControl.getViewer.useQuery(
     { token: params.viewerToken ?? "" },
     {
@@ -238,6 +287,8 @@ export default function TournamentControlViewer() {
   }, [applyBoardView, games, localPositions, minimizedGameIds, nodeDrag]);
 
   const resetLayout = useCallback(() => {
+    setGroupDrag(null);
+    setNodeDrag(null);
     setLocalPositions(new Map());
     setMinimizedGameIds(new Set());
     requestAnimationFrame(fitBoardView);
@@ -334,6 +385,34 @@ export default function TournamentControlViewer() {
     };
   }, [canvasPoint, nodeDrag]);
 
+  useEffect(() => {
+    if (!groupDrag) return;
+    const apply = (event: PointerEvent) => {
+      if (event.pointerId !== groupDrag.pointerId || isPinchingRef.current)
+        return;
+      const positions = getViewerGroupDragPositions(groupDrag, event, zoom);
+      setLocalPositions(
+        current => new Map([...Array.from(current), ...Array.from(positions)])
+      );
+    };
+    const finish = (event: PointerEvent) => {
+      if (event.pointerId !== groupDrag.pointerId) return;
+      apply(event);
+      setGroupDrag(null);
+    };
+    const cancel = (event: PointerEvent) => {
+      if (event.pointerId === groupDrag.pointerId) setGroupDrag(null);
+    };
+    window.addEventListener("pointermove", apply);
+    window.addEventListener("pointerup", finish);
+    window.addEventListener("pointercancel", cancel);
+    return () => {
+      window.removeEventListener("pointermove", apply);
+      window.removeEventListener("pointerup", finish);
+      window.removeEventListener("pointercancel", cancel);
+    };
+  }, [groupDrag, zoom]);
+
   if (query.isLoading) return <ViewerState title="Loading bracket…" />;
   if (query.error)
     return (
@@ -391,6 +470,7 @@ export default function TournamentControlViewer() {
             if (shouldCancelBoardDragsForPinch(touchPointersRef.current.size)) {
               isPinchingRef.current = true;
               setNodeDrag(null);
+              setGroupDrag(null);
               canvasPanRef.current = null;
               const element = canvasRef.current;
               const rect = element?.getBoundingClientRect();
@@ -489,6 +569,10 @@ export default function TournamentControlViewer() {
         }}
         onPointerCancel={event => {
           touchPointersRef.current.delete(event.pointerId);
+          if (touchPointersRef.current.size < 2) pinchStartRef.current = null;
+          if (touchPointersRef.current.size === 0)
+            isPinchingRef.current = false;
+          setGroupDrag(null);
           canvasPanRef.current = null;
           setIsPanning(false);
         }}
@@ -577,13 +661,7 @@ export default function TournamentControlViewer() {
                   width: frame.width,
                   height: frame.height,
                 }}
-              >
-                <span
-                  className={`absolute -top-7 left-5 rounded-md border-2 px-3 py-1.5 font-mono text-sm font-black uppercase tracking-[0.18em] ${frame.theme.label}`}
-                >
-                  {frame.label}
-                </span>
-              </div>
+              />
             ))}
             <svg
               className="pointer-events-none absolute inset-0 z-[1] overflow-visible"
@@ -627,9 +705,7 @@ export default function TournamentControlViewer() {
               const mode = getTournamentGameMode(game.gameType);
               const capacity = mode.teamsPerLobby;
               const isMinimized = minimizedGameIds.has(game.id);
-              const mapName = game.mapId
-                ? mapsById.get(game.mapId)
-                : null;
+              const mapName = game.mapId ? mapsById.get(game.mapId) : null;
               const statusClasses = getGameStatusClasses(game.status);
               const broadcastHref = toSafeBroadcastHref(game.broadcastUrl);
               const hasOutgoingLoserConnection = query.data.connections.some(
@@ -650,6 +726,9 @@ export default function TournamentControlViewer() {
                   onPointerDown={(event: ReactPointerEvent<HTMLElement>) => {
                     if (
                       event.button !== 0 ||
+                      groupDrag ||
+                      isPinchingRef.current ||
+                      touchPointersRef.current.size > 0 ||
                       (event.target instanceof Element &&
                         event.target.closest(
                           '[data-no-node-drag="true"], button, a'
@@ -786,6 +865,80 @@ export default function TournamentControlViewer() {
               );
             })}
           </div>
+          {/* Keep labels outside the scaled board: text and drag targets stay readable. */}
+          {roundFrames.map(frame => (
+            <button
+              key={`${frame.groupId}-header`}
+              type="button"
+              data-no-canvas-pan="true"
+              data-round-group-header="true"
+              aria-label={`Move ${frame.label} group in your viewer layout`}
+              title="Drag to move this group. Arrow keys move it; Shift moves farther. Reset restores the official layout."
+              className={`absolute z-30 min-h-11 max-w-xs touch-none select-none break-words rounded-md border-2 px-3 py-2 text-left font-mono text-lg font-black uppercase leading-tight tracking-wide focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#FFD700] ${frame.theme.label} ${groupDrag?.groupId === frame.groupId ? "cursor-grabbing" : "cursor-grab"}`}
+              style={{
+                left: Math.max(0, frame.x * zoom + 20),
+                top: Math.max(0, frame.y * zoom - 52),
+              }}
+              onPointerDown={event => {
+                if (
+                  event.button !== 0 ||
+                  nodeDrag ||
+                  groupDrag ||
+                  isPinchingRef.current ||
+                  touchPointersRef.current.size > 0
+                )
+                  return;
+                event.preventDefault();
+                event.currentTarget.focus({ preventScroll: true });
+                if (event.pointerType !== "touch") {
+                  event.currentTarget.setPointerCapture(event.pointerId);
+                }
+                setGroupDrag({
+                  groupId: frame.groupId,
+                  pointerId: event.pointerId,
+                  clientX: event.clientX,
+                  clientY: event.clientY,
+                  startPositions: getViewerGroupStartPositions(
+                    games,
+                    localPositions,
+                    frame.groupId
+                  ),
+                });
+                // Touch events bubble so the board can still begin a two-finger pinch.
+              }}
+              onKeyDown={event => {
+                const directions: Record<string, CanvasPoint> = {
+                  ArrowLeft: { x: -1, y: 0 },
+                  ArrowRight: { x: 1, y: 0 },
+                  ArrowUp: { x: 0, y: -1 },
+                  ArrowDown: { x: 0, y: 1 },
+                };
+                const direction = directions[event.key];
+                if (!direction || groupDrag || nodeDrag) return;
+                event.preventDefault();
+                const step = event.shiftKey ? 80 : 20;
+                const positions = getViewerGroupDragPositions(
+                  {
+                    clientX: 0,
+                    clientY: 0,
+                    startPositions: getViewerGroupStartPositions(
+                      games,
+                      localPositions,
+                      frame.groupId
+                    ),
+                  },
+                  { clientX: direction.x * step, clientY: direction.y * step },
+                  zoom
+                );
+                setLocalPositions(
+                  current =>
+                    new Map([...Array.from(current), ...Array.from(positions)])
+                );
+              }}
+            >
+              {frame.label}
+            </button>
+          ))}
         </div>
       </main>
     </section>
