@@ -79,7 +79,7 @@ const SEASON_12_HIGHLIGHTS = [
     title: "Respec becomes permanent",
     label: "Health & movement",
     description:
-      "Light moves to 175 HP with slightly slower movement; Heavy moves to 325 HP with slightly faster movement. A major balance patch arrives alongside these changes.",
+      "Light moves to 175 HP with slightly slower movement; Heavy moves to 325 HP with slightly faster movement. These changes are part of Season 12’s major balance update.",
     href: "/patchnotes?version=respec-order-3-retrospective#patch-respec-order-3-retrospective",
   },
 ];
@@ -135,16 +135,16 @@ export default function Home() {
                       Season 12 · PRIME TIME
                     </span>
                     <span className="font-mono text-[10px] uppercase tracking-widest text-[var(--mt-muted)]">
-                      Launches October 20, 2026
+                      Season launch · October 20, 2026
                     </span>
                   </div>
                   <h2 className="text-2xl font-black uppercase leading-tight text-[var(--mt-off-white)] sm:text-3xl">
                     PRIME TIME: the Season 12 highlights
                   </h2>
                   <p className="mt-3 text-sm leading-6 text-[var(--mt-muted)]">
-                    A new Light playstyle, a solo tournament mode and a major
-                    evolution of the arenas and game show. Here are the reveals
-                    to catch before Season 12 arrives.
+                    Season 12 brings a new Light playstyle, a solo tournament
+                    mode and a major evolution of the arenas and game show.
+                    Explore the PRIME TIME highlights below.
                   </p>
                 </div>
                 <a
@@ -197,14 +197,15 @@ export default function Home() {
                 ))}
               </div>
               <p className="mt-6 border-t border-[var(--mt-steel-line)] pt-5 text-xs leading-5 text-[var(--mt-muted)]">
-                Based on Embark’s announcements through October 19. Full launch
-                balance details will follow with the Season 12 patch notes.{" "}
+                Highlights from Embark’s official PRIME TIME reveals. For
+                detailed balance changes and update history,{" "}
                 <a
                   href="/patchnotes"
                   className="font-bold text-[var(--mt-gold-bright)] underline underline-offset-4"
                 >
-                  Browse the patch notes
+                  browse the patch notes
                 </a>
+                .
               </p>
             </div>
           </div>
