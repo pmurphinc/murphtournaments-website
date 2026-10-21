@@ -37,6 +37,8 @@ type BaselineStatsCardProps = {
 };
 
 type RawBaselineValues = {
+  bodyDamageRaw?: string;
+  ttkUnavailable?: boolean;
   damageDropoffMinRange?: string;
   damageDropoffMaxRange?: string;
   damageDropoffModifierAtMaxRange?: string;
@@ -56,18 +58,22 @@ type HandlingStat = {
 };
 
 const CLASS_HEALTH = {
-  Light: 150,
+  Light: 175,
   Medium: 250,
-  Heavy: 350,
+  Heavy: 325,
 } as const;
 
 const formatNumber = (value: number | null | undefined, suffix = "") => {
   if (value === null || value === undefined || Number.isNaN(value)) return "-";
-  const rounded = Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2)));
+  const rounded = Number.isInteger(value)
+    ? String(value)
+    : String(Number(value.toFixed(2)));
   return `${rounded}${suffix}`;
 };
 
-const parseRawValues = (rawValues: string | null | undefined): RawBaselineValues => {
+const parseRawValues = (
+  rawValues: string | null | undefined
+): RawBaselineValues => {
   if (!rawValues) return {};
   try {
     return JSON.parse(rawValues) as RawBaselineValues;
@@ -77,14 +83,21 @@ const parseRawValues = (rawValues: string | null | undefined): RawBaselineValues
 };
 
 const deriveDamagePerMagazine = (stat: BaselineWeaponStat) => {
-  if (stat.damagePerMagazine !== null && stat.damagePerMagazine !== undefined) return stat.damagePerMagazine;
+  if (stat.damagePerMagazine !== null && stat.damagePerMagazine !== undefined)
+    return stat.damagePerMagazine;
   if (stat.bodyDamage === null || stat.bodyDamage === undefined) return null;
-  if (stat.magazineSize === null || stat.magazineSize === undefined) return null;
+  if (stat.magazineSize === null || stat.magazineSize === undefined)
+    return null;
   return stat.bodyDamage * stat.magazineSize;
 };
 
 const deriveTtk = (stat: BaselineWeaponStat, health: number) => {
-  if (!stat.bodyDamage || !stat.rateOfFireRpm) return null;
+  if (
+    parseRawValues(stat.rawValues).ttkUnavailable ||
+    !stat.bodyDamage ||
+    !stat.rateOfFireRpm
+  )
+    return null;
   const shotsToKill = Math.ceil(health / stat.bodyDamage);
   return {
     ttkSeconds: (shotsToKill - 1) / (stat.rateOfFireRpm / 60),
@@ -95,17 +108,22 @@ const deriveTtk = (stat: BaselineWeaponStat, health: number) => {
 const formatTtk = (
   ttkSeconds: number | null | undefined,
   shotsToKill: number | null | undefined,
-  fallback: ReturnType<typeof deriveTtk>,
+  fallback: ReturnType<typeof deriveTtk>
 ) => {
   const ttk = ttkSeconds ?? fallback?.ttkSeconds ?? null;
   const shots = shotsToKill ?? fallback?.shotsToKill ?? null;
-  if (ttk === null || shots === null) return "-";
+  if (shots === null) return "-";
+  if (ttk === null) return `— / ${shots} shots`;
   return `${formatNumber(ttk, "s")} / ${shots} shots`;
 };
 
 const getHandlingAccent = (value: string) => {
   const normalized = value.trim().toLowerCase();
-  if (normalized.startsWith("-") || normalized.includes("correct") || normalized.includes("fix")) {
+  if (
+    normalized.startsWith("-") ||
+    normalized.includes("correct") ||
+    normalized.includes("fix")
+  ) {
     return "text-[#4ADE80]";
   }
   if (normalized.startsWith("+")) return "text-[#E84B4B]";
@@ -123,8 +141,14 @@ function StatCell({
 }) {
   return (
     <div className="min-w-0 px-3 py-3">
-      <div className="font-mono text-[10px] font-bold uppercase tracking-wide text-[var(--mt-muted)]">{label}</div>
-      <div className={`mt-1 truncate font-mono text-2xl font-black leading-tight ${accent}`}>{value}</div>
+      <div className="font-mono text-[10px] font-bold uppercase tracking-wide text-[var(--mt-muted)]">
+        {label}
+      </div>
+      <div
+        className={`mt-1 whitespace-normal break-words font-mono text-2xl font-black leading-tight ${accent}`}
+      >
+        {value}
+      </div>
     </div>
   );
 }
@@ -140,8 +164,14 @@ function TtkCell({
 }) {
   return (
     <div className="min-w-0 px-3 py-3">
-      <div className={`font-mono text-[10px] font-black uppercase tracking-wide ${accent}`}>{label}</div>
-      <div className="mt-1 truncate font-mono text-lg font-black text-[var(--mt-off-white)]">{value}</div>
+      <div
+        className={`font-mono text-[10px] font-black uppercase tracking-wide ${accent}`}
+      >
+        {label}
+      </div>
+      <div className="mt-1 whitespace-normal break-words font-mono text-lg font-black text-[var(--mt-off-white)]">
+        {value}
+      </div>
     </div>
   );
 }
@@ -164,13 +194,24 @@ function MeleeStatsCard({
   return (
     <section className="mb-5 overflow-hidden rounded-lg border border-[var(--mt-steel-line)] bg-[var(--mt-charcoal)]">
       <div className="border-b border-[var(--mt-steel-line)] px-4 py-3">
-        <div className="font-mono text-[11px] font-black uppercase tracking-wide text-[var(--mt-muted)]">Melee Baseline</div>
-        <h2 className="mt-1 font-mono text-xl font-black uppercase tracking-wide text-[var(--mt-gold-bright)]">{weaponName}</h2>
+        <div className="font-mono text-[11px] font-black uppercase tracking-wide text-[var(--mt-muted)]">
+          Melee Baseline
+        </div>
+        <h2 className="mt-1 font-mono text-xl font-black uppercase tracking-wide text-[var(--mt-gold-bright)]">
+          {weaponName}
+        </h2>
       </div>
 
-      {stat.bodyDamage !== null && stat.bodyDamage !== undefined ? (
+      {stat.bodyDamage != null ||
+      parseRawValues(stat.rawValues).bodyDamageRaw ? (
         <div className="grid grid-cols-1">
-          <StatCell label="Attack DMG" value={formatNumber(stat.bodyDamage)} />
+          <StatCell
+            label="Attack DMG"
+            value={
+              parseRawValues(stat.rawValues).bodyDamageRaw ??
+              formatNumber(stat.bodyDamage)
+            }
+          />
         </div>
       ) : null}
 
@@ -194,17 +235,27 @@ function MeleeStatsCard({
 
       {stat.sourceNotes?.trim() ? (
         <div className="border-t border-[var(--mt-steel-line)] px-4 py-3">
-          <div className="font-mono text-[10px] font-black uppercase tracking-wide text-[var(--mt-muted)]">Attack Notes</div>
-          <p className="mt-2 text-sm leading-6 text-[var(--mt-off-white)]">{stat.sourceNotes.trim()}</p>
+          <div className="font-mono text-[10px] font-black uppercase tracking-wide text-[var(--mt-muted)]">
+            Attack Notes
+          </div>
+          <p className="mt-2 text-sm leading-6 text-[var(--mt-off-white)]">
+            {stat.sourceNotes.trim()}
+          </p>
         </div>
       ) : null}
 
-      <div className="border-t border-[var(--mt-steel-line)] px-4 py-3 font-mono text-xs text-[var(--mt-muted)]">{sourceText}</div>
+      <div className="border-t border-[var(--mt-steel-line)] px-4 py-3 font-mono text-xs text-[var(--mt-muted)]">
+        {sourceText}
+      </div>
     </section>
   );
 }
 
-export default function BaselineStatsCard({ weaponName, stat, source }: BaselineStatsCardProps) {
+export default function BaselineStatsCard({
+  weaponName,
+  stat,
+  source,
+}: BaselineStatsCardProps) {
   const raw = parseRawValues(stat.rawValues);
   const damagePerMagazine = deriveDamagePerMagazine(stat);
   const lightTtk = deriveTtk(stat, CLASS_HEALTH.Light);
@@ -214,37 +265,65 @@ export default function BaselineStatsCard({ weaponName, stat, source }: Baseline
     { label: "Hip Recoil", value: raw.hipFireRecoilModifier },
     { label: "ADS Recoil", value: raw.adsRecoilModifier },
     { label: "ADS Dispersion", value: raw.adsDispersionModifier },
-    { label: "Airborne ADS Dispersion", value: raw.airborneAdsDispersionModifier },
+    {
+      label: "Airborne ADS Dispersion",
+      value: raw.airborneAdsDispersionModifier,
+    },
     { label: "Recoil Curve", value: raw.recoilCurveStatus },
   ].filter(
     (entry): entry is HandlingStat =>
-      typeof entry.value === "string" && entry.value.trim().length > 0,
+      typeof entry.value === "string" && entry.value.trim().length > 0
   );
   const sourceText = source
     ? `Source: ${source.sourceLabel} - ${source.versionLabel} Baseline`
     : "Source: Krome's Spreadsheet - 11.0.0 Baseline";
 
   if (stat.weaponType === "melee") {
-    return <MeleeStatsCard weaponName={weaponName} stat={stat} sourceText={sourceText} />;
+    return (
+      <MeleeStatsCard
+        weaponName={weaponName}
+        stat={stat}
+        sourceText={sourceText}
+      />
+    );
   }
 
   return (
     <section className="mb-5 overflow-hidden rounded-lg border border-[var(--mt-steel-line)] bg-[var(--mt-charcoal)]">
       <div className="border-b border-[var(--mt-steel-line)] px-4 py-3">
-        <div className="font-mono text-[11px] font-black uppercase tracking-wide text-[var(--mt-muted)]">Baseline Stats</div>
-        <h2 className="mt-1 font-mono text-xl font-black uppercase tracking-wide text-[var(--mt-gold-bright)]">{weaponName}</h2>
+        <div className="font-mono text-[11px] font-black uppercase tracking-wide text-[var(--mt-muted)]">
+          Baseline Stats
+        </div>
+        <h2 className="mt-1 font-mono text-xl font-black uppercase tracking-wide text-[var(--mt-gold-bright)]">
+          {weaponName}
+        </h2>
       </div>
 
       <div className="grid grid-cols-2 divide-x divide-y divide-[var(--mt-steel-line)] sm:grid-cols-4">
         <StatCell label="Body DMG" value={formatNumber(stat.bodyDamage)} />
-        <StatCell label="Head DMG" value={formatNumber(stat.headDamage)} accent="text-[#E84B4B]" />
+        <StatCell
+          label="Head DMG"
+          value={formatNumber(stat.headDamage)}
+          accent="text-[#E84B4B]"
+        />
         <StatCell label="Fire Rate" value={formatNumber(stat.rateOfFireRpm)} />
-        <StatCell label="Mag Size" value={raw.magazineRaw ?? formatNumber(stat.magazineSize)} />
+        <StatCell
+          label="Mag Size"
+          value={raw.magazineRaw ?? formatNumber(stat.magazineSize)}
+        />
       </div>
 
       <div className="grid grid-cols-1 divide-y divide-[var(--mt-steel-line)] border-t border-[var(--mt-steel-line)] sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-        <StatCell label="Tact. Reload" value={formatNumber(stat.tacticalReloadTimeSeconds, "s")} />
-        <StatCell label="Empty Reload" value={raw.emptyReloadRaw ?? formatNumber(stat.emptyReloadTimeSeconds, "s")} />
+        <StatCell
+          label="Tact. Reload"
+          value={formatNumber(stat.tacticalReloadTimeSeconds, "s")}
+        />
+        <StatCell
+          label="Empty Reload"
+          value={
+            raw.emptyReloadRaw ?? formatNumber(stat.emptyReloadTimeSeconds, "s")
+          }
+        />
         <StatCell label="DMG / Mag" value={formatNumber(damagePerMagazine)} />
       </div>
 
@@ -254,29 +333,56 @@ export default function BaselineStatsCard({ weaponName, stat, source }: Baseline
         </div>
         <div className="grid grid-cols-1 divide-y divide-[var(--mt-steel-line)] sm:grid-cols-3 sm:divide-x sm:divide-y-0">
           <TtkCell
-            label="Light"
+            label="Light · 175 HP"
             accent="text-[#00d9ff]"
-            value={formatTtk(stat.ttkVsLightBodySeconds, stat.stkLightBody, lightTtk)}
+            value={formatTtk(
+              stat.ttkVsLightBodySeconds,
+              stat.stkLightBody,
+              lightTtk
+            )}
           />
           <TtkCell
-            label="Medium"
+            label="Medium · 250 HP"
             accent="text-[#E8B84B]"
-            value={formatTtk(stat.ttkVsMediumBodySeconds, stat.stkMediumBody, mediumTtk)}
+            value={formatTtk(
+              stat.ttkVsMediumBodySeconds,
+              stat.stkMediumBody,
+              mediumTtk
+            )}
           />
           <TtkCell
-            label="Heavy"
+            label="Heavy · 325 HP"
             accent="text-[#E84B4B]"
-            value={formatTtk(stat.ttkVsHeavyBodySeconds, stat.stkHeavyBody, heavyTtk)}
+            value={formatTtk(
+              stat.ttkVsHeavyBodySeconds,
+              stat.stkHeavyBody,
+              heavyTtk
+            )}
           />
         </div>
       </div>
 
       <div className="grid grid-cols-1 divide-y divide-[var(--mt-steel-line)] border-t border-[var(--mt-steel-line)] sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-        <StatCell label="Dropoff Start" value={raw.damageDropoffMinRange ?? formatNumber(stat.damageDropoffMinRange, "m")} />
-        <StatCell label="Dropoff End" value={raw.damageDropoffMaxRange ?? formatNumber(stat.damageDropoffMaxRange, "m")} />
+        <StatCell
+          label="Dropoff Start"
+          value={
+            raw.damageDropoffMinRange ??
+            formatNumber(stat.damageDropoffMinRange, "m")
+          }
+        />
+        <StatCell
+          label="Dropoff End"
+          value={
+            raw.damageDropoffMaxRange ??
+            formatNumber(stat.damageDropoffMaxRange, "m")
+          }
+        />
         <StatCell
           label="Max DMG %"
-          value={raw.damageDropoffModifierAtMaxRange ?? formatNumber(stat.damageDropoffModifierAtMaxRange, "%")}
+          value={
+            raw.damageDropoffModifierAtMaxRange ??
+            formatNumber(stat.damageDropoffModifierAtMaxRange, "%")
+          }
           accent="text-[#E84B4B]"
         />
       </div>
@@ -294,7 +400,8 @@ export default function BaselineStatsCard({ weaponName, stat, source }: Baseline
             ) : null}
           </div>
           <p className="px-4 pt-1 text-xs leading-5 text-[var(--mt-muted)]">
-            Patch modifiers are relative changes from the previous values, not absolute recoil or dispersion units.
+            Patch modifiers are relative changes from the previous values, not
+            absolute recoil or dispersion units.
           </p>
           <div className="mt-2 grid grid-cols-2 divide-x divide-y divide-[var(--mt-steel-line)] border-t border-[var(--mt-steel-line)] sm:grid-cols-4">
             {handlingStats.map(entry => (
@@ -309,7 +416,9 @@ export default function BaselineStatsCard({ weaponName, stat, source }: Baseline
         </div>
       ) : null}
 
-      <div className="border-t border-[var(--mt-steel-line)] px-4 py-3 font-mono text-xs text-[var(--mt-muted)]">{sourceText}</div>
+      <div className="border-t border-[var(--mt-steel-line)] px-4 py-3 font-mono text-xs text-[var(--mt-muted)]">
+        {sourceText}
+      </div>
     </section>
   );
 }

@@ -4,7 +4,7 @@ import SectionHeading from "@/components/public/SectionHeading";
 import { PublicEmptyState } from "@/components/public/PublicStates";
 import { ChevronDown } from "lucide-react";
 import { trpc } from "@/lib/trpc";
-import { useLocation } from "wouter";
+import { useSearch } from "wouter";
 
 const RESPEC_ORDER_PATCH_NOTE = {
   id: -1012,
@@ -129,13 +129,11 @@ const combinePatchNotes = (patchNotesData: PatchNoteListItem[] | undefined) => {
  * - Supports deep-linking via ?version= and #patch-{version} anchors
  */
 export default function PatchNotes() {
-  const [location] = useLocation();
-  const requestedVersion = useMemo(() => {
-    const query = location.includes("?")
-      ? location.slice(location.indexOf("?"))
-      : "";
-    return new URLSearchParams(query).get("version");
-  }, [location]);
+  const search = useSearch();
+  const requestedVersion = useMemo(
+    () => new URLSearchParams(search).get("version"),
+    [search]
+  );
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const { data: patchNotesData, isLoading } = trpc.patchNotes.getAll.useQuery();
 

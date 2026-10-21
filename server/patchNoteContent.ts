@@ -60,6 +60,102 @@ export const cleanPatchNoteContent = (content: string) => {
 
 export const WEBSITE_PATCH_NOTES: WebsitePatchNote[] = [
   {
+    id: -12001,
+    title: "Season 12 Hotfix & Upcoming Fixes",
+    date: "2026.10.21",
+    version: "hotfix-2026-10-21",
+    url: "https://www.reachthefinals.com/patchnotes/12-01",
+    sourceUrl: "https://www.reachthefinals.com/patchnotes/12-01",
+    isGameUpdate: 1,
+    content: `THE FINALS — October 21 Hotfix
+
+Shipped Fixes
+• Loading-screen crashes on PS5/Xbox and blocked loadout changes after elimination are addressed.
+• Guardian Turret targeting and Grappling Hook cooldown enforcement are corrected.
+• The M60 Murky Business cosmetic no longer blocks certain sights; Cold Brew-Tality gains its missing sticker.
+• No weapon damage changes are specified; the 12.0.0 stat snapshot remains applicable.
+
+Still Planned — Not Part of This Hotfix
+• HUD glow toggle, shotgun-hitmarker improvements, restored ultrawide support, and a correction for contracts not progressing in bot matches.`,
+  },
+
+  {
+    id: -12000,
+    title: "PRIME TIME — Season 12 (12.0.0)",
+    date: "2026.10.20",
+    version: "12.0.0",
+    url: "https://www.reachthefinals.com/patchnotes/12-00",
+    sourceUrl: "https://www.reachthefinals.com/patchnotes/12-00",
+    isGameUpdate: 1,
+    content: `THE FINALS — PRIME TIME (12.0.0)
+
+Season 12 launched October 20, 2026. This is a curated launch summary; the official source includes the complete notes and bug-fix list.
+
+Launch Highlights
+• Light gains True Sight, Mimic Device and Translocator. Solo Showdown beta brings 12 solo contestants and three elimination rounds.
+• Monaco, Seoul and Skyway Stadium are reworked. Gradual destruction, blast waves and dynamic smoke reshape fights.
+• Sponsor challenges and Signature Plays replace the old system; Fans advance World Tour. HUD, menus, footsteps and commentary are updated.
+• Light / Medium / Heavy health is now 175 / 250 / 325. Light moves slower, Heavy faster. Light regeneration delay is 8s.
+• Cashout rounds last 9.5 minutes, final rounds 14 minutes; vault opening takes 10s and spawn preview takes 5s.
+• Double Jump replaces Low Gravity and Mega Damage events. VR currency is removed; equipment unlocks use Playstyles or automatic unlocks.
+
+Weapon, Gadget and Specialization Balance
+• BFR Titan: Damage 90 → 95; reload intro 0.68 → 0.62s, loop 0.88 → 0.8s; restock point 0.465 → 0.52s.
+• CB-01 Repeater: Damage 84 → 88; minimum falloff multiplier 0.64 → 0.66.
+• Chimera-XB: Damage 45 → 47.
+• KS-23: Damage 104 → 100.
+• LH1: Damage 44 → 40; falloff starts at 35m instead of 50m and ends at 45m instead of 55m.
+• Lewis Gun: Fire rate 500 → 520 RPM.
+• M60: Fire rate 580 → 600 RPM.
+• MGL32: Damage 83 → 97.
+• P90: Damage 14 → 15.
+• Pike-556: Damage 49 → 50.
+• R.357: Damage 74 → 76.
+• SA1216: Recoil reduced about 20%; tighter pellet pattern and smoother firing sequence; minimum falloff multiplier 0.62 → 0.67.
+• SR-84: Damage 118 → 122.
+• XP-54: Magazine 36 → 34. The notes do not specify a damage reduction.
+• Dagger: Backstab base damage 85 → 90; attack duration 0.5 → 0.35s; primary and backstab lunges 5 → 4.25m. Hit detection updated.
+• Dual Blades: Primary precise damage 57 → 60 per hit; glancing 37 → 39. Cross Slash precise 140 → 155; glancing 91 → 100. Precision angle 12 → 14 degrees; wider secondary hitbox and more reliable deflection.
+• Riot Shield: Primary precise damage 86 → 90; glancing 60 → 63. Primary and Shield Bash hitboxes enlarged; bash lunge refined.
+• Sword: Primary precise damage 110 → 100; glancing 71 → 65. Primary lunge 4.25 → 4m; hit detection updated.
+• Sledgehammer: Primary and secondary lunges 5 → 4.5m; hit sweeps and predictive lunges updated.
+• Spear: Primary lunge 6.5 → 5.75m; hitbox width 0.4 → 0.35m. Spin hit timing updated and kick knockback reduced while spinning.
+• Explosive Mine: Damage 120 → 145.
+• Frag Grenade: Maximum damage 140 → 165; less intrusive light trail.
+• Dome Shield: Shield health 250 → 600; decays by 100 HP per second.
+• Flashbang: Flash duration 1.5–4.5 → 2–5s; improved traces; weaker friendly flash and enemy-only hit markers.
+• Gateway: Portal distance limit 50 → 60m, now including vertical distance; cooldown 40 → 50s.
+• Gas Grenade: Duration 12 → 8s; cooldown 24 → 20s; charges 1 → 2; radius 5 → 4.5m.
+• Gas Mine: Radius 5 → 3.5m.
+• H+ Infuser: Healing per shot 11 → 10.
+• Lockbolt: Gateway travel breaks Lockbolt tethers.
+• Pyro Grenade: Adds 40 explosive impact damage within 2.5m, separately from burning.
+• Pyro Mine: Explosion damage 55 → 45.
+• Smoke Grenade: Radius 3.5 → 4.5m; duration 9 → 13s.
+• Sonar Grenade: Now available to Medium as well as Light.
+• Thermal Bore: Detonation fuse 1.75 → 1.4s.
+• Vanishing Bomb: Cooldown 25 → 30s; underhand throw adjusted.
+• Breach Drill: Blind hit markers only indicate enemies.
+• Charge N Slam: Ground slam damages ground-level targets; airborne targets still receive knockback and concussion.
+• Cloaking Device: Stationary cloak is louder and moving cloak can be heard farther away.
+• Guardian Turret: Active targets are highlighted to the owner and teammates through cover while tracked.
+• Grappling Hook: Cooldown varies from 4 to 7.5s with grapple duration.
+• Healing Beam: Healing 46 → 50 HP/s.
+
+New Equipment
+• True Sight highlights opponents and equipment through smoke and exposes disguises.
+• Mimic Device copies an arena prop's appearance; Translocator swaps positions with a marked object.
+
+Other Launch Changes
+• Full UI/HUD rework, customizable Quick Settings, separate in-world HUD scaling, party highlighting, shotgun pellet feedback and new revive animations.
+• Sponsor progression has persistent choices; existing earned rewards remain, while unearned old rewards are removed.
+• Performance, destruction, audio, spectator and weapon interaction fixes are included. Explosions can disperse gas and smoke.
+
+Stats Source
+• Weapon stats are reconciled against Krome's 12.0.0 spreadsheet and the official launch notes. Historical Respec test values remain separate from these live changes.`,
+  },
+
+  {
     id: -11140,
     title: "Store Update 11.14.0",
     date: "2026.10.15",

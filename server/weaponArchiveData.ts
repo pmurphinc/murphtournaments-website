@@ -73,11 +73,6 @@ type SeedBaselineStat = {
   rawValues?: string | null;
 };
 
-type SeedBaselineOverride = {
-  weaponId: string;
-  values: Partial<Omit<SeedBaselineStat, "weaponId">>;
-};
-
 type SeedBaselineBatch = {
   id: string;
   sourceLabel: string;
@@ -157,25 +152,13 @@ async function readJsonFile<T>(fileName: string): Promise<T> {
   return JSON.parse(raw) as T;
 }
 
-async function readOptionalJsonFile<T>(fileName: string, fallback: T): Promise<T> {
+async function readOptionalJsonFile<T>(
+  fileName: string,
+  fallback: T
+): Promise<T> {
   return readJsonFile<T>(fileName).catch(error => {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return fallback;
     throw error;
-  });
-}
-
-function applyBaselineOverrides(
-  baselineStats: SeedBaselineStat[],
-  overrides: SeedBaselineOverride[],
-) {
-  const overridesByWeaponId = new Map(
-    overrides.map(override => [override.weaponId, override.values]),
-  );
-
-  return baselineStats.map(stat => {
-    if (!stat.weaponId) return stat;
-    const values = overridesByWeaponId.get(stat.weaponId);
-    return values ? { ...stat, ...values } : stat;
   });
 }
 
@@ -186,54 +169,66 @@ async function loadArchiveData() {
     readOptionalJsonFile<SeedPatch[]>("patches-official-extra-seed.json", []),
     readOptionalJsonFile<SeedPatch[]>("patches-update-11-6-seed.json", []),
     readOptionalJsonFile<SeedPatch[]>("patches-respec-order-3-seed.json", []),
+    readJsonFile<SeedPatch[]>("patches-season-12-seed.json"),
     readJsonFile<SeedChange[]>("weapon-changes-seed.json"),
-    readOptionalJsonFile<SeedChange[]>("weapon-changes-corrections-seed.json", []),
-    readOptionalJsonFile<SeedChange[]>("weapon-changes-official-extra-seed.json", []),
-    readOptionalJsonFile<SeedChange[]>("weapon-changes-update-11-6-seed.json", []),
+    readOptionalJsonFile<SeedChange[]>(
+      "weapon-changes-corrections-seed.json",
+      []
+    ),
+    readOptionalJsonFile<SeedChange[]>(
+      "weapon-changes-official-extra-seed.json",
+      []
+    ),
+    readOptionalJsonFile<SeedChange[]>(
+      "weapon-changes-update-11-6-seed.json",
+      []
+    ),
     readOptionalJsonFile<SeedChange[]>(
       "weapon-changes-respec-order-3-seed.json",
-      [],
+      []
     ),
+    readJsonFile<SeedChange[]>("weapon-changes-season-12-seed.json"),
     readJsonFile<SeedBaselineStat[]>("weapon-baseline-stats-seed.json"),
-    readOptionalJsonFile<SeedBaselineOverride[]>(
-      "weapon-baseline-overrides-update-11-6-seed.json",
-      [],
-    ),
     readJsonFile<SeedBaselineBatch>("weapon-baseline-batch-seed.json").catch(
-      () => null,
+      () => null
     ),
-  ]).then(([
-    weapons,
-    patches,
-    extraPatches,
-    update116Patches,
-    respecOrder3Patches,
-    changes,
-    correctionChanges,
-    extraChanges,
-    update116Changes,
-    respecOrder3Changes,
-    baselineStats,
-    baselineOverrides,
-    baselineBatch,
-  ]) => ({
-    weapons,
-    patches: [
-      ...patches,
-      ...extraPatches,
-      ...update116Patches,
-      ...respecOrder3Patches,
-    ],
-    changes: [
-      ...changes,
-      ...correctionChanges,
-      ...extraChanges,
-      ...update116Changes,
-      ...respecOrder3Changes,
-    ],
-    baselineStats: applyBaselineOverrides(baselineStats, baselineOverrides),
-    baselineBatch,
-  }));
+  ]).then(
+    ([
+      weapons,
+      patches,
+      extraPatches,
+      update116Patches,
+      respecOrder3Patches,
+      season12Patches,
+      changes,
+      correctionChanges,
+      extraChanges,
+      update116Changes,
+      respecOrder3Changes,
+      season12Changes,
+      baselineStats,
+      baselineBatch,
+    ]) => ({
+      weapons,
+      patches: [
+        ...patches,
+        ...extraPatches,
+        ...update116Patches,
+        ...respecOrder3Patches,
+        ...season12Patches,
+      ],
+      changes: [
+        ...changes,
+        ...correctionChanges,
+        ...extraChanges,
+        ...update116Changes,
+        ...respecOrder3Changes,
+        ...season12Changes,
+      ],
+      baselineStats,
+      baselineBatch,
+    })
+  );
 
   return archivePromise;
 }
@@ -269,14 +264,17 @@ function applySharedGadgetClass<
   if ((weapon.category ?? "").toLowerCase() !== "gadget") return weapon;
   if (
     !SHARED_GADGET_CANONICAL_SLUGS.has(
-      canonicalizeSharedGadgetSlug(weapon.slug),
+      canonicalizeSharedGadgetSlug(weapon.slug)
     )
   )
     return weapon;
   return { ...weapon, class: "multi" } as T;
 }
 
-function compareVersion(a: string | null | undefined, b: string | null | undefined) {
+function compareVersion(
+  a: string | null | undefined,
+  b: string | null | undefined
+) {
   const parse = (value: string | null | undefined) =>
     (value ?? "")
       .split(".")
@@ -316,7 +314,7 @@ function dedupeChanges(changes: SeedChange[]) {
 function matchesClassFilter(
   weapon: { class: string | null; category: string | null },
   classFilter: WeaponClass,
-  categoryFilter?: string,
+  categoryFilter?: string
 ) {
   if (classFilter === "multi") return weapon.class === "multi";
   if ((categoryFilter ?? "").toLowerCase() === "gadget") {
@@ -348,7 +346,7 @@ async function buildListItems() {
     });
     const weaponChanges = changesByWeapon.get(weapon.id) ?? [];
     const patchIds = Array.from(
-      new Set(weaponChanges.map(change => change.patchId)),
+      new Set(weaponChanges.map(change => change.patchId))
     );
     const latestPatch =
       patchIds
@@ -364,7 +362,7 @@ async function buildListItems() {
       ...canonicalWeapon,
       imageUrl: resolveWeaponArchiveImageUrl(
         canonicalSlug,
-        canonicalWeapon.imageUrl,
+        canonicalWeapon.imageUrl
       ),
       changeCount: weaponChanges.length,
       latestPatch: latestPatch?.versionLabel ?? null,
@@ -390,7 +388,7 @@ export async function listWeaponArchiveItems(input?: {
 
   if (input?.class) {
     items = items.filter(item =>
-      matchesClassFilter(item, input.class!, input.category),
+      matchesClassFilter(item, input.class!, input.category)
     );
   }
 
@@ -415,15 +413,18 @@ export async function listWeaponArchiveItems(input?: {
   const sort = input?.sort ?? "alphabetical";
   if (sort === "most-changed") {
     items.sort(
-      (a, b) => b.changeCount - a.changeCount || a.name.localeCompare(b.name),
+      (a, b) => b.changeCount - a.changeCount || a.name.localeCompare(b.name)
     );
   } else if (sort === "recently-changed") {
     items.sort((a, b) => {
       const dateCompare = (b.latestPatchDate ?? "").localeCompare(
-        a.latestPatchDate ?? "",
+        a.latestPatchDate ?? ""
       );
       if (dateCompare !== 0) return dateCompare;
-      return compareVersion(b.latestPatch, a.latestPatch) || a.name.localeCompare(b.name);
+      return (
+        compareVersion(b.latestPatch, a.latestPatch) ||
+        a.name.localeCompare(b.name)
+      );
     });
   } else {
     items.sort((a, b) => a.name.localeCompare(b.name));
@@ -433,10 +434,10 @@ export async function listWeaponArchiveItems(input?: {
 }
 
 export async function getWeaponArchiveDetail(
-  slug: string,
+  slug: string
 ): Promise<WeaponArchiveDetail | null> {
   const canonicalSlug = canonicalizeSharedGadgetSlug(
-    canonicalizeWeaponSlug(slug),
+    canonicalizeWeaponSlug(slug)
   );
   const { weapons, patches, changes, baselineStats, baselineBatch } =
     await loadArchiveData();
@@ -449,7 +450,7 @@ export async function getWeaponArchiveDetail(
     .map(item => item.id);
   const patchById = new Map(patches.map(patch => [patch.id, patch]));
   const relevantChanges = dedupeChanges(
-    changes.filter(change => matchingWeaponIds.includes(change.weaponId)),
+    changes.filter(change => matchingWeaponIds.includes(change.weaponId))
   );
   const changesByPatch = new Map<string, SeedChange[]>();
 
@@ -467,14 +468,14 @@ export async function getWeaponArchiveDetail(
       return {
         patch,
         changes: patchChanges.sort(
-          (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0),
+          (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
         ),
       };
     })
     .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
     .sort((a, b) => {
       const dateCompare = (b.patch.patchDate ?? "").localeCompare(
-        a.patch.patchDate ?? "",
+        a.patch.patchDate ?? ""
       );
       if (dateCompare !== 0) return dateCompare;
       return compareVersion(b.patch.versionLabel, a.patch.versionLabel);
@@ -496,9 +497,8 @@ export async function getWeaponArchiveDetail(
       ? {
           sourceLabel: baselineBatch.sourceLabel,
           versionLabel:
-            baselineBatch.id
-              .match(/(\d+_\d+_\d+)/)?.[1]
-              ?.replace(/_/g, ".") ?? "11.0.0",
+            baselineBatch.id.match(/(\d+_\d+_\d+)/)?.[1]?.replace(/_/g, ".") ??
+            "11.0.0",
           snapshotDate: baselineBatch.snapshotDate,
         }
       : null,

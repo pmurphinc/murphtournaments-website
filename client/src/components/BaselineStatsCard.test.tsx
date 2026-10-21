@@ -30,7 +30,11 @@ const meleeStat = {
 describe("BaselineStatsCard", () => {
   it("renders sourced melee attack data without firearm-only sections", () => {
     const html = renderToStaticMarkup(
-      <BaselineStatsCard weaponName="Spear (Alt.)" stat={meleeStat} source={null} />,
+      <BaselineStatsCard
+        weaponName="Spear (Alt.)"
+        stat={meleeStat}
+        source={null}
+      />
     );
 
     expect(html).toContain("Attack DMG");
@@ -64,7 +68,7 @@ describe("BaselineStatsCard", () => {
           sourceNotes: null,
         }}
         source={null}
-      />,
+      />
     );
 
     expect(html).toContain("Head DMG");
@@ -106,7 +110,7 @@ describe("BaselineStatsCard", () => {
           versionLabel: "11.6.0",
           snapshotDate: "2026-08-20",
         }}
-      />,
+      />
     );
 
     expect(html).toContain("Current Handling");
@@ -117,5 +121,50 @@ describe("BaselineStatsCard", () => {
     expect(html).toContain("Airborne ADS Dispersion");
     expect(html).toContain("+120%");
     expect(html).toContain("relative changes");
+  });
+});
+
+describe("Season 12 body-shot health", () => {
+  it("uses 175/250/325 health when a ranged timing must be derived", () => {
+    const html = renderToStaticMarkup(
+      <BaselineStatsCard
+        weaponName="Health check"
+        source={null}
+        stat={{
+          ...meleeStat,
+          weaponType: undefined,
+          bodyDamage: 50,
+          rateOfFireRpm: 600,
+          stkLightBody: null,
+          stkMediumBody: null,
+          stkHeavyBody: null,
+          rawValues: null,
+        }}
+      />
+    );
+    expect(html).toContain("Light · 175 HP");
+    expect(html).toContain("Heavy · 325 HP");
+    expect(html).toContain("0.3s / 4 shots");
+    expect(html).toContain("0.6s / 7 shots");
+  });
+  it("does not invent uniform-fire timings for missing burst-source data", () => {
+    const html = renderToStaticMarkup(
+      <BaselineStatsCard
+        weaponName="93R"
+        source={null}
+        stat={{
+          ...meleeStat,
+          weaponType: undefined,
+          bodyDamage: 24,
+          rateOfFireRpm: 1000,
+          stkLightBody: 8,
+          stkMediumBody: 11,
+          stkHeavyBody: 14,
+          rawValues: JSON.stringify({ ttkUnavailable: true }),
+        }}
+      />
+    );
+    expect(html).toContain("— / 8 shots");
+    expect(html).not.toContain("0.42s");
   });
 });
