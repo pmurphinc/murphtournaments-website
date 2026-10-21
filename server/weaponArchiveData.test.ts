@@ -22,11 +22,11 @@ describe("weapon archive melee baseline data", () => {
   );
 
   it.each(["dual-blades", "riot-shield"])(
-    "marks %s as melee without manufacturing an alt row",
+    "includes sourced primary and secondary attacks for %s",
     async slug => {
       const detail = await getWeaponArchiveDetail(slug);
 
-      expect(detail?.baselineStats).toHaveLength(1);
+      expect(detail?.baselineStats).toHaveLength(2);
       expect(detail?.baselineStats[0]?.weaponType).toBe("melee");
     }
   );
@@ -102,16 +102,16 @@ describe("Update 11.3.0 archive data", () => {
   });
 
   it.each([
-    ["bfm-titan", 90, 135, 450],
+    ["bfm-titan", 95, 142.5, 475],
     ["famas", 24, 36, 648],
-    ["ks-23", 104, null, 624],
+    ["ks-23", 100, null, 600],
     ["spear", 82, null, null],
   ])(
-    "retains the official 11.3 %s damage values in the current baseline",
+    "returns the latest live %s damage while keeping its 11.3 history",
     async (slug, bodyDamage, headDamage, damagePerMagazine) => {
       const detail = await getWeaponArchiveDetail(slug);
 
-      expect(detail?.baselineSource?.versionLabel).toBe("11.6.0");
+      expect(detail?.baselineSource?.versionLabel).toBe("12.0.0");
       expect(detail?.baselineStats[0]).toMatchObject({
         bodyDamage,
         headDamage,
@@ -123,22 +123,46 @@ describe("Update 11.3.0 archive data", () => {
 
 describe("Update 11.6.0 archive data", () => {
   it.each([
-    ["lockbolt-heavy", "Reload animation shortened and ammo restock timing moved earlier"],
+    [
+      "lockbolt-heavy",
+      "Reload animation shortened and ammo restock timing moved earlier",
+    ],
     ["dematerializer-medium", "Cooldown reduced and item raise time removed"],
     ["evasive-dash-light", "Cooldown decreased from 6.5s to 6s per charge"],
-    ["guardian-turret-medium", "Faster activation, more health, and shorter remote-retrieve cooldown"],
+    [
+      "guardian-turret-medium",
+      "Faster activation, more health, and shorter remote-retrieve cooldown",
+    ],
     ["akm", "Damage increased from 20 to 21"],
     ["arn-220", "Fire rate increased and reload animations shortened"],
     ["bfm-titan", "Damage falloff multiplier increased from 0.65 to 0.7"],
-    ["cerberus-12ga", "Pellet damage increased from 8 to 9; full-shot damage increased from 104 to 117"],
-    ["dagger", "Primary and Backstab damage increased with longer lunge durations"],
+    [
+      "cerberus-12ga",
+      "Pellet damage increased from 8 to 9; full-shot damage increased from 104 to 117",
+    ],
+    [
+      "dagger",
+      "Primary and Backstab damage increased with longer lunge durations",
+    ],
     ["dual-blades", "Precision zone angle increased from 9° to 12°"],
-    ["ks-23", "Range reduced with lower falloff multiplier and shorter falloff ranges"],
+    [
+      "ks-23",
+      "Range reduced with lower falloff multiplier and shorter falloff ranges",
+    ],
     ["m11", "Recoil and ADS dispersion increased to reduce effective range"],
     ["recurve-bow", "Maximum-draw damage increased from 124 to 126"],
-    ["riot-shield", "Primary damage and Shield Bash damage increased; 5m lunge fix applied"],
-    ["spear", "Lunge reach, speed, sweep size, and Spin Attack sequence timing improved"],
-    ["xp-54", "Full-mag recoil curve fixed and airborne ADS dispersion reduced by 8%"],
+    [
+      "riot-shield",
+      "Primary damage and Shield Bash damage increased; 5m lunge fix applied",
+    ],
+    [
+      "spear",
+      "Lunge reach, speed, sweep size, and Spin Attack sequence timing improved",
+    ],
+    [
+      "xp-54",
+      "Full-mag recoil curve fixed and airborne ADS dispersion reduced by 8%",
+    ],
   ])("adds the official 11.6.0 history entry for %s", async (slug, summary) => {
     const detail = await getWeaponArchiveDetail(slug);
     const update = detail?.history.find(
@@ -176,7 +200,7 @@ describe("Update 11.6.0 archive data", () => {
 
   it("advances numeric baseline stats affected by 11.6", async () => {
     const akm = await getWeaponArchiveDetail("akm");
-    expect(akm?.baselineSource?.versionLabel).toBe("11.6.0");
+    expect(akm?.baselineSource?.versionLabel).toBe("12.0.0");
     expect(akm?.baselineStats[0]).toMatchObject({
       bodyDamage: 21,
       headDamage: 31.5,
@@ -201,9 +225,7 @@ describe("Update 11.6.0 archive data", () => {
 
     const dagger = await getWeaponArchiveDetail("dagger");
     expect(dagger?.baselineStats.map(stat => stat.bodyDamage)).toEqual([
-      70,
-      85,
-      340,
+      70, 90, 340,
     ]);
 
     const ks23 = await getWeaponArchiveDetail("ks-23");
@@ -224,10 +246,10 @@ describe("Update 11.6.0 archive data", () => {
 
     const riotShield = await getWeaponArchiveDetail("riot-shield");
     expect(riotShield?.baselineStats[0]).toMatchObject({
-      bodyDamage: 86,
+      bodyDamage: 90,
       stkLightBody: 2,
       stkMediumBody: 3,
-      stkHeavyBody: 5,
+      stkHeavyBody: 4,
     });
   });
 
@@ -235,8 +257,12 @@ describe("Update 11.6.0 archive data", () => {
     const m11 = await getWeaponArchiveDetail("m11");
     const xp54 = await getWeaponArchiveDetail("xp-54");
 
-    const m11Raw = JSON.parse(m11?.baselineStats[0]?.rawValues ?? "{}") as Record<string, string>;
-    const xp54Raw = JSON.parse(xp54?.baselineStats[0]?.rawValues ?? "{}") as Record<string, string>;
+    const m11Raw = JSON.parse(
+      m11?.baselineStats[0]?.rawValues ?? "{}"
+    ) as Record<string, string>;
+    const xp54Raw = JSON.parse(
+      xp54?.baselineStats[0]?.rawValues ?? "{}"
+    ) as Record<string, string>;
 
     expect(m11Raw).toMatchObject({
       handlingPatch: "11.6.0",
@@ -255,7 +281,10 @@ describe("Update 11.6.0 archive data", () => {
 
 describe("Respec Order 3.0 archive data", () => {
   it.each([
-    ["dagger", "Backstab base damage increased, while full backstab damage decreased"],
+    [
+      "dagger",
+      "Backstab base damage increased, while full backstab damage decreased",
+    ],
     ["lh1", "Damage falloff begins and ends at shorter ranges"],
     ["sword", "Primary base and precise-hit damage decreased"],
     ["cb-01-repeater", "Damage and ranged damage increased"],
@@ -268,28 +297,133 @@ describe("Respec Order 3.0 archive data", () => {
     ["lewis-gun", "Fire rate increased from 500 to 520 RPM"],
     ["m60", "Fire rate increased from 580 to 590 RPM"],
     ["mgl32", "Damage increased from 83 to 97"],
-  ])("adds the Cashout-only Respec Order history entry for %s", async (slug, summary) => {
-    const detail = await getWeaponArchiveDetail(slug);
-    const update = detail?.history.find(
-      entry => entry.patch.versionLabel === "11.10.0"
-    );
+  ])(
+    "adds the Cashout-only Respec Order history entry for %s",
+    async (slug, summary) => {
+      const detail = await getWeaponArchiveDetail(slug);
+      const update = detail?.history.find(
+        entry => entry.patch.versionLabel === "11.10.0"
+      );
 
-    expect(update?.patch).toMatchObject({
-      title: "Respec Order 3.0",
-      patchDate: "2026-09-16",
-      sourceUrl: "https://www.reachthefinals.com/patchnotes/s11-respec-order-3",
-    });
-    expect(update?.changes.map(change => change.changeSummary)).toContain(
-      summary
-    );
-  });
+      expect(update?.patch).toMatchObject({
+        title: "Respec Order 3.0",
+        patchDate: "2026-09-16",
+        sourceUrl:
+          "https://www.reachthefinals.com/patchnotes/s11-respec-order-3",
+      });
+      expect(update?.changes.map(change => change.changeSummary)).toContain(
+        summary
+      );
+    }
+  );
 
-  it("keeps normal-game baseline stats unchanged by the temporary test", async () => {
+  it("uses live Season 12 values instead of the old temporary test", async () => {
     const pike = await getWeaponArchiveDetail("pike-556");
     const bfr = await getWeaponArchiveDetail("bfm-titan");
 
-    expect(pike?.baselineSource?.versionLabel).toBe("11.6.0");
-    expect(pike?.baselineStats[0]?.bodyDamage).toBe(49);
-    expect(bfr?.baselineStats[0]?.bodyDamage).toBe(90);
+    expect(pike?.baselineSource?.versionLabel).toBe("12.0.0");
+    expect(pike?.baselineStats[0]?.bodyDamage).toBe(50);
+    expect(bfr?.baselineStats[0]?.bodyDamage).toBe(95);
+  });
+});
+
+describe("Season 12 live weapon stats", () => {
+  it.each([
+    ["bfr-titan", 95, 142.5],
+    ["cb-01-repeater", 88, 132],
+    ["chimera-xb", 47, 70.5],
+    ["ks-23", 100, null],
+    ["lh1", 40, 80],
+    ["mgl32", 97, null],
+    ["p90", 15, 22.5],
+    ["pike-556", 50, 87.5],
+    ["r357", 76, 152],
+    ["sr-84", 122, 244],
+    ["sword", 100, null],
+    ["dual-blades", 120, null],
+    ["riot-shield", 90, null],
+  ])(
+    "reconciles %s with Krome 12.0.0 and the official launch",
+    async (slug, bodyDamage, headDamage) => {
+      const detail = await getWeaponArchiveDetail(String(slug));
+      expect(detail?.baselineSource?.versionLabel).toBe("12.0.0");
+      expect(detail?.baselineStats[0]).toMatchObject({
+        bodyDamage,
+        headDamage,
+      });
+      expect(detail?.history[0].patch.versionLabel).toBe("12.0.0");
+    }
+  );
+
+  it("updates fire rate, magazine, falloff and derived magazine damage", async () => {
+    expect(
+      (await getWeaponArchiveDetail("m60"))?.baselineStats[0].rateOfFireRpm
+    ).toBe(600);
+    expect(
+      (await getWeaponArchiveDetail("lewis-gun"))?.baselineStats[0]
+        .rateOfFireRpm
+    ).toBe(520);
+    expect(
+      (await getWeaponArchiveDetail("xp-54"))?.baselineStats[0]
+    ).toMatchObject({
+      bodyDamage: 16,
+      magazineSize: 34,
+      damagePerMagazine: 544,
+    });
+    const lh1 = (await getWeaponArchiveDetail("lh1"))?.baselineStats[0];
+    expect(lh1).toMatchObject({
+      damageDropoffMinRange: 35,
+      damageDropoffMaxRange: 45,
+      damagePerMagazine: 600,
+      stkLightBody: 5,
+      stkHeavyBody: 9,
+    });
+    expect(JSON.parse(lh1?.rawValues ?? "{}").damageDropoffMinRange).toBe(
+      "35m"
+    );
+  });
+
+  it("keeps accurate primary and secondary melee profiles", async () => {
+    expect(
+      (await getWeaponArchiveDetail("dagger"))?.baselineStats.map(
+        s => s.bodyDamage
+      )
+    ).toEqual([70, 90, 340]);
+    expect(
+      (await getWeaponArchiveDetail("dual-blades"))?.baselineStats.map(
+        s => s.bodyDamage
+      )
+    ).toEqual([120, 155]);
+    expect(
+      (await getWeaponArchiveDetail("riot-shield"))?.baselineStats.map(
+        s => s.bodyDamage
+      )
+    ).toEqual([90, 50]);
+  });
+
+  it("covers every weapon and uses current archetype health for all body-shot counts", async () => {
+    const { listWeaponArchiveItems } = await import("./weaponArchiveData");
+    const list = await listWeaponArchiveItems({ category: "Weapon" });
+    expect(list).toHaveLength(38);
+    for (const item of list) {
+      const detail = await getWeaponArchiveDetail(item.slug);
+      expect(detail?.baselineStats.length).toBeGreaterThan(0);
+      for (const stat of detail!.baselineStats) {
+        if (!stat.bodyDamage) continue;
+        expect(stat.stkLightBody).toBe(Math.ceil(175 / stat.bodyDamage));
+        expect(stat.stkMediumBody).toBe(Math.ceil(250 / stat.bodyDamage));
+        expect(stat.stkHeavyBody).toBe(Math.ceil(325 / stat.bodyDamage));
+      }
+    }
+  });
+
+  it.each([
+    "true-sight-light",
+    "mimic-device-light",
+    "translocator-light",
+    "sonar-grenade-medium",
+  ])("includes %s and its launch history", async slug => {
+    const detail = await getWeaponArchiveDetail(slug);
+    expect(detail?.history[0].patch.versionLabel).toBe("12.0.0");
   });
 });

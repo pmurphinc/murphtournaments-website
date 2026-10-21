@@ -1,0 +1,20 @@
+[
+  {
+    "id": "patch_12_0_0",
+    "versionLabel": "12.0.0",
+    "title": "PRIME TIME \u2014 Season 12",
+    "patchDate": "2026-10-20",
+    "seasonLabel": "Season 12",
+    "sourceUrl": "https://www.reachthefinals.com/patchnotes/12-00",
+    "sourceType": "official"
+  },
+  {
+    "id": "patch_s12_hotfix_2026_10_21",
+    "versionLabel": "hotfix-2026-10-21",
+    "title": "October 21 Season 12 hotfix",
+    "patchDate": "2026-10-21",
+    "seasonLabel": "Season 12",
+    "sourceUrl": "https://www.reachthefinals.com/patchnotes/12-01",
+    "sourceType": "official"
+  }
+]

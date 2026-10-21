@@ -24,7 +24,7 @@ import {
 
 const DISCORD_URL = "https://discord.gg/kcmdxmBgnC";
 
-// Editorial summaries of Embark's PRIME TIME reveals, checked October 19, 2026.
+// Editorial summaries of Embark's PRIME TIME launch notes and Krome 12.0.0, checked October 21, 2026.
 const SEASON_12_HIGHLIGHTS = [
   {
     title: "The Infiltrator",
@@ -135,29 +135,51 @@ export default function Home() {
                       Season 12 · PRIME TIME
                     </span>
                     <span className="font-mono text-[10px] uppercase tracking-widest text-[var(--mt-muted)]">
-                      Season launch · October 20, 2026
+                      Update 12.0.0 · October 20, 2026
                     </span>
                   </div>
                   <h2 className="text-2xl font-black uppercase leading-tight text-[var(--mt-off-white)] sm:text-3xl">
-                    PRIME TIME: the Season 12 highlights
+                    PRIME TIME: Season 12 is here
                   </h2>
                   <p className="mt-3 text-sm leading-6 text-[var(--mt-muted)]">
                     Season 12 brings a new Light playstyle, a solo tournament
                     mode and a major evolution of the arenas and game show.
-                    Explore the PRIME TIME highlights below.
+                    Explore the launch highlights and current balance changes
+                    below.
                   </p>
                 </div>
                 <a
-                  href="https://www.reachthefinals.com/roadmap"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href="/patchnotes?version=12.0.0#patch-12-0-0"
                   className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-md bg-[var(--mt-gold)] px-5 font-mono text-xs font-black uppercase tracking-widest text-[var(--mt-gold-foreground)] transition hover:bg-[var(--mt-gold-bright)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mt-gold-bright)]"
                 >
-                  Official Season Roadmap
+                  Read the Launch Notes
                   <ArrowRight className="size-4" aria-hidden="true" />
                 </a>
               </div>
 
+              <p className="mt-5 text-sm leading-6 text-[var(--mt-muted)]">
+                Weapon stats now use Krome’s 12.0.0 data: CB-01 damage 88,
+                Pike-556 damage 50, LH1 damage 40 and M60 fire rate 600 RPM.
+                Body-shot comparisons use 175 / 250 / 325 HP.{" "}
+                <a
+                  href="/balance-archive"
+                  className="font-bold text-[var(--mt-gold-bright)] underline underline-offset-4"
+                >
+                  Explore the updated weapon archive
+                </a>
+                .
+              </p>
+              <p className="mt-3 text-sm leading-6 text-[var(--mt-muted)]">
+                October 21 hotfix: console stability, Turret targeting and
+                Grappling Hook fixes. No new damage changes are listed.{" "}
+                <a
+                  href="/patchnotes?version=hotfix-2026-10-21#patch-hotfix-2026-10-21"
+                  className="font-bold text-[var(--mt-gold-bright)] underline underline-offset-4"
+                >
+                  Read the hotfix and planned UI fixes
+                </a>
+                .
+              </p>
               <figure className="mx-auto mt-6 max-w-2xl">
                 <img
                   src="https://images.squarespace-cdn.com/content/62d66fa29e72c560f8efc020/dd9c2e22-0cff-42cd-a894-acf36ece3004/TF_S12_LIGHT_KA.png?format=1000w"
@@ -221,7 +243,7 @@ export default function Home() {
                 ))}
               </div>
               <p className="mt-6 border-t border-[var(--mt-steel-line)] pt-5 text-xs leading-5 text-[var(--mt-muted)]">
-                Highlights from Embark’s official PRIME TIME reveals. For
+                Highlights from Embark’s official Season 12 launch notes. For
                 detailed balance changes and update history,{" "}
                 <a
                   href="/patchnotes"

@@ -78,16 +78,22 @@ describe("patchNotes.getAll", () => {
     const caller = appRouter.createCaller(ctx);
     const result = await caller.patchNotes.getAll();
 
-    expect(result).toHaveLength(10);
-    expect(result[0]).toMatchObject({
-      id: -11140,
-      title: "Store Update 11.14.0",
-      date: "2026.10.15",
-      url: "https://www.reachthefinals.com/patchnotes/11-140",
-      version: "11.14.0",
+    expect(result).toHaveLength(12);
+    expect(result.find(note => note.version === "12.0.0")).toMatchObject({
+      id: -12000,
+      title: "PRIME TIME — Season 12 (12.0.0)",
+      date: "2026.10.20",
+      url: "https://www.reachthefinals.com/patchnotes/12-00",
+      version: "12.0.0",
     });
 
-    expect(result[0].content).toContain("no weapon, gadget, specialization");
+    expect(result.find(note => note.version === "12.0.0")?.content).toContain(
+      "M60: Fire rate 580 → 600 RPM"
+    );
+    expect(result[0].version).toBe("hotfix-2026-10-21");
+    expect(result[0].content).toContain(
+      "Still Planned — Not Part of This Hotfix"
+    );
     const retrospective = result.find(
       note => note.version === "respec-order-3-retrospective"
     );
@@ -201,11 +207,11 @@ describe("patchNotes.getAll", () => {
     const caller = appRouter.createCaller(ctx);
     const result = await caller.patchNotes.getAll();
 
-    expect(result).toHaveLength(8);
-    expect(result[0]).toMatchObject({
-      id: -11140,
-      title: "Store Update 11.14.0",
-      version: "11.14.0",
+    expect(result).toHaveLength(10);
+    expect(result.find(note => note.version === "12.0.0")).toMatchObject({
+      id: -12000,
+      title: "PRIME TIME — Season 12 (12.0.0)",
+      version: "12.0.0",
     });
   });
 
@@ -216,11 +222,11 @@ describe("patchNotes.getAll", () => {
     const caller = appRouter.createCaller(ctx);
     const result = await caller.patchNotes.getAll();
 
-    expect(result).toHaveLength(8);
-    expect(result[0]).toMatchObject({
-      id: -11140,
-      title: "Store Update 11.14.0",
-      version: "11.14.0",
+    expect(result).toHaveLength(10);
+    expect(result.find(note => note.version === "12.0.0")).toMatchObject({
+      id: -12000,
+      title: "PRIME TIME — Season 12 (12.0.0)",
+      version: "12.0.0",
     });
   });
 });

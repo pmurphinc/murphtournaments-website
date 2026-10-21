@@ -395,7 +395,7 @@
     "name": "Thermal Vision",
     "category": "Gadget",
     "class": "Light",
-    "description": "Thermal Vision gadget for Light build.",
+    "description": "Historical Light gadget. Season 12 introduces True Sight as a new Specialization; this entry preserves the older Thermal Vision archive.",
     "ammoSize": null,
     "damageProfile": null,
     "fireRate": null,
@@ -1324,5 +1324,57 @@
     "fireRate": null,
     "isActive": 1,
     "imageUrl": null
+  },
+  {
+    "id": "item_true_sight_light",
+    "slug": "true-sight-light",
+    "name": "True Sight",
+    "category": "Specialization",
+    "class": "Light",
+    "description": "Highlights enemies and deployables through smoke and reveals cloaked or disguised contestants.",
+    "ammoSize": null,
+    "damageProfile": null,
+    "fireRate": null,
+    "isActive": 1,
+    "imageUrl": "https://images.squarespace-cdn.com/content/62d66fa29e72c560f8efc020/dd9c2e22-0cff-42cd-a894-acf36ece3004/TF_S12_LIGHT_KA.png?format=500w"
+  },
+  {
+    "id": "item_mimic_device_light",
+    "slug": "mimic-device-light",
+    "name": "Mimic Device",
+    "category": "Gadget",
+    "class": "Light",
+    "description": "Disguise yourself as a scanned arena prop.",
+    "ammoSize": null,
+    "damageProfile": null,
+    "fireRate": null,
+    "isActive": 1,
+    "imageUrl": "https://images.squarespace-cdn.com/content/62d66fa29e72c560f8efc020/dd9c2e22-0cff-42cd-a894-acf36ece3004/TF_S12_LIGHT_KA.png?format=500w"
+  },
+  {
+    "id": "item_translocator_light",
+    "slug": "translocator-light",
+    "name": "Translocator",
+    "category": "Gadget",
+    "class": "Light",
+    "description": "Mark an arena object and exchange positions with it.",
+    "ammoSize": null,
+    "damageProfile": null,
+    "fireRate": null,
+    "isActive": 1,
+    "imageUrl": "https://images.squarespace-cdn.com/content/62d66fa29e72c560f8efc020/dd9c2e22-0cff-42cd-a894-acf36ece3004/TF_S12_LIGHT_KA.png?format=500w"
+  },
+  {
+    "id": "item_sonar_grenade_medium",
+    "slug": "sonar-grenade-medium",
+    "name": "Sonar Grenade",
+    "category": "Gadget",
+    "class": "Medium",
+    "description": "Medium now shares the Sonar Grenade with Light.",
+    "ammoSize": null,
+    "damageProfile": null,
+    "fireRate": null,
+    "isActive": 1,
+    "imageUrl": "/images/weapons/light/gadgets/sonar-grenade.png"
   }
 ]
