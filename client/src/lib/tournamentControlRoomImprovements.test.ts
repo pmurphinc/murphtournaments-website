@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
 import {
+  broadcastUrlSchema,
   storedMapIdSchema,
   userSelectedMapIdSchema,
 } from "../../../server/tournamentControl";
@@ -169,7 +170,27 @@ describe("Tournament Control Room improvements", () => {
     );
     expect(server).toContain("export const broadcastUrlSchema");
     expect(server).toContain('protocol === "http:" || protocol === "https:"');
-    expect(server).toContain("trimmed.length === 0 ? null : trimmed");
+    // Blank input clears the link.
+    expect(broadcastUrlSchema.parse("")).toBeNull();
+    expect(broadcastUrlSchema.parse("   ")).toBeNull();
+    // Scheme-less and protocol-relative input is stored as an absolute https
+    // URL so the viewer never renders it as a broken relative link.
+    expect(broadcastUrlSchema.parse("twitch.tv/murph")).toBe(
+      "https://twitch.tv/murph"
+    );
+    expect(broadcastUrlSchema.parse("//twitch.tv/murph")).toBe(
+      "https://twitch.tv/murph"
+    );
+    expect(broadcastUrlSchema.parse("https://twitch.tv/murph")).toBe(
+      "https://twitch.tv/murph"
+    );
+    // Only http(s) is accepted; script URLs must never reach the viewer.
+    expect(broadcastUrlSchema.safeParse("javascript:alert(1)").success).toBe(
+      false
+    );
+    expect(broadcastUrlSchema.safeParse("data:text/html,x").success).toBe(
+      false
+    );
     expect(server).toContain(
       "setBroadcastUrl: discordTournamentStaffProcedure"
     );
@@ -194,18 +215,34 @@ describe("Tournament Control Room improvements", () => {
       new URL("../pages/TournamentControlRoom.tsx", import.meta.url),
       "utf8"
     );
+    const lobbyNode = await readFile(
+      new URL("../components/tcr/TcrLobbyNode.tsx", import.meta.url),
+      "utf8"
+    );
 
+    // The broadcast dialog still lives on the page that owns dialog state.
     expect(controlRoom).toContain('dialogState?.type === "broadcast"');
-    expect(controlRoom).toContain('className="mb-3 space-y-2"');
-    expect(controlRoom).toContain(
-      'className="min-w-0 flex-1 rounded border border-[#FFD700]/30'
+
+    // The lobby card renders metadata as two stacked rows.
+    expect(lobbyNode).toContain('className="mb-3 space-y-2"');
+
+    // Row one: status pill and map picker share a line, the picker flexes and
+    // the pill stays fixed so they cannot overlap.
+    expect(lobbyNode).toContain('className="flex min-w-0 items-center gap-2"');
+    expect(lobbyNode).toContain("inline-flex shrink-0 items-center gap-1");
+    expect(lobbyNode).toContain("h-7 min-w-0 flex-1 rounded-md");
+
+    // Row two: the broadcast badge never wraps and the capacity summary is
+    // pushed to the opposite edge.
+    expect(lobbyNode).toContain(
+      'className="flex min-w-0 items-center justify-between gap-2"'
     );
-    expect(controlRoom).toContain(
-      'className="shrink-0 whitespace-nowrap rounded border border-cyan-300/30'
+    expect(lobbyNode).toContain(
+      "shrink-0 whitespace-nowrap rounded-md border border-cyan-300/30"
     );
-    expect(controlRoom).toContain("Broadcast Link Set");
-    expect(controlRoom).toContain(
-      'className="ml-auto shrink-0 font-mono text-[10px] uppercase tracking-widest text-white/35"'
+    expect(lobbyNode).toContain("Broadcast Link Set");
+    expect(lobbyNode).toContain(
+      'className="ml-auto shrink-0 text-[11px] text-zinc-500"'
     );
   });
 });
