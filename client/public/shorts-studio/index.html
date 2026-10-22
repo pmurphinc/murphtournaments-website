@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Podcast Shorts Studio</title>
+<meta name="description" content="A personal tool for turning licensed footage into short vertical videos and publishing them on a schedule.">
+<style>
+  :root {
+    --bg: #ffffff; --text: #16191d; --muted: #5b6471;
+    --line: #e3e6ea; --accent: #1d4ed8; --panel: #f6f7f9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0e1116; --text: #e6e9ee; --muted: #9aa4b2;
+      --line: #242a33; --accent: #7aa2ff; --panel: #151a21;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e1116; --text: #e6e9ee; --muted: #9aa4b2;
+    --line: #242a33; --accent: #7aa2ff; --panel: #151a21;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  main { max-width: 44rem; margin: 0 auto; padding: 72px 16px 96px; }
+  h1 { font-size: 2.1rem; line-height: 1.15; margin: 0 0 .3em; letter-spacing: -.015em; }
+  h2 { font-size: 1.15rem; margin: 2.4em 0 .6em; letter-spacing: -.005em; }
+  .lede { color: var(--muted); font-size: 1.1rem; margin: 0 0 2em; }
+  ul { padding-left: 1.25rem; } li { margin: .4em 0; }
+  a { color: var(--accent); }
+  .steps { list-style: none; padding: 0; margin: 1.2em 0; counter-reset: s; }
+  .steps li {
+    counter-increment: s; position: relative; padding: .55em 0 .55em 2.4rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .steps li:last-child { border-bottom: 0; }
+  .steps li::before {
+    content: counter(s); position: absolute; left: 0; top: .5em;
+    width: 1.6rem; height: 1.6rem; border-radius: 50%;
+    background: var(--panel); border: 1px solid var(--line);
+    display: grid; place-items: center; font-size: .8rem; color: var(--muted);
+  }
+  .note {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 1rem 1.1rem; margin: 2em 0; color: var(--muted);
+  }
+  footer {
+    margin-top: 3.5em; padding-top: 1.3em; border-top: 1px solid var(--line);
+    color: var(--muted); font-size: .92rem;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Podcast Shorts Studio</h1>
+  <p class="lede">A personal tool that turns footage you already hold into short vertical videos,
+  and publishes them to your own channels on a schedule.</p>
+
+  <p>It runs on one computer — the owner's. There is no hosted service and no account to create.
+  It was built for one person to run their own channels, and that is all it does.</p>
+
+  <h2>How it works</h2>
+  <ol class="steps">
+    <li>Point it at footage you have the right to use — a folder of clips, or a shared folder from
+      the creator who made them.</li>
+    <li>It transcribes each clip locally and renders a vertical version, with captions burned in
+      where they belong.</li>
+    <li>You review what it proposes and approve or reject it, with a reason. Nothing is published
+      that you have not seen.</li>
+    <li>Approved clips go out on a daily schedule to the channels you connected.</li>
+    <li>It reads back views, likes and comments so you can see how each one did.</li>
+  </ol>
+
+  <h2>What it will not do</h2>
+  <ul>
+    <li>Download video from YouTube, TikTok or any platform through unofficial means.</li>
+    <li>Publish anything you have not authorised, from a source whose rights you have not recorded.</li>
+    <li>Send your footage, transcripts or credentials anywhere except the platform you are
+      publishing to.</li>
+    <li>Claim a licence to share clips is also a licence to monetise them. Those are tracked
+      separately and never conflated.</li>
+  </ul>
+
+  <div class="note">
+    Every clip is tied to a recorded authorisation before it can be processed, and again before it
+    can be published. A licence that lapses stops production, not just posting.
+  </div>
+
+  <h2>Connected accounts</h2>
+  <p>It connects to YouTube, Instagram and TikTok only when you authorise it, and only to publish to
+  accounts you own. Access tokens are encrypted on your own computer. You can disconnect any
+  account at any time, which revokes the grant and deletes the stored token.</p>
+
+  <footer>
+    <a href="privacy.html">Privacy policy</a> &middot;
+    <a href="mailto:signalsplice@gmail.com">signalsplice@gmail.com</a>
+  </footer>
+</main>
+</body>
+</html>

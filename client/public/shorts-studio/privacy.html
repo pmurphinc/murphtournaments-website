@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy — Podcast Shorts Studio</title>
+<meta name="description" content="What Podcast Shorts Studio stores, what it sends, and to whom.">
+<style>
+  :root {
+    --bg: #ffffff; --text: #16191d; --muted: #5b6471;
+    --line: #e3e6ea; --accent: #1d4ed8;
+  }
+  :root:not([data-theme="light"]) { }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0e1116; --text: #e6e9ee; --muted: #9aa4b2;
+      --line: #242a33; --accent: #7aa2ff;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e1116; --text: #e6e9ee; --muted: #9aa4b2;
+    --line: #242a33; --accent: #7aa2ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  main { max-width: 42rem; margin: 0 auto; padding: 56px 16px 96px; }
+  h1 { font-size: 1.9rem; line-height: 1.2; margin: 0 0 .35em; letter-spacing: -.01em; }
+  h2 { font-size: 1.15rem; margin: 2.2em 0 .6em; letter-spacing: -.005em; }
+  p, li { color: var(--text); }
+  .lede { color: var(--muted); font-size: 1.05rem; margin-top: 0; }
+  .updated { color: var(--muted); font-size: .9rem; margin-top: 2.5em; padding-top: 1.2em; border-top: 1px solid var(--line); }
+  ul { padding-left: 1.25rem; }
+  li { margin: .35em 0; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em;
+         background: color-mix(in srgb, var(--text) 7%, transparent); padding: .1em .35em; border-radius: 4px; }
+  a { color: var(--accent); }
+  .callout { border-left: 3px solid var(--accent); padding: .1em 0 .1em 1rem; margin: 1.5em 0; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Privacy Policy</h1>
+  <p class="lede">Podcast Shorts Studio is a personal tool that runs on its operator's own computer
+  and publishes short videos to that operator's own accounts. It has no users other than the
+  person who installed it.</p>
+
+  <h2>What this software is</h2>
+  <p>Podcast Shorts Studio prepares short vertical videos from footage its operator already holds,
+  and uploads them to social accounts that the same operator owns. It runs entirely on a personal
+  computer. There is no hosted service, no shared server, and no account to sign up for.</p>
+
+  <div class="callout">
+    Because it is installed and run by one person on their own machine, the only data it handles is
+    that person's own. It does not collect information about anyone else.
+  </div>
+
+  <h2>What it stores, and where</h2>
+  <p>Everything is stored on the computer it runs on. Nothing is stored anywhere else.</p>
+  <ul>
+    <li><strong>Video files</strong> the operator supplied, and the vertical versions made from them.</li>
+    <li><strong>Transcripts</strong> produced locally by speech recognition, used for captions and titles.</li>
+    <li><strong>Access tokens</strong> for the accounts the operator connected, encrypted on disk.</li>
+    <li><strong>A record of what was published</strong>: titles, descriptions, timestamps, and the
+      view and like counts the platforms report back.</li>
+  </ul>
+
+  <h2>What it sends, and to whom</h2>
+  <p>It contacts only the services the operator connected it to, and only to do what they asked:</p>
+  <ul>
+    <li><strong>YouTube and Google</strong> — to upload a video to the operator's own channel, to
+      read back how it performed, and to correct a title or description afterwards.</li>
+    <li><strong>Instagram and Facebook (Meta)</strong> — to publish a Reel to the operator's own
+      professional account and read its metrics.</li>
+    <li><strong>TikTok</strong> — only if the operator connects it; otherwise the software prepares
+      a file to upload by hand and contacts TikTok not at all.</li>
+    <li><strong>Google Drive</strong> — only to read a folder the operator pointed it at.</li>
+  </ul>
+  <p>No analytics service, advertising network, error-reporting service or third-party backend is
+  used. There is nowhere for data to go that the operator did not choose.</p>
+
+  <h2>Hosting a clip for Instagram</h2>
+  <p>Instagram does not accept a file upload; it fetches the video from a web address. To publish
+  there, the software uploads the clip to a storage bucket belonging to the operator, under a
+  random unguessable name, and deletes it immediately afterwards &mdash; whether publishing
+  succeeded or failed. For the seconds in between, that one file is readable by anyone holding the
+  exact link. No other platform requires this and no other file is ever exposed.</p>
+
+  <h2>Google user data</h2>
+  <p>The software requests only the access it needs to do its job on the operator's own channel:
+  permission to upload a video, to read the channel's own data back, and to edit or remove a video
+  it published. Google offers nothing narrower for editing, so that permission also allows
+  deletion; the software never deletes anything unless explicitly instructed to, and records it
+  when it does.</p>
+  <p>Google data obtained this way is used only to publish and manage the operator's own videos. It
+  is never sold, never shared with anyone, never used for advertising, and never used to train any
+  model. Tokens are stored encrypted on the operator's computer and nowhere else.</p>
+  <p>Access can be withdrawn at any time by disconnecting the account inside the software, which
+  revokes the grant and deletes the stored token, or from
+  <a href="https://myaccount.google.com/permissions">Google Account permissions</a>.</p>
+
+  <h2>Keeping and deleting data</h2>
+  <p>Files and records stay on the operator's computer until the operator removes them. Deleting
+  the application's data folder removes everything it holds. Videos already published to a platform
+  live under that platform's own terms and must be removed there.</p>
+
+  <h2>Children</h2>
+  <p>This is a tool for publishing a person's own video work. It is not directed at children and
+  collects nothing from them.</p>
+
+  <h2>Changes</h2>
+  <p>If what the software does with data changes, this page changes with it.</p>
+
+  <h2>Contact</h2>
+  <p>Questions about this policy: <a href="mailto:signalsplice@gmail.com">signalsplice@gmail.com</a></p>
+
+  <p class="updated">Last updated 22 October 2026.</p>
+</main>
+</body>
+</html>
