@@ -94,6 +94,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import TcrTopBar from "@/components/tcr/TcrTopBar";
+import TcrConnectorLegend from "@/components/tcr/TcrConnectorLegend";
 import TcrToolbar from "@/components/tcr/TcrToolbar";
 import TcrTeamsPanel from "@/components/tcr/TcrTeamsPanel";
 import TcrInspector, {
@@ -1876,8 +1877,23 @@ export default function TournamentControlRoom({
     );
   }
   if (query.isLoading)
-    return <ControlState title="Verifying Discord organizer roles…" />;
+    return (
+      <ControlState
+        title={
+          isPersonalTcr
+            ? "Opening your Control Room…"
+            : "Verifying Discord organizer roles…"
+        }
+      />
+    );
   if (query.error) {
+    // Personal /TCR has no Discord role requirement, so the staff-only role
+    // wording below must not be shown to those users: an owner who hits the
+    // alpha gate or a permission error would otherwise be told to obtain a
+    // "Tournament Control role" that does not apply to them.
+    const fallbackErrorTitle = isPersonalTcr
+      ? "Control Room unavailable"
+      : "Tournament Control role required";
     return (
       <ControlState
         title={
@@ -1885,7 +1901,9 @@ export default function TournamentControlRoom({
             ? "Discord role configuration error"
             : query.error.message.includes("Unable to verify")
               ? "Discord service verification failed"
-              : "Tournament Control role required"
+              : query.error.message.includes("alpha testers")
+                ? "Alpha access required"
+                : fallbackErrorTitle
         }
         description={getSafeTournamentControlErrorMessage(query.error.message)}
       />
@@ -3291,6 +3309,8 @@ export default function TournamentControlRoom({
                 ))}
               </ContextMenuContent>
             </ContextMenu>
+
+            <TcrConnectorLegend />
 
             {mobileDockOpen && (
               <div

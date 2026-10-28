@@ -77,7 +77,10 @@ describe("TCR game mode configuration", () => {
     const journal = JSON.parse(
       readFileSync("drizzle/meta/_journal.json", "utf8")
     ) as { entries: Array<{ idx: number; tag: string }> };
-    expect(journal.entries.at(-1)).toEqual(
+    // Assert the migration is registered, not that it is the most recent
+    // one: pinning it to the tail of the journal made this test fail for
+    // every unrelated migration added afterwards.
+    expect(journal.entries).toContainEqual(
       expect.objectContaining({ idx: 33, tag: "0033_add_tcr_game_modes" })
     );
 

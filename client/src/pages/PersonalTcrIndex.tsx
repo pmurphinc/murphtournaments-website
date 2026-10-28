@@ -157,7 +157,14 @@ export default function PersonalTcrIndex() {
   if (query.error)
     return (
       <State
-        title="TCR unavailable"
+        // /TCR is the page an announcement links to, so the alpha gate is
+        // the error a brand-new visitor is most likely to hit: name it
+        // instead of reporting it as an outage.
+        title={
+          query.error.message.includes("alpha testers")
+            ? "Alpha access required"
+            : "TCR unavailable"
+        }
         description={getSafeTournamentControlErrorMessage(query.error.message)}
       />
     );
@@ -273,199 +280,209 @@ export default function PersonalTcrIndex() {
                     isFinished ? "opacity-75" : ""
                   }`}
                 >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <CreatorAvatar owner={tournament.owner} />
-                    <h2 className="min-w-0 font-mono text-xl font-bold text-[var(--mt-gold-bright)]">
-                      <Link
-                        href={`/TCR/${tournament.id}`}
-                        className="rounded outline-none transition hover:text-[var(--mt-gold-bright)] hover:underline focus-visible:ring-2 focus-visible:ring-[var(--mt-gold-bright)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--mt-charcoal)]"
-                      >
-                        {tournament.name}
-                      </Link>
-                    </h2>
-                  </div>
-                  <span className="shrink-0 rounded-full border border-[var(--mt-gold)]/40 px-3 py-1 font-mono text-xs uppercase text-[var(--mt-gold-bright)]/90">
-                    {tournament.staffRole === "collaborator"
-                      ? "Collaborator"
-                      : "Owner"}
-                  </span>
-                </div>
-                <p className="mt-2 text-sm text-[var(--mt-muted)]">
-                  {tournament.eventStatus === "live" && (
-                    <span
-                      className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400 align-middle"
-                      aria-hidden
-                    />
-                  )}
-                  {tournament.eventStatus} · {tournament.currentStage}
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2 text-xs font-mono uppercase">
-                  <span className="rounded-full border border-[var(--mt-steel-line)] px-3 py-1 text-[var(--mt-muted)]">
-                    {tournament.visibility}
-                  </span>
-                  <span className="rounded-full border border-[var(--mt-steel-line)] px-3 py-1 text-[var(--mt-muted)]">
-                    {tournament.publishedAt ? "Published" : "Unpublished"}
-                  </span>
-                  <span
-                    className={`rounded-full border px-3 py-1 ${
-                      tournament.registrationOpen === 1
-                        ? "border-emerald-400/40 text-emerald-200"
-                        : "border-[var(--mt-steel-line)] text-[var(--mt-muted)]"
-                    }`}
-                  >
-                    Registration{" "}
-                    {tournament.registrationOpen === 1 ? "open" : "closed"}
-                  </span>
-                  {pendingCount > 0 && (
-                    <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-3 py-1 text-amber-200">
-                      {pendingCount} pending approval
-                      {pendingCount === 1 ? "" : "s"}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <CreatorAvatar owner={tournament.owner} />
+                      <h2 className="min-w-0 font-mono text-xl font-bold text-[var(--mt-gold-bright)]">
+                        <Link
+                          href={`/TCR/${tournament.id}`}
+                          className="rounded outline-none transition hover:text-[var(--mt-gold-bright)] hover:underline focus-visible:ring-2 focus-visible:ring-[var(--mt-gold-bright)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--mt-charcoal)]"
+                        >
+                          {tournament.name}
+                        </Link>
+                      </h2>
+                    </div>
+                    <span className="shrink-0 rounded-full border border-[var(--mt-gold)]/40 px-3 py-1 font-mono text-xs uppercase text-[var(--mt-gold-bright)]/90">
+                      {tournament.staffRole === "collaborator"
+                        ? "Collaborator"
+                        : "Owner"}
                     </span>
-                  )}
-                </div>
-                {tournament.eventNote && (
-                  <p className="mt-3 line-clamp-2 text-sm text-[var(--mt-muted)]">
-                    {tournament.eventNote}
+                  </div>
+                  <p className="mt-2 text-sm text-[var(--mt-muted)]">
+                    {tournament.eventStatus === "live" && (
+                      <span
+                        className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400 align-middle"
+                        aria-hidden
+                      />
+                    )}
+                    {tournament.eventStatus} · {tournament.currentStage}
                   </p>
-                )}
-                <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[var(--mt-steel-line)]/60 pt-4">
-                  <Button asChild className={goldButtonClass}>
-                    <Link href={`/TCR/${tournament.id}`}>
-                      Open Control Room
-                    </Link>
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" className={outlineButtonClass}>
-                        Share
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className={menuContentClass}>
-                      <DropdownMenuLabel className={menuLabelClass}>
-                        Copy link
-                      </DropdownMenuLabel>
-                      <DropdownMenuItem
-                        className={menuItemClass}
-                        onSelect={() => {
-                          void utils.personalTcr.getPrivateInviteLink
-                            .fetch({ tournamentId: tournament.id })
-                            .then(data => copyText(data.url));
-                        }}
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs font-mono uppercase">
+                    <span className="rounded-full border border-[var(--mt-steel-line)] px-3 py-1 text-[var(--mt-muted)]">
+                      {tournament.visibility}
+                    </span>
+                    <span className="rounded-full border border-[var(--mt-steel-line)] px-3 py-1 text-[var(--mt-muted)]">
+                      {tournament.publishedAt ? "Published" : "Unpublished"}
+                    </span>
+                    <span
+                      className={`rounded-full border px-3 py-1 ${
+                        tournament.registrationOpen === 1
+                          ? "border-emerald-400/40 text-emerald-200"
+                          : "border-[var(--mt-steel-line)] text-[var(--mt-muted)]"
+                      }`}
+                    >
+                      Registration{" "}
+                      {tournament.registrationOpen === 1 ? "open" : "closed"}
+                    </span>
+                    {pendingCount > 0 && (
+                      <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-3 py-1 text-amber-200">
+                        {pendingCount} pending approval
+                        {pendingCount === 1 ? "" : "s"}
+                      </span>
+                    )}
+                  </div>
+                  {tournament.eventNote && (
+                    <p className="mt-3 line-clamp-2 text-sm text-[var(--mt-muted)]">
+                      {tournament.eventNote}
+                    </p>
+                  )}
+                  <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[var(--mt-steel-line)]/60 pt-4">
+                    <Button asChild className={goldButtonClass}>
+                      <Link href={`/TCR/${tournament.id}`}>
+                        Open Control Room
+                      </Link>
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={outlineButtonClass}
+                        >
+                          Share
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        align="start"
+                        className={menuContentClass}
                       >
-                        Invite link
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className={menuItemClass}
-                        onSelect={() =>
-                          viewerLink.mutate(
-                            { tournamentId: tournament.id },
-                            { onSuccess: data => void copyText(data.url) }
-                          )
-                        }
-                      >
-                        Viewer link
-                      </DropdownMenuItem>
-                      {publicUrl && (
+                        <DropdownMenuLabel className={menuLabelClass}>
+                          Copy link
+                        </DropdownMenuLabel>
                         <DropdownMenuItem
                           className={menuItemClass}
-                          onSelect={() => void copyText(publicUrl)}
+                          onSelect={() => {
+                            void utils.personalTcr.getPrivateInviteLink
+                              .fetch({ tournamentId: tournament.id })
+                              .then(data => copyText(data.url));
+                          }}
                         >
-                          Public link
+                          Invite link
                         </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="outline"
-                        aria-label={`Manage ${tournament.name}`}
-                        className={`${outlineButtonClass} px-3`}
-                      >
-                        ⋯
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className={menuContentClass}>
-                      <DropdownMenuLabel className={menuLabelClass}>
-                        Registration
-                      </DropdownMenuLabel>
-                      <DropdownMenuItem
-                        className={menuItemClass}
-                        onSelect={() =>
-                          toggleRegistration.mutate({
-                            tournamentId: tournament.id,
-                            registrationOpen: tournament.registrationOpen !== 1,
-                          })
-                        }
-                      >
-                        {tournament.registrationOpen === 1
-                          ? "Close registration"
-                          : "Open registration"}
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator className="bg-[var(--mt-steel-line)]" />
-                      <DropdownMenuLabel className={menuLabelClass}>
-                        Visibility
-                      </DropdownMenuLabel>
-                      <DropdownMenuItem
-                        className={menuItemClass}
-                        onSelect={() =>
-                          setTournamentVisibility.mutate({
-                            tournamentId: tournament.id,
-                            visibility:
-                              tournament.visibility === "public"
-                                ? "private"
-                                : "public",
-                          })
-                        }
-                      >
-                        Make{" "}
-                        {tournament.visibility === "public"
-                          ? "private"
-                          : "public"}
-                      </DropdownMenuItem>
-                      {tournament.visibility === "public" && (
                         <DropdownMenuItem
                           className={menuItemClass}
                           onSelect={() =>
-                            publishTournament.mutate({
-                              tournamentId: tournament.id,
-                              publish: !tournament.publishedAt,
-                            })
+                            viewerLink.mutate(
+                              { tournamentId: tournament.id },
+                              { onSuccess: data => void copyText(data.url) }
+                            )
                           }
                         >
-                          {tournament.publishedAt ? "Unpublish" : "Publish"}
+                          Viewer link
                         </DropdownMenuItem>
-                      )}
-                      <DropdownMenuSeparator className="bg-[var(--mt-steel-line)]" />
-                      <DropdownMenuItem
-                        className={menuItemClass}
-                        onSelect={() => {
-                          setRenameTarget({
-                            id: tournament.id,
-                            name: tournament.name,
-                          });
-                          setRenameValue(tournament.name);
-                        }}
+                        {publicUrl && (
+                          <DropdownMenuItem
+                            className={menuItemClass}
+                            onSelect={() => void copyText(publicUrl)}
+                          >
+                            Public link
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="outline"
+                          aria-label={`Manage ${tournament.name}`}
+                          className={`${outlineButtonClass} px-3`}
+                        >
+                          ⋯
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        align="start"
+                        className={menuContentClass}
                       >
-                        Rename
-                      </DropdownMenuItem>
-                      {tournament.staffRole !== "collaborator" && (
+                        <DropdownMenuLabel className={menuLabelClass}>
+                          Registration
+                        </DropdownMenuLabel>
                         <DropdownMenuItem
-                          className="cursor-pointer text-red-300 focus:bg-red-500/15 focus:text-red-200"
+                          className={menuItemClass}
                           onSelect={() =>
-                            window.confirm(`Delete ${tournament.name}?`) &&
-                            deleteTournament.mutate({
+                            toggleRegistration.mutate({
                               tournamentId: tournament.id,
+                              registrationOpen:
+                                tournament.registrationOpen !== 1,
                             })
                           }
                         >
-                          Delete
+                          {tournament.registrationOpen === 1
+                            ? "Close registration"
+                            : "Open registration"}
                         </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+                        <DropdownMenuSeparator className="bg-[var(--mt-steel-line)]" />
+                        <DropdownMenuLabel className={menuLabelClass}>
+                          Visibility
+                        </DropdownMenuLabel>
+                        <DropdownMenuItem
+                          className={menuItemClass}
+                          onSelect={() =>
+                            setTournamentVisibility.mutate({
+                              tournamentId: tournament.id,
+                              visibility:
+                                tournament.visibility === "public"
+                                  ? "private"
+                                  : "public",
+                            })
+                          }
+                        >
+                          Make{" "}
+                          {tournament.visibility === "public"
+                            ? "private"
+                            : "public"}
+                        </DropdownMenuItem>
+                        {tournament.visibility === "public" && (
+                          <DropdownMenuItem
+                            className={menuItemClass}
+                            onSelect={() =>
+                              publishTournament.mutate({
+                                tournamentId: tournament.id,
+                                publish: !tournament.publishedAt,
+                              })
+                            }
+                          >
+                            {tournament.publishedAt ? "Unpublish" : "Publish"}
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator className="bg-[var(--mt-steel-line)]" />
+                        <DropdownMenuItem
+                          className={menuItemClass}
+                          onSelect={() => {
+                            setRenameTarget({
+                              id: tournament.id,
+                              name: tournament.name,
+                            });
+                            setRenameValue(tournament.name);
+                          }}
+                        >
+                          Rename
+                        </DropdownMenuItem>
+                        {tournament.staffRole !== "collaborator" && (
+                          <DropdownMenuItem
+                            className="cursor-pointer text-red-300 focus:bg-red-500/15 focus:text-red-200"
+                            onSelect={() =>
+                              window.confirm(`Delete ${tournament.name}?`) &&
+                              deleteTournament.mutate({
+                                tournamentId: tournament.id,
+                              })
+                            }
+                          >
+                            Delete
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
               </Fragment>
             );

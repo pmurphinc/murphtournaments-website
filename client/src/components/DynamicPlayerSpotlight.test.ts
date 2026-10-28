@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { calculateCurrentWeek } from './DynamicPlayerSpotlight';
 
 /**
  * Unit tests for DynamicPlayerSpotlight weekly rotation logic
@@ -72,35 +73,6 @@ const mockSpotlightData = {
 };
 
 // Helper function to calculate current week (extracted from component logic)
-function calculateCurrentWeek(today: Date, weeks: typeof mockSpotlightData.weeks) {
-  const normalizedToday = new Date(today);
-  normalizedToday.setHours(0, 0, 0, 0);
-
-  let activeWeek = weeks[0]; // Default to first week until the rotation starts
-
-  for (let i = 0; i < weeks.length; i++) {
-    const weekStartDate = new Date(weeks[i].startDate);
-    weekStartDate.setHours(0, 0, 0, 0);
-
-    if (normalizedToday >= weekStartDate) {
-      if (i + 1 < weeks.length) {
-        const nextWeekStartDate = new Date(weeks[i + 1].startDate);
-        nextWeekStartDate.setHours(0, 0, 0, 0);
-
-        if (normalizedToday < nextWeekStartDate) {
-          activeWeek = weeks[i];
-          break;
-        }
-      } else {
-        activeWeek = weeks[i];
-        break;
-      }
-    }
-  }
-
-  return activeWeek;
-}
-
 describe('DynamicPlayerSpotlight - Weekly Rotation Logic', () => {
   beforeEach(() => {
     vi.clearAllMocks();

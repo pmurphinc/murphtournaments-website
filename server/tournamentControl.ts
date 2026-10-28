@@ -451,46 +451,68 @@ export const storedMapIdSchema = z
     "Stored map must be a known Finals map"
   );
 
-const boardSnapshotSchema = z.object({
+/**
+ * Upper bounds for a restored board snapshot.
+ *
+ * The undo payload is the largest client-supplied body the control room
+ * sends, and express accepts up to 50mb. Without a cap at the schema edge
+ * every element of an oversized array is validated before the handler's
+ * own limit check runs, so the bounds are applied here, during parsing.
+ * They are deliberately generous: a board is capped at
+ * gameNodesPerTournament lobbies (the same limit the restore handler
+ * enforces), each lobby seats at most 4 teams, and each lobby needs only a
+ * winner and a loser edge, so 4x and 8x leave ample headroom.
+ */
+const maxSnapshotGames = PERSONAL_TCR_LIMITS.gameNodesPerTournament;
+const maxSnapshotAssignments = maxSnapshotGames * 4;
+const maxSnapshotConnections = maxSnapshotGames * 8;
+
+export const boardSnapshotSchema = z.object({
   tournament: z.object({ name: z.string().trim().min(2).max(255) }).optional(),
   expectedRevision: z.number().int().min(0),
-  games: z.array(
-    z.object({
-      id: idSchema,
-      tournamentId: idSchema,
-      gameType: z.enum(tournamentGameTypes),
-      status: z.enum(tournamentGameStatuses),
-      displayLabel: labelSchema,
-      canvasX: z.number().int().min(-10000).max(10000),
-      canvasY: z.number().int().min(-10000).max(10000),
-      privateLobbyCode: z.string().trim().max(64).nullable().optional(),
-      seriesBestOf: seriesBestOfSchema.optional(),
-      mapId: storedMapIdSchema.optional(),
-      broadcastUrl: broadcastUrlSchema.optional(),
-      roundGroupId: z.string().trim().max(64).nullable().optional(),
-      roundLabel: z.string().trim().max(80).nullable().optional(),
-      roundColor: z.string().trim().max(24).nullable().optional(),
-      roundLocked: z.number().int().min(0).max(1).optional(),
-    })
-  ),
-  assignments: z.array(
-    z.object({
-      id: idSchema,
-      gameId: idSchema,
-      teamId: idSchema,
-      slotIndex: z.number().int().positive(),
-      resultPlacement: resultPlacementSchema.optional(),
-    })
-  ),
-  connections: z.array(
-    z.object({
-      id: idSchema,
-      tournamentId: idSchema,
-      sourceGameId: idSchema,
-      targetGameId: idSchema,
-      flowType: connectionFlowTypeSchema,
-    })
-  ),
+  games: z
+    .array(
+      z.object({
+        id: idSchema,
+        tournamentId: idSchema,
+        gameType: z.enum(tournamentGameTypes),
+        status: z.enum(tournamentGameStatuses),
+        displayLabel: labelSchema,
+        canvasX: z.number().int().min(-10000).max(10000),
+        canvasY: z.number().int().min(-10000).max(10000),
+        privateLobbyCode: z.string().trim().max(64).nullable().optional(),
+        seriesBestOf: seriesBestOfSchema.optional(),
+        mapId: storedMapIdSchema.optional(),
+        broadcastUrl: broadcastUrlSchema.optional(),
+        roundGroupId: z.string().trim().max(64).nullable().optional(),
+        roundLabel: z.string().trim().max(80).nullable().optional(),
+        roundColor: z.string().trim().max(24).nullable().optional(),
+        roundLocked: z.number().int().min(0).max(1).optional(),
+      })
+    )
+    .max(maxSnapshotGames),
+  assignments: z
+    .array(
+      z.object({
+        id: idSchema,
+        gameId: idSchema,
+        teamId: idSchema,
+        slotIndex: z.number().int().positive(),
+        resultPlacement: resultPlacementSchema.optional(),
+      })
+    )
+    .max(maxSnapshotAssignments),
+  connections: z
+    .array(
+      z.object({
+        id: idSchema,
+        tournamentId: idSchema,
+        sourceGameId: idSchema,
+        targetGameId: idSchema,
+        flowType: connectionFlowTypeSchema,
+      })
+    )
+    .max(maxSnapshotConnections),
 });
 
 function isRecord(value: unknown): value is Record<string, unknown> {
