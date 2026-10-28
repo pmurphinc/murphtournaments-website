@@ -60,14 +60,43 @@ describe("Tournament Control Room improvements", () => {
       "async function saveTemplateFromTournament"
     );
     const viewerCode = server.slice(viewerStart, viewerEnd);
-    expect(viewerCode).toContain("teams: data.teams.map(team =>");
-    expect(viewerCode).toContain("frp: team.frp");
+    expect(viewerCode).toContain("frp: teams.frp");
     expect(viewerCode).toContain("seriesBestOf");
     expect(viewerCode).toContain("mapId");
     expect(viewerCode).toContain("broadcastUrl");
     expect(viewerCode).not.toContain("privateLobbyCode");
     expect(viewerCode).not.toContain("captainDiscordId");
     expect(viewerCode).not.toContain("captainUserId");
+    expect(viewerCode).not.toContain("captainDiscordOpenId");
+  });
+
+  it("builds the viewer board without touching the captain tables", async () => {
+    // The public viewer used to project the full staff board down, which
+    // meant joining managed_teams and users to resolve each team's captain
+    // and carrying their Discord open ids to an unauthenticated endpoint
+    // before discarding them. Selecting the viewer's own columns keeps that
+    // data out of the query entirely.
+    const server = await readFile(
+      new URL("../../../server/tournamentControl.ts", import.meta.url),
+      "utf8"
+    );
+    const start = server.indexOf("async function fetchViewerBoard");
+    expect(start).toBeGreaterThan(-1);
+    const body = server.slice(
+      start,
+      server.indexOf("async function", start + 1)
+    );
+    expect(body).not.toContain("managedTeams");
+    expect(body).not.toContain("leftJoin");
+    expect(body).not.toContain("fetchTournamentRows");
+  });
+
+  it("does not hand the viewer the staff board", async () => {
+    const server = await readFile(
+      new URL("../../../server/tournamentControl.ts", import.meta.url),
+      "utf8"
+    );
+    expect(server).toContain("return fetchViewerBoard(db, link.tournamentId)");
   });
 
   it("manual team claim links are token-hashed, single-use, expiring, and create managed ownership", async () => {
@@ -180,7 +209,7 @@ describe("Tournament Control Room improvements", () => {
       server.indexOf("async function getViewerDataByToken"),
       server.indexOf("async function saveTemplateFromTournament")
     );
-    expect(viewerCode).toContain("broadcastUrl: game.broadcastUrl");
+    expect(viewerCode).toContain("broadcastUrl: tournamentGames.broadcastUrl");
     expect(viewerCode).not.toContain("privateLobbyCode");
     const restoreCode = server.slice(
       server.indexOf("async function restoreTournamentBoardSnapshot"),

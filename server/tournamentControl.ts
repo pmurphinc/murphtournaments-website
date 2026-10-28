@@ -2308,38 +2308,89 @@ async function getViewerDataByToken(token: string) {
       code: "NOT_FOUND",
       message: "Viewer link not found.",
     });
-  const data = await fetchTournamentRows(db, link.tournamentId);
+  return fetchViewerBoard(db, link.tournamentId);
+}
+
+/**
+ * The board as an anonymous viewer may see it.
+ *
+ * This selects the viewer's columns from the database rather than fetching
+ * the staff board and projecting it down. fetchTournamentRows joins
+ * managed_teams and users to resolve each team's captain, so the old path
+ * pulled captain Discord open IDs and display names across the wire for a
+ * public, unauthenticated endpoint and then dropped them — correct, but one
+ * careless change to the projection away from publishing them. Private
+ * lobby codes were excluded the same way and carry the same risk.
+ *
+ * Every field is listed explicitly, including on assignments and
+ * connections, so a column added to those tables later does not reach the
+ * public endpoint on its own.
+ */
+async function fetchViewerBoard(db: QueryExecutor, tournamentId: number) {
+  const [tournament] = await db
+    .select({
+      id: tournaments.id,
+      name: tournaments.name,
+      eventStatus: tournaments.eventStatus,
+      currentStage: tournaments.currentStage,
+      currentCycle: tournaments.currentCycle,
+      currentMatch: tournaments.currentMatch,
+    })
+    .from(tournaments)
+    .where(eq(tournaments.id, tournamentId))
+    .limit(1);
+  if (!tournament)
+    throw new TRPCError({ code: "NOT_FOUND", message: "Tournament not found" });
+
+  const [teamRows, gameRows, assignmentRows, connectionResult] =
+    await Promise.all([
+      db
+        .select({ id: teams.id, name: teams.name, frp: teams.frp })
+        .from(teams)
+        .where(eq(teams.tournamentId, tournamentId)),
+      db
+        .select({
+          id: tournamentGames.id,
+          tournamentId: tournamentGames.tournamentId,
+          gameType: tournamentGames.gameType,
+          status: tournamentGames.status,
+          displayLabel: tournamentGames.displayLabel,
+          canvasX: tournamentGames.canvasX,
+          canvasY: tournamentGames.canvasY,
+          seriesBestOf: tournamentGames.seriesBestOf,
+          mapId: tournamentGames.mapId,
+          broadcastUrl: tournamentGames.broadcastUrl,
+          roundGroupId: tournamentGames.roundGroupId,
+          roundLabel: tournamentGames.roundLabel,
+          roundColor: tournamentGames.roundColor,
+        })
+        .from(tournamentGames)
+        .where(eq(tournamentGames.tournamentId, tournamentId)),
+      db
+        .select({
+          id: tournamentGameAssignments.id,
+          gameId: tournamentGameAssignments.gameId,
+          teamId: tournamentGameAssignments.teamId,
+          slotIndex: tournamentGameAssignments.slotIndex,
+          resultPlacement: tournamentGameAssignments.resultPlacement,
+        })
+        .from(tournamentGameAssignments)
+        .innerJoin(
+          tournamentGames,
+          eq(tournamentGameAssignments.gameId, tournamentGames.id)
+        )
+        .where(eq(tournamentGames.tournamentId, tournamentId)),
+      db.execute(
+        sql`SELECT id, tournamentId, sourceGameId, targetGameId, flowType FROM tournament_game_connections WHERE tournamentId = ${tournamentId}`
+      ),
+    ]);
+
   return {
-    tournament: {
-      id: data.tournament.id,
-      name: data.tournament.name,
-      eventStatus: data.tournament.eventStatus,
-      currentStage: data.tournament.currentStage,
-      currentCycle: data.tournament.currentCycle,
-      currentMatch: data.tournament.currentMatch,
-    },
-    teams: data.teams.map(team => ({
-      id: team.id,
-      name: team.name,
-      frp: team.frp,
-    })),
-    games: data.games.map(game => ({
-      id: game.id,
-      tournamentId: game.tournamentId,
-      gameType: game.gameType,
-      status: game.status,
-      displayLabel: game.displayLabel,
-      canvasX: game.canvasX,
-      canvasY: game.canvasY,
-      seriesBestOf: game.seriesBestOf,
-      mapId: game.mapId,
-      broadcastUrl: game.broadcastUrl,
-      roundGroupId: game.roundGroupId,
-      roundLabel: game.roundLabel,
-      roundColor: game.roundColor,
-    })),
-    assignments: data.assignments,
-    connections: data.connections,
+    tournament,
+    teams: teamRows,
+    games: gameRows,
+    assignments: assignmentRows,
+    connections: readRows<ControlGameConnection>(connectionResult),
   };
 }
 

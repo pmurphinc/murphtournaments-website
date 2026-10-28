@@ -2,8 +2,18 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   consumeRateLimit,
   rateLimits,
+  __rateLimitInternals,
   __resetRateLimits,
+  __trackedKeyCount,
 } from "./_core/rateLimit";
+
+const { clientKey, maxTrackedKeys, overflowKey } = __rateLimitInternals;
+
+const reqWith = (xff?: string, remote = "203.0.113.9") =>
+  ({
+    headers: xff === undefined ? {} : { "x-forwarded-for": xff },
+    socket: { remoteAddress: remote },
+  }) as never;
 
 beforeEach(() => __resetRateLimits());
 
@@ -84,5 +94,90 @@ describe("configured limits", () => {
       expect(
         consumeRateLimit("getViewer:ip", rateLimits.poll, 1_000).allowed
       ).toBe(true);
+  });
+});
+
+describe("clientKey", () => {
+  it("uses the socket address when there is no proxy header", () => {
+    expect(clientKey(reqWith(undefined, "203.0.113.9"))).toBe("203.0.113.9");
+  });
+
+  it("uses the address the proxy appended", () => {
+    expect(clientKey(reqWith("198.51.100.7"))).toBe("198.51.100.7");
+  });
+
+  it("ignores a chain the client invented", () => {
+    // A client sending its own X-Forwarded-For has that value placed to the
+    // LEFT of the address the proxy appends, so reading from the right
+    // yields the address that actually connected.
+    expect(clientKey(reqWith("8.8.8.8, 198.51.100.7"))).toBe("198.51.100.7");
+    expect(clientKey(reqWith("1.1.1.1, 2.2.2.2, 198.51.100.7"))).toBe(
+      "198.51.100.7"
+    );
+  });
+
+  it("cannot be moved to a fresh bucket by spoofing the header", () => {
+    const a = clientKey(reqWith("10.0.0.1, 198.51.100.7"));
+    const b = clientKey(reqWith("172.16.5.5, 198.51.100.7"));
+    const c = clientKey(reqWith("evil, 198.51.100.7"));
+    expect(new Set([a, b, c]).size).toBe(1);
+  });
+
+  it("skips private hops to find the real caller", () => {
+    expect(clientKey(reqWith("198.51.100.7, 10.0.0.3"))).toBe("198.51.100.7");
+    expect(clientKey(reqWith("198.51.100.7, 172.16.0.1, 10.1.2.3"))).toBe(
+      "198.51.100.7"
+    );
+  });
+
+  it("collapses unparseable addresses into one bucket", () => {
+    // Otherwise each junk value would mint a map entry.
+    const junk = ["not-an-ip", "", "   ", "'; DROP TABLE", "999.999.999.999"];
+    const keys = junk.map(v => clientKey(reqWith(v, "bogus")));
+    expect(new Set(keys)).toEqual(new Set(["unknown"]));
+  });
+
+  it("never returns an attacker-supplied string as the key", () => {
+    const key = clientKey(reqWith("A".repeat(5000), "bogus"));
+    expect(key).toBe("unknown");
+    expect(key.length).toBeLessThan(50);
+  });
+
+  it("handles IPv6 and IPv4-mapped addresses", () => {
+    expect(clientKey(reqWith("2001:db8::1"))).toBe("2001:db8::1");
+    expect(clientKey(reqWith("::1", "bogus"))).toBe("unknown");
+  });
+});
+
+describe("keyspace bounds", () => {
+  it("stops growing once the ceiling is reached", () => {
+    for (let i = 0; i < maxTrackedKeys + 500; i++)
+      consumeRateLimit(`k${i}`, 10, 1_000);
+    expect(__trackedKeyCount()).toBeLessThanOrEqual(maxTrackedKeys + 1);
+  });
+
+  it("still limits callers that land in the overflow bucket", () => {
+    for (let i = 0; i < maxTrackedKeys; i++)
+      consumeRateLimit(`k${i}`, 10, 1_000);
+    // Everything new now shares one window, so the cap still applies.
+    let blocked = false;
+    for (let i = 0; i < 40; i++)
+      if (!consumeRateLimit(`overflow${i}`, 10, 1_000).allowed) blocked = true;
+    expect(blocked).toBe(true);
+  });
+
+  it("reclaims the keyspace once windows expire", () => {
+    for (let i = 0; i < 1_000; i++) consumeRateLimit(`k${i}`, 10, 1_000);
+    expect(__trackedKeyCount()).toBe(1_000);
+    // A new caller after the window closes triggers a prune of the stale
+    // entries rather than stacking on top of them.
+    for (let i = 0; i < maxTrackedKeys; i++)
+      consumeRateLimit(`later${i}`, 10, 61_001);
+    expect(__trackedKeyCount()).toBeLessThanOrEqual(maxTrackedKeys + 1);
+  });
+
+  it("exposes a stable overflow key", () => {
+    expect(typeof overflowKey).toBe("string");
+    expect(overflowKey.length).toBeGreaterThan(0);
   });
 });

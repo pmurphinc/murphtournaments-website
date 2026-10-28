@@ -1,3 +1,4 @@
+import { isIP } from "node:net";
 import { TRPCError } from "@trpc/server";
 import { t } from "./trpc";
 
@@ -21,7 +22,18 @@ type Window = { count: number; resetAt: number };
 const windows = new Map<string, Window>();
 const windowMs = 60_000;
 
-/** Stop the map growing without bound on a long-lived process. */
+/**
+ * Ceiling on tracked keys.
+ *
+ * The key embeds a caller address, so without a cap the map is a write
+ * primitive for anyone who can vary that address. Past the ceiling, new
+ * callers share one overflow bucket: the limiter gets less precise under
+ * flood, which is the moment precision matters least and bounded memory
+ * matters most.
+ */
+const maxTrackedKeys = 50_000;
+const overflowKey = "__overflow__";
+
 function pruneExpired(now: number) {
   windows.forEach((window, key) => {
     if (window.resetAt <= now) windows.delete(key);
@@ -35,17 +47,39 @@ function maybePrune(now: number) {
   pruneExpired(now);
 }
 
+/** RFC1918, loopback, link-local and unique-local ranges. */
+function isPrivateAddress(address: string) {
+  if (address.startsWith("::ffff:")) return isPrivateAddress(address.slice(7));
+  if (isIP(address) === 6)
+    return (
+      address === "::1" || /^f[cd]/i.test(address) || /^fe80:/i.test(address)
+    );
+  const parts = address.split(".").map(Number);
+  if (parts.length !== 4 || parts.some(Number.isNaN)) return true;
+  const [a, b] = parts;
+  return (
+    a === 10 ||
+    a === 127 ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) ||
+    (a === 169 && b === 254)
+  );
+}
+
 /**
- * The caller's address, taken from the left-most X-Forwarded-For entry.
+ * The caller's address, read right-to-left out of X-Forwarded-For.
  *
  * Railway terminates TLS at a proxy, so the socket address is the proxy for
- * every caller and would put all of them in one bucket. This reads the
- * header directly rather than enabling Express `trust proxy`, which would
- * also change `req.protocol` and `req.secure` for the OAuth redirect and
- * cookie paths. The header is client-supplied and therefore spoofable: an
- * attacker can rotate it to get a fresh bucket, which is accepted here
- * because the goal is bounding accidental and casual load, not defeating a
- * determined one.
+ * every caller and would put all of them in one bucket. The header is read
+ * directly rather than by enabling Express `trust proxy`, which would also
+ * change `req.protocol` and `req.secure` on the OAuth redirect and cookie
+ * paths — not a change to make the week of a launch.
+ *
+ * Anything the client sends appears to the LEFT of what the proxy appends,
+ * so scanning from the right for the first public address yields the
+ * address that actually connected and ignores any chain the client invented.
+ * Values that are not well-formed public IPs are never used as keys, so a
+ * caller cannot mint map entries by varying the header.
  */
 function clientKey(req: {
   headers: Record<string, unknown>;
@@ -55,10 +89,23 @@ function clientKey(req: {
   const forwarded = req.headers["x-forwarded-for"];
   const raw = Array.isArray(forwarded) ? forwarded[0] : forwarded;
   if (typeof raw === "string" && raw.length > 0) {
-    const first = raw.split(",")[0]?.trim();
-    if (first) return first;
+    const hops = raw.split(",");
+    for (let i = hops.length - 1; i >= 0; i--) {
+      const hop = hops[i]?.trim() ?? "";
+      if (isIP(hop) && !isPrivateAddress(hop)) return hop;
+    }
   }
-  return req.ip ?? req.socket?.remoteAddress ?? "unknown";
+  const direct = req.ip ?? req.socket?.remoteAddress ?? "";
+  return isIP(direct) ? direct : "unknown";
+}
+
+const allowed = { allowed: true, retryAfterSeconds: 0 } as const;
+
+function blocked(resetAt: number, now: number) {
+  return {
+    allowed: false,
+    retryAfterSeconds: Math.max(1, Math.ceil((resetAt - now) / 1000)),
+  };
 }
 
 export function consumeRateLimit(
@@ -66,21 +113,30 @@ export function consumeRateLimit(
   limit: number,
   now = Date.now()
 ): { allowed: boolean; retryAfterSeconds: number } {
-  const existing = windows.get(key);
-  if (!existing || existing.resetAt <= now) {
-    windows.set(key, { count: 1, resetAt: now + windowMs });
-    return { allowed: true, retryAfterSeconds: 0 };
+  let resolvedKey = key;
+  let existing = windows.get(resolvedKey);
+
+  // A new key past the ceiling is served from the shared overflow bucket.
+  // The overflow entry itself is always allowed to exist, otherwise a full
+  // map would have nowhere to record the flood it is meant to bound.
+  if (
+    (!existing || existing.resetAt <= now) &&
+    windows.size >= maxTrackedKeys
+  ) {
+    pruneExpired(now);
+    if (windows.size >= maxTrackedKeys) {
+      resolvedKey = overflowKey;
+      existing = windows.get(resolvedKey);
+    }
   }
-  existing.count += 1;
-  if (existing.count > limit)
-    return {
-      allowed: false,
-      retryAfterSeconds: Math.max(
-        1,
-        Math.ceil((existing.resetAt - now) / 1000)
-      ),
-    };
-  return { allowed: true, retryAfterSeconds: 0 };
+
+  if (existing && existing.resetAt > now) {
+    existing.count += 1;
+    return existing.count > limit ? blocked(existing.resetAt, now) : allowed;
+  }
+
+  windows.set(resolvedKey, { count: 1, resetAt: now + windowMs });
+  return allowed;
 }
 
 /** Exposed so tests start from a clean window. */
@@ -88,6 +144,17 @@ export function __resetRateLimits() {
   windows.clear();
   lastPrune = 0;
 }
+
+/** Exposed for tests asserting the keyspace stays bounded. */
+export function __trackedKeyCount() {
+  return windows.size;
+}
+
+export const __rateLimitInternals = {
+  clientKey,
+  maxTrackedKeys,
+  overflowKey,
+} as const;
 
 /**
  * Requests per minute, per address, per procedure.
