@@ -10,6 +10,7 @@ import {
   publicProcedure,
   router,
 } from "./_core/trpc";
+import { rateLimited, rateLimits } from "./_core/rateLimit";
 import {
   getDiscordUserId,
   assertDiscordTournamentStaff,
@@ -4220,6 +4221,7 @@ export const personalTcrRouter = router({
       revokeStaffInviteLink(input.tournamentId, ctx.user)
     ),
   previewStaffInvite: personalTcrProcedure
+    .use(rateLimited(rateLimits.preview))
     .input(z.object({ token: tokenSchema }))
     .query(({ input }) => previewStaffInvite(input.token)),
   acceptStaffInvite: personalTcrProcedure
@@ -4933,10 +4935,14 @@ export const tournamentControlRouter = router({
     .mutation(({ input, ctx }) =>
       regenerateViewerLink(input.tournamentId, ctx.user.id)
     ),
+  // Polled every five seconds by every open bracket tab, and reachable
+  // without a login, so it carries the heavier of the two public limits.
   getViewer: publicProcedure
+    .use(rateLimited(rateLimits.poll))
     .input(z.object({ token: tokenSchema }))
     .query(({ input }) => getViewerDataByToken(input.token)),
   getTeamClaimLinkPreview: publicProcedure
+    .use(rateLimited(rateLimits.preview))
     .input(z.object({ token: tokenSchema }))
     .query(async ({ input }) => {
       const db = await requireDb();
