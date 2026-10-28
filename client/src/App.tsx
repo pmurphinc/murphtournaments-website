@@ -13,35 +13,57 @@ import JuneTournamentRoster2026 from "./pages/JuneTournamentRoster2026";
 import LiveBracket from "./pages/LiveBracket";
 import DevDivision from "./pages/DevDivision";
 import DevelopmentDivisionInvite from "./pages/DevelopmentDivisionInvite";
-import DevelopmentDivisionAdmin from "./pages/DevelopmentDivisionAdmin";
 import About from "./pages/About";
 import Watch from "./pages/Watch";
-import FclReplay from "./pages/FclReplay";
 import Join from "./pages/Join";
-import LiveBracket2 from "./pages/LiveBracket2";
-import PlayerArchive from "./pages/PlayerArchive";
-import PlayerProfile from "./pages/PlayerProfile";
 import PatchNotes from "./pages/PatchNotes";
-import LoadoutTracker from "./pages/LoadoutTracker";
-import MapRandomizer from "./pages/MapRandomizer";
-import BalanceArchive from "./pages/BalanceArchive";
-import BalanceArchiveDetail from "./pages/BalanceArchiveDetail";
-import VodAnalysis from "./pages/VodAnalysis";
-import VodAnalysisDetail from "./pages/VodAnalysisDetail";
-import VodTeamInsights from "./pages/VodTeamInsights";
 import TeamFinder from "./pages/TeamFinder";
-import TeamManagement from "./pages/TeamManagement";
-import TeamJoinInvite from "./pages/TeamJoinInvite";
-import TeamClaimLink from "./pages/TeamClaimLink";
-import TournamentControlViewer from "./pages/TournamentControlViewer";
-import TournamentControlRoom from "./pages/TournamentControlRoom";
-import TournamentControlIndex from "./pages/TournamentControlIndex";
-import PersonalTcrIndex from "./pages/PersonalTcrIndex";
-import TcrTemplatesPage from "./pages/TcrTemplates";
-import TournamentStaffInviteJoin from "./pages/TournamentStaffInviteJoin";
 import CommunityTournaments from "./pages/CommunityTournaments";
-import TournamentResultsArchive from "./pages/TournamentResultsArchive";
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
+
+/**
+ * Routes split out of the initial bundle.
+ *
+ * The whole app shipped as one ~1.2MB chunk, so every visitor to the
+ * home page also downloaded the Control Room, the VOD tools and the team
+ * admin screens. These are the heavy or sign-in-gated pages that a first
+ * visit does not need; the public pages above stay eager so first paint
+ * is unchanged.
+ */
+const DevelopmentDivisionAdmin = lazy(
+  () => import("./pages/DevelopmentDivisionAdmin")
+);
+const VodAnalysis = lazy(() => import("./pages/VodAnalysis"));
+const VodAnalysisDetail = lazy(() => import("./pages/VodAnalysisDetail"));
+const VodTeamInsights = lazy(() => import("./pages/VodTeamInsights"));
+const TeamManagement = lazy(() => import("./pages/TeamManagement"));
+const TeamJoinInvite = lazy(() => import("./pages/TeamJoinInvite"));
+const TeamClaimLink = lazy(() => import("./pages/TeamClaimLink"));
+const TournamentControlViewer = lazy(
+  () => import("./pages/TournamentControlViewer")
+);
+const TournamentControlRoom = lazy(
+  () => import("./pages/TournamentControlRoom")
+);
+const TournamentControlIndex = lazy(
+  () => import("./pages/TournamentControlIndex")
+);
+const PersonalTcrIndex = lazy(() => import("./pages/PersonalTcrIndex"));
+const TournamentStaffInviteJoin = lazy(
+  () => import("./pages/TournamentStaffInviteJoin")
+);
+const BalanceArchive = lazy(() => import("./pages/BalanceArchive"));
+const BalanceArchiveDetail = lazy(() => import("./pages/BalanceArchiveDetail"));
+const PlayerArchive = lazy(() => import("./pages/PlayerArchive"));
+const PlayerProfile = lazy(() => import("./pages/PlayerProfile"));
+const LoadoutTracker = lazy(() => import("./pages/LoadoutTracker"));
+const MapRandomizer = lazy(() => import("./pages/MapRandomizer"));
+const TournamentResultsArchive = lazy(
+  () => import("./pages/TournamentResultsArchive")
+);
+const FclReplay = lazy(() => import("./pages/FclReplay"));
+const LiveBracket2 = lazy(() => import("./pages/LiveBracket2"));
+const TcrTemplatesPage = lazy(() => import("./pages/TcrTemplates"));
 
 /**
  * Murph Tournaments Website
@@ -57,6 +79,26 @@ function PersonalTournamentControlRoomRoute() {
 
 function DiscordStaffTournamentControlRoomRoute() {
   return <TournamentControlRoom mode="discord-staff" />;
+}
+
+/**
+ * Placeholder while a split route's chunk is fetched. Sized to the content
+ * area so the header and footer do not jump while it loads.
+ */
+function RouteLoading() {
+  return (
+    <div
+      className="flex min-h-[60vh] items-center justify-center"
+      role="status"
+      aria-live="polite"
+    >
+      <span className="sr-only">Loading page</span>
+      <span
+        aria-hidden="true"
+        className="h-8 w-8 animate-spin rounded-full border-2 border-white/15 border-t-white/60"
+      />
+    </div>
+  );
 }
 
 function Router() {
@@ -83,101 +125,103 @@ function Router() {
       <main
         className={`flex-1 pt-16 ${isProtectedRoute ? "" : "public-theme"}`}
       >
-        <Switch>
-          <Route path={"/"} component={Home} />
-          <Route
-            path={"/tournaments/june-2026/roster"}
-            component={JuneTournamentRoster2026}
-          />
-          <Route
-            path={"/tournaments/june-2026"}
-            component={JuneTournament2026}
-          />
-          <Route
-            path={"/tournaments/community/:slug"}
-            component={CommunityTournaments}
-          />
-          <Route
-            path={"/tournaments/community"}
-            component={CommunityTournaments}
-          />
-          <Route path={"/tournaments"} component={TournamentHistory} />
-          <Route
-            path={"/tournament-results/:tournamentId"}
-            component={TournamentResultsArchive}
-          />
-          <Route
-            path={"/bracket/:viewerToken"}
-            component={TournamentControlViewer}
-          />
-          <Route path={"/bracket"} component={LiveBracket} />
-          <Route path={"/dev-division"} component={DevDivision} />
-          <Route
-            path={"/invite/development-division/:token"}
-            component={DevelopmentDivisionInvite}
-          />
-          <Route path={"/about"} component={About} />
-          <Route path={"/watch"} component={Watch} />
-          <Route path={"/watch/fcl/:slug"} component={FclReplay} />
-          <Route
-            path={"/vod/:id/team-summary/:teamName"}
-            component={VodTeamInsights}
-          />
-          <Route path={"/vod/:id"} component={VodAnalysisDetail} />
-          <Route path={"/vod"} component={VodAnalysis} />
-          <Route path={"/join"} component={Join} />
-          <Route path={"/bracket2"} component={LiveBracket2} />
-          <Route path={"/players"} component={PlayerArchive} />
-          <Route path={"/player/:id"} component={PlayerProfile} />
-          <Route path={"/patchnotes"} component={PatchNotes} />
-          <Route path={"/loadout-tracker"} component={LoadoutTracker} />
-          <Route path={"/maprng"} component={MapRandomizer} />
-          <Route
-            path={"/balance-archive/:slug"}
-            component={BalanceArchiveDetail}
-          />
-          <Route path={"/balance-archive"} component={BalanceArchive} />
-          <Route path={"/team-finder"} component={TeamFinder} />
-          <Route path={"/lft"} component={TeamFinder} />
-          <Route path={"/teams/claim/:token"} component={TeamClaimLink} />
-          <Route path={"/teams/join/:token"} component={TeamJoinInvite} />
-          <Route path={"/teams"} component={TeamManagement} />
-          <Route
-            path={"/TCR/staff/join/:token"}
-            component={TournamentStaffInviteJoin}
-          />
-          <Route
-            path={"/tcr/staff/join/:token"}
-            component={TournamentStaffInviteJoin}
-          />
-          <Route path={"/TCR/templates"} component={TcrTemplatesPage} />
-          <Route path={"/tcr/templates"} component={TcrTemplatesPage} />
-          <Route
-            path={"/TCR/:tournamentId"}
-            component={PersonalTournamentControlRoomRoute}
-          />
-          <Route
-            path={"/tcr/:tournamentId"}
-            component={PersonalTournamentControlRoomRoute}
-          />
-          <Route path={"/TCR"} component={PersonalTcrIndex} />
-          <Route path={"/tcr"} component={PersonalTcrIndex} />
-          <Route
-            path={"/admin/tournaments/control"}
-            component={TournamentControlIndex}
-          />
-          <Route
-            path={"/admin/development-division"}
-            component={DevelopmentDivisionAdmin}
-          />
-          <Route
-            path={"/admin/tournaments/:tournamentId/control"}
-            component={DiscordStaffTournamentControlRoomRoute}
-          />
-          <Route path={"/404"} component={NotFound} />
-          {/* Final fallback route */}
-          <Route component={NotFound} />
-        </Switch>
+        <Suspense fallback={<RouteLoading />}>
+          <Switch>
+            <Route path={"/"} component={Home} />
+            <Route
+              path={"/tournaments/june-2026/roster"}
+              component={JuneTournamentRoster2026}
+            />
+            <Route
+              path={"/tournaments/june-2026"}
+              component={JuneTournament2026}
+            />
+            <Route
+              path={"/tournaments/community/:slug"}
+              component={CommunityTournaments}
+            />
+            <Route
+              path={"/tournaments/community"}
+              component={CommunityTournaments}
+            />
+            <Route path={"/tournaments"} component={TournamentHistory} />
+            <Route
+              path={"/tournament-results/:tournamentId"}
+              component={TournamentResultsArchive}
+            />
+            <Route
+              path={"/bracket/:viewerToken"}
+              component={TournamentControlViewer}
+            />
+            <Route path={"/bracket"} component={LiveBracket} />
+            <Route path={"/dev-division"} component={DevDivision} />
+            <Route
+              path={"/invite/development-division/:token"}
+              component={DevelopmentDivisionInvite}
+            />
+            <Route path={"/about"} component={About} />
+            <Route path={"/watch"} component={Watch} />
+            <Route path={"/watch/fcl/:slug"} component={FclReplay} />
+            <Route
+              path={"/vod/:id/team-summary/:teamName"}
+              component={VodTeamInsights}
+            />
+            <Route path={"/vod/:id"} component={VodAnalysisDetail} />
+            <Route path={"/vod"} component={VodAnalysis} />
+            <Route path={"/join"} component={Join} />
+            <Route path={"/bracket2"} component={LiveBracket2} />
+            <Route path={"/players"} component={PlayerArchive} />
+            <Route path={"/player/:id"} component={PlayerProfile} />
+            <Route path={"/patchnotes"} component={PatchNotes} />
+            <Route path={"/loadout-tracker"} component={LoadoutTracker} />
+            <Route path={"/maprng"} component={MapRandomizer} />
+            <Route
+              path={"/balance-archive/:slug"}
+              component={BalanceArchiveDetail}
+            />
+            <Route path={"/balance-archive"} component={BalanceArchive} />
+            <Route path={"/team-finder"} component={TeamFinder} />
+            <Route path={"/lft"} component={TeamFinder} />
+            <Route path={"/teams/claim/:token"} component={TeamClaimLink} />
+            <Route path={"/teams/join/:token"} component={TeamJoinInvite} />
+            <Route path={"/teams"} component={TeamManagement} />
+            <Route
+              path={"/TCR/staff/join/:token"}
+              component={TournamentStaffInviteJoin}
+            />
+            <Route
+              path={"/tcr/staff/join/:token"}
+              component={TournamentStaffInviteJoin}
+            />
+            <Route path={"/TCR/templates"} component={TcrTemplatesPage} />
+            <Route path={"/tcr/templates"} component={TcrTemplatesPage} />
+            <Route
+              path={"/TCR/:tournamentId"}
+              component={PersonalTournamentControlRoomRoute}
+            />
+            <Route
+              path={"/tcr/:tournamentId"}
+              component={PersonalTournamentControlRoomRoute}
+            />
+            <Route path={"/TCR"} component={PersonalTcrIndex} />
+            <Route path={"/tcr"} component={PersonalTcrIndex} />
+            <Route
+              path={"/admin/tournaments/control"}
+              component={TournamentControlIndex}
+            />
+            <Route
+              path={"/admin/development-division"}
+              component={DevelopmentDivisionAdmin}
+            />
+            <Route
+              path={"/admin/tournaments/:tournamentId/control"}
+              component={DiscordStaffTournamentControlRoomRoute}
+            />
+            <Route path={"/404"} component={NotFound} />
+            {/* Final fallback route */}
+            <Route component={NotFound} />
+          </Switch>
+        </Suspense>
       </main>
       <Footer />
     </div>

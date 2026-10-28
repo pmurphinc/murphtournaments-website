@@ -57,7 +57,7 @@ function writeToLogFile(source: LogSource, entries: unknown[]) {
   const logPath = path.join(LOG_DIR, `${source}.log`);
 
   // Format entries with timestamps
-  const lines = entries.map((entry) => {
+  const lines = entries.map(entry => {
     const ts = new Date().toISOString();
     return `[${ts}] ${JSON.stringify(entry)}`;
   });
@@ -96,7 +96,9 @@ function vitePluginControlRoomFixes(): Plugin {
     enforce: "pre",
     transform(code, id) {
       const normalizedId = id.split(path.sep).join("/");
-      if (!normalizedId.endsWith("/client/src/pages/TournamentControlRoom.tsx")) {
+      if (
+        !normalizedId.endsWith("/client/src/pages/TournamentControlRoom.tsx")
+      ) {
         return null;
       }
 
@@ -169,7 +171,7 @@ function vitePluginManusDebugCollector(): Plugin {
         }
 
         let body = "";
-        req.on("data", (chunk) => {
+        req.on("data", chunk => {
           body += chunk.toString();
         });
 
@@ -212,6 +214,13 @@ export default defineConfig({
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
   },
+  // No manualChunks here on purpose. Splitting the vendor bundle by package
+  // (react / radix / tanstack / recharts) built cleanly and then failed at
+  // runtime with "Cannot read properties of undefined (reading
+  // 'createContext')": the chunks ended up initialising in an order where
+  // code reached React before React's own chunk had evaluated, and the page
+  // rendered blank. Route-level splitting in App.tsx gets the bulk of the
+  // win without touching module order, so chunking is left to Rollup.
   server: {
     host: true,
     allowedHosts: [
