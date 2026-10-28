@@ -40,15 +40,6 @@ const menuItemClass =
 const menuLabelClass =
   "font-mono text-[10px] uppercase tracking-widest text-[var(--mt-muted)]";
 
-const alphaBadge = (
-  <span
-    className="inline-flex rounded-full border border-[var(--mt-gold)]/60 bg-[var(--mt-gold)]/10 px-2.5 py-1 align-middle font-mono text-xs font-black uppercase tracking-[0.22em] text-[var(--mt-gold-bright)]"
-    title="Tournament Control Room is a work in progress"
-  >
-    ALPHA
-  </span>
-);
-
 type Visibility = "private" | "public";
 
 type CardOwner = {
@@ -157,14 +148,7 @@ export default function PersonalTcrIndex() {
   if (query.error)
     return (
       <State
-        // /TCR is the page an announcement links to, so the alpha gate is
-        // the error a brand-new visitor is most likely to hit: name it
-        // instead of reporting it as an outage.
-        title={
-          query.error.message.includes("alpha testers")
-            ? "Alpha access required"
-            : "TCR unavailable"
-        }
+        title="TCR unavailable"
         description={getSafeTournamentControlErrorMessage(query.error.message)}
       />
     );
@@ -209,7 +193,6 @@ export default function PersonalTcrIndex() {
               <h1 className="font-mono text-4xl font-black uppercase">
                 Tournament Control Rooms
               </h1>
-              {alphaBadge}
             </div>
             <p className="mt-3 max-w-2xl text-sm text-[var(--mt-muted)]">
               Create and manage your own tournaments with Discord sign-in.

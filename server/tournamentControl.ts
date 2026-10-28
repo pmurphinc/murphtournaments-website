@@ -5,7 +5,7 @@ import { z } from "zod";
 import { getDb } from "./db";
 import {
   discordAuthenticatedProcedure,
-  personalTcrAlphaProcedure,
+  personalTcrProcedure,
   protectedProcedure,
   publicProcedure,
   router,
@@ -4088,8 +4088,6 @@ async function unlockTournamentForEditing(
     return fetchTournamentRows(tx, tournamentId);
   });
 }
-
-export const personalTcrProcedure = personalTcrAlphaProcedure;
 
 export const personalTcrRouter = router({
   listTournaments: personalTcrProcedure.query(async ({ ctx }) => {

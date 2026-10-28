@@ -1925,9 +1925,7 @@ export default function TournamentControlRoom({
             ? "Discord role configuration error"
             : query.error.message.includes("Unable to verify")
               ? "Discord service verification failed"
-              : query.error.message.includes("alpha testers")
-                ? "Alpha access required"
-                : fallbackErrorTitle
+              : fallbackErrorTitle
         }
         description={getSafeTournamentControlErrorMessage(query.error.message)}
       />

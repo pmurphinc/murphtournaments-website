@@ -209,10 +209,12 @@ describe("TcrTopBar tournament header", () => {
     expect(html).toContain('aria-label="Back to Tournament Rooms"');
   });
 
-  it("marks the room as alpha while the feature is in progress", () => {
+  it("no longer brands the room as alpha", () => {
+    // TCR is launched: the badge and its "work in progress" tooltip are
+    // gone, and the invite gate they advertised has been removed with them.
     const html = renderTopBar();
-    expect(html).toContain("ALPHA");
-    expect(html).toContain("Tournament Control Room is a work in progress");
+    expect(html).not.toContain("ALPHA");
+    expect(html).not.toContain("Tournament Control Room is a work in progress");
   });
 
   it("shows a finalized badge once the tournament is locked", () => {
@@ -518,5 +520,49 @@ describe("Team approval rejection UI", () => {
     expect(indexSource).toContain(
       'submission.status === "rejected" && submission.adminNote'
     );
+  });
+});
+
+/**
+ * Launch guards.
+ *
+ * Personal TCR is public. These assert the invite gate and its badge are
+ * actually gone from the code, rather than merely switched off by an
+ * environment variable that no committed config records.
+ */
+describe("Personal TCR is publicly reachable", () => {
+  const trpcSource = readFileSync(
+    new URL("../../../server/_core/trpc.ts", import.meta.url),
+    "utf8"
+  );
+
+  it("gates personal TCR on Discord sign-in alone", () => {
+    expect(trpcSource).toContain(
+      "export const personalTcrProcedure = discordAuthenticatedProcedure"
+    );
+  });
+
+  it("reads no alpha-mode switch or allowlist", () => {
+    // Matched against the code rather than the file, so the comment
+    // recording why the gate was removed does not trip this.
+    expect(trpcSource).not.toContain("process.env.TCR_ALPHA_MODE");
+    expect(trpcSource).not.toContain("process.env.TCR_ALPHA_ALLOWED");
+    expect(trpcSource).not.toContain("getTcrAlphaAllowlist");
+    expect(trpcSource).not.toContain("alpha testers only");
+  });
+
+  it("still requires a Discord identity to own a tournament", () => {
+    expect(trpcSource).toContain("Discord sign-in is required.");
+  });
+
+  it("shows no alpha badge on either index page", () => {
+    for (const page of ["PersonalTcrIndex.tsx", "TournamentControlIndex.tsx"]) {
+      const source = readFileSync(
+        new URL(`./${page}`, import.meta.url),
+        "utf8"
+      );
+      expect(source).not.toContain("ALPHA");
+      expect(source).not.toContain("alphaBadge");
+    }
   });
 });
