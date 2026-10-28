@@ -5,6 +5,7 @@ export default defineConfig({
   test: {
     include: [
       "server/tournamentControlRevisionSafety.test.ts",
+      "server/tournamentControlGroupActions.test.ts",
       "server/communityTournaments.test.ts",
       "server/tournamentControlLobbyTimer.test.ts",
       "server/teamManagement.test.ts",

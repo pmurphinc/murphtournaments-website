@@ -14,6 +14,26 @@ import { tournamentGameModeList } from "../../../../shared/finalsGameModes";
 
 const noop = () => undefined;
 
+/**
+ * The opening <button> tag of the control whose label is `label`, with its
+ * class attribute removed.
+ *
+ * Matching on the tag rather than a fixed window around the label keeps the
+ * assertion stable, since an icon <svg> sits between the attributes and the
+ * text. The class has to go because the shared button styles carry Tailwind
+ * variants like `disabled:opacity-40`, which would satisfy a naive check for
+ * "disabled" on a button that is in fact enabled.
+ */
+function buttonTagFor(html: string, label: string) {
+  const labelIndex = html.indexOf(label);
+  expect(labelIndex).toBeGreaterThan(-1);
+  const openIndex = html.lastIndexOf("<button", labelIndex);
+  expect(openIndex).toBeGreaterThan(-1);
+  return html
+    .slice(openIndex, html.indexOf(">", openIndex) + 1)
+    .replace(/\sclass="[^"]*"/g, "");
+}
+
 const cashoutGame: ControlGameView = {
   id: 1,
   tournamentId: 5,
@@ -114,6 +134,11 @@ function makeInspectorProps(
     onSetGroupColor: noop,
     onToggleGroupLock: noop,
     onOrganizeGroup: noop,
+    onSetSelectedStatus: noop,
+    onShuffleSelectedTeams: noop,
+    onReturnSelectedTeams: noop,
+    groupActionPending: false,
+    selectedAssignedTeamCount: 0,
     onDeleteGroup: noop,
     ...overrides,
   };
@@ -258,6 +283,103 @@ describe("TcrInspector group selection", () => {
     expect(html).toContain("Set group color to gold");
     expect(html).toContain("Remove Selected From Group");
     expect(html).toContain("Delete Group…");
+  });
+
+  it("offers bulk lobby actions before the lobbies are grouped", () => {
+    // These act on the selection, not on a named group, so an ungrouped
+    // multi-select gets them too.
+    const html = renderToStaticMarkup(
+      <TcrInspector
+        {...makeInspectorProps(
+          { kind: "group", gameIds: [1, 2], group: null },
+          { selectedAssignedTeamCount: 6 }
+        )}
+      />
+    );
+    expect(html).toContain("Set status");
+    expect(html).toContain("Draft");
+    expect(html).toContain("Ready");
+    expect(html).toContain("Live");
+    expect(html).toContain("Shuffle Teams");
+    expect(html).toContain("Return Teams to Available");
+  });
+
+  it("reports how many teams the bulk actions would move", () => {
+    const html = renderToStaticMarkup(
+      <TcrInspector
+        {...makeInspectorProps(
+          { kind: "group", gameIds: [1, 2], group: null },
+          { selectedAssignedTeamCount: 6 }
+        )}
+      />
+    );
+    expect(html).toContain("6 seated teams");
+    expect(html).toContain("Completed lobbies are left untouched");
+  });
+
+  it("disables the team actions when no teams are seated", () => {
+    const html = renderToStaticMarkup(
+      <TcrInspector
+        {...makeInspectorProps(
+          { kind: "group", gameIds: [1, 2], group: null },
+          { selectedAssignedTeamCount: 0 }
+        )}
+      />
+    );
+    expect(html).toContain("No teams are seated in the selected lobbies.");
+    expect(buttonTagFor(html, "Shuffle Teams")).toContain("disabled");
+    expect(buttonTagFor(html, "Return Teams to Available")).toContain(
+      "disabled"
+    );
+  });
+
+  it("needs at least two seated teams before a shuffle can change anything", () => {
+    const html = renderToStaticMarkup(
+      <TcrInspector
+        {...makeInspectorProps(
+          { kind: "group", gameIds: [1, 2], group: null },
+          { selectedAssignedTeamCount: 1 }
+        )}
+      />
+    );
+    expect(buttonTagFor(html, "Shuffle Teams")).toContain("disabled");
+    // Returning a single seated team is still meaningful.
+    expect(buttonTagFor(html, "Return Teams to Available")).not.toContain(
+      "disabled"
+    );
+  });
+
+  it("locks every bulk action once the tournament is finalized", () => {
+    const html = renderToStaticMarkup(
+      <TcrInspector
+        {...makeInspectorProps(
+          { kind: "group", gameIds: [1, 2], group: null },
+          { selectedAssignedTeamCount: 6, isFinalized: true }
+        )}
+      />
+    );
+    for (const label of [
+      "Shuffle Teams",
+      "Return Teams to Available",
+      "Draft",
+      "Ready",
+      "Live",
+    ]) {
+      expect(buttonTagFor(html, label)).toContain("disabled");
+    }
+  });
+
+  it("disables bulk actions while one is in flight", () => {
+    const html = renderToStaticMarkup(
+      <TcrInspector
+        {...makeInspectorProps(
+          { kind: "group", gameIds: [1, 2], group: null },
+          { selectedAssignedTeamCount: 6, groupActionPending: true }
+        )}
+      />
+    );
+    expect(buttonTagFor(html, "Shuffle Teams")).toContain("disabled");
+    expect(buttonTagFor(html, "Ready")).toContain("disabled");
   });
 });
 

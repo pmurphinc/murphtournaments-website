@@ -520,6 +520,115 @@ describe("tournament control revision behavior", () => {
     expect(board.tournament.boardRevision).toBe(state.tournament.boardRevision);
   });
 
+  describe("bulk group actions", () => {
+    // The mock db treats `where` as a no-op, so these cover only what does
+    // not depend on filtering: that a bulk action commits exactly one
+    // revision, and that a no-op commits none. The selection and seating
+    // rules are tested directly in tournamentControlGroupActions.test.ts.
+    function seedTwoLobbies() {
+      state.games = [
+        { ...state.games[0], id: 10, status: "ready" },
+        { ...state.games[0], id: 11, status: "ready", displayLabel: "Lobby B" },
+      ];
+      state.teams = [1, 2, 3, 4].map(id => ({
+        id,
+        tournamentId: 1,
+        name: `Team ${id}`,
+        frp: 0,
+      }));
+      state.assignments = [
+        { id: 1, gameId: 10, teamId: 1, slotIndex: 1, resultPlacement: null },
+        { id: 2, gameId: 10, teamId: 2, slotIndex: 2, resultPlacement: null },
+        { id: 3, gameId: 11, teamId: 3, slotIndex: 1, resultPlacement: null },
+        { id: 4, gameId: 11, teamId: 4, slotIndex: 2, resultPlacement: null },
+      ];
+    }
+
+    it("commits exactly one revision for a bulk status change", async () => {
+      seedTwoLobbies();
+      const board = await __tournamentControlTestInternals.setGamesStatus({
+        tournamentId: 1,
+        gameIds: [10, 11],
+        status: "live",
+      });
+      expect(board.tournament.boardRevision).toBe(8);
+      expect(state.tournament.boardRevision).toBe(8);
+    });
+
+    it("does not increment when every selected lobby already has the status", async () => {
+      seedTwoLobbies();
+      const board = await __tournamentControlTestInternals.setGamesStatus({
+        tournamentId: 1,
+        gameIds: [10, 11],
+        status: "ready",
+      });
+      expect(board.tournament.boardRevision).toBe(7);
+      expect(state.tournament.boardRevision).toBe(7);
+    });
+
+    it("commits exactly one revision when returning teams", async () => {
+      seedTwoLobbies();
+      const board =
+        await __tournamentControlTestInternals.returnGamesTeamsToAvailable({
+          tournamentId: 1,
+          gameIds: [10, 11],
+        });
+      expect(board.tournament.boardRevision).toBe(8);
+    });
+
+    it("does not increment when the selected lobbies are already empty", async () => {
+      seedTwoLobbies();
+      state.assignments = [];
+      const board =
+        await __tournamentControlTestInternals.returnGamesTeamsToAvailable({
+          tournamentId: 1,
+          gameIds: [10, 11],
+        });
+      expect(board.tournament.boardRevision).toBe(7);
+    });
+
+    it("commits exactly one revision for a shuffle", async () => {
+      seedTwoLobbies();
+      const board = await __tournamentControlTestInternals.shuffleGamesTeams({
+        tournamentId: 1,
+        gameIds: [10, 11],
+      });
+      expect(board.tournament.boardRevision).toBe(8);
+    });
+
+    it("does not increment when fewer than two teams are seated", async () => {
+      seedTwoLobbies();
+      state.assignments = [state.assignments[0]];
+      const board = await __tournamentControlTestInternals.shuffleGamesTeams({
+        tournamentId: 1,
+        gameIds: [10, 11],
+      });
+      expect(board.tournament.boardRevision).toBe(7);
+    });
+
+    it("rejects a duplicated lobby in the selection", async () => {
+      seedTwoLobbies();
+      await expect(
+        __tournamentControlTestInternals.setGamesStatus({
+          tournamentId: 1,
+          gameIds: [10, 10],
+          status: "live",
+        })
+      ).rejects.toThrow(TRPCError);
+    });
+
+    it("rejects finalized tournaments", async () => {
+      seedTwoLobbies();
+      state.tournament.finalizedAt = new Date();
+      await expect(
+        __tournamentControlTestInternals.shuffleGamesTeams({
+          tournamentId: 1,
+          gameIds: [10, 11],
+        })
+      ).rejects.toThrow(TRPCError);
+    });
+  });
+
   it("batch move no-op leaves the revision unchanged", async () => {
     const board = await __tournamentControlTestInternals.moveGames({
       tournamentId: 1,

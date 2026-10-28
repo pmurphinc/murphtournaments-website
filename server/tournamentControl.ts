@@ -1,5 +1,5 @@
 import { and, eq, inArray, not, sql } from "drizzle-orm";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomInt, randomUUID } from "node:crypto";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { getDb } from "./db";
@@ -46,6 +46,8 @@ import {
   validateReopenPlan,
   resolveAssignmentSlot,
   selectAutoFillLobbyAssignments,
+  planGroupAction,
+  planShuffledSeating,
   type ControlAssignment,
   type ControlGame,
   type ControlTeam,
@@ -389,6 +391,22 @@ type AdvancementGame = {
 const idSchema = z.number().int().positive();
 const gameIdSchema = z.object({ gameId: idSchema });
 const tournamentIdSchema = z.object({ tournamentId: idSchema });
+/**
+ * A bulk action over the lobbies currently selected on the board. Capped at
+ * the per-tournament lobby limit, since a selection cannot exceed the board.
+ */
+const groupActionSchema = tournamentIdSchema.extend({
+  gameIds: z
+    .array(idSchema)
+    .min(1)
+    .max(PERSONAL_TCR_LIMITS.gameNodesPerTournament),
+});
+/**
+ * Bulk status changes cover the active statuses only. Completing a lobby
+ * validates qualifier advancement against that lobby's own results, which is
+ * a per-lobby decision rather than something to apply across a round.
+ */
+const groupActionStatusSchema = z.enum(activeTournamentGameStatuses);
 const positionSchema = z.object({
   x: z.number().int().min(-10000).max(10000),
   y: z.number().int().min(-10000).max(10000),
@@ -1399,6 +1417,112 @@ async function moveGames(input: {
         .where(eq(tournamentGames.id, entry.gameId));
     }
     if (!changed) return false;
+  });
+}
+
+/**
+ * Load the lobbies a bulk group action targets and split them into the ones
+ * the action may change and the completed ones it must leave alone. The
+ * split itself lives in tournamentControlRules so it can be tested without
+ * a database.
+ */
+async function loadGroupActionGames(
+  tx: QueryExecutor,
+  tournamentId: number,
+  gameIds: number[]
+) {
+  const games = await tx
+    .select()
+    .from(tournamentGames)
+    .where(inArray(tournamentGames.id, Array.from(new Set(gameIds))));
+  return planGroupAction(games, tournamentId, gameIds);
+}
+
+async function setGamesStatus(input: {
+  tournamentId: number;
+  gameIds: number[];
+  status: (typeof activeTournamentGameStatuses)[number];
+}) {
+  return runBoardMutationAndFetch(input.tournamentId, async tx => {
+    const { editable } = await loadGroupActionGames(
+      tx,
+      input.tournamentId,
+      input.gameIds
+    );
+    const toUpdate = editable.filter(game => game.status !== input.status);
+    if (toUpdate.length === 0) return false;
+    await tx
+      .update(tournamentGames)
+      .set({ status: input.status })
+      .where(
+        inArray(
+          tournamentGames.id,
+          toUpdate.map(game => game.id)
+        )
+      );
+  });
+}
+
+async function returnGamesTeamsToAvailable(input: {
+  tournamentId: number;
+  gameIds: number[];
+}) {
+  return runBoardMutationAndFetch(input.tournamentId, async tx => {
+    const { editable } = await loadGroupActionGames(
+      tx,
+      input.tournamentId,
+      input.gameIds
+    );
+    if (editable.length === 0) return false;
+    const editableIds = editable.map(game => game.id);
+    const existing = await tx
+      .select({ id: tournamentGameAssignments.id })
+      .from(tournamentGameAssignments)
+      .where(inArray(tournamentGameAssignments.gameId, editableIds));
+    if (existing.length === 0) return false;
+    await tx
+      .delete(tournamentGameAssignments)
+      .where(inArray(tournamentGameAssignments.gameId, editableIds));
+  });
+}
+
+function shuffleTeamIds(teamIds: number[]) {
+  const shuffled = [...teamIds];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = randomInt(i + 1);
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
+async function shuffleGamesTeams(input: {
+  tournamentId: number;
+  gameIds: number[];
+}) {
+  return runBoardMutationAndFetch(input.tournamentId, async tx => {
+    const { editable } = await loadGroupActionGames(
+      tx,
+      input.tournamentId,
+      input.gameIds
+    );
+    if (editable.length === 0) return false;
+    const editableIds = editable.map(game => game.id);
+    const assignments = await tx
+      .select()
+      .from(tournamentGameAssignments)
+      .where(inArray(tournamentGameAssignments.gameId, editableIds));
+    const seating = planShuffledSeating(editable, assignments, shuffleTeamIds);
+    if (!seating) return false;
+
+    await tx
+      .delete(tournamentGameAssignments)
+      .where(inArray(tournamentGameAssignments.gameId, editableIds));
+    for (const seat of seating)
+      await tx.insert(tournamentGameAssignments).values({
+        gameId: seat.gameId,
+        teamId: seat.teamId,
+        slotIndex: seat.slotIndex,
+      });
   });
 }
 
@@ -4286,6 +4410,39 @@ export const personalTcrRouter = router({
       await getManageableTournamentOrThrow(db, input.tournamentId, ctx.user);
       return moveGames(input);
     }),
+  setGamesStatus: personalTcrProcedure
+    .input(groupActionSchema.extend({ status: groupActionStatusSchema }))
+    .mutation(async ({ input, ctx }) => {
+      const db = await requireDb();
+      await getMutableManageableTournamentOrThrow(
+        db,
+        input.tournamentId,
+        ctx.user
+      );
+      return setGamesStatus(input);
+    }),
+  returnGamesTeamsToAvailable: personalTcrProcedure
+    .input(groupActionSchema)
+    .mutation(async ({ input, ctx }) => {
+      const db = await requireDb();
+      await getMutableManageableTournamentOrThrow(
+        db,
+        input.tournamentId,
+        ctx.user
+      );
+      return returnGamesTeamsToAvailable(input);
+    }),
+  shuffleGamesTeams: personalTcrProcedure
+    .input(groupActionSchema)
+    .mutation(async ({ input, ctx }) => {
+      const db = await requireDb();
+      await getMutableManageableTournamentOrThrow(
+        db,
+        input.tournamentId,
+        ctx.user
+      );
+      return shuffleGamesTeams(input);
+    }),
   setLobbyCode: personalTcrProcedure
     .input(gameIdSchema.extend({ lobbyCode: lobbyCodeSchema }))
     .mutation(async ({ input, ctx }) => {
@@ -4988,6 +5145,15 @@ export const tournamentControlRouter = router({
       })
     )
     .mutation(({ input }) => moveGames(input)),
+  setGamesStatus: discordTournamentStaffProcedure
+    .input(groupActionSchema.extend({ status: groupActionStatusSchema }))
+    .mutation(({ input }) => setGamesStatus(input)),
+  returnGamesTeamsToAvailable: discordTournamentStaffProcedure
+    .input(groupActionSchema)
+    .mutation(({ input }) => returnGamesTeamsToAvailable(input)),
+  shuffleGamesTeams: discordTournamentStaffProcedure
+    .input(groupActionSchema)
+    .mutation(({ input }) => shuffleGamesTeams(input)),
   connectGames: discordTournamentStaffProcedure
     .input(
       tournamentIdSchema.extend({
@@ -5180,6 +5346,9 @@ export const __tournamentControlTestInternals = {
   unlockTournamentForEditing,
   approveSubmission,
   moveGames,
+  setGamesStatus,
+  returnGamesTeamsToAvailable,
+  shuffleGamesTeams,
   createGame,
   assignTeamToGameSlot,
   createTournamentTeamAndFetch,

@@ -383,3 +383,80 @@ export function validateMovePlan(input: {
 
   return { sourceGame, targetGame, sourceAssignment };
 }
+
+/**
+ * Split the lobbies a bulk group action targets into the ones it may change
+ * and the ones it must leave alone.
+ *
+ * Completed lobbies are historical: reopening one runs advancement
+ * validation that only makes sense per lobby, so bulk actions skip them and
+ * report the count rather than refusing outright — a round of eight where
+ * one lobby has already finished is the normal case, not an error.
+ */
+export function planGroupAction<
+  T extends { id: number; tournamentId: number; status: TournamentGameStatus },
+>(games: T[], tournamentId: number, gameIds: number[]) {
+  const uniqueGameIds = Array.from(new Set(gameIds));
+  if (uniqueGameIds.length !== gameIds.length)
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Duplicate lobby in selection.",
+    });
+  const selected = uniqueGameIds.map(id => {
+    const game = games.find(candidate => candidate.id === id);
+    if (!game)
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "One or more lobbies were not found.",
+      });
+    return game;
+  });
+  if (selected.some(game => game.tournamentId !== tournamentId))
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Selected lobbies must belong to this tournament.",
+    });
+  const editable = selected.filter(game => game.status !== "complete");
+  return { selected, editable, skipped: selected.length - editable.length };
+}
+
+/**
+ * Reseat the teams already in `games` across those same lobbies.
+ *
+ * The seats themselves do not move: the occupied (lobby, slot) pairs stay
+ * exactly as they were and only the teams sitting in them are permuted. That
+ * keeps every lobby's headcount intact, which is the point of shuffling a
+ * round — packing teams into the earliest lobbies and emptying the rest
+ * would restructure the bracket rather than redraw it.
+ *
+ * Seats are ordered by lobby then slot so the result is determined by
+ * `shuffle` alone, and the (gameId, slotIndex) unique index is never offered
+ * a duplicate. Placements are dropped, since a result recorded against the
+ * previous seating says nothing about this one.
+ */
+export function planShuffledSeating<T extends { id: number }>(
+  games: T[],
+  assignments: ControlAssignment[],
+  shuffle: (teamIds: number[]) => number[]
+) {
+  const gameIds = new Set(games.map(game => game.id));
+  const seats = assignments
+    .filter(assignment => gameIds.has(assignment.gameId))
+    .sort((a, b) =>
+      a.gameId === b.gameId ? a.slotIndex - b.slotIndex : a.gameId - b.gameId
+    );
+  if (seats.length < 2) return null;
+
+  const teamIds = shuffle(seats.map(seat => seat.teamId));
+  if (teamIds.length !== seats.length)
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Shuffle changed the number of seated teams.",
+    });
+
+  return seats.map((seat, index) => ({
+    gameId: seat.gameId,
+    teamId: teamIds[index],
+    slotIndex: seat.slotIndex,
+  }));
+}
