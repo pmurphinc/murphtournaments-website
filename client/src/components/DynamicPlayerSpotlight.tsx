@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
-import PlayerSpotlight from './PlayerSpotlight';
-import spotlightData from '@/data/playerSpotlights.json';
+import { useMemo } from "react";
+import PlayerSpotlight from "./PlayerSpotlight";
+import spotlightData from "@/data/playerSpotlights.json";
 
 /**
  * DynamicPlayerSpotlight Component
@@ -21,7 +21,7 @@ interface SpotlightPlayer {
   achievement1: string;
   achievement2: string;
   achievement3: string;
-  accentColor: 'magenta' | 'cyan' | 'gold' | 'lime';
+  accentColor: "magenta" | "cyan" | "gold" | "lime";
   profileSlug: string;
 }
 
@@ -32,39 +32,54 @@ interface SpotlightWeek {
   players: SpotlightPlayer[];
 }
 
+/**
+ * Whole days since the epoch for an instant, in UTC.
+ *
+ * The rotation has to be compared in a single time zone. A `startDate` like
+ * "2026-04-06" is parsed by `new Date` as UTC midnight, so normalizing the
+ * other side of the comparison with `setHours(0,0,0,0)` — which is local —
+ * mixed the two: west of UTC the week start landed on the previous local day
+ * and the spotlight rotated up to a day early. UTC for both sides also means
+ * every viewer worldwide changes week at the same moment.
+ */
+function utcDayNumber(value: Date) {
+  return Math.floor(value.getTime() / 86_400_000);
+}
+
+/**
+ * The week whose window contains `today`, falling back to the first week
+ * before the rotation starts and holding on the last week after it ends.
+ * Exported so the rotation is tested directly rather than reimplemented.
+ */
+export function calculateCurrentWeek<T extends { startDate: string }>(
+  today: Date,
+  weeks: T[]
+): T {
+  const todayDay = utcDayNumber(today);
+  let activeWeek = weeks[0]; // Default to first week until the rotation starts
+
+  for (let i = 0; i < weeks.length; i++) {
+    const weekStartDay = utcDayNumber(new Date(weeks[i].startDate));
+    if (todayDay < weekStartDay) continue;
+
+    const next = weeks[i + 1];
+    if (!next) {
+      activeWeek = weeks[i];
+      break;
+    }
+    if (todayDay < utcDayNumber(new Date(next.startDate))) {
+      activeWeek = weeks[i];
+      break;
+    }
+  }
+
+  return activeWeek;
+}
+
 export default function DynamicPlayerSpotlight() {
   const { currentWeek, players } = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Normalize to start of day
-
     const weeks = spotlightData.weeks as SpotlightWeek[];
-
-    // Find the appropriate week based on current date
-    let activeWeek = weeks[0]; // Default to first week until the rotation starts
-
-    for (let i = 0; i < weeks.length; i++) {
-      const weekStartDate = new Date(weeks[i].startDate);
-      weekStartDate.setHours(0, 0, 0, 0);
-
-      // Check if today is on or after this week's start date
-      if (today >= weekStartDate) {
-        // Check if there's a next week
-        if (i + 1 < weeks.length) {
-          const nextWeekStartDate = new Date(weeks[i + 1].startDate);
-          nextWeekStartDate.setHours(0, 0, 0, 0);
-
-          // If today is before next week's start, use current week
-          if (today < nextWeekStartDate) {
-            activeWeek = weeks[i];
-            break;
-          }
-        } else {
-          // This is the last week, use it
-          activeWeek = weeks[i];
-          break;
-        }
-      }
-    }
+    const activeWeek = calculateCurrentWeek(new Date(), weeks);
 
     return {
       currentWeek: activeWeek.week,
@@ -73,14 +88,15 @@ export default function DynamicPlayerSpotlight() {
   }, []);
 
   // Safely map color names to variant types
-  const getVariant = (color: string): 'magenta' | 'cyan' | 'gold' | 'lime' => {
-    const validVariants: Record<string, 'magenta' | 'cyan' | 'gold' | 'lime'> = {
-      magenta: 'magenta',
-      cyan: 'cyan',
-      gold: 'gold',
-      lime: 'lime',
-    };
-    return validVariants[color] || 'magenta';
+  const getVariant = (color: string): "magenta" | "cyan" | "gold" | "lime" => {
+    const validVariants: Record<string, "magenta" | "cyan" | "gold" | "lime"> =
+      {
+        magenta: "magenta",
+        cyan: "cyan",
+        gold: "gold",
+        lime: "lime",
+      };
+    return validVariants[color] || "magenta";
   };
 
   if (!players || players.length === 0) {
@@ -107,10 +123,10 @@ export default function DynamicPlayerSpotlight() {
                 player.achievement3,
               ]}
               stats={[
-                { label: 'K/D', value: player.kd.toFixed(2) },
-                { label: 'Win Rate', value: `${player.winRate}%` },
-                { label: 'Level', value: player.level.toString() },
-                { label: 'Hours', value: player.hours.toString() },
+                { label: "K/D", value: player.kd.toFixed(2) },
+                { label: "Win Rate", value: `${player.winRate}%` },
+                { label: "Level", value: player.level.toString() },
+                { label: "Hours", value: player.hours.toString() },
               ]}
               variant={getVariant(player.accentColor)}
               href={`/player/${player.profileSlug}`}

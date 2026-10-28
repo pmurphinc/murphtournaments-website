@@ -1,15 +1,16 @@
 import { and, eq, inArray, not, sql } from "drizzle-orm";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomInt, randomUUID } from "node:crypto";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { getDb } from "./db";
 import {
   discordAuthenticatedProcedure,
-  personalTcrAlphaProcedure,
+  personalTcrProcedure,
   protectedProcedure,
   publicProcedure,
   router,
 } from "./_core/trpc";
+import { rateLimited, rateLimits } from "./_core/rateLimit";
 import {
   getDiscordUserId,
   assertDiscordTournamentStaff,
@@ -46,6 +47,8 @@ import {
   validateReopenPlan,
   resolveAssignmentSlot,
   selectAutoFillLobbyAssignments,
+  planGroupAction,
+  planShuffledSeating,
   type ControlAssignment,
   type ControlGame,
   type ControlTeam,
@@ -389,6 +392,22 @@ type AdvancementGame = {
 const idSchema = z.number().int().positive();
 const gameIdSchema = z.object({ gameId: idSchema });
 const tournamentIdSchema = z.object({ tournamentId: idSchema });
+/**
+ * A bulk action over the lobbies currently selected on the board. Capped at
+ * the per-tournament lobby limit, since a selection cannot exceed the board.
+ */
+const groupActionSchema = tournamentIdSchema.extend({
+  gameIds: z
+    .array(idSchema)
+    .min(1)
+    .max(PERSONAL_TCR_LIMITS.gameNodesPerTournament),
+});
+/**
+ * Bulk status changes cover the active statuses only. Completing a lobby
+ * validates qualifier advancement against that lobby's own results, which is
+ * a per-lobby decision rather than something to apply across a round.
+ */
+const groupActionStatusSchema = z.enum(activeTournamentGameStatuses);
 const positionSchema = z.object({
   x: z.number().int().min(-10000).max(10000),
   y: z.number().int().min(-10000).max(10000),
@@ -451,46 +470,68 @@ export const storedMapIdSchema = z
     "Stored map must be a known Finals map"
   );
 
-const boardSnapshotSchema = z.object({
+/**
+ * Upper bounds for a restored board snapshot.
+ *
+ * The undo payload is the largest client-supplied body the control room
+ * sends, and express accepts up to 50mb. Without a cap at the schema edge
+ * every element of an oversized array is validated before the handler's
+ * own limit check runs, so the bounds are applied here, during parsing.
+ * They are deliberately generous: a board is capped at
+ * gameNodesPerTournament lobbies (the same limit the restore handler
+ * enforces), each lobby seats at most 4 teams, and each lobby needs only a
+ * winner and a loser edge, so 4x and 8x leave ample headroom.
+ */
+const maxSnapshotGames = PERSONAL_TCR_LIMITS.gameNodesPerTournament;
+const maxSnapshotAssignments = maxSnapshotGames * 4;
+const maxSnapshotConnections = maxSnapshotGames * 8;
+
+export const boardSnapshotSchema = z.object({
   tournament: z.object({ name: z.string().trim().min(2).max(255) }).optional(),
   expectedRevision: z.number().int().min(0),
-  games: z.array(
-    z.object({
-      id: idSchema,
-      tournamentId: idSchema,
-      gameType: z.enum(tournamentGameTypes),
-      status: z.enum(tournamentGameStatuses),
-      displayLabel: labelSchema,
-      canvasX: z.number().int().min(-10000).max(10000),
-      canvasY: z.number().int().min(-10000).max(10000),
-      privateLobbyCode: z.string().trim().max(64).nullable().optional(),
-      seriesBestOf: seriesBestOfSchema.optional(),
-      mapId: storedMapIdSchema.optional(),
-      broadcastUrl: broadcastUrlSchema.optional(),
-      roundGroupId: z.string().trim().max(64).nullable().optional(),
-      roundLabel: z.string().trim().max(80).nullable().optional(),
-      roundColor: z.string().trim().max(24).nullable().optional(),
-      roundLocked: z.number().int().min(0).max(1).optional(),
-    })
-  ),
-  assignments: z.array(
-    z.object({
-      id: idSchema,
-      gameId: idSchema,
-      teamId: idSchema,
-      slotIndex: z.number().int().positive(),
-      resultPlacement: resultPlacementSchema.optional(),
-    })
-  ),
-  connections: z.array(
-    z.object({
-      id: idSchema,
-      tournamentId: idSchema,
-      sourceGameId: idSchema,
-      targetGameId: idSchema,
-      flowType: connectionFlowTypeSchema,
-    })
-  ),
+  games: z
+    .array(
+      z.object({
+        id: idSchema,
+        tournamentId: idSchema,
+        gameType: z.enum(tournamentGameTypes),
+        status: z.enum(tournamentGameStatuses),
+        displayLabel: labelSchema,
+        canvasX: z.number().int().min(-10000).max(10000),
+        canvasY: z.number().int().min(-10000).max(10000),
+        privateLobbyCode: z.string().trim().max(64).nullable().optional(),
+        seriesBestOf: seriesBestOfSchema.optional(),
+        mapId: storedMapIdSchema.optional(),
+        broadcastUrl: broadcastUrlSchema.optional(),
+        roundGroupId: z.string().trim().max(64).nullable().optional(),
+        roundLabel: z.string().trim().max(80).nullable().optional(),
+        roundColor: z.string().trim().max(24).nullable().optional(),
+        roundLocked: z.number().int().min(0).max(1).optional(),
+      })
+    )
+    .max(maxSnapshotGames),
+  assignments: z
+    .array(
+      z.object({
+        id: idSchema,
+        gameId: idSchema,
+        teamId: idSchema,
+        slotIndex: z.number().int().positive(),
+        resultPlacement: resultPlacementSchema.optional(),
+      })
+    )
+    .max(maxSnapshotAssignments),
+  connections: z
+    .array(
+      z.object({
+        id: idSchema,
+        tournamentId: idSchema,
+        sourceGameId: idSchema,
+        targetGameId: idSchema,
+        flowType: connectionFlowTypeSchema,
+      })
+    )
+    .max(maxSnapshotConnections),
 });
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -1380,6 +1421,112 @@ async function moveGames(input: {
   });
 }
 
+/**
+ * Load the lobbies a bulk group action targets and split them into the ones
+ * the action may change and the completed ones it must leave alone. The
+ * split itself lives in tournamentControlRules so it can be tested without
+ * a database.
+ */
+async function loadGroupActionGames(
+  tx: QueryExecutor,
+  tournamentId: number,
+  gameIds: number[]
+) {
+  const games = await tx
+    .select()
+    .from(tournamentGames)
+    .where(inArray(tournamentGames.id, Array.from(new Set(gameIds))));
+  return planGroupAction(games, tournamentId, gameIds);
+}
+
+async function setGamesStatus(input: {
+  tournamentId: number;
+  gameIds: number[];
+  status: (typeof activeTournamentGameStatuses)[number];
+}) {
+  return runBoardMutationAndFetch(input.tournamentId, async tx => {
+    const { editable } = await loadGroupActionGames(
+      tx,
+      input.tournamentId,
+      input.gameIds
+    );
+    const toUpdate = editable.filter(game => game.status !== input.status);
+    if (toUpdate.length === 0) return false;
+    await tx
+      .update(tournamentGames)
+      .set({ status: input.status })
+      .where(
+        inArray(
+          tournamentGames.id,
+          toUpdate.map(game => game.id)
+        )
+      );
+  });
+}
+
+async function returnGamesTeamsToAvailable(input: {
+  tournamentId: number;
+  gameIds: number[];
+}) {
+  return runBoardMutationAndFetch(input.tournamentId, async tx => {
+    const { editable } = await loadGroupActionGames(
+      tx,
+      input.tournamentId,
+      input.gameIds
+    );
+    if (editable.length === 0) return false;
+    const editableIds = editable.map(game => game.id);
+    const existing = await tx
+      .select({ id: tournamentGameAssignments.id })
+      .from(tournamentGameAssignments)
+      .where(inArray(tournamentGameAssignments.gameId, editableIds));
+    if (existing.length === 0) return false;
+    await tx
+      .delete(tournamentGameAssignments)
+      .where(inArray(tournamentGameAssignments.gameId, editableIds));
+  });
+}
+
+function shuffleTeamIds(teamIds: number[]) {
+  const shuffled = [...teamIds];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = randomInt(i + 1);
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
+async function shuffleGamesTeams(input: {
+  tournamentId: number;
+  gameIds: number[];
+}) {
+  return runBoardMutationAndFetch(input.tournamentId, async tx => {
+    const { editable } = await loadGroupActionGames(
+      tx,
+      input.tournamentId,
+      input.gameIds
+    );
+    if (editable.length === 0) return false;
+    const editableIds = editable.map(game => game.id);
+    const assignments = await tx
+      .select()
+      .from(tournamentGameAssignments)
+      .where(inArray(tournamentGameAssignments.gameId, editableIds));
+    const seating = planShuffledSeating(editable, assignments, shuffleTeamIds);
+    if (!seating) return false;
+
+    await tx
+      .delete(tournamentGameAssignments)
+      .where(inArray(tournamentGameAssignments.gameId, editableIds));
+    for (const seat of seating)
+      await tx.insert(tournamentGameAssignments).values({
+        gameId: seat.gameId,
+        teamId: seat.teamId,
+        slotIndex: seat.slotIndex,
+      });
+  });
+}
+
 async function connectGames(
   tournamentId: number,
   sourceGameId: number,
@@ -2161,38 +2308,89 @@ async function getViewerDataByToken(token: string) {
       code: "NOT_FOUND",
       message: "Viewer link not found.",
     });
-  const data = await fetchTournamentRows(db, link.tournamentId);
+  return fetchViewerBoard(db, link.tournamentId);
+}
+
+/**
+ * The board as an anonymous viewer may see it.
+ *
+ * This selects the viewer's columns from the database rather than fetching
+ * the staff board and projecting it down. fetchTournamentRows joins
+ * managed_teams and users to resolve each team's captain, so the old path
+ * pulled captain Discord open IDs and display names across the wire for a
+ * public, unauthenticated endpoint and then dropped them — correct, but one
+ * careless change to the projection away from publishing them. Private
+ * lobby codes were excluded the same way and carry the same risk.
+ *
+ * Every field is listed explicitly, including on assignments and
+ * connections, so a column added to those tables later does not reach the
+ * public endpoint on its own.
+ */
+async function fetchViewerBoard(db: QueryExecutor, tournamentId: number) {
+  const [tournament] = await db
+    .select({
+      id: tournaments.id,
+      name: tournaments.name,
+      eventStatus: tournaments.eventStatus,
+      currentStage: tournaments.currentStage,
+      currentCycle: tournaments.currentCycle,
+      currentMatch: tournaments.currentMatch,
+    })
+    .from(tournaments)
+    .where(eq(tournaments.id, tournamentId))
+    .limit(1);
+  if (!tournament)
+    throw new TRPCError({ code: "NOT_FOUND", message: "Tournament not found" });
+
+  const [teamRows, gameRows, assignmentRows, connectionResult] =
+    await Promise.all([
+      db
+        .select({ id: teams.id, name: teams.name, frp: teams.frp })
+        .from(teams)
+        .where(eq(teams.tournamentId, tournamentId)),
+      db
+        .select({
+          id: tournamentGames.id,
+          tournamentId: tournamentGames.tournamentId,
+          gameType: tournamentGames.gameType,
+          status: tournamentGames.status,
+          displayLabel: tournamentGames.displayLabel,
+          canvasX: tournamentGames.canvasX,
+          canvasY: tournamentGames.canvasY,
+          seriesBestOf: tournamentGames.seriesBestOf,
+          mapId: tournamentGames.mapId,
+          broadcastUrl: tournamentGames.broadcastUrl,
+          roundGroupId: tournamentGames.roundGroupId,
+          roundLabel: tournamentGames.roundLabel,
+          roundColor: tournamentGames.roundColor,
+        })
+        .from(tournamentGames)
+        .where(eq(tournamentGames.tournamentId, tournamentId)),
+      db
+        .select({
+          id: tournamentGameAssignments.id,
+          gameId: tournamentGameAssignments.gameId,
+          teamId: tournamentGameAssignments.teamId,
+          slotIndex: tournamentGameAssignments.slotIndex,
+          resultPlacement: tournamentGameAssignments.resultPlacement,
+        })
+        .from(tournamentGameAssignments)
+        .innerJoin(
+          tournamentGames,
+          eq(tournamentGameAssignments.gameId, tournamentGames.id)
+        )
+        .where(eq(tournamentGames.tournamentId, tournamentId)),
+      db.execute(
+        sql`SELECT id, tournamentId, sourceGameId, targetGameId, flowType FROM tournament_game_connections WHERE tournamentId = ${tournamentId}`
+      ),
+    ]);
+
   return {
-    tournament: {
-      id: data.tournament.id,
-      name: data.tournament.name,
-      eventStatus: data.tournament.eventStatus,
-      currentStage: data.tournament.currentStage,
-      currentCycle: data.tournament.currentCycle,
-      currentMatch: data.tournament.currentMatch,
-    },
-    teams: data.teams.map(team => ({
-      id: team.id,
-      name: team.name,
-      frp: team.frp,
-    })),
-    games: data.games.map(game => ({
-      id: game.id,
-      tournamentId: game.tournamentId,
-      gameType: game.gameType,
-      status: game.status,
-      displayLabel: game.displayLabel,
-      canvasX: game.canvasX,
-      canvasY: game.canvasY,
-      seriesBestOf: game.seriesBestOf,
-      mapId: game.mapId,
-      broadcastUrl: game.broadcastUrl,
-      roundGroupId: game.roundGroupId,
-      roundLabel: game.roundLabel,
-      roundColor: game.roundColor,
-    })),
-    assignments: data.assignments,
-    connections: data.connections,
+    tournament,
+    teams: teamRows,
+    games: gameRows,
+    assignments: assignmentRows,
+    connections: readRows<ControlGameConnection>(connectionResult),
   };
 }
 
@@ -3891,8 +4089,6 @@ async function unlockTournamentForEditing(
   });
 }
 
-export const personalTcrProcedure = personalTcrAlphaProcedure;
-
 export const personalTcrRouter = router({
   listTournaments: personalTcrProcedure.query(async ({ ctx }) => {
     const db = await requireDb();
@@ -4074,6 +4270,7 @@ export const personalTcrRouter = router({
       revokeStaffInviteLink(input.tournamentId, ctx.user)
     ),
   previewStaffInvite: personalTcrProcedure
+    .use(rateLimited(rateLimits.preview))
     .input(z.object({ token: tokenSchema }))
     .query(({ input }) => previewStaffInvite(input.token)),
   acceptStaffInvite: personalTcrProcedure
@@ -4263,6 +4460,39 @@ export const personalTcrRouter = router({
       const db = await requireDb();
       await getManageableTournamentOrThrow(db, input.tournamentId, ctx.user);
       return moveGames(input);
+    }),
+  setGamesStatus: personalTcrProcedure
+    .input(groupActionSchema.extend({ status: groupActionStatusSchema }))
+    .mutation(async ({ input, ctx }) => {
+      const db = await requireDb();
+      await getMutableManageableTournamentOrThrow(
+        db,
+        input.tournamentId,
+        ctx.user
+      );
+      return setGamesStatus(input);
+    }),
+  returnGamesTeamsToAvailable: personalTcrProcedure
+    .input(groupActionSchema)
+    .mutation(async ({ input, ctx }) => {
+      const db = await requireDb();
+      await getMutableManageableTournamentOrThrow(
+        db,
+        input.tournamentId,
+        ctx.user
+      );
+      return returnGamesTeamsToAvailable(input);
+    }),
+  shuffleGamesTeams: personalTcrProcedure
+    .input(groupActionSchema)
+    .mutation(async ({ input, ctx }) => {
+      const db = await requireDb();
+      await getMutableManageableTournamentOrThrow(
+        db,
+        input.tournamentId,
+        ctx.user
+      );
+      return shuffleGamesTeams(input);
     }),
   setLobbyCode: personalTcrProcedure
     .input(gameIdSchema.extend({ lobbyCode: lobbyCodeSchema }))
@@ -4754,10 +4984,14 @@ export const tournamentControlRouter = router({
     .mutation(({ input, ctx }) =>
       regenerateViewerLink(input.tournamentId, ctx.user.id)
     ),
+  // Polled every five seconds by every open bracket tab, and reachable
+  // without a login, so it carries the heavier of the two public limits.
   getViewer: publicProcedure
+    .use(rateLimited(rateLimits.poll))
     .input(z.object({ token: tokenSchema }))
     .query(({ input }) => getViewerDataByToken(input.token)),
   getTeamClaimLinkPreview: publicProcedure
+    .use(rateLimited(rateLimits.preview))
     .input(z.object({ token: tokenSchema }))
     .query(async ({ input }) => {
       const db = await requireDb();
@@ -4966,6 +5200,15 @@ export const tournamentControlRouter = router({
       })
     )
     .mutation(({ input }) => moveGames(input)),
+  setGamesStatus: discordTournamentStaffProcedure
+    .input(groupActionSchema.extend({ status: groupActionStatusSchema }))
+    .mutation(({ input }) => setGamesStatus(input)),
+  returnGamesTeamsToAvailable: discordTournamentStaffProcedure
+    .input(groupActionSchema)
+    .mutation(({ input }) => returnGamesTeamsToAvailable(input)),
+  shuffleGamesTeams: discordTournamentStaffProcedure
+    .input(groupActionSchema)
+    .mutation(({ input }) => shuffleGamesTeams(input)),
   connectGames: discordTournamentStaffProcedure
     .input(
       tournamentIdSchema.extend({
@@ -5158,6 +5401,9 @@ export const __tournamentControlTestInternals = {
   unlockTournamentForEditing,
   approveSubmission,
   moveGames,
+  setGamesStatus,
+  returnGamesTeamsToAvailable,
+  shuffleGamesTeams,
   createGame,
   assignTeamToGameSlot,
   createTournamentTeamAndFetch,

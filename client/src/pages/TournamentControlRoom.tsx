@@ -94,6 +94,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import TcrTopBar from "@/components/tcr/TcrTopBar";
+import TcrConnectorLegend from "@/components/tcr/TcrConnectorLegend";
 import TcrToolbar from "@/components/tcr/TcrToolbar";
 import TcrTeamsPanel from "@/components/tcr/TcrTeamsPanel";
 import TcrInspector, {
@@ -183,6 +184,7 @@ type DialogState =
       currentValue?: string;
     }
   | { type: "delete-round"; roundGroupId: string; label: string }
+  | { type: "bulk-return-selected-teams"; gameIds: number[] }
   | {
       type:
         | "bulk-delete-connections"
@@ -538,6 +540,14 @@ export default function TournamentControlRoom({
   const moveGames = controlApi.moveGames.useMutation({
     onError: (error: { message: string }) => toast.error(error.message),
   });
+  // Bulk actions over the selected lobbies. They go through mutationOptions
+  // so each lands as a single board revision and a single undo entry, rather
+  // than one per lobby as a client-side loop would.
+  const setGamesStatus = controlApi.setGamesStatus.useMutation(mutationOptions);
+  const returnGamesTeamsToAvailable =
+    controlApi.returnGamesTeamsToAvailable.useMutation(mutationOptions);
+  const shuffleGamesTeams =
+    controlApi.shuffleGamesTeams.useMutation(mutationOptions);
   const connectGames = controlApi.connectGames.useMutation(mutationOptions);
   const deleteGameConnection =
     controlApi.deleteGameConnection.useMutation(mutationOptions);
@@ -615,6 +625,12 @@ export default function TournamentControlRoom({
             ].slice(0, undoHistoryLimit)
           )
         )
+        .then(() => {
+          // Group moves are the one board mutation that did not refetch, so
+          // the cached games kept their pre-move positions and the optimistic
+          // overlay was never reconciled away.
+          invalidate();
+        })
         .catch(() => undefined);
     },
     [moveGames, tournamentId]
@@ -642,6 +658,15 @@ export default function TournamentControlRoom({
         const boardRevision = data.tournament.boardRevision;
         setUndoHistory(history =>
           rebaseBoardUndoHistoryAfterRestore(history, boardRevision)
+        );
+        // The restored snapshot is authoritative, so drop every optimistic
+        // position. Without this, undoing a move leaves the lobby drawn at
+        // the position it was dragged or organized to: getVisualPosition
+        // prefers the optimistic entry, and the reconciliation effect only
+        // clears one that already matches the server, which a reverted
+        // position never does.
+        setOptimisticGamePositions(current =>
+          current.size === 0 ? current : new Map()
         );
         invalidate();
         toast.success("Undo applied");
@@ -1876,8 +1901,23 @@ export default function TournamentControlRoom({
     );
   }
   if (query.isLoading)
-    return <ControlState title="Verifying Discord organizer roles…" />;
+    return (
+      <ControlState
+        title={
+          isPersonalTcr
+            ? "Opening your Control Room…"
+            : "Verifying Discord organizer roles…"
+        }
+      />
+    );
   if (query.error) {
+    // Personal /TCR has no Discord role requirement, so the staff-only role
+    // wording below must not be shown to those users: an owner who hits the
+    // alpha gate or a permission error would otherwise be told to obtain a
+    // "Tournament Control role" that does not apply to them.
+    const fallbackErrorTitle = isPersonalTcr
+      ? "Control Room unavailable"
+      : "Tournament Control role required";
     return (
       <ControlState
         title={
@@ -1885,7 +1925,7 @@ export default function TournamentControlRoom({
             ? "Discord role configuration error"
             : query.error.message.includes("Unable to verify")
               ? "Discord service verification failed"
-              : "Tournament Control role required"
+              : fallbackErrorTitle
         }
         description={getSafeTournamentControlErrorMessage(query.error.message)}
       />
@@ -1908,6 +1948,21 @@ export default function TournamentControlRoom({
 
   const groupSelectionForActions =
     selection.kind === "group" ? selection : null;
+
+  // Teams currently seated in the selected lobbies. Completed lobbies are
+  // excluded because the bulk actions leave them untouched, so counting them
+  // would promise to move teams that will not move.
+  const selectedAssignedTeamCount = (() => {
+    const ids = groupSelectionForActions?.gameIds;
+    if (!ids?.length) return 0;
+    const editable = new Set(
+      games
+        .filter(game => ids.includes(game.id) && game.status !== "complete")
+        .map(game => game.id)
+    );
+    return assignments.filter(assignment => editable.has(assignment.gameId))
+      .length;
+  })();
 
   const openGroupRenameDialog = () => {
     const game = games.find(
@@ -2065,6 +2120,27 @@ export default function TournamentControlRoom({
       onOrganizeGroup={() => {
         const group = groupSelectionForActions?.group;
         if (group) organizeGroup(group.id);
+      }}
+      groupActionPending={
+        setGamesStatus.isPending ||
+        shuffleGamesTeams.isPending ||
+        returnGamesTeamsToAvailable.isPending
+      }
+      selectedAssignedTeamCount={selectedAssignedTeamCount}
+      onSetSelectedStatus={status => {
+        const gameIds = groupSelectionForActions?.gameIds ?? [];
+        if (gameIds.length > 0)
+          setGamesStatus.mutate({ tournamentId, gameIds, status });
+      }}
+      onShuffleSelectedTeams={() => {
+        const gameIds = groupSelectionForActions?.gameIds ?? [];
+        if (gameIds.length > 0)
+          shuffleGamesTeams.mutate({ tournamentId, gameIds });
+      }}
+      onReturnSelectedTeams={() => {
+        const gameIds = groupSelectionForActions?.gameIds ?? [];
+        if (gameIds.length > 0)
+          setDialogState({ type: "bulk-return-selected-teams", gameIds });
       }}
       onDeleteGroup={() => {
         const group = groupSelectionForActions?.group;
@@ -3292,6 +3368,8 @@ export default function TournamentControlRoom({
               </ContextMenuContent>
             </ContextMenu>
 
+            <TcrConnectorLegend />
+
             {mobileDockOpen && (
               <div
                 className="absolute inset-x-0 bottom-0 z-[60] flex max-h-[45dvh] flex-col border-t border-white/10 bg-zinc-950 shadow-[0_-8px_24px_rgba(0,0,0,0.5)] lg:hidden"
@@ -3599,6 +3677,7 @@ export default function TournamentControlRoom({
         open={
           dialogState?.type === "bulk-delete-connections" ||
           dialogState?.type === "bulk-return-teams" ||
+          dialogState?.type === "bulk-return-selected-teams" ||
           dialogState?.type === "bulk-wipe-canvas"
         }
         onOpenChange={open => !open && setDialogState(null)}
@@ -3610,14 +3689,18 @@ export default function TournamentControlRoom({
                 ? "Delete all connections?"
                 : dialogState?.type === "bulk-return-teams"
                   ? "Return all teams to available?"
-                  : "Wipe canvas?"}
+                  : dialogState?.type === "bulk-return-selected-teams"
+                    ? "Return teams from the selected lobbies?"
+                    : "Wipe canvas?"}
             </AlertDialogTitle>
             <AlertDialogDescription className="text-zinc-400">
               {dialogState?.type === "bulk-delete-connections"
                 ? "This removes every lobby connection for this tournament and leaves lobbies, teams, assignments, submissions, and viewer links intact."
                 : dialogState?.type === "bulk-return-teams"
                   ? "This removes every team assignment from the current lobbies without deleting teams, lobbies, or connections."
-                  : "This deletes every lobby on the canvas. Existing cascade cleanup removes their assignments and connections while preserving teams, submissions, viewer links, and the tournament."}
+                  : dialogState?.type === "bulk-return-selected-teams"
+                    ? "This empties only the selected lobbies, sending their teams back to Available Teams. Completed lobbies are left untouched, and no teams, lobbies, or connections are deleted."
+                    : "This deletes every lobby on the canvas. Existing cascade cleanup removes their assignments and connections while preserving teams, submissions, viewer links, and the tournament."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -3638,6 +3721,12 @@ export default function TournamentControlRoom({
                       tournamentId,
                     })
                   );
+                }
+                if (dialogState?.type === "bulk-return-selected-teams") {
+                  returnGamesTeamsToAvailable.mutate({
+                    tournamentId,
+                    gameIds: dialogState.gameIds,
+                  });
                 }
                 if (dialogState?.type === "bulk-wipe-canvas") {
                   runDestructiveBoardAction(() =>

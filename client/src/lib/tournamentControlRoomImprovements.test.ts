@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
 import {
+  boardSnapshotSchema,
+  broadcastUrlSchema,
   storedMapIdSchema,
   userSelectedMapIdSchema,
 } from "../../../server/tournamentControl";
@@ -58,14 +60,43 @@ describe("Tournament Control Room improvements", () => {
       "async function saveTemplateFromTournament"
     );
     const viewerCode = server.slice(viewerStart, viewerEnd);
-    expect(viewerCode).toContain("teams: data.teams.map(team =>");
-    expect(viewerCode).toContain("frp: team.frp");
+    expect(viewerCode).toContain("frp: teams.frp");
     expect(viewerCode).toContain("seriesBestOf");
     expect(viewerCode).toContain("mapId");
     expect(viewerCode).toContain("broadcastUrl");
     expect(viewerCode).not.toContain("privateLobbyCode");
     expect(viewerCode).not.toContain("captainDiscordId");
     expect(viewerCode).not.toContain("captainUserId");
+    expect(viewerCode).not.toContain("captainDiscordOpenId");
+  });
+
+  it("builds the viewer board without touching the captain tables", async () => {
+    // The public viewer used to project the full staff board down, which
+    // meant joining managed_teams and users to resolve each team's captain
+    // and carrying their Discord open ids to an unauthenticated endpoint
+    // before discarding them. Selecting the viewer's own columns keeps that
+    // data out of the query entirely.
+    const server = await readFile(
+      new URL("../../../server/tournamentControl.ts", import.meta.url),
+      "utf8"
+    );
+    const start = server.indexOf("async function fetchViewerBoard");
+    expect(start).toBeGreaterThan(-1);
+    const body = server.slice(
+      start,
+      server.indexOf("async function", start + 1)
+    );
+    expect(body).not.toContain("managedTeams");
+    expect(body).not.toContain("leftJoin");
+    expect(body).not.toContain("fetchTournamentRows");
+  });
+
+  it("does not hand the viewer the staff board", async () => {
+    const server = await readFile(
+      new URL("../../../server/tournamentControl.ts", import.meta.url),
+      "utf8"
+    );
+    expect(server).toContain("return fetchViewerBoard(db, link.tournamentId)");
   });
 
   it("manual team claim links are token-hashed, single-use, expiring, and create managed ownership", async () => {
@@ -168,8 +199,6 @@ describe("Tournament Control Room improvements", () => {
       'broadcastUrl: varchar("broadcastUrl", { length: 1024 })'
     );
     expect(server).toContain("export const broadcastUrlSchema");
-    expect(server).toContain('protocol === "http:" || protocol === "https:"');
-    expect(server).toContain("trimmed.length === 0 ? null : trimmed");
     expect(server).toContain(
       "setBroadcastUrl: discordTournamentStaffProcedure"
     );
@@ -180,7 +209,7 @@ describe("Tournament Control Room improvements", () => {
       server.indexOf("async function getViewerDataByToken"),
       server.indexOf("async function saveTemplateFromTournament")
     );
-    expect(viewerCode).toContain("broadcastUrl: game.broadcastUrl");
+    expect(viewerCode).toContain("broadcastUrl: tournamentGames.broadcastUrl");
     expect(viewerCode).not.toContain("privateLobbyCode");
     const restoreCode = server.slice(
       server.indexOf("async function restoreTournamentBoardSnapshot"),
@@ -189,23 +218,178 @@ describe("Tournament Control Room improvements", () => {
     expect(restoreCode).toContain("broadcastUrl: game.broadcastUrl ?? null");
   });
 
-  it("keeps broadcast dialog reachable and splits lobby metadata into two non-overlapping rows", async () => {
+  it("keeps the broadcast dialog reachable from the board", async () => {
     const controlRoom = await readFile(
       new URL("../pages/TournamentControlRoom.tsx", import.meta.url),
       "utf8"
     );
+    const lobbyNode = await readFile(
+      new URL("../components/tcr/TcrLobbyNode.tsx", import.meta.url),
+      "utf8"
+    );
+    const inspector = await readFile(
+      new URL("../components/tcr/TcrInspector.tsx", import.meta.url),
+      "utf8"
+    );
 
     expect(controlRoom).toContain('dialogState?.type === "broadcast"');
-    expect(controlRoom).toContain('className="mb-3 space-y-2"');
-    expect(controlRoom).toContain(
-      'className="min-w-0 flex-1 rounded border border-[#FFD700]/30'
+    // Reachable from the lobby node context menu and from the inspector.
+    expect(lobbyNode).toContain("Set/Clear Broadcast Link");
+    expect(inspector).toContain("Set Broadcast");
+    // A lobby with a broadcast link says so on the node.
+    expect(lobbyNode).toContain("Broadcast Link Set");
+  });
+});
+
+/**
+ * Behavioral cover for the broadcast URL boundary.
+ *
+ * broadcastUrl is the one staff-entered free-text field that reaches the
+ * PUBLIC viewer (/bracket/<token>) and is rendered there as a link, so the
+ * scheme restriction is a security boundary, not a formatting nicety.
+ */
+describe("broadcastUrlSchema", () => {
+  const parse = (value: unknown) => broadcastUrlSchema.safeParse(value);
+
+  it("accepts an ordinary https broadcast link", () => {
+    const result = parse("https://twitch.tv/murphtournaments");
+    expect(result.success).toBe(true);
+    if (result.success)
+      expect(result.data).toBe("https://twitch.tv/murphtournaments");
+  });
+
+  it("upgrades a scheme-less host to https so the viewer link is absolute", () => {
+    const result = parse("twitch.tv/murphtournaments");
+    expect(result.success).toBe(true);
+    if (result.success)
+      expect(result.data).toBe("https://twitch.tv/murphtournaments");
+  });
+
+  it("upgrades a protocol-relative link to https", () => {
+    const result = parse("//twitch.tv/murphtournaments");
+    expect(result.success).toBe(true);
+    if (result.success)
+      expect(result.data).toBe("https://twitch.tv/murphtournaments");
+  });
+
+  it("normalizes an empty or whitespace-only value to null", () => {
+    for (const value of ["", "   ", "\t\n"]) {
+      const result = parse(value);
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data).toBeNull();
+    }
+  });
+
+  it("trims surrounding whitespace", () => {
+    const result = parse("  https://twitch.tv/x  ");
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data).toBe("https://twitch.tv/x");
+  });
+
+  it("rejects javascript: and other script-bearing schemes", () => {
+    // These would otherwise become an href in the public viewer.
+    expect(parse("javascript:alert(1)").success).toBe(false);
+    expect(parse("JavaScript:alert(1)").success).toBe(false);
+    expect(parse("data:text/html;base64,PHNjcmlwdD4=").success).toBe(false);
+    expect(parse("vbscript:msgbox(1)").success).toBe(false);
+  });
+
+  it("rejects non-web schemes", () => {
+    expect(parse("file:///etc/passwd").success).toBe(false);
+    expect(parse("ftp://example.com/x").success).toBe(false);
+  });
+
+  it("accepts plain http", () => {
+    expect(parse("http://example.com/stream").success).toBe(true);
+  });
+
+  it("rejects a URL longer than the column allows", () => {
+    expect(parse(`https://example.com/${"a".repeat(1100)}`).success).toBe(
+      false
     );
-    expect(controlRoom).toContain(
-      'className="shrink-0 whitespace-nowrap rounded border border-cyan-300/30'
+  });
+
+  it("accepts an explicit null", () => {
+    const result = parse(null);
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data).toBeNull();
+  });
+});
+
+/**
+ * Bounds on the undo/restore payload.
+ *
+ * restoreTournamentBoardSnapshot takes the largest client-supplied body in
+ * the product and express accepts up to 50mb, so the arrays are capped
+ * during parsing rather than only in the handler.
+ */
+describe("boardSnapshotSchema size limits", () => {
+  const game = (id: number) => ({
+    id,
+    tournamentId: 1,
+    gameType: "cashout" as const,
+    status: "ready" as const,
+    displayLabel: `Lobby ${id}`,
+    canvasX: 0,
+    canvasY: 0,
+  });
+  const assignment = (id: number) => ({
+    id,
+    gameId: 1,
+    teamId: id,
+    slotIndex: 1,
+  });
+  const connection = (id: number) => ({
+    id,
+    tournamentId: 1,
+    sourceGameId: 1,
+    targetGameId: 2,
+    flowType: "winner" as const,
+  });
+  const snapshot = (counts: {
+    games?: number;
+    assignments?: number;
+    connections?: number;
+  }) => ({
+    expectedRevision: 0,
+    games: Array.from({ length: counts.games ?? 1 }, (_, i) => game(i + 1)),
+    assignments: Array.from({ length: counts.assignments ?? 0 }, (_, i) =>
+      assignment(i + 1)
+    ),
+    connections: Array.from({ length: counts.connections ?? 0 }, (_, i) =>
+      connection(i + 1)
+    ),
+  });
+
+  it("accepts a board at the documented limits", () => {
+    const result = boardSnapshotSchema.safeParse(
+      snapshot({ games: 64, assignments: 256, connections: 512 })
     );
-    expect(controlRoom).toContain("Broadcast Link Set");
-    expect(controlRoom).toContain(
-      'className="ml-auto shrink-0 font-mono text-[10px] uppercase tracking-widest text-white/35"'
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects more lobbies than a tournament may hold", () => {
+    expect(boardSnapshotSchema.safeParse(snapshot({ games: 65 })).success).toBe(
+      false
     );
+  });
+
+  it("rejects an oversized assignments array", () => {
+    expect(
+      boardSnapshotSchema.safeParse(snapshot({ assignments: 257 })).success
+    ).toBe(false);
+  });
+
+  it("rejects an oversized connections array", () => {
+    expect(
+      boardSnapshotSchema.safeParse(snapshot({ connections: 513 })).success
+    ).toBe(false);
+  });
+
+  it("still accepts an ordinary small board", () => {
+    const result = boardSnapshotSchema.safeParse(
+      snapshot({ games: 4, assignments: 12, connections: 3 })
+    );
+    expect(result.success).toBe(true);
   });
 });

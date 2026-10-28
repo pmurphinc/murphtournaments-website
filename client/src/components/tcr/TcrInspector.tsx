@@ -129,6 +129,12 @@ export type TcrInspectorProps = {
   onSetGroupColor: (colorId: RoundFrameColorId) => void;
   onToggleGroupLock: () => void;
   onOrganizeGroup: () => void;
+  // Bulk actions over the selected lobbies.
+  onSetSelectedStatus: (status: "draft" | "ready" | "live") => void;
+  onShuffleSelectedTeams: () => void;
+  onReturnSelectedTeams: () => void;
+  groupActionPending: boolean;
+  selectedAssignedTeamCount: number;
   onDeleteGroup: () => void;
 };
 
@@ -684,6 +690,81 @@ function GroupSection(props: TcrInspectorProps) {
           </div>
         </>
       )}
+
+      {/*
+        Actions over the selected lobbies themselves. These work on the
+        selection rather than on a named group, so they are available before
+        the lobbies have been grouped.
+      */}
+      <div className="space-y-2 border-t border-white/10 pt-3">
+        <span className={tcrFieldLabelClass} id="group-bulk-label">
+          {gameIds.length} selected {gameIds.length === 1 ? "lobby" : "lobbies"}
+        </span>
+
+        <div role="group" aria-labelledby="group-bulk-status-label">
+          <span
+            className="mb-1.5 block text-[11px] text-zinc-500"
+            id="group-bulk-status-label"
+          >
+            Set status
+          </span>
+          <div className="grid grid-cols-3 gap-1.5">
+            {(
+              [
+                { status: "draft", label: "Draft", Icon: CircleDashed },
+                { status: "ready", label: "Ready", Icon: CircleDot },
+                { status: "live", label: "Live", Icon: Radio },
+              ] as const
+            ).map(({ status, label, Icon }) => (
+              <button
+                key={status}
+                type="button"
+                className={tcrSecondaryButtonClass}
+                disabled={locked || props.groupActionPending}
+                onClick={() => props.onSetSelectedStatus(status)}
+              >
+                <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid gap-1.5">
+          <button
+            type="button"
+            className={tcrSecondaryButtonClass}
+            disabled={
+              locked ||
+              props.groupActionPending ||
+              props.selectedAssignedTeamCount < 2
+            }
+            onClick={props.onShuffleSelectedTeams}
+          >
+            <Shuffle className="h-3.5 w-3.5" aria-hidden="true" />
+            Shuffle Teams
+          </button>
+          <button
+            type="button"
+            className={tcrSecondaryButtonClass}
+            disabled={
+              locked ||
+              props.groupActionPending ||
+              props.selectedAssignedTeamCount === 0
+            }
+            onClick={props.onReturnSelectedTeams}
+          >
+            <UserMinus className="h-3.5 w-3.5" aria-hidden="true" />
+            Return Teams to Available
+          </button>
+        </div>
+
+        <p className="text-xs leading-relaxed text-zinc-500">
+          {props.selectedAssignedTeamCount === 0
+            ? "No teams are seated in the selected lobbies."
+            : `Shuffle redraws the ${props.selectedAssignedTeamCount} seated teams across these lobbies. Completed lobbies are left untouched.`}
+        </p>
+      </div>
 
       <button
         type="button"

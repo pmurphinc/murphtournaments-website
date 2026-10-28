@@ -3,7 +3,7 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import type { TrpcContext } from "./context";
 
-const t = initTRPC.context<TrpcContext>().create({
+export const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
 });
 
@@ -40,52 +40,22 @@ export const discordAuthenticatedProcedure = t.procedure.use(
   })
 );
 
-export const TCR_ALPHA_ONLY_MESSAGE =
-  "The Tournament Control Room is currently available to invited alpha testers only.";
-
-function getDiscordId(user: { openId?: string | null }) {
-  const match = user.openId?.match(/(?:^discord:|^)(\d{5,32})$/);
-  return match?.[1] ?? null;
-}
-
-function getTcrAlphaAllowlist() {
-  return new Set(
-    (process.env.TCR_ALPHA_ALLOWED_DISCORD_IDS ?? "")
-      .split(",")
-      .map(id => id.trim())
-      .filter(id => /^\d{5,32}$/.test(id))
-  );
-}
-
-if (
-  process.env.TCR_ALPHA_MODE === "true" &&
-  getTcrAlphaAllowlist().size === 0
-) {
-  console.warn(
-    "TCR alpha mode is enabled without any valid allowlisted Discord IDs; only site admins can access Personal TCR."
-  );
-}
-
-export const personalTcrAlphaProcedure = discordAuthenticatedProcedure.use(
-  t.middleware(async opts => {
-    const { ctx, next } = opts;
-    const user = ctx.user;
-    if (!user || user.loginMethod !== "discord")
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "Discord sign-in is required.",
-      });
-    if (user.role === "admin" || process.env.TCR_ALPHA_MODE !== "true")
-      return next({ ctx: { ...ctx, user } });
-    const discordId = getDiscordId(user);
-    if (!discordId || !getTcrAlphaAllowlist().has(discordId))
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: TCR_ALPHA_ONLY_MESSAGE,
-      });
-    return next({ ctx: { ...ctx, user } });
-  })
-);
+/**
+ * Personal Tournament Control Room access.
+ *
+ * Personal TCR launched publicly, so the only requirement is a Discord
+ * identity: a tournament has an owner, and ownership is what every
+ * per-tournament guard in tournamentControl.ts checks against. Resource
+ * ceilings live in PERSONAL_TCR_LIMITS rather than in an access gate.
+ *
+ * This replaces an invite allowlist driven by TCR_ALPHA_MODE and
+ * TCR_ALPHA_ALLOWED_DISCORD_IDS. That gate failed open — any value other
+ * than the exact string "true" admitted everyone — so whether the product
+ * was reachable at all turned on an environment variable that appeared in
+ * no committed config. Removing it makes the launched state the state the
+ * code describes.
+ */
+export const personalTcrProcedure = discordAuthenticatedProcedure;
 
 export const adminProcedure = t.procedure.use(
   t.middleware(async opts => {

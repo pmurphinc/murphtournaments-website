@@ -8,9 +8,15 @@ import {
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { tcrPanelHeadingClass } from "./tcrStyles";
 
-type ShortcutRow = { keys: string[]; description: string };
+export type ShortcutRow = { keys: string[]; description: string };
 
-const mouseRows: ShortcutRow[] = [
+/**
+ * The shortcut tables are exported so tests can assert on the documented
+ * controls directly: the dialog body renders through a Radix portal, which
+ * produces no output under renderToStaticMarkup (the only renderer available
+ * in this suite), so the rendered markup cannot be inspected.
+ */
+export const mouseRows: ShortcutRow[] = [
   { keys: ["Drag empty board"], description: "Pan around the bracket" },
   { keys: ["Shift", "Wheel"], description: "Zoom in and out" },
   { keys: ["Right-click empty board"], description: "Add a team or lobby" },
@@ -23,7 +29,7 @@ const mouseRows: ShortcutRow[] = [
   { keys: ["Double-click a connection"], description: "Remove the connection" },
 ];
 
-const keyboardRows: ShortcutRow[] = [
+export const keyboardRows: ShortcutRow[] = [
   { keys: ["W", "A", "S", "D"], description: "Move around the canvas" },
   { keys: ["Ctrl", "Z"], description: "Undo the last board change" },
   { keys: ["1"], description: "…to 4 — set placement for the selected team" },
@@ -32,7 +38,7 @@ const keyboardRows: ShortcutRow[] = [
   { keys: ["Esc"], description: "Clear the current selection" },
 ];
 
-const selectionRows: ShortcutRow[] = [
+export const selectionRows: ShortcutRow[] = [
   { keys: ["Click lobby"], description: "Inspect and edit the lobby" },
   { keys: ["Click team in lobby"], description: "Inspect and set placement" },
   { keys: ["Ctrl", "Click lobby"], description: "Select lobbies for a group" },
@@ -41,7 +47,7 @@ const selectionRows: ShortcutRow[] = [
   { keys: ["Click empty board"], description: "Clear the selection" },
 ];
 
-const touchRows: string[] = [
+export const touchRows: string[] = [
   "Long-press a team, lobby, or group header to open its options.",
   "Drag teams into lobbies or exact slots.",
   "Double-tap an assigned team to cycle its placement.",
