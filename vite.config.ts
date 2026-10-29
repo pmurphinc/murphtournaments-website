@@ -3,7 +3,7 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import fs from "node:fs";
 import path from "node:path";
-import { defineConfig, type Plugin, type ViteDevServer } from "vite";
+import { defineConfig, loadEnv, type Plugin, type ViteDevServer } from "vite";
 import { vitePluginManusRuntime } from "vite-plugin-manus-runtime";
 
 // =============================================================================
@@ -189,6 +189,52 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
+/**
+ * Injects the Umami analytics tag, and only when it is actually configured.
+ *
+ * The tag was previously written into client/index.html using Vite's %VAR%
+ * substitution. That substitution leaves the placeholder untouched when a
+ * variable is missing, so an unconfigured build shipped a literal
+ * `<script src="%VITE_ANALYTICS_ENDPOINT%/umami">`: every visitor's browser
+ * resolved it against our own origin and requested
+ * /%VITE_ANALYTICS_ENDPOINT%/umami, which 502s. Building the tag here means
+ * a missing variable produces no tag at all.
+ *
+ * Both variables are read at BUILD time, not at runtime — see the ARG lines
+ * in the Dockerfile, without which Railway's service variables never reach
+ * `vite build`.
+ */
+function analyticsTagPlugin(): Plugin {
+  let endpoint = "";
+  let websiteId = "";
+  return {
+    name: "murph-analytics-tag",
+    configResolved(config) {
+      const env = loadEnv(config.mode, config.envDir, "");
+      endpoint = (env.VITE_ANALYTICS_ENDPOINT ?? "").trim().replace(/\/+$/, "");
+      websiteId = (env.VITE_ANALYTICS_WEBSITE_ID ?? "").trim();
+      if (config.command === "build" && !(endpoint && websiteId))
+        config.logger.warn(
+          "[analytics] VITE_ANALYTICS_ENDPOINT / VITE_ANALYTICS_WEBSITE_ID are not set; building without the analytics tag."
+        );
+    },
+    transformIndexHtml() {
+      if (!endpoint || !websiteId) return [];
+      return [
+        {
+          tag: "script",
+          attrs: {
+            defer: true,
+            src: `${endpoint}/umami`,
+            "data-website-id": websiteId,
+          },
+          injectTo: "body" as const,
+        },
+      ];
+    },
+  };
+}
+
 const plugins = [
   vitePluginControlRoomFixes(),
   react(),
@@ -196,6 +242,7 @@ const plugins = [
   jsxLocPlugin(),
   vitePluginManusRuntime(),
   vitePluginManusDebugCollector(),
+  analyticsTagPlugin(),
 ];
 
 export default defineConfig({

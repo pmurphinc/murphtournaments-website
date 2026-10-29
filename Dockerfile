@@ -11,6 +11,15 @@ COPY patches ./patches
 RUN pnpm install --frozen-lockfile
 
 FROM deps AS build
+# Vite bakes VITE_* variables into the bundle at build time, and a Docker
+# build does not inherit the service's runtime environment. Railway supplies
+# matching service variables as build args, but only for names the Dockerfile
+# declares, so these two have to be named here or the analytics tag is built
+# without them and silently omitted.
+ARG VITE_ANALYTICS_ENDPOINT=""
+ARG VITE_ANALYTICS_WEBSITE_ID=""
+ENV VITE_ANALYTICS_ENDPOINT=$VITE_ANALYTICS_ENDPOINT
+ENV VITE_ANALYTICS_WEBSITE_ID=$VITE_ANALYTICS_WEBSITE_ID
 COPY . .
 RUN pnpm build
 

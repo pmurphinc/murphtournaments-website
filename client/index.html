@@ -18,10 +18,13 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <script
-      defer
-      src="%VITE_ANALYTICS_ENDPOINT%/umami"
-      data-website-id="%VITE_ANALYTICS_WEBSITE_ID%"></script>
+    <!--
+      The analytics tag is injected by the murph-analytics-tag plugin in
+      vite.config.ts, and only when analytics is configured. Do not write it
+      here: Vite's percent-delimited substitution leaves the placeholder text
+      in place when a variable is missing, and the built page then asks our
+      own server for that literal path on every visit.
+    -->
   </body>
 
 </html>
