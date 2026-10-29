@@ -1,5 +1,5 @@
 import { trpc } from "@/lib/trpc";
-import { UNAUTHED_ERR_MSG } from '@shared/const';
+import { UNAUTHED_ERR_MSG } from "@shared/const";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
@@ -7,6 +7,16 @@ import superjson from "superjson";
 import App from "./App";
 import { getLoginUrl } from "./const";
 import "./index.css";
+
+// The Manus preview runtime mirrored the signed-in user into localStorage on
+// every auth change. That tooling is gone, but the key is still sitting in the
+// browser of everyone who visited before it was removed, so clear it on load.
+// Safe to drop once the regulars have all been back.
+try {
+  localStorage.removeItem("manus-runtime-user-info");
+} catch {
+  /* storage can be unavailable in private mode or when blocked */
+}
 
 const queryClient = new QueryClient();
 

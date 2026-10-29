@@ -17,8 +17,8 @@ interface Anchor {
   text: string;
 }
 
-/** Anchors are matched by attribute lookup because the dev jsx-loc plugin
- * injects a `data-loc` attribute ahead of the ones we author. */
+/** Anchors are matched by attribute lookup rather than by exact tag text so
+ * the assertions do not depend on attribute order. */
 function anchors(html: string): Anchor[] {
   const pattern = /<a\s([^>]*)>(.*?)<\/a>/g;
   const found: Anchor[] = [];
