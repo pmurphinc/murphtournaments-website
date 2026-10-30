@@ -88,7 +88,7 @@ async function fetchDiscordUser(accessToken: string) {
 }
 
 const DISCORD_EXTERNAL_RETURN_ORIGINS = new Set([
-  "https://wormhole.murphtournaments.com",
+  "https://breachrunner.murphtournaments.com",
 ]);
 
 export function sanitizeDiscordReturnPath(value: unknown) {
@@ -105,7 +105,7 @@ export function sanitizeDiscordReturnPath(value: unknown) {
     }
   }
 
-  // Wormhole is a separate Railway deployment on our own fixed subdomain.
+  // Breach Runner is a separate Railway deployment on our own fixed subdomain.
   // Permit only that exact HTTPS origin; never turn returnTo into an open
   // redirect for arbitrary hosts, lookalike subdomains, or HTTP URLs.
   try {
