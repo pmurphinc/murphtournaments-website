@@ -1,0 +1,110 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A new push supersedes an in-flight PR run, but every push to main gets its
+# own run so the history of what was green is not full of cancelled entries.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Typecheck, test, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # No version here on purpose: action-setup reads the packageManager
+      # field in package.json, so CI and the Dockerfile's corepack install
+      # cannot drift apart.
+      - uses: pnpm/action-setup@v4
+
+      # Matches `FROM node:22-bookworm-slim` in the Dockerfile.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      # Two vitest projects: the client suite off vite.config.ts and the
+      # server suite off vitest.server.config.ts. `pnpm test` runs both and
+      # fails if either does.
+      - name: Test
+        run: pnpm test
+
+      # Nothing in the build reads a database, Discord credentials or any
+      # other Railway secret: vite build only bundles client code, the
+      # esbuild step bundles server/_core/index.ts without executing it, and
+      # server/_core/env.ts defaults every variable to "". The analytics
+      # plugin in vite.config.ts logs a warning when VITE_ANALYTICS_* are
+      # unset and ships no tag, which is the correct behaviour for CI.
+      - name: Build
+        shell: bash
+        run: pnpm build 2>&1 | tee build.log
+
+      # The build's last step validates the weapon-archive seed data and
+      # prints a coverage line. It only warns on a shortfall, so assert it
+      # here or a weapon added without baseline stats slips through silently.
+      # Matching N/N rather than a hard-coded 38/38 keeps the check honest
+      # when weapons are legitimately added.
+      - name: Check weapon-archive baseline coverage
+        shell: bash
+        run: |
+          line=$(grep -F "[weapon-archive] Baseline stats coverage:" build.log || true)
+          if [ -z "$line" ]; then
+            echo "::error::The build printed no weapon-archive coverage line."
+            exit 1
+          fi
+          echo "$line"
+          matched=$(sed -E 's#.*coverage: ([0-9]+)/([0-9]+) .*#\1#' <<<"$line")
+          total=$(sed -E 's#.*coverage: ([0-9]+)/([0-9]+) .*#\2#' <<<"$line")
+          if [ "$matched" != "$total" ]; then
+            echo "::error::Weapon-archive baseline stats cover only $matched of $total weapons."
+            grep -F "[weapon-archive] Weapons without baseline stats:" -A 50 build.log || true
+            exit 1
+          fi
+
+  freshness:
+    name: Branch freshness
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Warn-only by design. Several PRs on this repo sat open while main
+      # moved underneath them and quietly became regressions, so the goal is
+      # to surface the drift early, not to block a PR that is fine. Turn the
+      # final `exit 0` into `exit 1` to make it a hard gate.
+      - name: Warn when the branch has fallen behind the base
+        shell: bash
+        env:
+          BASE: ${{ github.event.pull_request.base.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          THRESHOLD: "20"
+        run: |
+          behind=$(git rev-list --count "$HEAD_SHA..origin/$BASE")
+          echo "This branch is $behind commit(s) behind origin/$BASE."
+          {
+            echo "### Branch freshness"
+            echo
+            echo "\`$behind\` commit(s) on \`origin/$BASE\` are not in this branch."
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$behind" -gt "$THRESHOLD" ]; then
+            echo "::warning::This branch is $behind commits behind $BASE (threshold $THRESHOLD). Merge or rebase before merging it: parts of it may already have been redone on $BASE."
+            echo >> "$GITHUB_STEP_SUMMARY"
+            echo "That is past the threshold of \`$THRESHOLD\`. Merge or rebase \`$BASE\` in and re-read the diff before merging — parts of this branch may already have been redone on \`$BASE\`." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit 0
