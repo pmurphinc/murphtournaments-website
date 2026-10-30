@@ -24,10 +24,10 @@ jobs:
       # No version here on purpose: action-setup reads the packageManager
       # field in package.json, so CI and the Dockerfile's corepack install
       # cannot drift apart.
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
       # Matches `FROM node:22-bookworm-slim` in the Dockerfile.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
