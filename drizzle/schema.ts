@@ -1017,17 +1017,17 @@ export const arcadeScores = mysqlTable(
     initials: varchar("initials", { length: 3 }).notNull(),
     score: int("score").notNull(),
     ship: varchar("ship", { length: 64 }).notNull(),
-    difficulty: mysqlEnum("difficulty", ["easy", "difficult", "hard"])
-      .notNull(),
+    difficulty: mysqlEnum("difficulty", [
+      "easy",
+      "difficult",
+      "hard",
+    ]).notNull(),
     durationSeconds: int("durationSeconds").notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
   table => [
     uniqueIndex("arcade_scores_runId_unique").on(table.runId),
-    index("arcade_scores_score_created_idx").on(
-      table.score,
-      table.createdAt
-    ),
+    index("arcade_scores_score_created_idx").on(table.score, table.createdAt),
   ]
 );
 

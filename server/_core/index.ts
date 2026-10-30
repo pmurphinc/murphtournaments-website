@@ -24,7 +24,9 @@ function resolveFclMediaDirectory() {
     path.resolve(process.cwd(), "data", "reference", "FCL"),
   ];
 
-  return candidates.find(candidate => fs.existsSync(candidate)) ?? candidates[0];
+  return (
+    candidates.find(candidate => fs.existsSync(candidate)) ?? candidates[0]
+  );
 }
 
 function isPortAvailable(port: number): Promise<boolean> {
