@@ -5,7 +5,7 @@ import {
   parseArcadeScoreInput,
 } from "./arcadeScores";
 
-describe("Wormhole Arcade public leaderboard", () => {
+describe("Breach Runner Arcade public leaderboard", () => {
   it("normalizes classic three-character initials", () => {
     expect(normalizeArcadeInitials(" p9m ")).toBe("P9M");
     expect(normalizeArcadeInitials("PM")).toBeNull();
