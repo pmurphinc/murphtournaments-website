@@ -57,6 +57,12 @@ function vitePluginControlRoomFixes(): Plugin {
  * Both variables are read at BUILD time, not at runtime — see the ARG lines
  * in the Dockerfile, without which Railway's service variables never reach
  * `vite build`.
+ *
+ * VITE_ANALYTICS_ENDPOINT is the instance origin — https://cloud.umami.is on
+ * Umami Cloud — and the tracker is served at /script.js there and on a
+ * self-hosted instance alike. This used to build `${endpoint}/umami`, a path
+ * Umami does not serve, so the first correctly configured build would have
+ * shipped a tag that 404s and collected nothing while reporting success.
  */
 function analyticsTagPlugin(): Plugin {
   let endpoint = "";
@@ -79,7 +85,7 @@ function analyticsTagPlugin(): Plugin {
           tag: "script",
           attrs: {
             defer: true,
-            src: `${endpoint}/umami`,
+            src: `${endpoint}/script.js`,
             "data-website-id": websiteId,
           },
           injectTo: "body" as const,
