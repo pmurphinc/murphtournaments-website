@@ -41,9 +41,37 @@ export function truncate(value: string | undefined, max: number) {
 }
 
 /**
+ * Route families whose URL carries a credential. The capturing group is the
+ * part replaced by a placeholder: a bracket viewer token in a bug report is
+ * the bracket's key, and the issue tracker this is mirrored to is public.
+ */
+const TOKEN_BEARING_PATHS: RegExp[] = [
+  /^(\/bracket\/)[^/]+/i,
+  /^(\/tcr\/staff\/join\/)[^/]+/i,
+  /^(\/teams\/(?:claim|join)\/)[^/]+/i,
+  /^(\/invite\/[^/]+\/)[^/]+/i,
+];
+
+/** Replace a credential in the path with `:token`, leaving the route legible. */
+export function redactTokenPath(pathname: string) {
+  for (const pattern of TOKEN_BEARING_PATHS) {
+    if (pattern.test(pathname))
+      return pathname.replace(pattern, (_match, prefix) => `${prefix}:token`);
+  }
+  return pathname;
+}
+
+/**
  * Only our own site's URLs are worth recording, and the value arrives from
  * the client, so anything else is dropped rather than stored and later
  * rendered into a GitHub issue as a link.
+ *
+ * Two things are removed even from our own URLs, because the issue tracker
+ * is a public repository: the token segment of the credential-bearing
+ * routes, and the query string in its entirety. Knowing the reporter was on
+ * `/bracket/:token` is all a fix needs; the token itself is the thing that
+ * opens the bracket, and a query string is an open-ended place for one to
+ * hide.
  */
 export function sanitizePageUrl(value: string | undefined) {
   if (!value) return null;
@@ -53,7 +81,7 @@ export function sanitizePageUrl(value: string | undefined) {
       return null;
     if (!/(^|\.)murphtournaments\.com$/i.test(parsed.hostname)) return null;
     return truncate(
-      `${parsed.origin}${parsed.pathname}${parsed.search}`,
+      `${parsed.origin}${redactTokenPath(parsed.pathname)}`,
       512
     );
   } catch {
@@ -61,24 +89,35 @@ export function sanitizePageUrl(value: string | undefined) {
   }
 }
 
+/** Render an untrusted value as inline code that cannot close its own span. */
+function asCode(value: string | null, fallback: string) {
+  if (!value) return fallback;
+  return `\`${value.replace(/`/g, "'")}\``;
+}
+
 /**
  * Build the issue body.
  *
- * Everything interpolated here is reporter-controlled, so it goes inside a
- * fenced block rather than as markdown: a report is data, and a report that
- * renders as instructions is a report that can impersonate one.
+ * This repository is PUBLIC, so the issue is published to the open internet
+ * the moment it is opened. Two consequences shape what goes in it:
+ *
+ * - Nothing identifying the reporter is included. Their Discord tag, their
+ *   signed-in name and their user agent stay in the database row, which the
+ *   issue references by id. Someone reporting a bug has not agreed to have
+ *   their handle posted publicly, and an issue cannot be unpublished from
+ *   the people who already read it.
+ * - Everything interpolated is reporter-controlled, so it is quoted rather
+ *   than rendered: a report is data, and a report that renders as markdown
+ *   is a report that can impersonate the issue's own text.
  */
 export function buildIssueBody(input: {
   details: string;
   pageUrl: string | null;
-  userAgent: string | null;
-  contact: string | null;
-  reporterName: string | null;
   reportId: number;
 }) {
   const fence = "```";
   const lines = [
-    `**Reported from the site** (bug_reports #${input.reportId})`,
+    `**Reported from the site** (\`bug_reports\` #${input.reportId})`,
     "",
     "### What happened",
     fence,
@@ -86,12 +125,11 @@ export function buildIssueBody(input: {
     fence,
     "",
     "### Context",
-    `- Page: ${input.pageUrl ?? "not captured"}`,
-    `- Reporter: ${input.reporterName ?? "anonymous"}`,
-    `- Contact: ${input.contact ? `\`${input.contact.replace(/`/g, "'")}\`` : "none given"}`,
-    `- User agent: ${input.userAgent ? `\`${input.userAgent.replace(/`/g, "'")}\`` : "not captured"}`,
+    `- Page: ${asCode(input.pageUrl, "not captured")}`,
     "",
-    "_Opened automatically from a site bug report. The reporter's text is quoted above, not interpreted._",
+    "_Opened automatically from a site bug report. The reporter's own text is",
+    "quoted above, not interpreted. Reporter contact details and user agent are",
+    `in the \`bug_reports\` row, deliberately not here — this repository is public._`,
   ];
   return lines.join("\n");
 }
@@ -181,14 +219,7 @@ export async function createBugReport(args: {
 
   const mirror = await mirrorToGitHub(
     args.input.summary,
-    buildIssueBody({
-      details: args.input.details,
-      pageUrl,
-      userAgent,
-      contact,
-      reporterName,
-      reportId,
-    })
+    buildIssueBody({ details: args.input.details, pageUrl, reportId })
   );
 
   if (mirror && reportId) {

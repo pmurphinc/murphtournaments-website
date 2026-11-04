@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   bugReportInputSchema,
   buildIssueBody,
+  redactTokenPath,
   sanitizePageUrl,
   truncate,
 } from "./bugReports";
@@ -39,13 +40,50 @@ describe("bug report input", () => {
 });
 
 describe("page URL sanitising", () => {
-  it("keeps our own pages, with the path and query", () => {
-    expect(sanitizePageUrl("https://murphtournaments.com/TCR/12?tab=teams")).toBe(
-      "https://murphtournaments.com/TCR/12?tab=teams"
+  it("keeps our own pages, path only", () => {
+    expect(sanitizePageUrl("https://murphtournaments.com/TCR/12")).toBe(
+      "https://murphtournaments.com/TCR/12"
     );
     expect(
       sanitizePageUrl("https://breachrunner.murphtournaments.com/")
     ).toBe("https://breachrunner.murphtournaments.com/");
+  });
+
+  // The issue tracker is a public repository, so a token that reaches the
+  // issue body is published to the internet permanently.
+  it("redacts the token out of every credential-bearing route", () => {
+    const cases: [string, string][] = [
+      ["/bracket/s3cr3t-viewer-token", "/bracket/:token"],
+      ["/tcr/staff/join/s3cr3t", "/tcr/staff/join/:token"],
+      ["/TCR/staff/join/s3cr3t", "/TCR/staff/join/:token"],
+      ["/teams/claim/s3cr3t", "/teams/claim/:token"],
+      ["/teams/join/s3cr3t", "/teams/join/:token"],
+      ["/invite/development-division/s3cr3t", "/invite/development-division/:token"],
+    ];
+    for (const [input, expected] of cases) {
+      expect(redactTokenPath(input)).toBe(expected);
+      const full = sanitizePageUrl(`https://murphtournaments.com${input}`);
+      expect(full).toBe(`https://murphtournaments.com${expected}`);
+      expect(full).not.toContain("s3cr3t");
+    }
+  });
+
+  it("leaves ordinary routes alone", () => {
+    expect(redactTokenPath("/TCR/templates")).toBe("/TCR/templates");
+    expect(redactTokenPath("/tournaments/community")).toBe(
+      "/tournaments/community"
+    );
+  });
+
+  // A query string is an open-ended place for a token to hide, and no fix
+  // has ever needed one.
+  it("drops the query string entirely", () => {
+    expect(
+      sanitizePageUrl("https://murphtournaments.com/TCR?token=s3cr3t&tab=teams")
+    ).toBe("https://murphtournaments.com/TCR");
+    expect(
+      sanitizePageUrl("https://murphtournaments.com/bracket/abc?k=s3cr3t")
+    ).toBe("https://murphtournaments.com/bracket/:token");
   });
 
   // The value comes from the client and ends up rendered into a GitHub
@@ -64,32 +102,45 @@ describe("page URL sanitising", () => {
 describe("issue body", () => {
   const base = {
     pageUrl: "https://murphtournaments.com/TCR",
-    userAgent: "Mozilla/5.0",
-    contact: "murph",
-    reporterName: "pmurphinc",
     reportId: 7,
   };
 
   it("records the context a fix would need", () => {
     const body = buildIssueBody({ ...base, details: "Steps to reproduce." });
-    expect(body).toContain("bug_reports #7");
+    expect(body).toContain("`bug_reports` #7");
     expect(body).toContain("https://murphtournaments.com/TCR");
-    expect(body).toContain("pmurphinc");
-    expect(body).toContain("Mozilla/5.0");
+    expect(body).toContain("Steps to reproduce.");
   });
 
-  it("says plainly when a field was not captured", () => {
+  // The repository is public. Contact details, the signed-in name and the
+  // user agent stay in the row; the issue points at it by id.
+  it("publishes nothing that identifies the reporter", () => {
+    const body = buildIssueBody({
+      ...base,
+      details: "Something broke while I was scoring a match.",
+    });
+    for (const field of ["Reporter:", "Contact:", "User agent:"]) {
+      expect(body).not.toContain(field);
+    }
+    expect(body).toContain("deliberately not here");
+  });
+
+  it("says plainly when the page was not captured", () => {
     const body = buildIssueBody({
       details: "Something broke.",
       pageUrl: null,
-      userAgent: null,
-      contact: null,
-      reporterName: null,
       reportId: 1,
     });
     expect(body).toContain("Page: not captured");
-    expect(body).toContain("Reporter: anonymous");
-    expect(body).toContain("Contact: none given");
+  });
+
+  it("quotes the page so it cannot be read as markdown", () => {
+    const body = buildIssueBody({
+      ...base,
+      pageUrl: "https://murphtournaments.com/a`b",
+      details: "ok",
+    });
+    expect(body).toContain("`https://murphtournaments.com/a'b`");
   });
 
   // A report is data. Text that closes the fence could present itself as
@@ -104,16 +155,6 @@ describe("issue body", () => {
     expect(body).toContain("'''");
   });
 
-  it("neutralises backticks in captured header values", () => {
-    const body = buildIssueBody({
-      ...base,
-      details: "ok",
-      userAgent: "Mozilla/5.0 `whoami`",
-      contact: "a`b",
-    });
-    expect(body).toContain("Mozilla/5.0 'whoami'");
-    expect(body).toContain("a'b");
-  });
 });
 
 describe("rate limiting", () => {

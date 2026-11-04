@@ -80,6 +80,11 @@ export default function BugReportWidget() {
                 ? "Thanks — it is logged and will be looked at. You can close this."
                 : "Tell us what went wrong. No account needed, and the page you are on is included automatically."}
             </DialogDescription>
+            <DialogDescription className="text-[var(--mt-muted)]">
+              {sent
+                ? null
+                : "What you write here is posted to our public issue tracker, so please leave out passwords and private links. Your Discord tag is kept private and never posted."}
+            </DialogDescription>
           </DialogHeader>
 
           {sent ? null : (
