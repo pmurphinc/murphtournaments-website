@@ -1,11 +1,14 @@
 import {
   ArrowRight,
+  LayoutGrid,
   Megaphone,
   PlayCircle,
   Radio,
+  Share2,
   Shuffle,
   Swords,
   Trophy,
+  Users,
   Video,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
@@ -254,6 +257,63 @@ export default function Home() {
                 .
               </p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Launch announcement for the Tournament Control Room. Its only other
+          public entry point is the Tournaments menu, so for most visitors this
+          is where they first learn the feature exists. */}
+      <section className="border-b border-[var(--mt-steel-line)] py-12 sm:py-16">
+        <div className="container">
+          <SectionHeading
+            eyebrow="New"
+            title="Run Your Own Tournament"
+            description="The Tournament Control Room is open to everyone. Build the bracket, track every match as it finishes, and share one link that stays current for everyone watching."
+            action={
+              <a href="/TCR">
+                <CtaButton tone="gold">
+                  Open the Control Room
+                  <ArrowRight className="ml-2 size-4" aria-hidden="true" />
+                </CtaButton>
+              </a>
+            }
+          />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            {[
+              {
+                Icon: LayoutGrid,
+                title: "Groups and brackets",
+                body: "Lay out group stages and elimination rounds, then move teams through as results land.",
+              },
+              {
+                Icon: Users,
+                title: "Staff who help",
+                body: "Invite someone to run matches alongside you. They get their own access, not your account.",
+              },
+              {
+                Icon: Share2,
+                title: "One live link",
+                body: "Everyone watching sees the same bracket as you run it. No account needed to open it.",
+              },
+            ].map(({ Icon, title, body }) => (
+              <div key={title} className="mt-panel flex items-start gap-4 p-5">
+                <div
+                  aria-hidden="true"
+                  className="flex size-12 shrink-0 items-center justify-center rounded border border-[var(--mt-steel-line)] bg-[var(--mt-black)] text-[var(--mt-gold-bright)]"
+                >
+                  <Icon className="size-5" aria-hidden="true" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-bold text-[var(--mt-off-white)]">
+                    {title}
+                  </h3>
+                  <p className="mt-1 text-sm leading-relaxed text-[var(--mt-muted)]">
+                    {body}
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
