@@ -10,6 +10,12 @@ import {
 } from "./tournamentControl";
 import { ENV } from "./_core/env";
 import { publicProcedure, router, adminProcedure } from "./_core/trpc";
+import { rateLimited, rateLimits } from "./_core/rateLimit";
+import {
+  bugReportInputSchema,
+  createBugReport,
+  listBugReports,
+} from "./bugReports";
 import { z } from "zod";
 import {
   checkVodFrameCaptureBinaries,
@@ -346,6 +352,27 @@ export const appRouter = router({
   tournamentControl: tournamentControlRouter,
   personalTcr: personalTcrRouter,
   communityTournaments: communityTournamentsRouter,
+  // Anyone can report a bug, signed in or not: the visitor who cannot sign
+  // in is the one most likely to have something worth reporting.
+  bugReports: router({
+    submit: publicProcedure
+      .use(rateLimited(rateLimits.bugReport))
+      .input(bugReportInputSchema)
+      .mutation(async ({ ctx, input }) => {
+        const result = await createBugReport({
+          input,
+          userAgent: ctx.req?.headers["user-agent"],
+          reporterUserId: ctx.user?.id ?? null,
+          reporterName:
+            ctx.user?.discordUsername ?? ctx.user?.name ?? null,
+        });
+        return { id: result.id };
+      }),
+    list: adminProcedure
+      .input(z.object({ limit: z.number().int().min(1).max(200).optional() }))
+      .query(({ input }) => listBugReports(input.limit ?? 50)),
+  }),
+
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {

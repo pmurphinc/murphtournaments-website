@@ -14,6 +14,7 @@ export default defineConfig({
       "server/weaponArchiveData.test.ts",
       "server/teamRosterCapacity.test.ts",
       "server/arcadeScores.test.ts",
+      "server/bugReports.test.ts",
       "shared/finalsGameModes.test.ts",
       "shared/pageMetadata.test.ts",
     ],

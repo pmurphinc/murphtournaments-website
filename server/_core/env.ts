@@ -13,4 +13,11 @@ export const ENV = {
   twitchClientId: process.env.TWITCH_CLIENT_ID ?? "",
   twitchClientSecret: process.env.TWITCH_CLIENT_SECRET ?? "",
   googleSheetsApiKey: process.env.GOOGLE_SHEETS_API_KEY ?? "",
+  /**
+   * Opens a GitHub issue for each site bug report. Both are optional: with
+   * either unset, reports are still stored, just not mirrored.
+   */
+  githubIssueToken: process.env.GITHUB_ISSUE_TOKEN ?? "",
+  githubIssueRepo:
+    process.env.GITHUB_ISSUE_REPO ?? "pmurphinc/murphtournaments-website",
 };

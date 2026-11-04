@@ -7,6 +7,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Navigation from "./components/Navigation";
 import Footer from "./components/Footer";
+import BugReportWidget from "./components/BugReportWidget";
 import Home from "./pages/Home";
 import TournamentHistory from "./pages/TournamentHistory";
 import JuneTournament2026 from "./pages/JuneTournament2026";
@@ -232,6 +233,8 @@ function Router() {
           </Switch>
         </Suspense>
       </main>
+      {/* Every page, including the ones most likely to be broken. */}
+      <BugReportWidget />
       <Footer />
     </div>
   );

@@ -253,6 +253,13 @@
       "when": 1787533200000,
       "tag": "0035_add_arcade_scores",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "5",
+      "when": 1793750400000,
+      "tag": "0036_add_bug_reports",
+      "breakpoints": true
     }
   ]
 }

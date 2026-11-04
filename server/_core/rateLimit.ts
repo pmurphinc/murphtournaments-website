@@ -164,7 +164,12 @@ export const __rateLimitInternals = {
  * inside it while a scripted client does not. The one-shot link previews are
  * opened by hand and need far less.
  */
-export const rateLimits = { poll: 600, preview: 60 } as const;
+/**
+ * `bugReport` is deliberately small: it is an unauthenticated write that
+ * opens a GitHub issue, so the cost of an abusive caller is paid in the
+ * repository, not just in database rows.
+ */
+export const rateLimits = { poll: 600, preview: 60, bugReport: 5 } as const;
 
 export function rateLimited(limit: number) {
   return t.middleware(async ({ ctx, path, next }) => {

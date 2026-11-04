@@ -1033,3 +1033,38 @@ export const arcadeScores = mysqlTable(
 
 export type ArcadeScore = typeof arcadeScores.$inferSelect;
 export type InsertArcadeScore = typeof arcadeScores.$inferInsert;
+
+/**
+ * Bug reports submitted from anywhere on the site.
+ *
+ * The row is written first and the GitHub issue is opened afterwards, as a
+ * best-effort mirror: if GitHub is down or the token is missing, the report
+ * is still here and can be mirrored later. Losing a report because an
+ * external API was unavailable would be the one unacceptable failure.
+ *
+ * Reporting does not require an account — a visitor who cannot sign in is
+ * exactly the person most likely to have something worth reporting — so
+ * reporterUserId is null for anonymous reports.
+ */
+export const bugReports = mysqlTable(
+  "bug_reports",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    summary: varchar("summary", { length: 200 }).notNull(),
+    details: text("details").notNull(),
+    /** The page the reporter was on, captured rather than typed. */
+    pageUrl: varchar("pageUrl", { length: 512 }),
+    userAgent: varchar("userAgent", { length: 512 }),
+    /** Optional, reporter-supplied: how to reach them for follow-up. */
+    contact: varchar("contact", { length: 120 }),
+    reporterUserId: int("reporterUserId"),
+    reporterName: varchar("reporterName", { length: 120 }),
+    githubIssueNumber: int("githubIssueNumber"),
+    githubIssueUrl: varchar("githubIssueUrl", { length: 512 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [index("bug_reports_created_idx").on(table.createdAt)]
+);
+
+export type BugReport = typeof bugReports.$inferSelect;
+export type InsertBugReport = typeof bugReports.$inferInsert;
