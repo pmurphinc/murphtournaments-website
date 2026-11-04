@@ -2,6 +2,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch, useLocation } from "wouter";
+import { metadataForPath } from "@shared/pageMetadata";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Navigation from "./components/Navigation";
@@ -106,6 +107,14 @@ function Router() {
   const [location] = useLocation();
   useEffect(() => {
     window.scrollTo(0, 0);
+  }, [location]);
+
+  // The server injects this route's title and link-preview tags into the
+  // document it sends, which is the only version a link scraper reads.
+  // In-app navigation serves no new document, so keep the tab title in step
+  // from the same table.
+  useEffect(() => {
+    document.title = metadataForPath(location).title;
   }, [location]);
 
   // Admin and TCR pages keep the shared Navigation/Footer chrome (a small,

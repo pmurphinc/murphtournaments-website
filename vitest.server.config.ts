@@ -15,6 +15,7 @@ export default defineConfig({
       "server/teamRosterCapacity.test.ts",
       "server/arcadeScores.test.ts",
       "shared/finalsGameModes.test.ts",
+      "shared/pageMetadata.test.ts",
     ],
     environment: "node",
   },

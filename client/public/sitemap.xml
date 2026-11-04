@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Stable public routes only. Pages reached through a token (bracket viewers,
+  staff and team invites), owner-only admin surfaces, and the de-linked legacy
+  bracket pages are deliberately absent; robots.txt disallows the first two.
+
+  No <lastmod> here on purpose: these are client-rendered routes with no single
+  modification date, and a date that is wrong is worse for crawlers than none.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://murphtournaments.com/</loc></url>
+  <url><loc>https://murphtournaments.com/about</loc></url>
+  <url><loc>https://murphtournaments.com/TCR</loc></url>
+  <url><loc>https://murphtournaments.com/TCR/templates</loc></url>
+  <url><loc>https://murphtournaments.com/tournaments</loc></url>
+  <url><loc>https://murphtournaments.com/tournaments/community</loc></url>
+  <url><loc>https://murphtournaments.com/tournaments/june-2026</loc></url>
+  <url><loc>https://murphtournaments.com/dev-division</loc></url>
+  <url><loc>https://murphtournaments.com/teams</loc></url>
+  <url><loc>https://murphtournaments.com/team-finder</loc></url>
+  <url><loc>https://murphtournaments.com/lft</loc></url>
+  <url><loc>https://murphtournaments.com/players</loc></url>
+  <url><loc>https://murphtournaments.com/patchnotes</loc></url>
+  <url><loc>https://murphtournaments.com/balance-archive</loc></url>
+  <url><loc>https://murphtournaments.com/loadout-tracker</loc></url>
+  <url><loc>https://murphtournaments.com/maprng</loc></url>
+  <url><loc>https://murphtournaments.com/watch</loc></url>
+  <url><loc>https://murphtournaments.com/vod</loc></url>
+  <url><loc>https://murphtournaments.com/join</loc></url>
+</urlset>

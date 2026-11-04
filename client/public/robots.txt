@@ -1,0 +1,27 @@
+# Murph Tournaments
+#
+# Before this file existed, /robots.txt fell through to the SPA catch-all and
+# answered 200 with the app's HTML shell, so a crawler got a page instead of
+# rules and nothing here was ever stated.
+
+User-agent: *
+Allow: /
+
+# Paths whose URL is itself the credential. A viewer, staff, claim or invite
+# token in a search result hands a stranger whatever that token unlocks, so
+# these must never be indexed. The matching pages also send
+# `<meta name="robots" content="noindex">`, because a crawler that ignores
+# this file still honours that.
+Disallow: /bracket/
+Disallow: /TCR/staff/
+Disallow: /tcr/staff/
+Disallow: /teams/claim/
+Disallow: /teams/join/
+Disallow: /invite/
+
+# Owner-only surfaces. Gated server-side regardless; keeping crawlers out
+# saves them the redirect and keeps them out of the logs.
+Disallow: /admin/
+Disallow: /api/
+
+Sitemap: https://murphtournaments.com/sitemap.xml
