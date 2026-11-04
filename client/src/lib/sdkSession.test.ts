@@ -16,6 +16,15 @@ async function loadSdkWithEnv(env: Record<string, string | undefined>) {
   return module;
 }
 
+/**
+ * Each case resets the module registry and re-imports the server SDK so it
+ * can be constructed under different environment variables, which pulls its
+ * whole dependency graph in again. That costs seconds: measured at 3.7s and
+ * 4.6s for the file against vitest's 5s default, so this was failing
+ * whenever the machine was busy and passing when it was not. The work is
+ * inherent to what the test checks, so give it room rather than trimming
+ * the assertions.
+ */
 describe("SDK session tokens", () => {
   it("creates a Discord-compatible session when VITE_APP_ID is absent", async () => {
     const { SDKServer } = await loadSdkWithEnv({
@@ -71,4 +80,4 @@ describe("SDK session tokens", () => {
     expect(session?.appId).toBe("murph-tournaments-website");
     expect(session?.appId).not.toBe("");
   });
-});
+}, 30_000);
