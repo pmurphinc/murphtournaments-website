@@ -23,6 +23,7 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getDiscordLoginUrl } from "@/lib/discordLogin";
 import { getSafeTournamentControlErrorMessage } from "@/lib/tcrError";
+import TcrSignedOutLanding from "@/components/TcrSignedOutLanding";
 import { TcrTemplateBrowser } from "./TcrTemplates";
 
 const goldButtonClass =
@@ -135,14 +136,10 @@ export default function PersonalTcrIndex() {
     );
 
   if (auth.loading) return <State title="Loading TCR…" />;
+  // A signed-out visitor is a first-time visitor far more often than not, so
+  // /TCR explains itself before it asks for anything.
   if (!auth.user || auth.user.loginMethod !== "discord")
-    return (
-      <State
-        title="Discord sign-in required"
-        description="Sign in with Discord to create and manage your Tournament Control Rooms."
-        showDiscordSignIn
-      />
-    );
+    return <TcrSignedOutLanding />;
   if (query.isLoading)
     return <State title="Loading your Tournament Control Rooms…" />;
   if (query.error)

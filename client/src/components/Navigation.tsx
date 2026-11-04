@@ -43,6 +43,9 @@ const NAV_ITEMS: NavItem[] = [
     submenu: [
       { label: "Current Event", href: "/tournaments/june-2026" },
       { label: "Browse Tournaments", href: "/tournaments/community" },
+      // The account dropdown also links /TCR, but only once you are signed
+      // in — which left signed-out visitors no way to find it at all.
+      { label: "Run Your Own", href: "/TCR" },
       { label: "Results & Archive", href: "/tournaments" },
     ],
   },
