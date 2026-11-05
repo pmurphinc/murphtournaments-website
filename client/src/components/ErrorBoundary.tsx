@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
+import * as Sentry from "@sentry/react";
 import { AlertTriangle, RotateCcw } from "lucide-react";
-import { Component, ReactNode } from "react";
+import { Component, ErrorInfo, ReactNode } from "react";
 
 interface Props {
   children: ReactNode;
@@ -19,6 +20,21 @@ class ErrorBoundary extends Component<Props, State> {
 
   static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
+  }
+
+  /**
+   * A boundary that only renders a fallback hides the crash completely: the
+   * visitor sees "something went wrong" and nobody else ever learns it
+   * happened. Report it before rendering the fallback.
+   *
+   * Sentry.captureException is a no-op when Sentry was never initialised, so
+   * this is safe with no DSN configured.
+   */
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    Sentry.captureException(error, {
+      contexts: { react: { componentStack: errorInfo.componentStack } },
+    });
+    console.error("[ErrorBoundary]", error, errorInfo.componentStack);
   }
 
   render() {

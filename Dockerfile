@@ -19,6 +19,11 @@ ARG VITE_ANALYTICS_ENDPOINT=""
 ARG VITE_ANALYTICS_WEBSITE_ID=""
 ENV VITE_ANALYTICS_ENDPOINT=$VITE_ANALYTICS_ENDPOINT
 ENV VITE_ANALYTICS_WEBSITE_ID=$VITE_ANALYTICS_WEBSITE_ID
+# Same rule for error reporting: without this pair the Sentry DSN never
+# reaches `vite build`, the SDK is never initialised, and the only symptom
+# is that no errors ever arrive — which looks exactly like no errors.
+ARG VITE_SENTRY_DSN=""
+ENV VITE_SENTRY_DSN=$VITE_SENTRY_DSN
 COPY . .
 RUN pnpm build
 

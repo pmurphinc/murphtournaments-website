@@ -161,8 +161,13 @@ export async function mirrorToGitHub(
       body: JSON.stringify({ title, body, labels: [ISSUE_LABEL] }),
     });
     if (!response.ok) {
+      // Log GitHub's own reason, not just the status. A bare 403 could be a
+      // missing Issues permission, a token not granted this repository, or
+      // an unapproved fine-grained token, and guessing between them wastes
+      // a deploy each time. The body is an API error string, not a secret.
+      const reason = await response.text().catch(() => "");
       console.error(
-        `[bugReports] GitHub issue creation failed: ${response.status}`
+        `[bugReports] GitHub issue creation failed: ${response.status} ${reason.slice(0, 300)}`
       );
       return null;
     }
