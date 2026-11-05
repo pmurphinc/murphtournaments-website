@@ -1,6 +1,7 @@
 import * as Sentry from "@sentry/react";
 import { trpc } from "@/lib/trpc";
 import { UNAUTHED_ERR_MSG } from "@shared/const";
+import { redactUrl } from "@shared/redactTokens";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
@@ -43,6 +44,8 @@ if (sentryDsn) {
     // people do on the page, which is a decision to take on purpose rather
     // than inherit from a default.
     tracesSampleRate: 0,
+    // Do not attach IP addresses, cookies or headers to events.
+    sendDefaultPii: false,
     // Noise that says nothing about our code: extensions injecting scripts,
     // and the ResizeObserver notice browsers emit during normal layout.
     ignoreErrors: [
@@ -50,6 +53,32 @@ if (sentryDsn) {
       "ResizeObserver loop completed with undelivered notifications",
     ],
     denyUrls: [/extensions\//i, /^chrome:\/\//i, /^moz-extension:\/\//i],
+
+    /**
+     * Sentry attaches the current URL to every event, and an error thrown
+     * while someone is on /bracket/<viewerToken> would otherwise hand that
+     * token to a third party. Same leak the bug report pipeline already
+     * redacts, so it uses the same rule — see shared/redactTokens.ts.
+     */
+    beforeSend(event) {
+      if (event.request?.url)
+        event.request.url = redactUrl(event.request.url);
+      return event;
+    },
+
+    /**
+     * Breadcrumbs carry URLs too: navigations record where the viewer came
+     * from and went to, and fetch/xhr crumbs record the request URL.
+     */
+    beforeBreadcrumb(breadcrumb) {
+      const data = breadcrumb.data;
+      if (data) {
+        for (const key of ["url", "from", "to"]) {
+          if (typeof data[key] === "string") data[key] = redactUrl(data[key]);
+        }
+      }
+      return breadcrumb;
+    },
   });
 }
 

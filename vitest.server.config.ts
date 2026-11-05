@@ -17,6 +17,7 @@ export default defineConfig({
       "server/bugReports.test.ts",
       "shared/finalsGameModes.test.ts",
       "shared/pageMetadata.test.ts",
+      "shared/redactTokens.test.ts",
       // vite.config.ts sets root: client, so the client suite never sees
       // shared/. Anything here that is not named is never run by anyone:
       // these seven existed for months without once executing in CI.

@@ -4,6 +4,9 @@ import { bugReports } from "../drizzle/schema";
 import { getDb } from "./db";
 import { ENV } from "./_core/env";
 import { extractInsertId } from "./tournamentControl";
+import { redactTokenPath } from "../shared/redactTokens";
+
+export { redactTokenPath };
 
 /**
  * Bug reports from the site.
@@ -38,27 +41,6 @@ export function truncate(value: string | undefined, max: number) {
   const trimmed = value.trim();
   if (!trimmed) return null;
   return trimmed.length > max ? trimmed.slice(0, max) : trimmed;
-}
-
-/**
- * Route families whose URL carries a credential. The capturing group is the
- * part replaced by a placeholder: a bracket viewer token in a bug report is
- * the bracket's key, and the issue tracker this is mirrored to is public.
- */
-const TOKEN_BEARING_PATHS: RegExp[] = [
-  /^(\/bracket\/)[^/]+/i,
-  /^(\/tcr\/staff\/join\/)[^/]+/i,
-  /^(\/teams\/(?:claim|join)\/)[^/]+/i,
-  /^(\/invite\/[^/]+\/)[^/]+/i,
-];
-
-/** Replace a credential in the path with `:token`, leaving the route legible. */
-export function redactTokenPath(pathname: string) {
-  for (const pattern of TOKEN_BEARING_PATHS) {
-    if (pattern.test(pathname))
-      return pathname.replace(pattern, (_match, prefix) => `${prefix}:token`);
-  }
-  return pathname;
 }
 
 /**
@@ -165,9 +147,13 @@ export async function mirrorToGitHub(
       // missing Issues permission, a token not granted this repository, or
       // an unapproved fine-grained token, and guessing between them wastes
       // a deploy each time. The body is an API error string, not a secret.
-      const reason = await response.text().catch(() => "");
+      // Strip control characters before logging: a newline in a response
+      // body would otherwise let an upstream forge extra log lines.
+      const reason = (await response.text().catch(() => ""))
+        .replace(/[\u0000-\u001f\u007f]+/g, " ")
+        .slice(0, 300);
       console.error(
-        `[bugReports] GitHub issue creation failed: ${response.status} ${reason.slice(0, 300)}`
+        `[bugReports] GitHub issue creation failed: ${response.status} ${reason}`
       );
       return null;
     }
