@@ -61,6 +61,13 @@ export type TcrTopBarProps = {
   staffInvitePending: boolean;
   onCreateStaffInvite: () => void;
   onRegenerateStaffInvite: () => void;
+  /** How many people the next link should admit. */
+  staffInviteSeats: number;
+  staffInviteSeatOptions: readonly number[];
+  onStaffInviteSeatsChange: (seats: number) => void;
+  /** Seats taken on the link that is currently active, when there is one. */
+  activeStaffInviteUseCount?: number;
+  activeStaffInviteMaxUses?: number;
   onRevokeStaffInvite: () => void;
   removeStaffPending: boolean;
   onRemoveStaffMember: (memberId: number) => void;
@@ -202,11 +209,19 @@ export default function TcrTopBar(props: TcrTopBarProps) {
               {props.hasActiveStaffInvite ? (
                 <div className="space-y-2 py-2">
                   <p className="rounded-md border border-[#FFD700]/30 bg-[#FFD700]/10 px-2 py-1.5 text-xs font-medium text-[#FFD700]">
-                    Staff invite active
+                    {typeof props.activeStaffInviteMaxUses === "number"
+                      ? `Staff invite active — ${props.activeStaffInviteUseCount ?? 0} of ${props.activeStaffInviteMaxUses} used`
+                      : "Staff invite active"}
                   </p>
+                  <StaffSeatPicker
+                    seats={props.staffInviteSeats}
+                    options={props.staffInviteSeatOptions}
+                    disabled={props.staffInvitePending}
+                    onChange={props.onStaffInviteSeatsChange}
+                  />
                   <p className="text-xs leading-relaxed text-zinc-400">
-                    Regenerating creates a new single-use link and invalidates
-                    the previous unclaimed invite.
+                    Regenerating issues a new link for that many people and
+                    invalidates the current one, including seats already used.
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <button
@@ -229,8 +244,15 @@ export default function TcrTopBar(props: TcrTopBarProps) {
                 </div>
               ) : (
                 <div className="space-y-2 py-2">
+                  <StaffSeatPicker
+                    seats={props.staffInviteSeats}
+                    options={props.staffInviteSeatOptions}
+                    disabled={props.staffInvitePending}
+                    onChange={props.onStaffInviteSeatsChange}
+                  />
                   <p className="text-xs leading-relaxed text-zinc-400">
-                    Create a single-use staff invite and copy the fresh link.
+                    Create a staff invite for that many people and copy the
+                    link. It expires after 7 days.
                   </p>
                   <button
                     type="button"
@@ -371,5 +393,48 @@ export default function TcrTopBar(props: TcrTopBarProps) {
         </DropdownMenu>
       </div>
     </header>
+  );
+}
+
+/**
+ * How many people the next staff link admits.
+ *
+ * Staff links used to be single-use, so inviting three people meant issuing
+ * three links in sequence, each one revoking the last — on event day, with
+ * three people waiting.
+ */
+function StaffSeatPicker({
+  seats,
+  options,
+  disabled,
+  onChange,
+}: {
+  seats: number;
+  options: readonly number[];
+  disabled?: boolean;
+  onChange: (seats: number) => void;
+}) {
+  return (
+    <div className="space-y-1">
+      <label
+        htmlFor="tcr-staff-seats"
+        className="block text-xs font-medium text-zinc-300"
+      >
+        People who can use this link
+      </label>
+      <select
+        id="tcr-staff-seats"
+        value={seats}
+        disabled={disabled}
+        onChange={event => onChange(Number(event.target.value))}
+        className="w-full rounded-md border border-white/15 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-100 disabled:opacity-40"
+      >
+        {options.map(option => (
+          <option key={option} value={option}>
+            {option === 1 ? "1 person" : `${option} people`}
+          </option>
+        ))}
+      </select>
+    </div>
   );
 }

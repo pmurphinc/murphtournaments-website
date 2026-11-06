@@ -22,6 +22,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import TcrToolbar, { type TcrToolbarProps } from "@/components/tcr/TcrToolbar";
 import { Router } from "wouter";
+import { STAFF_INVITE_SEAT_OPTIONS } from "@shared/const";
 import TcrTopBar, { type TcrTopBarProps } from "@/components/tcr/TcrTopBar";
 import {
   keyboardRows,
@@ -99,6 +100,9 @@ function makeTopBarProps(
     onCreateStaffInvite: noop,
     onRegenerateStaffInvite: noop,
     onRevokeStaffInvite: noop,
+    staffInviteSeats: 1,
+    staffInviteSeatOptions: STAFF_INVITE_SEAT_OPTIONS,
+    onStaffInviteSeatsChange: noop,
     removeStaffPending: false,
     onRemoveStaffMember: noop,
     ...overrides,
@@ -498,12 +502,28 @@ describe("Staff invite dropdown contents", () => {
     expect(topBarSource).toContain("No staff members have joined yet");
   });
 
-  it("warns that regenerating invalidates the previous invite", () => {
-    expect(topBarSource).toContain("the previous unclaimed invite");
+  it("warns that regenerating invalidates the current invite", () => {
+    expect(topBarSource).toContain("invalidates the current one");
+    // Regenerating now discards seats that were already taken, which the
+    // owner should know before clicking it.
+    expect(topBarSource).toContain("including seats already used");
   });
 
-  it("describes staff invites as single-use", () => {
-    expect(topBarSource).toContain("single-use");
+  /**
+   * Replaces a test asserting the copy said "single-use". Staff links now
+   * carry a seat count, and that assertion had quietly started passing off
+   * the word "single-use" in a code comment rather than anything a user
+   * reads — green for the wrong reason.
+   */
+  it("lets the owner choose how many people a link admits", () => {
+    expect(topBarSource).toContain("People who can use this link");
+    expect(topBarSource).toContain("staffInviteSeatOptions");
+    expect(topBarSource).toContain('option === 1 ? "1 person"');
+  });
+
+  it("shows how many seats of the active link are gone", () => {
+    expect(topBarSource).toContain("activeStaffInviteUseCount");
+    expect(topBarSource).toContain("used`");
   });
 });
 

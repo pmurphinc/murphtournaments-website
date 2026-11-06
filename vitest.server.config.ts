@@ -15,6 +15,7 @@ export default defineConfig({
       "server/teamRosterCapacity.test.ts",
       "server/arcadeScores.test.ts",
       "server/bugReports.test.ts",
+      "server/staffInviteSeats.test.ts",
       "shared/finalsGameModes.test.ts",
       "shared/pageMetadata.test.ts",
       "shared/redactTokens.test.ts",

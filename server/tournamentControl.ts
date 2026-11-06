@@ -1,6 +1,7 @@
 import { and, eq, inArray, not, sql } from "drizzle-orm";
 import { createHash, randomBytes, randomInt, randomUUID } from "node:crypto";
 import { TRPCError } from "@trpc/server";
+import { STAFF_INVITE_SEAT_OPTIONS } from "@shared/const";
 import { z } from "zod";
 import { getDb } from "./db";
 import {
@@ -99,6 +100,16 @@ export const PERSONAL_TCR_LIMITS = {
   activePrivateLinksPerTournament: 1,
 } as const;
 const STAFF_INVITE_TTL_DAYS = 7;
+// Imported from shared/ so the picker and this validation cannot drift.
+/** Validated against the same list the Control Room's picker offers. */
+const staffInviteMaxUsesSchema = z
+  .number()
+  .int()
+  .refine(
+    value => (STAFF_INVITE_SEAT_OPTIONS as readonly number[]).includes(value),
+    { message: "Unsupported staff invite size." }
+  )
+  .default(1);
 const TOURNAMENT_LOCKED_MESSAGE = "Tournament is finalized and locked.";
 
 function assertTournamentUnlocked(tournament: { finalizedAt: Date | null }) {
@@ -3310,6 +3321,10 @@ async function listTournamentStaff(
       id: tournamentStaffInviteLinks.id,
       status: tournamentStaffInviteLinks.status,
       expiresAt: tournamentStaffInviteLinks.expiresAt,
+      // So the owner can see how many seats are left before handing the
+      // link to one more person.
+      maxUses: tournamentStaffInviteLinks.maxUses,
+      useCount: tournamentStaffInviteLinks.useCount,
     })
     .from(tournamentStaffInviteLinks)
     .where(
@@ -3421,7 +3436,8 @@ async function revokeStaffInviteLink(
 
 async function regenerateStaffInviteLink(
   tournamentId: number,
-  user: { id: number; role: "user" | "admin" }
+  user: { id: number; role: "user" | "admin" },
+  maxUses = 1
 ) {
   const db = await requireDb();
   await getOwnedTournamentOrThrow(db, tournamentId, user);
@@ -3442,12 +3458,15 @@ async function regenerateStaffInviteLink(
       createdByUserId: user.id,
       tokenHash: hashToken(token),
       expiresAt,
+      maxUses,
     });
     return {
       path: createTokenPath("/TCR/staff/join", token),
       url: createTokenPath("/TCR/staff/join", token),
       expiresAt,
       hasActiveInvite: true,
+      maxUses,
+      useCount: 0,
     } as const;
   });
 }
@@ -3522,7 +3541,7 @@ async function acceptStaffInvite(
     if (row.invite.status === "accepted")
       throw new TRPCError({
         code: "FORBIDDEN",
-        message: "This staff invite has already been used.",
+        message: "This staff invite has already been fully used.",
       });
     if (row.invite.expiresAt <= new Date())
       throw new TRPCError({
@@ -3540,18 +3559,26 @@ async function acceptStaffInvite(
         message: "You are already a collaborator for this tournament.",
       });
 
+    // One statement claims a seat and closes the link when the last one
+    // goes, so two people accepting at the same moment cannot both take the
+    // final seat: `useCount < maxUses` is evaluated by the database as part
+    // of the update, not read first and trusted.
     const claimResult = await tx.execute(sql`
       UPDATE tournament_staff_invite_links
-      SET status = 'accepted', acceptedByUserId = ${user.id}, updatedAt = NOW()
+      SET useCount = useCount + 1,
+          status = CASE WHEN useCount + 1 >= maxUses THEN 'accepted' ELSE 'active' END,
+          acceptedByUserId = COALESCE(acceptedByUserId, ${user.id}),
+          updatedAt = NOW()
       WHERE id = ${row.invite.id}
         AND tokenHash = ${tokenHash}
         AND status = 'active'
         AND expiresAt > NOW()
+        AND useCount < maxUses
     `);
     if (getAffectedRows(claimResult) !== 1)
       throw new TRPCError({
         code: "CONFLICT",
-        message: "This staff invite has already been used.",
+        message: "This staff invite has already been fully used.",
       });
 
     await tx.insert(tournamentStaffMembers).values({
@@ -4266,9 +4293,13 @@ export const personalTcrRouter = router({
       getOrCreateStaffInviteLink(input.tournamentId, ctx.user)
     ),
   regenerateStaffInviteLink: personalTcrProcedure
-    .input(tournamentIdSchema)
+    .input(tournamentIdSchema.extend({ maxUses: staffInviteMaxUsesSchema }))
     .mutation(async ({ input, ctx }) => {
-      return regenerateStaffInviteLink(input.tournamentId, ctx.user);
+      return regenerateStaffInviteLink(
+        input.tournamentId,
+        ctx.user,
+        input.maxUses
+      );
     }),
   revokeStaffInviteLink: personalTcrProcedure
     .input(tournamentIdSchema)

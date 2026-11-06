@@ -14,6 +14,7 @@ import { trpc } from "@/lib/trpc";
 import { getSafeTournamentControlErrorMessage } from "@/lib/tcrError";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getDiscordLoginUrl } from "@/lib/discordLogin";
+import { STAFF_INVITE_SEAT_OPTIONS } from "@shared/const";
 import { Button } from "@/components/ui/button";
 import {
   baseCanvasSize,
@@ -773,6 +774,9 @@ export default function TournamentControlRoom({
       onError: (error: { message: string }) => toast.error(error.message),
     }
   );
+  // How many people the next staff link should admit. Defaults to 1 so the
+  // control behaves as it always did until the owner changes it.
+  const [staffInviteSeats, setStaffInviteSeats] = useState<number>(1);
   const regenerateStaffInviteLink =
     trpc.personalTcr.regenerateStaffInviteLink.useMutation({
       onSuccess: async data => {
@@ -2317,11 +2321,19 @@ export default function TournamentControlRoom({
           regenerateStaffInviteLink.isPending ||
           revokeStaffInviteLink.isPending
         }
+        staffInviteSeats={staffInviteSeats}
+        staffInviteSeatOptions={STAFF_INVITE_SEAT_OPTIONS}
+        onStaffInviteSeatsChange={setStaffInviteSeats}
+        activeStaffInviteUseCount={staffQuery.data?.activeInvite?.useCount}
+        activeStaffInviteMaxUses={staffQuery.data?.activeInvite?.maxUses}
         onCreateStaffInvite={() =>
           createStaffInviteLink.mutate({ tournamentId })
         }
         onRegenerateStaffInvite={() =>
-          regenerateStaffInviteLink.mutate({ tournamentId })
+          regenerateStaffInviteLink.mutate({
+            tournamentId,
+            maxUses: staffInviteSeats,
+          })
         }
         onRevokeStaffInvite={() =>
           revokeStaffInviteLink.mutate({ tournamentId })

@@ -373,6 +373,19 @@ export const tournamentStaffInviteLinks = mysqlTable(
       .default("active")
       .notNull(),
     expiresAt: timestamp("expiresAt").notNull(),
+    /**
+     * How many people this link may admit, chosen when it is created. The
+     * link was single-use, so onboarding three staff meant issuing three
+     * links in sequence, each one revoking the last. Defaulting to 1 keeps
+     * every existing row behaving exactly as it did.
+     *
+     * There is deliberately no unlimited option: accepting makes someone a
+     * collaborator on the board, so a link that never fills up is a
+     * standing invitation if it leaks.
+     */
+    maxUses: int("maxUses").default(1).notNull(),
+    useCount: int("useCount").default(0).notNull(),
+    /** The first person who accepted; kept for continuity with single-use links. */
     acceptedByUserId: int("acceptedByUserId").references(() => users.id),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

@@ -260,6 +260,13 @@
       "when": 1793750400000,
       "tag": "0036_add_bug_reports",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "5",
+      "when": 1793836800000,
+      "tag": "0037_staff_invite_uses",
+      "breakpoints": true
     }
   ]
 }
