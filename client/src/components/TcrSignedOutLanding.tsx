@@ -33,7 +33,7 @@ const STEPS = [
 
 const FACTS = [
   { value: "32", label: "teams per tournament" },
-  { value: "64", label: "matches per bracket" },
+  { value: "128", label: "matches per bracket" },
   { value: "12", label: "tournaments at a time" },
 ];
 

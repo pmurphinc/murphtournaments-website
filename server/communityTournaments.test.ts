@@ -69,6 +69,14 @@ vi.mock("./db", () => ({
   getDb: vi.fn(async () => dbState.current),
 }));
 
+/**
+ * These exercise the degraded-database paths, which import the router and
+ * its dependency graph before the first assertion runs. On a busy machine
+ * that crosses vitest's 5s default — measured failing at 5004ms and passing
+ * in isolation, on an unmodified checkout — so the file gets room. Second
+ * case of this pattern after sdkSession.test.ts; both are slow for real
+ * reasons rather than hung.
+ */
 describe("communityTournaments public read reliability", () => {
   afterEach(() => {
     dbState.current = null;
@@ -165,4 +173,4 @@ describe("communityTournaments public read reliability", () => {
       })
     );
   });
-});
+}, 30_000);

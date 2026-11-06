@@ -5,6 +5,7 @@ import {
   broadcastUrlSchema,
   storedMapIdSchema,
   userSelectedMapIdSchema,
+  PERSONAL_TCR_LIMITS,
 } from "../../../server/tournamentControl";
 
 describe("Tournament Control Room improvements", () => {
@@ -361,29 +362,51 @@ describe("boardSnapshotSchema size limits", () => {
     ),
   });
 
+  // Derived rather than written out, because the schema derives them too:
+  // assignments and connections are games x 4 and games x 8. Hard-coding
+  // these made raising the lobby ceiling fail three tests that were not
+  // actually about the new value.
+  const maxGames = PERSONAL_TCR_LIMITS.gameNodesPerTournament;
+  const maxAssignments = maxGames * 4;
+  const maxConnections = maxGames * 8;
+
   it("accepts a board at the documented limits", () => {
     const result = boardSnapshotSchema.safeParse(
-      snapshot({ games: 64, assignments: 256, connections: 512 })
+      snapshot({
+        games: maxGames,
+        assignments: maxAssignments,
+        connections: maxConnections,
+      })
     );
     expect(result.success).toBe(true);
   });
 
   it("rejects more lobbies than a tournament may hold", () => {
-    expect(boardSnapshotSchema.safeParse(snapshot({ games: 65 })).success).toBe(
-      false
-    );
+    expect(
+      boardSnapshotSchema.safeParse(snapshot({ games: maxGames + 1 })).success
+    ).toBe(false);
   });
 
   it("rejects an oversized assignments array", () => {
     expect(
-      boardSnapshotSchema.safeParse(snapshot({ assignments: 257 })).success
+      boardSnapshotSchema.safeParse(snapshot({ assignments: maxAssignments + 1 }))
+        .success
     ).toBe(false);
   });
 
   it("rejects an oversized connections array", () => {
     expect(
-      boardSnapshotSchema.safeParse(snapshot({ connections: 513 })).success
+      boardSnapshotSchema.safeParse(snapshot({ connections: maxConnections + 1 }))
+        .success
     ).toBe(false);
+  });
+
+  // The ceiling is a product decision, so pin it here too: a change to it
+  // should be deliberate, and this is the line that says so out loud.
+  it("holds a 32-team double elimination with room to spare", () => {
+    // 2n-2 matches, plus a grand final reset.
+    const doubleElimination32 = 2 * 32 - 2 + 1;
+    expect(maxGames).toBeGreaterThan(doubleElimination32);
   });
 
   it("still accepts an ordinary small board", () => {

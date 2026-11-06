@@ -88,9 +88,15 @@ const connectionFlowTypeSchema = z.enum(["winner", "loser"]);
 export const PERSONAL_TCR_LIMITS = {
   activeTournamentsPerUser: 12,
   teamsPerTournament: 32,
-  gameNodesPerTournament: 64,
+  /**
+   * Matches on one board. 64 was one short of comfortable: a 32-team double
+   * elimination needs 62, or 63 once the grand final can be reset, so a
+   * third-place match or a single stray node failed mid-event with "Lobby
+   * node limit reached". 128 clears that format with a group stage in front
+   * of it; the cost is table rows, which are nothing.
+   */
+  gameNodesPerTournament: 128,
   activePrivateLinksPerTournament: 1,
-  activeStaffLinksPerTournament: 1,
 } as const;
 const STAFF_INVITE_TTL_DAYS = 7;
 const TOURNAMENT_LOCKED_MESSAGE = "Tournament is finalized and locked.";
