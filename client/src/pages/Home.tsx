@@ -115,6 +115,12 @@ export default function Home() {
             <a href={DISCORD_URL} target="_blank" rel="noopener noreferrer">
               <CtaButton tone="gold">Join Discord</CtaButton>
             </a>
+            {/* Above the fold on purpose. The Control Room section further
+                down the page is only reached by scrolling, and the nav link
+                sat inside a dropdown, so neither was actually seen. */}
+            <a href="/TCR">
+              <CtaButton tone="outline">Run a Tournament</CtaButton>
+            </a>
             <a href="/watch">
               <CtaButton tone="outline">Watch Live</CtaButton>
             </a>
