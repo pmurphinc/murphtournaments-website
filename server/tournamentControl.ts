@@ -894,22 +894,52 @@ export function nextPlaceholderTeamNames(
   const taken = new Set(
     existingNames.map(name => name.trim().toLowerCase())
   );
+
+  /**
+   * Six digits at most, and only safe integers.
+   *
+   * Team names are free text up to 80 characters, so "Team
+   * 99999999999999999999999" is a name anyone can save. Parsing that gives
+   * 1e+23, where `candidate + 1 === candidate` — the counter stops moving,
+   * every later name is the same string, and the first version of this
+   * spun forever inside a held board-mutation lock. A board cannot hold
+   * more than a few dozen teams, so anything past six digits is not a
+   * sequence number worth continuing from.
+   */
   let highest = 0;
   for (const name of existingNames) {
-    const match = /^team\s+(\d+)$/i.exec(name.trim());
-    if (match) highest = Math.max(highest, Number(match[1]));
+    const match = /^team\s+(\d{1,6})$/i.exec(name.trim());
+    if (!match) continue;
+    const parsed = Number(match[1]);
+    if (Number.isSafeInteger(parsed)) highest = Math.max(highest, parsed);
   }
 
+  /**
+   * Bounded rather than `while (names.length < count)`: termination should
+   * not depend on arithmetic behaving. The window holds
+   * `count + existingNames.length + 1` candidates and at most
+   * `existingNames.length` can be taken, so enough free names always exist
+   * — the throw below is a backstop, not an expected path.
+   */
   const names: string[] = [];
-  let candidate = highest + 1;
-  while (names.length < count) {
+  const lastCandidate = highest + count + existingNames.length + 1;
+  for (
+    let candidate = highest + 1;
+    candidate <= lastCandidate && names.length < count;
+    candidate++
+  ) {
     const name = `Team ${candidate}`;
-    if (!taken.has(name.toLowerCase())) {
-      names.push(name);
-      taken.add(name.toLowerCase());
-    }
-    candidate++;
+    if (taken.has(name.toLowerCase())) continue;
+    names.push(name);
+    taken.add(name.toLowerCase());
   }
+
+  if (names.length < count)
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Could not generate enough team names.",
+    });
+
   return names;
 }
 

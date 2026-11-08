@@ -58,6 +58,43 @@ describe("placeholder team names", () => {
     expect(new Set(names).size).toBe(8);
   });
 
+  /**
+   * Team names are free text up to 80 characters, so this is a name any
+   * signed-in person can save on their own board. Parsing it gives 1e+23,
+   * where incrementing the counter does nothing: the first version of this
+   * generated the same name forever, inside a held board-mutation lock.
+   * Found by the automated security review.
+   */
+  it("does not hang on a team name with an enormous number in it", () => {
+    const hostile = "Team 99999999999999999999999";
+    const started = Date.now();
+    const names = nextPlaceholderTeamNames([hostile], 4);
+    expect(Date.now() - started).toBeLessThan(1000);
+    expect(names).toHaveLength(4);
+    expect(new Set(names).size).toBe(4);
+    // Nothing past six digits is treated as a sequence to continue from,
+    // so numbering restarts at 1 rather than near 1e23.
+    expect(names[0]).toBe("Team 1");
+  });
+
+  it("ignores any number too long to be a real sequence", () => {
+    for (const name of [
+      "Team 1234567",
+      "Team 99999999999999999999999",
+      `Team ${Number.MAX_SAFE_INTEGER}`,
+    ]) {
+      const names = nextPlaceholderTeamNames([name], 2);
+      expect(names).toEqual(["Team 1", "Team 2"]);
+    }
+  });
+
+  it("still continues from a plausible six-digit number", () => {
+    expect(nextPlaceholderTeamNames(["Team 999998"], 2)).toEqual([
+      "Team 999999",
+      "Team 1000000",
+    ]);
+  });
+
   it("can fill a board to the ceiling in one call", () => {
     const names = nextPlaceholderTeamNames(
       [],
