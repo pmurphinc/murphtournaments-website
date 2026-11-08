@@ -195,7 +195,7 @@ export default function TournamentControlIndex() {
             ? "Discord role configuration error"
             : query.error.message.includes("Unable to verify")
               ? "Discord service verification failed"
-              : "MTC Discord TCR role required"
+              : "Staff Control Room role required"
         }
         description={query.error.message}
       />

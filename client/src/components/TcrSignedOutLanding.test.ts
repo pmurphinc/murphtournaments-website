@@ -82,8 +82,9 @@ describe("public discoverability", () => {
     expect(navigation).not.toContain(
       '\n      { label: "Control Room", href: "/TCR" },'
     );
-    // The signed-in account-menu link stays where it was.
-    expect(navigation).toContain('<Link href="/TCR">TCR</Link>');
+    // The signed-in account-menu link stays where it was, under a name
+    // that says what the page holds.
+    expect(navigation).toContain('<Link href="/TCR">My Tournaments</Link>');
   });
 
   /**

@@ -182,13 +182,19 @@ export default function Navigation() {
           <DropdownMenuItem asChild className="cursor-pointer font-mono">
             <Link href="/teams">Team Management</Link>
           </DropdownMenuItem>
+          {/* These two entries used to be named after where each page
+              lives rather than what it holds, and read as duplicates.
+              /TCR is your own tournaments; the control room is every
+              tournament, for people holding the Discord staff roles. */}
           <DropdownMenuItem asChild className="cursor-pointer font-mono">
-            <Link href="/TCR">TCR</Link>
+            <Link href="/TCR">My Tournaments</Link>
           </DropdownMenuItem>
           {canSeeTournamentControl && (
             <>
               <DropdownMenuItem asChild className="cursor-pointer font-mono">
-                <Link href="/admin/tournaments/control">MTC Discord TCR</Link>
+                <Link href="/admin/tournaments/control">
+                  Staff Control Room
+                </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild className="cursor-pointer font-mono">
                 <Link href="/admin/development-division">

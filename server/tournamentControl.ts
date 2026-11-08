@@ -3251,17 +3251,25 @@ export const discordTournamentStaffProcedure = publicProcedure.use(
   }
 );
 
+/**
+ * The tournaments to show on /TCR: the ones this person owns, plus the ones
+ * they have been added to as staff.
+ *
+ * Site admins used to be returned every tournament here, which made /TCR
+ * and the staff control room look like the same page to the only people
+ * who could open both — they listed identical rows. An admin who wants the
+ * whole list has the staff control room for exactly that; this page is
+ * "mine", for everyone.
+ *
+ * Note this is the list only. Opening a specific board still goes through
+ * getOwnedTournamentOrThrow, which keeps its own admin bypass, so an admin
+ * following a link to someone else's board is unaffected.
+ */
 async function listPersonalTournamentRows(
   db: QueryExecutor,
   user: { id: number; role: "user" | "admin" }
 ) {
   const rows = await listTournamentRows(db);
-  if (user.role === "admin")
-    return rows.map(row => ({
-      ...row,
-      staffRole:
-        row.ownerUserId === user.id ? ("owner" as const) : ("admin" as const),
-    }));
   const staffRows = await db
     .select({ tournamentId: tournamentStaffMembers.tournamentId })
     .from(tournamentStaffMembers)

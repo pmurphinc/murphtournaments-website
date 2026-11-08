@@ -38,12 +38,22 @@ describe("Discord avatar header control", () => {
     expect(source).toContain('href="/teams"');
     expect(source).toContain('href="/TCR"');
     expect(source).toContain('href="/admin/tournaments/control"');
-    expect(source).toContain("MTC Discord TCR");
     expect(source).not.toContain("Tournament Signups");
     expect(source).not.toContain("Coming soon");
   });
 
-  it("only shows the MTC Discord TCR menu link to admin users", () => {
+  /**
+   * They were "TCR" and "MTC Discord TCR" — named for where each page sits
+   * rather than what is on it, which made them read as the same entry
+   * twice. The labels now say what each list contains.
+   */
+  it("names the two tournament entries by what they hold", () => {
+    expect(source).toContain('<Link href="/TCR">My Tournaments</Link>');
+    expect(source).toContain("Staff Control Room");
+    expect(source).not.toContain("MTC Discord TCR");
+  });
+
+  it("only shows the staff control room link to admin users", () => {
     expect(source).toContain(
       'const canSeeTournamentControl = user?.role === "admin";'
     );
