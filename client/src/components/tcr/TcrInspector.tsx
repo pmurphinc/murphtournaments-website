@@ -100,6 +100,10 @@ export type TcrInspectorProps = {
   teamsById: ReadonlyMap<number, ControlTeamView>;
   // Board quick actions (empty selection)
   onCreateTeam: () => void;
+  /** Seat a whole lobby of placeholder teams in one click. */
+  onCreatePlaceholderTeams: (count: number) => void;
+  placeholderTeamCounts: readonly number[];
+  createPlaceholderTeamsPending: boolean;
   onCreateGame: (gameType: TournamentGameType) => void;
   onOpenHelp: () => void;
   // Lobby actions
@@ -798,6 +802,23 @@ function BoardSection(props: TcrInspectorProps) {
             <Plus className="h-4 w-4" aria-hidden="true" />
             New Team…
           </button>
+          {/* Filling a bracket one dialog at a time is the slowest part of
+              setting a board up, and the names are almost always going to
+              be replaced anyway. */}
+          <div className="grid grid-cols-2 gap-1.5">
+            {props.placeholderTeamCounts.map(count => (
+              <button
+                key={count}
+                type="button"
+                className={tcrSecondaryButtonClass}
+                disabled={props.createPlaceholderTeamsPending}
+                onClick={() => props.onCreatePlaceholderTeams(count)}
+              >
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                Add {count} Teams
+              </button>
+            ))}
+          </div>
           {tournamentGameModeList.map(mode => (
             <button
               key={mode.id}

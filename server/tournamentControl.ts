@@ -876,6 +876,93 @@ async function createTournamentTeamAndFetch(input: {
   });
 }
 
+/**
+ * Names for a batch of placeholder teams.
+ *
+ * Continues from the highest "Team N" already on the board rather than
+ * starting at 1, so adding four to a board that already has four gives
+ * Team 5 through Team 8 instead of colliding. Any name already taken is
+ * skipped, including one a person typed by hand: "Team 7" entered manually
+ * is still "Team 7", and the batch works around it.
+ *
+ * Exported for tests — the numbering is the part worth pinning.
+ */
+export function nextPlaceholderTeamNames(
+  existingNames: readonly string[],
+  count: number
+): string[] {
+  const taken = new Set(
+    existingNames.map(name => name.trim().toLowerCase())
+  );
+  let highest = 0;
+  for (const name of existingNames) {
+    const match = /^team\s+(\d+)$/i.exec(name.trim());
+    if (match) highest = Math.max(highest, Number(match[1]));
+  }
+
+  const names: string[] = [];
+  let candidate = highest + 1;
+  while (names.length < count) {
+    const name = `Team ${candidate}`;
+    if (!taken.has(name.toLowerCase())) {
+      names.push(name);
+      taken.add(name.toLowerCase());
+    }
+    candidate++;
+  }
+  return names;
+}
+
+/**
+ * Seat a whole lobby's worth of placeholder teams at once.
+ *
+ * Adds as many as will fit rather than refusing the batch: asking for
+ * eight with six seats left should give six and say so, not nothing. The
+ * caller gets the count back so the UI can be honest about it.
+ */
+async function createPlaceholderTeamsAndFetch(input: {
+  tournamentId: number;
+  count: number;
+  user?: { role: "user" | "admin" };
+}) {
+  let created = 0;
+  const board = await runBoardMutationAndFetch(
+    input.tournamentId,
+    async tx => {
+      const existing = await tx
+        .select({ name: teams.name })
+        .from(teams)
+        .where(eq(teams.tournamentId, input.tournamentId));
+
+      // Admins are exempt from the ceiling everywhere else, so they are
+      // here too.
+      const room =
+        input.user?.role === "admin"
+          ? input.count
+          : PERSONAL_TCR_LIMITS.teamsPerTournament - existing.length;
+      if (room <= 0)
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Team limit reached.",
+        });
+
+      const names = nextPlaceholderTeamNames(
+        existing.map(row => row.name),
+        Math.min(input.count, room)
+      );
+      await tx.insert(teams).values(
+        names.map(name => ({
+          tournamentId: input.tournamentId,
+          name,
+          frp: 0,
+        }))
+      );
+      created = names.length;
+    }
+  );
+  return { ...board, createdTeamCount: created };
+}
+
 async function setTournamentRegistrationOpenAndFetch(
   tournamentId: number,
   registrationOpen: boolean
@@ -4407,6 +4494,29 @@ export const personalTcrRouter = router({
       );
       return createTournamentTeamAndFetch({ ...input, user: ctx.user });
     }),
+  createPlaceholderTeams: personalTcrProcedure
+    .input(
+      tournamentIdSchema.extend({
+        count: z
+          .number()
+          .int()
+          .min(1)
+          .max(PERSONAL_TCR_LIMITS.teamsPerTournament),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const db = await requireDb();
+      await getMutableManageableTournamentOrThrow(
+        db,
+        input.tournamentId,
+        ctx.user
+      );
+      return createPlaceholderTeamsAndFetch({
+        tournamentId: input.tournamentId,
+        count: input.count,
+        user: ctx.user,
+      });
+    }),
   deleteTeam: personalTcrProcedure
     .input(tournamentIdSchema.extend({ teamId: idSchema }))
     .mutation(async ({ input, ctx }) => {
@@ -5181,6 +5291,27 @@ export const tournamentControlRouter = router({
     .mutation(async ({ input }) => {
       const db = await requireDb();
       return createTournamentTeamAndFetch(input);
+    }),
+  // Also on the personal router. The Control Room page picks one of the two
+  // by mode, so a procedure missing from either breaks that board.
+  createPlaceholderTeams: discordTournamentStaffProcedure
+    .input(
+      tournamentIdSchema.extend({
+        count: z
+          .number()
+          .int()
+          .min(1)
+          .max(PERSONAL_TCR_LIMITS.teamsPerTournament),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const db = await requireDb();
+      await fetchTournamentRows(db, input.tournamentId);
+      return createPlaceholderTeamsAndFetch({
+        tournamentId: input.tournamentId,
+        count: input.count,
+        user: ctx.user,
+      });
     }),
   deleteTeam: discordTournamentStaffProcedure
     .input(tournamentIdSchema.extend({ teamId: idSchema }))

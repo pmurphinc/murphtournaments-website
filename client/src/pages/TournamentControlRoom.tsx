@@ -169,6 +169,12 @@ type UndoEntry =
   | { kind: "board"; snapshot: BoardUndoSnapshot; label: string }
   | { kind: "ui"; state: UiUndoState; label: string };
 const undoHistoryLimit = 50;
+/**
+ * Batch sizes offered for seating placeholder teams. Four and eight are
+ * the lobby sizes a bracket is actually built from; anything else is
+ * quicker to reach by clicking one of these twice.
+ */
+const PLACEHOLDER_TEAM_COUNTS = [4, 8] as const;
 
 type DialogState =
   | { type: "create-team" }
@@ -537,6 +543,26 @@ export default function TournamentControlRoom({
   const createFinal =
     controlApi.createFinalRoundMatch.useMutation(mutationOptions);
   const createGameNode = controlApi.createGameNode.useMutation(mutationOptions);
+  /**
+   * Seats a lobby's worth of placeholder teams in one call rather than
+   * looping createTeam on the client, so the batch lands as a single board
+   * revision and a single undo entry. The server adds as many as fit, so
+   * the toast reports what actually happened rather than what was asked
+   * for.
+   */
+  const createPlaceholderTeams = controlApi.createPlaceholderTeams.useMutation({
+    ...mutationOptions,
+    onSuccess: (data, variables, context) => {
+      mutationOptions.onSuccess?.(data, variables, context);
+      const added = (data as { createdTeamCount?: number })?.createdTeamCount;
+      if (typeof added !== "number") return;
+      if (added < variables.count)
+        toast.warning(
+          `Added ${added} of ${variables.count} teams — the team limit was reached.`
+        );
+      else toast.success(`Added ${added} teams`);
+    },
+  });
   const moveGame = controlApi.moveGame.useMutation(mutationOptions);
   const moveGames = controlApi.moveGames.useMutation({
     onError: (error: { message: string }) => toast.error(error.message),
@@ -2018,6 +2044,11 @@ export default function TournamentControlRoom({
       championTeamId={championRow?.teamId ?? null}
       teamsById={teamsById}
       onCreateTeam={() => openDialog({ type: "create-team" })}
+      onCreatePlaceholderTeams={count =>
+        createPlaceholderTeams.mutate({ tournamentId, count })
+      }
+      placeholderTeamCounts={PLACEHOLDER_TEAM_COUNTS}
+      createPlaceholderTeamsPending={createPlaceholderTeams.isPending}
       onCreateGame={gameType =>
         createGameNode.mutate({
           tournamentId,
