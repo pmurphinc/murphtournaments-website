@@ -53,6 +53,30 @@ describe("Discord avatar header control", () => {
     expect(source).not.toContain("MTC Discord TCR");
   });
 
+  /**
+   * A deliberate order, not an accident of when each item was added: the
+   * person's own tournaments first, then their team, then looking for one.
+   * Asserting on the full JSX avoids matching the same words in a comment.
+   */
+  it("puts the account menu in order of what the person owns", () => {
+    const myTournaments = source.indexOf(
+      '<Link href="/TCR">My Tournaments</Link>'
+    );
+    const teamManagement = source.indexOf(
+      '<Link href="/teams">Team Management</Link>'
+    );
+    const lft = source.indexOf('<Link href="/lft">LFT</Link>');
+    const arcade = source.indexOf("Breach Runner Arcade");
+
+    for (const index of [myTournaments, teamManagement, lft, arcade]) {
+      expect(index).toBeGreaterThan(-1);
+    }
+    expect(myTournaments).toBeLessThan(teamManagement);
+    expect(teamManagement).toBeLessThan(lft);
+    // The arcade is a diversion, so it sits after the three that are work.
+    expect(lft).toBeLessThan(arcade);
+  });
+
   it("only shows the staff control room link to admin users", () => {
     expect(source).toContain(
       'const canSeeTournamentControl = user?.role === "admin";'

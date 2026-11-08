@@ -166,9 +166,25 @@ export default function Navigation() {
             ) : null}
           </DropdownMenuLabel>
           <DropdownMenuSeparator className="bg-[var(--mt-gold)]/25" />
+          {/* Ordered by how much of the person's own work sits behind each
+              one: their tournaments, then their team, then looking for one.
+              The arcade is a diversion rather than part of that, so it sits
+              below the divider with the staff tools.
+
+              /TCR is your own tournaments; the control room below is every
+              tournament, for people holding the Discord staff roles. The
+              two were once named for where each page lives, which made them
+              read as the same entry twice. */}
+          <DropdownMenuItem asChild className="cursor-pointer font-mono">
+            <Link href="/TCR">My Tournaments</Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild className="cursor-pointer font-mono">
+            <Link href="/teams">Team Management</Link>
+          </DropdownMenuItem>
           <DropdownMenuItem asChild className="cursor-pointer font-mono">
             <Link href="/lft">LFT</Link>
           </DropdownMenuItem>
+          <DropdownMenuSeparator className="bg-[var(--mt-gold)]/25" />
           <DropdownMenuItem asChild className="cursor-pointer font-mono">
             <a
               href="https://breachrunner.murphtournaments.com"
@@ -177,17 +193,6 @@ export default function Navigation() {
             >
               <Gamepad2 size={14} aria-hidden="true" /> Breach Runner Arcade
             </a>
-          </DropdownMenuItem>
-          <DropdownMenuSeparator className="bg-[var(--mt-gold)]/25" />
-          <DropdownMenuItem asChild className="cursor-pointer font-mono">
-            <Link href="/teams">Team Management</Link>
-          </DropdownMenuItem>
-          {/* These two entries used to be named after where each page
-              lives rather than what it holds, and read as duplicates.
-              /TCR is your own tournaments; the control room is every
-              tournament, for people holding the Discord staff roles. */}
-          <DropdownMenuItem asChild className="cursor-pointer font-mono">
-            <Link href="/TCR">My Tournaments</Link>
           </DropdownMenuItem>
           {canSeeTournamentControl && (
             <>
