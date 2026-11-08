@@ -24,7 +24,20 @@ export const cleanPatchNoteContent = (content: string) => {
     .replace(/<\/onlyinclude>/gi, "")
     .replace(/<br\s*\/?\s*>/gi, "\n")
     .replace(/<ref\b[^>]*>[\s\S]*?<\/ref>/gi, "")
-    .replace(/<ref\b[^>]*\/?\s*>/gi, "");
+    .replace(/<ref\b[^>]*\/?\s*>/gi, "")
+    // Not every source publishes wiki markup. Update 12.1.0 arrived as HTML
+    // and rendered "<h2> CHAT & DISPLAY NAMES </h2>" as visible text on the
+    // page, because only the handful of tags above were ever stripped.
+    //
+    // The tag list is explicit rather than a catch-all /<[^>]+>/: patch
+    // notes talk about numbers, and a blanket rule would eat the text
+    // between "damage <100" and the next ">" in the document.
+    .replace(/<\/(?:p|div|h[1-6]|li|tr|blockquote)\s*>/gi, "\n")
+    .replace(/<li\b[^>]*>/gi, "• ")
+    .replace(
+      /<\/?(?:p|div|span|h[1-6]|strong|em|b|i|u|a|small|code|ul|ol|table|tbody|thead|tr|td|th|blockquote|figure|figcaption)\b[^>]*>/gi,
+      ""
+    );
 
   let previous: string;
   do {

@@ -11,6 +11,7 @@ export default defineConfig({
       "server/tournamentControlLobbyTimer.test.ts",
       "server/teamManagement.test.ts",
       "server/patchNotes.test.ts",
+      "server/patchNoteHtml.test.ts",
       "server/weaponArchiveData.test.ts",
       "server/teamRosterCapacity.test.ts",
       "server/arcadeScores.test.ts",

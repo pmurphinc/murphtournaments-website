@@ -4,6 +4,7 @@ import SectionHeading from "@/components/public/SectionHeading";
 import { PublicEmptyState } from "@/components/public/PublicStates";
 import { ChevronDown } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { parsePatchNoteText } from "@/lib/patchNoteText";
 import { useSearch } from "wouter";
 
 const RESPEC_ORDER_PATCH_NOTE = {
@@ -209,7 +210,22 @@ export default function PatchNotes() {
                       {expanded && (
                         <div className="mt-4 space-y-3 border-t border-[var(--mt-steel-line)] pt-4">
                           <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--mt-muted)]">
-                            {patch.content}
+                            {parsePatchNoteText(patch.content).map(
+                              (segment, index) =>
+                                segment.type === "link" ? (
+                                  <a
+                                    key={index}
+                                    href={segment.href}
+                                    target="_blank"
+                                    rel="noopener noreferrer nofollow"
+                                    className="text-[var(--mt-gold-bright)] underline underline-offset-2 hover:text-[var(--mt-gold)]"
+                                  >
+                                    {segment.label}
+                                  </a>
+                                ) : (
+                                  <span key={index}>{segment.value}</span>
+                                )
+                            )}
                           </p>
                           <a
                             href={
