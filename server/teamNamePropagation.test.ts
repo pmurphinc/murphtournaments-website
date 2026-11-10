@@ -106,8 +106,15 @@ describe("every display query reads the live name", () => {
 describe("claiming a team takes the captain's own name", () => {
   it("accepts a name on the mutation, bounded to the column width", () => {
     expect(code).toContain("name: z.string().trim().min(2).max(64).optional()");
+    // The call later gained an existing-team argument; the name must
+    // still reach it, in the right position.
     expect(code).toContain(
-      "acceptTeamClaimLink(input.token, ctx.user, input.name)"
+      `acceptTeamClaimLink(
+        input.token,
+        ctx.user,
+        input.name,
+        input.existingTeamId
+      )`
     );
   });
 
@@ -129,7 +136,7 @@ describe("claiming a team takes the captain's own name", () => {
   it("never copies the name back onto the tournament row", () => {
     // A copy would be a second name to go stale on the next rename, which
     // is the whole bug. The only write to `teams` here is the link-up.
-    expect(code).toContain(".set({ managedTeamId: managedTeam.id })");
+    expect(code).toContain(".set({ managedTeamId })");
     expect(code).not.toContain("set({ name: claimedName");
     expect(code).not.toContain("name: claimedName, frp");
   });

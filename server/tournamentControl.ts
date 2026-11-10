@@ -3279,7 +3279,8 @@ async function setAssignmentResultPlacement(
 async function acceptTeamClaimLink(
   token: string,
   user: { id: number },
-  requestedName?: string
+  requestedName?: string,
+  existingTeamId?: number
 ) {
   const db = await requireDb();
   const tokenHash = hashToken(token);
@@ -3330,43 +3331,84 @@ async function acceptTeamClaimLink(
         message: "This team is already managed.",
       });
 
-    // The captain names their own team here. Written only to the managed
-    // team, never copied back to `teams.name`: the managed team is the live
-    // source (see teamDisplayName), so copying would just create a second
-    // name to go stale on the next rename.
-    const claimedName = requestedName?.trim() || row.team.name;
-    const baseSlug = createManagedTeamSlug(claimedName);
-    let slug = baseSlug;
-    for (let i = 2; ; i++) {
-      const existing = await tx
+    let managedTeamId: number;
+    if (existingTeamId !== undefined) {
+      // Captain only. Entering a team in a tournament commits everyone on
+      // it, which is not a call a non-captain member makes for the rest.
+      const [owned] = await tx
         .select({ id: managedTeams.id })
+        .from(managedTeams)
+        .where(
+          and(
+            eq(managedTeams.id, existingTeamId),
+            eq(managedTeams.captainUserId, user.id)
+          )
+        )
+        .limit(1);
+      if (!owned)
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You can only enter a team you are the captain of.",
+        });
+      // Read inside the board lock, so two claim links for the same
+      // tournament cannot both attach this team in the same moment and
+      // seat it twice.
+      const [clash] = await tx
+        .select({ id: teams.id })
+        .from(teams)
+        .where(
+          and(
+            eq(teams.tournamentId, resolved.tournamentId),
+            eq(teams.managedTeamId, existingTeamId)
+          )
+        )
+        .limit(1);
+      if (clash)
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "That team is already in this tournament.",
+        });
+      managedTeamId = owned.id;
+    } else {
+      // A brand-new team, named by the captain. The name is written only to
+      // the managed team, never copied back to `teams.name`: the managed
+      // team is the live source (see teamDisplayName), so copying would
+      // just create a second name to go stale on the next rename.
+      const claimedName = requestedName?.trim() || row.team.name;
+      const baseSlug = createManagedTeamSlug(claimedName);
+      let slug = baseSlug;
+      for (let i = 2; ; i++) {
+        const existing = await tx
+          .select({ id: managedTeams.id })
+          .from(managedTeams)
+          .where(eq(managedTeams.slug, slug))
+          .limit(1);
+        if (!existing.length) break;
+        slug = `${baseSlug}-${i}`.slice(0, 80);
+      }
+      await tx
+        .insert(managedTeams)
+        .values({ name: claimedName, slug, captainUserId: user.id });
+      const [managedTeam] = await tx
+        .select()
         .from(managedTeams)
         .where(eq(managedTeams.slug, slug))
         .limit(1);
-      if (!existing.length) break;
-      slug = `${baseSlug}-${i}`.slice(0, 80);
+      if (!managedTeam)
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Managed team creation failed.",
+        });
+      await tx.insert(managedTeamMembers).values({
+        teamId: managedTeam.id,
+        userId: user.id,
+        role: "captain",
+      });
+      managedTeamId = managedTeam.id;
     }
     await tx
-      .insert(managedTeams)
-      .values({ name: claimedName, slug, captainUserId: user.id });
-    const [managedTeam] = await tx
-      .select()
-      .from(managedTeams)
-      .where(eq(managedTeams.slug, slug))
-      .limit(1);
-    if (!managedTeam)
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: "Managed team creation failed.",
-      });
-    await tx.insert(managedTeamMembers).values({
-      teamId: managedTeam.id,
-      userId: user.id,
-      role: "captain",
-    });
-    await tx
       .update(teams)
-      .set({ managedTeamId: managedTeam.id })
+      .set({ managedTeamId })
       .where(eq(teams.id, row.team.id));
     const claimResult = await tx.execute(sql`
       UPDATE tournament_team_claim_links
@@ -3384,12 +3426,64 @@ async function acceptTeamClaimLink(
     const board = await fetchTournamentRows(tx, resolved.tournamentId);
     return {
       success: true,
-      managedTeamId: managedTeam.id,
+      managedTeamId,
       tournamentId: row.team.tournamentId,
       boardRevision: board.tournament.boardRevision,
       board,
     };
   });
+}
+
+/**
+ * The teams this person could put into the tournament a claim link points
+ * at, so the claim page can offer "use a team I already have" rather than
+ * only ever minting a new one.
+ *
+ * Captain only, for the reason given in acceptTeamClaimLink: entering a
+ * team commits everyone on it.
+ *
+ * A team already in this tournament comes back flagged rather than missing,
+ * so the page can show it greyed with the reason. Filtering it out silently
+ * would read as "my team is gone" to the one person most likely to notice.
+ */
+async function listClaimableTeamsForToken(token: string, user: { id: number }) {
+  const db = await requireDb();
+  const [resolved] = await db
+    .select({ tournamentId: teams.tournamentId })
+    .from(tournamentTeamClaimLinks)
+    .innerJoin(teams, eq(tournamentTeamClaimLinks.tournamentTeamId, teams.id))
+    .where(eq(tournamentTeamClaimLinks.tokenHash, hashToken(token)))
+    .limit(1);
+  if (!resolved)
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Claim link not found.",
+    });
+  const owned = await db
+    .select({ id: managedTeams.id, name: managedTeams.name })
+    .from(managedTeams)
+    .where(eq(managedTeams.captainUserId, user.id));
+  if (!owned.length) return { teams: [] };
+  const entered = await db
+    .select({ managedTeamId: teams.managedTeamId })
+    .from(teams)
+    .where(
+      and(
+        eq(teams.tournamentId, resolved.tournamentId),
+        inArray(
+          teams.managedTeamId,
+          owned.map(team => team.id)
+        )
+      )
+    );
+  const enteredIds = new Set(entered.map(row => row.managedTeamId));
+  return {
+    teams: owned.map(team => ({
+      id: team.id,
+      name: team.name,
+      alreadyEntered: enteredIds.has(team.id),
+    })),
+  };
 }
 
 export const discordTournamentStaffProcedure = publicProcedure.use(
@@ -5239,17 +5333,33 @@ export const tournamentControlRouter = router({
         ...state,
       };
     }),
+  listClaimableTeams: protectedProcedure
+    .input(z.object({ token: tokenSchema }))
+    .query(({ input, ctx }) =>
+      listClaimableTeamsForToken(input.token, ctx.user)
+    ),
   acceptTeamClaimLink: protectedProcedure
     .input(
-      z.object({
-        token: tokenSchema,
-        // Optional so an older client that only sends a token still works;
-        // it then keeps the placeholder name it was given.
-        name: z.string().trim().min(2).max(64).optional(),
-      })
+      z
+        .object({
+          token: tokenSchema,
+          // Both optional so a claim page already open from before this
+          // shipped still works on just a token; it then creates a team
+          // under the placeholder name it was given.
+          name: z.string().trim().min(2).max(64).optional(),
+          existingTeamId: z.number().int().positive().optional(),
+        })
+        .refine(value => !(value.name && value.existingTeamId), {
+          message: "Choose an existing team or a new name, not both.",
+        })
     )
     .mutation(({ input, ctx }) =>
-      acceptTeamClaimLink(input.token, ctx.user, input.name)
+      acceptTeamClaimLink(
+        input.token,
+        ctx.user,
+        input.name,
+        input.existingTeamId
+      )
     ),
   listTournaments: discordTournamentStaffProcedure.query(async () => {
     const db = await requireDb();

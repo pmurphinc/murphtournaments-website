@@ -138,7 +138,10 @@ describe("Tournament Control Room improvements", () => {
     expect(server).toContain(".insert(managedTeams)");
     expect(server).toContain(".values({");
     expect(server).toContain(".insert(managedTeamMembers)");
-    expect(server).toContain("managedTeamId: managedTeam.id");
+    // Claiming can now also attach a team the captain already has, so the
+    // new-team path and the slot link are separate statements.
+    expect(server).toContain("managedTeamId = managedTeam.id");
+    expect(server).toContain(".set({ managedTeamId })");
   });
 
   it("persists and validates map ids through viewers and templates", async () => {
