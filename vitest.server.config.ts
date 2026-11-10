@@ -18,6 +18,7 @@ export default defineConfig({
       "server/bugReports.test.ts",
       "server/staffInviteSeats.test.ts",
       "server/placeholderTeams.test.ts",
+      "server/teamNamePropagation.test.ts",
       "shared/finalsGameModes.test.ts",
       "shared/pageMetadata.test.ts",
       "shared/redactTokens.test.ts",

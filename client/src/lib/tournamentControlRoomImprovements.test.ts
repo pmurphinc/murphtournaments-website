@@ -71,12 +71,20 @@ describe("Tournament Control Room improvements", () => {
     expect(viewerCode).not.toContain("captainDiscordOpenId");
   });
 
-  it("builds the viewer board without touching the captain tables", async () => {
+  it("builds the viewer board without touching the captain identity", async () => {
     // The public viewer used to project the full staff board down, which
-    // meant joining managed_teams and users to resolve each team's captain
+    // meant joining managed_teams AND users to resolve each team's captain
     // and carrying their Discord open ids to an unauthenticated endpoint
-    // before discarding them. Selecting the viewer's own columns keeps that
-    // data out of the query entirely.
+    // before discarding them.
+    //
+    // This originally asserted the query touched managed_teams at all,
+    // which was a convenient stand-in for "does not reach captain data"
+    // right up until a team's display name had to be read live from that
+    // same table, so a rename in Team Management would show on the public
+    // bracket. The name is already public; the Discord identity beside it
+    // is what must not travel. So the guard is now on the identity: the
+    // `users` join is gone, no captain column is selected, and nothing
+    // hands the viewer the staff projection.
     const server = await readFile(
       new URL("../../../server/tournamentControl.ts", import.meta.url),
       "utf8"
@@ -87,9 +95,16 @@ describe("Tournament Control Room improvements", () => {
       start,
       server.indexOf("async function", start + 1)
     );
-    expect(body).not.toContain("managedTeams");
-    expect(body).not.toContain("leftJoin");
+    expect(body).not.toContain("users");
+    expect(body).not.toContain("captain");
+    expect(body).not.toContain("openId");
+    expect(body).not.toContain("privateLobbyCode");
     expect(body).not.toContain("fetchTournamentRows");
+    // The one permitted join, and only for the name.
+    expect(body).toContain(
+      "leftJoin(managedTeams, eq(teams.managedTeamId, managedTeams.id))"
+    );
+    expect(body.match(/managedTeams/g)?.length).toBe(2);
   });
 
   it("does not hand the viewer the staff board", async () => {

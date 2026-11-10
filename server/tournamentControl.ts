@@ -1143,6 +1143,27 @@ async function moveTeamBetweenGamesAndFetch(input: {
   });
 }
 
+/**
+ * The name to show for a tournament team.
+ *
+ * `teams.name` is whatever the row was created with: a placeholder like
+ * "Team 3", or a copy of the managed team's name taken at the moment it
+ * registered. Neither follows a later rename, so a captain who renamed in
+ * Team Management kept showing under their old name in every tournament
+ * they were already in. Once a team has a managed team behind it the
+ * captain owns its name, so that is the live source and `teams.name` is
+ * only the fallback for rows that have none.
+ *
+ * This is deliberately NOT the rule used by `teams.mapBanId`, which is
+ * frozen on purpose so a captain cannot rewrite a ban an in-flight bracket
+ * was built on, nor by `tournament_team_results.teamNameSnapshot`, which
+ * keeps a finished tournament's standings reading the way they did on the
+ * day. Live for names in progress, frozen for settled history.
+ *
+ * Every query using this must join `managedTeams`.
+ */
+const teamDisplayName = sql<string>`COALESCE(${managedTeams.name}, ${teams.name})`;
+
 async function fetchTournamentRows(db: QueryExecutor, tournamentId: number) {
   const [tournament] = await db
     .select()
@@ -1158,7 +1179,7 @@ async function fetchTournamentRows(db: QueryExecutor, tournamentId: number) {
           id: teams.id,
           tournamentId: teams.tournamentId,
           managedTeamId: teams.managedTeamId,
-          name: teams.name,
+          name: teamDisplayName,
           frp: teams.frp,
           createdAt: teams.createdAt,
           updatedAt: teams.updatedAt,
@@ -2479,8 +2500,9 @@ async function fetchViewerBoard(db: QueryExecutor, tournamentId: number) {
   const [teamRows, gameRows, assignmentRows, connectionResult] =
     await Promise.all([
       db
-        .select({ id: teams.id, name: teams.name, frp: teams.frp })
+        .select({ id: teams.id, name: teamDisplayName, frp: teams.frp })
         .from(teams)
+        .leftJoin(managedTeams, eq(teams.managedTeamId, managedTeams.id))
         .where(eq(teams.tournamentId, tournamentId)),
       db
         .select({
@@ -2897,7 +2919,7 @@ async function getLobbyCodeRecipients(
           : null;
     return {
       teamId: row.team.id,
-      teamName: row.team.name,
+      teamName: row.managedTeam?.name ?? row.team.name,
       managedTeamId: row.team.managedTeamId,
       recipientUserId: row.managedTeam?.captainUserId ?? null,
       recipientDiscordId: discordId,
@@ -3254,7 +3276,11 @@ async function setAssignmentResultPlacement(
   });
 }
 
-async function acceptTeamClaimLink(token: string, user: { id: number }) {
+async function acceptTeamClaimLink(
+  token: string,
+  user: { id: number },
+  requestedName?: string
+) {
   const db = await requireDb();
   const tokenHash = hashToken(token);
   const [resolved] = await db
@@ -3304,7 +3330,12 @@ async function acceptTeamClaimLink(token: string, user: { id: number }) {
         message: "This team is already managed.",
       });
 
-    const baseSlug = createManagedTeamSlug(row.team.name);
+    // The captain names their own team here. Written only to the managed
+    // team, never copied back to `teams.name`: the managed team is the live
+    // source (see teamDisplayName), so copying would just create a second
+    // name to go stale on the next rename.
+    const claimedName = requestedName?.trim() || row.team.name;
+    const baseSlug = createManagedTeamSlug(claimedName);
     let slug = baseSlug;
     for (let i = 2; ; i++) {
       const existing = await tx
@@ -3317,7 +3348,7 @@ async function acceptTeamClaimLink(token: string, user: { id: number }) {
     }
     await tx
       .insert(managedTeams)
-      .values({ name: row.team.name, slug, captainUserId: user.id });
+      .values({ name: claimedName, slug, captainUserId: user.id });
     const [managedTeam] = await tx
       .select()
       .from(managedTeams)
@@ -5108,8 +5139,9 @@ export const communityTournamentsRouter = router({
           message: "Tournament not found.",
         });
       const approvedTeams = await db
-        .select({ id: teams.id, name: teams.name })
+        .select({ id: teams.id, name: teamDisplayName })
         .from(teams)
+        .leftJoin(managedTeams, eq(teams.managedTeamId, managedTeams.id))
         .where(eq(teams.tournamentId, row.tournament.id));
       return {
         tournament: {
@@ -5208,8 +5240,17 @@ export const tournamentControlRouter = router({
       };
     }),
   acceptTeamClaimLink: protectedProcedure
-    .input(z.object({ token: tokenSchema }))
-    .mutation(({ input, ctx }) => acceptTeamClaimLink(input.token, ctx.user)),
+    .input(
+      z.object({
+        token: tokenSchema,
+        // Optional so an older client that only sends a token still works;
+        // it then keeps the placeholder name it was given.
+        name: z.string().trim().min(2).max(64).optional(),
+      })
+    )
+    .mutation(({ input, ctx }) =>
+      acceptTeamClaimLink(input.token, ctx.user, input.name)
+    ),
   listTournaments: discordTournamentStaffProcedure.query(async () => {
     const db = await requireDb();
     return listTournamentRows(db);
