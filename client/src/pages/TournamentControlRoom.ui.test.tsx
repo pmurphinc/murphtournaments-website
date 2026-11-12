@@ -274,6 +274,27 @@ describe("Control Room help content", () => {
     });
   });
 
+  it("documents the placement keys as chips, the way WASD is", () => {
+    expect(keyboardRows).toContainEqual({
+      keys: ["1", "2", "3", "4"],
+      description: "Set placement for the selected team",
+    });
+  });
+
+  it("never leans a description on the key chip beside it", () => {
+    // This row used to be a lone "1" chip with the description
+    // "…to 4 — set placement for the selected team", so the dialog read as
+    // broken mid-sentence text. KbdGroup lays chips out side by side with no
+    // separator, so every key belongs in `keys` and the description has to
+    // stand on its own.
+    for (const row of allRows) {
+      expect(row.description).not.toMatch(/^[…."'\-–—]/);
+      expect(row.description.slice(0, 1)).toBe(
+        row.description.slice(0, 1).toUpperCase()
+      );
+    }
+  });
+
   it("documents multi-select and group controls", () => {
     expect(selectionRows).toContainEqual({
       keys: ["Ctrl", "Click lobby"],

@@ -32,7 +32,10 @@ export const mouseRows: ShortcutRow[] = [
 export const keyboardRows: ShortcutRow[] = [
   { keys: ["W", "A", "S", "D"], description: "Move around the canvas" },
   { keys: ["Ctrl", "Z"], description: "Undo the last board change" },
-  { keys: ["1"], description: "…to 4 — set placement for the selected team" },
+  {
+    keys: ["1", "2", "3", "4"],
+    description: "Set placement for the selected team",
+  },
   { keys: ["0"], description: "Clear the selected team's placement" },
   { keys: ["Delete"], description: "Delete the selected lobby or connection" },
   { keys: ["Esc"], description: "Clear the current selection" },
