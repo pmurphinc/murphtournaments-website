@@ -96,6 +96,25 @@ describe("every display query reads the live name", () => {
     expect(code).toContain("teamName: row.managedTeam?.name ?? row.team.name,");
   });
 
+  it("uses that same live name in the message the captain receives", () => {
+    // These two drifted apart once and it shipped: the label was switched
+    // to the managed team but the message body three lines below was not,
+    // so the organiser's toast read "Sent code to Cup Team 2" while the DM
+    // that actually arrived said "Team: Team 1". The label is what the
+    // person sending it sees; the body is what the captain sees. Both, or
+    // the bug is simply invisible from the sending side.
+    const start = code.indexOf("async function getLobbyCodeRecipients(");
+    expect(start).toBeGreaterThan(-1);
+    const rest = code.slice(start + 1);
+    const next = rest.search(/^async function /m);
+    const body =
+      next === -1 ? code.slice(start) : code.slice(start, start + 1 + next);
+    expect(
+      body.match(/row\.managedTeam\?\.name \?\? row\.team\.name/g)?.length
+    ).toBe(2);
+    expect(body).toContain("buildLobbyCodeMessage(");
+  });
+
   it("leaves no display select reading the stored name directly", () => {
     // The placeholder generator is the one legitimate reader and has its own
     // test below; it is the only `name: teams.name` the file should hold.

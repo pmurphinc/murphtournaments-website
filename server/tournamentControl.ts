@@ -2932,7 +2932,11 @@ async function getLobbyCodeRecipients(
         ? buildLobbyCodeMessage(
             game.tournament.name,
             game.game.displayLabel,
-            row.team.name,
+            // The live name, exactly as the label three lines above. These
+            // two drifted apart once: the organiser's toast said "Cup Team
+            // 2" while the DM the captain received said "Team 1", because
+            // only the label was switched to the managed team.
+            row.managedTeam?.name ?? row.team.name,
             game.game.privateLobbyCode
           )
         : "",
