@@ -20,6 +20,7 @@ export default defineConfig({
       "server/placeholderTeams.test.ts",
       "server/teamNamePropagation.test.ts",
       "server/teamClaimTeamSelection.test.ts",
+      "server/discordDmErrors.test.ts",
       "shared/finalsGameModes.test.ts",
       "shared/pageMetadata.test.ts",
       "shared/redactTokens.test.ts",
